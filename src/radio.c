@@ -1,8 +1,11 @@
 #include "radio.h"
+#include "board.h"
 #include "dcs.h"
 #include "driver/bk1080.h"
 #include "driver/bk4819.h"
 #include "driver/si473x.h"
+#include "driver/system.h"
+#include "helper/battery.h"
 #include "helper/channels.h"
 #include <string.h>
 
@@ -68,7 +71,7 @@ static const FreqBand si4732_bands[] = {
     },
 };
 
-static void RADIO_EnableCxCSS(VFOContext *ctx) {
+static void enableCxCSS(VFOContext *ctx) {
   switch (ctx->tx_state.code.type) {
   case CODE_TYPE_CONTINUOUS_TONE:
     BK4819_SetCTCSSFrequency(CTCSS_Options[ctx->tx_state.code.value]);
@@ -82,6 +85,79 @@ static void RADIO_EnableCxCSS(VFOContext *ctx) {
     BK4819_ExitSubAu();
     break;
   }
+}
+
+static void setupToneDetection(VFOContext *ctx) {
+  BK4819_WriteRegister(BK4819_REG_7E, 0x302E); // DC flt BW 0=BYP
+  uint16_t InterruptMask = BK4819_REG_3F_CxCSS_TAIL;
+  if (gSettings.dtmfdecode) {
+    BK4819_EnableDTMF();
+    InterruptMask |= BK4819_REG_3F_DTMF_5TONE_FOUND;
+  } else {
+    BK4819_DisableDTMF();
+  }
+  switch (ctx->code.type) {
+  case CODE_TYPE_DIGITAL:
+  case CODE_TYPE_REVERSE_DIGITAL:
+    // Log("DCS on");
+    BK4819_SetCDCSSCodeWord(
+        DCS_GetGolayCodeWord(ctx->code.type, ctx->code.value));
+    InterruptMask |= BK4819_REG_3F_CDCSS_FOUND | BK4819_REG_3F_CDCSS_LOST;
+    break;
+  case CODE_TYPE_CONTINUOUS_TONE:
+    // Log("CTCSS on");
+    BK4819_SetCTCSSFrequency(CTCSS_Options[ctx->code.value]);
+    InterruptMask |= BK4819_REG_3F_CTCSS_FOUND | BK4819_REG_3F_CTCSS_LOST;
+    break;
+  default:
+    // Log("STE on");
+    BK4819_SetCTCSSFrequency(670);
+    BK4819_SetTailDetection(550);
+    break;
+  }
+  BK4819_WriteRegister(BK4819_REG_3F, InterruptMask);
+}
+
+static void sendEOT() {
+  BK4819_ExitSubAu();
+  switch (gSettings.roger) {
+  case 1:
+    BK4819_PlayRogerTiny();
+    break;
+  default:
+    break;
+  }
+  if (gSettings.ste) {
+    SYS_DelayMs(50);
+    BK4819_GenTail(4);
+    BK4819_WriteRegister(BK4819_REG_51, 0x9033);
+    SYS_DelayMs(200);
+  }
+  BK4819_ExitSubAu();
+}
+
+static TXStatus checkTX(VFOContext *ctx) {
+  if (gSettings.upconverter) {
+    return TX_DISABLED_UPCONVERTER;
+  }
+
+  if (ctx->radio_type != RADIO_BK4819) {
+    return TX_DISABLED;
+  }
+
+  /* Band txBand = BANDS_ByFrequency(txF);
+
+  if (!txBand.allowTx && !(RADIO_IsChMode() && radio->allowTx)) {
+    return TX_DISABLED;
+  } */
+
+  if (gBatteryPercent == 0) {
+    return TX_BAT_LOW;
+  }
+  if (gChargingWithTypeC || gBatteryVoltage > 880) {
+    return TX_VOL_HIGH;
+  }
+  return TX_ON;
 }
 
 // Инициализация VFO
@@ -179,25 +255,15 @@ void RADIO_ApplySettings(VFOContext *ctx) {
   }
 }
 
-void RADIO_ToggleTXEX(bool on, uint32_t txF, uint8_t power, bool paEnabled) {
-  bool lastOn = gTxState == TX_ON;
-  if (gTxState == on) {
-    return;
-  }
-
-  gTxState = on ? RADIO_GetTXState(txF) : TX_UNKNOWN;
-
-  if (gTxState == TX_ON) {
-    RADIO_ToggleRX(false);
-
-  } else if (lastOn) {
-  }
-}
-
 // Начать передачу
-void RADIO2_StartTX(VFOContext *ctx) {
+bool RADIO2_StartTX(VFOContext *ctx) {
+  TXStatus status = checkTX(ctx);
+  if (status != TX_ON) {
+    ctx->tx_state.last_error = status;
+    return false;
+  }
   if (ctx->tx_state.is_active)
-    return;
+    return true;
 
   uint8_t power = ctx->tx_state.power_level;
 
@@ -214,8 +280,9 @@ void RADIO2_StartTX(VFOContext *ctx) {
   BK4819_SetupPowerAmplifier(power, ctx->tx_state.frequency);
   SYS_DelayMs(10);
 
-  RADIO_EnableCxCSS();
+  enableCxCSS(ctx);
   ctx->tx_state.is_active = true;
+  return true;
 }
 
 // Завершить передачу

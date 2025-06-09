@@ -17,6 +17,16 @@ typedef enum {
   PARAM_COUNT
 } ParamType;
 
+typedef enum {
+  TX_UNKNOWN,
+  TX_ON,
+  TX_VOL_HIGH,
+  TX_BAT_LOW,
+  TX_DISABLED,
+  TX_DISABLED_UPCONVERTER,
+  TX_POW_OVERDRIVE,
+} TXStatus;
+
 // Диапазон частот и его параметры
 typedef struct {
   uint32_t min_freq;
@@ -37,9 +47,10 @@ typedef struct {
   Code code;
   struct {
     bool is_active; // true, если идёт передача
+    TXStatus last_error;
     uint32_t frequency; // Частота передачи (может отличаться от RX)
     ModulationType modulation; // Модуляция TX
-    uint8_t power_level;       // Уровень мощности (0-100%)
+    uint8_t power_level;       // Уровень мощности
     bool dirty; // Флаг изменения параметров TX
     Code code;
   } tx_state;
