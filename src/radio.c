@@ -1,6 +1,7 @@
 #include "radio.h"
 #include "board.h"
 #include "dcs.h"
+#include "driver/audio.h"
 #include "driver/bk1080.h"
 #include "driver/bk4819.h"
 #include "driver/si473x.h"
@@ -164,6 +165,58 @@ static TXStatus checkTX(VFOContext *ctx) {
     return TX_VOL_HIGH;
   }
   return TX_ON;
+}
+
+static void toggleBK4819(bool on) {
+  // Log("Toggle bk4819 audio %u", on);
+  if (on) {
+    BK4819_ToggleAFDAC(true);
+    BK4819_ToggleAFBit(true);
+    SYS_DelayMs(8);
+    AUDIO_ToggleSpeaker(true);
+  } else {
+    AUDIO_ToggleSpeaker(false);
+    SYS_DelayMs(8);
+    BK4819_ToggleAFDAC(false);
+    BK4819_ToggleAFBit(false);
+  }
+}
+
+static void toggleBK1080SI4732(bool on) {
+  // Log("Toggle bk1080si audio %u", on);
+  if (on) {
+    SYS_DelayMs(8);
+    AUDIO_ToggleSpeaker(true);
+  } else {
+    AUDIO_ToggleSpeaker(false);
+    SYS_DelayMs(8);
+  }
+}
+
+// Внутренняя функция переключения аудио на конкретный VFO
+static void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
+  if (vfo_index >= state->num_vfos)
+    return;
+
+  const ExtendedVFOContext *vfo = &state->vfos[vfo_index];
+
+  // Реализация зависит от вашего аппаратного обеспечения
+  switch (vfo->context.radio_type) {
+  case RADIO_BK4819:
+    toggleBK1080SI4732(false);
+    toggleBK4819(true);
+    break;
+  case RADIO_SI4732:
+  case RADIO_BK1080:
+    toggleBK4819(false);
+    toggleBK1080SI4732(true);
+    break;
+  default:
+    break;
+  }
+
+  // Устанавливаем громкость для выбранного VFO
+  // AUDIO_SetVolume(vfo->context.volume);
 }
 
 // Инициализация VFO
@@ -383,7 +436,7 @@ void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
   // Initialize multiwatch
   state->multiwatch.active_vfo_index = 0;
   state->multiwatch.num_vfos = state->num_vfos;
-  state->multiwatch.scan_interval_ms = 1000; // 1 second scan interval
+  state->multiwatch.scan_interval_ms = 100; // 1 second scan interval
   state->multiwatch.last_scan_time = 0;
   state->multiwatch.enabled = false;
 }
@@ -420,6 +473,7 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
   RADIO_SetParam(&vfo->context, PARAM_MODULATION, storage->modulation);
   // RADIO_SetParam(&vfo->context, PARAM_VOLUME, storage->volume);
   RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, storage->bw);
+
   vfo->context.code = storage->code.rx;
   vfo->context.tx_state.code = storage->code.tx;
 
@@ -528,6 +582,9 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
 
   state->multiwatch.last_scan_time = current_time;
 
+  // Обновляем маршрутизацию аудио
+  RADIO_UpdateAudioRouting(state);
+
   // Get current active VFO
   uint8_t current_vfo = state->multiwatch.active_vfo_index;
   const ExtendedVFOContext *active_vfo = &state->vfos[current_vfo];
@@ -570,5 +627,76 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
         }
       }
     }
+  }
+}
+
+void RADIO_LoadVFOs(RadioState *state) {
+  uint8_t vfoIdx = 0;
+  for (uint16_t i = 0; i < CHANNELS_GetCountMax(); ++i) {
+    CHMeta meta = CHANNELS_GetMeta(i);
+
+    bool isOurType = (TYPE_FILTER_VFO & (1 << meta.type)) != 0;
+    if (!isOurType) {
+      continue;
+    }
+
+    MR ch;
+    CHANNELS_Load(i, &ch);
+    if (ch.isChMode) {
+      RADIO_LoadChannelToVFO(state, vfoIdx, ch.channel);
+    } else {
+      RADIO_LoadVFOFromStorage(state, vfoIdx, &ch);
+    }
+    vfoIdx++;
+  }
+}
+
+// Включаем/выключаем маршрутизацию аудио
+void RADIO_EnableAudioRouting(RadioState *state, bool enable) {
+  state->audio_routing_enabled = enable;
+  if (!enable) {
+    // При выключении возвращаем аудио на активный VFO
+    RADIO_SwitchAudioToVFO(state, state->multiwatch.active_vfo_index);
+  }
+}
+
+// Обновление маршрутизации аудио
+void RADIO_UpdateAudioRouting(RadioState *state) {
+  if (!state->audio_routing_enabled)
+    return;
+
+  // Если текущий VFO - вещательный приемник, оставляем аудио на нем
+  if (isBroadcastReceiver(
+          &state->vfos[state->multiwatch.active_vfo_index].context)) {
+    return;
+  }
+
+  // Проверяем активность на других VFO
+  for (uint8_t i = 0; i < state->num_vfos; i++) {
+    if (i == state->multiwatch.active_vfo_index)
+      continue;
+
+    ExtendedVFOContext *vfo = &state->vfos[i];
+
+    // Для вещательных приемников не переключаем аудио автоматически
+    if (isBroadcastReceiver(&vfo->context))
+      continue;
+
+    bool has_activity = RADIO_CheckSquelch(&vfo->context);
+
+    if (has_activity) {
+      // Если нашли активность и это не текущий VFO - переключаем аудио
+      if (state->last_active_vfo != i) {
+        RADIO_SwitchAudioToVFO(state, i);
+        state->last_active_vfo = i;
+      }
+      return;
+    }
+  }
+
+  // Если активность не обнаружена - возвращаем аудио на основной VFO
+  if (state->last_active_vfo != state->multiwatch.active_vfo_index) {
+    RADIO_SwitchAudioToVFO(state, state->multiwatch.active_vfo_index);
+    state->last_active_vfo = state->multiwatch.active_vfo_index;
   }
 }

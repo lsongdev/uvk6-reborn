@@ -87,6 +87,8 @@ typedef struct {
   ExtendedVFOContext vfos[MAX_VFOS]; // Array of VFOs
   MultiwatchContext multiwatch;
   uint8_t num_vfos; // Number of configured VFOs
+  bool audio_routing_enabled; // Флаг управления аудио маршрутизацией
+  uint8_t last_active_vfo; // Последний активный VFO с активностью
 } RadioState;
 
 // New functions for multi-VFO and multiwatch support
@@ -116,5 +118,9 @@ bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value);
 uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param);
 bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc);
 bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc);
+void RADIO_LoadVFOs(RadioState *state);
+
+void RADIO_EnableAudioRouting(RadioState *state, bool enable);
+void RADIO_UpdateAudioRouting(RadioState *state);
 
 #endif // RADIO_H

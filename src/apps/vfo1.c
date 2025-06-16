@@ -22,13 +22,15 @@
 
 static char String[16];
 
+static RadioState radio_state;
+
 static void setChannel(uint16_t v) { RADIO_TuneToCH(v); }
 
 static void tuneTo(uint32_t f) { RADIO_SetParam(ctx, PARAM_FREQUENCY, f); }
 
 void VFO1_init(void) {
-  VFO_LoadScanlist(0);
-  RADIO_LoadCurrentVFO();
+  RADIO_InitState(&radio_state, 16);
+  RADIO_LoadVFOs(&radio_state);
   gLastActiveLoot = NULL;
 }
 
@@ -47,28 +49,7 @@ void VFO1_update(void) {
     RADIO_CheckAndListen();
     lastUpdate = Now();
 
-    // multiwatch
-    if (gSettings.mWatch && gTxState != TX_ON) {
-      if (gIsListening) {
-        if (gSettings.mWatch == MW_SWITCH) {
-          VFO_Select(mWatchVfoIndex);
-          mWatchVfo = NULL;
-        } else if (mWatchVfoIndex != gSettings.activeVFO) {
-          mWatchVfo = shadowVfo;
-        }
-      } else {
-        mWatchVfoIndex = IncDecU(mWatchVfoIndex, 0, VFO_GetSize(), true);
-        shadowVfo = VFO_Get(mWatchVfoIndex);
-        RADIO_SetupEx(*shadowVfo);
-        BK4819_TuneTo(shadowVfo->rxF, true);
-      }
-
-      if (!gMonitorMode) {
-        gLoot.f = shadowVfo->rxF;
-        gLoot.open = gIsListening;
-        LOOT_Update(&gLoot);
-      }
-    }
+    RADIO_UpdateMultiwatch(&radio_state);
   }
 
   if (Now() - lastRender >= 1000) {
