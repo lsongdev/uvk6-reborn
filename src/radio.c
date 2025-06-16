@@ -9,7 +9,11 @@
 #include "helper/channels.h"
 #include "helper/measurements.h"
 #include "misc.h"
+#include "scheduler.h"
 #include <string.h>
+
+bool gShowAllRSSI;
+bool gMonitorMode;
 
 // Диапазоны для BK4819
 static const FreqBand bk4819_bands[] = {
@@ -362,4 +366,209 @@ void RADIO2_StopTX(VFOContext *ctx) {
 
   setupToneDetection(ctx);
   BK4819_TuneTo(ctx->frequency, true);
+}
+
+// Initialize radio state
+void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
+  memset(state, 0, sizeof(RadioState));
+  state->num_vfos = (num_vfos > MAX_VFOS) ? MAX_VFOS : num_vfos;
+
+  for (uint8_t i = 0; i < state->num_vfos; i++) {
+    RADIO_Init(&state->vfos[i].context, RADIO_BK4819); // Default to BK4819
+    state->vfos[i].mode = MODE_VFO;
+    state->vfos[i].channel_index = 0;
+    state->vfos[i].is_active = (i == 0); // First VFO is active by default
+  }
+
+  // Initialize multiwatch
+  state->multiwatch.active_vfo_index = 0;
+  state->multiwatch.num_vfos = state->num_vfos;
+  state->multiwatch.scan_interval_ms = 1000; // 1 second scan interval
+  state->multiwatch.last_scan_time = 0;
+  state->multiwatch.enabled = false;
+}
+
+// Switch to a different VFO
+bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
+  if (vfo_index >= state->num_vfos)
+    return false;
+
+  // Deactivate current VFO
+  state->vfos[state->multiwatch.active_vfo_index].is_active = false;
+
+  // Activate new VFO
+  state->multiwatch.active_vfo_index = vfo_index;
+  state->vfos[vfo_index].is_active = true;
+
+  // Apply settings for the new VFO
+  RADIO_ApplySettings(&state->vfos[vfo_index].context);
+
+  return true;
+}
+
+// Load VFO settings from EEPROM storage
+void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
+                              const VFO *storage) {
+  if (vfo_index >= state->num_vfos)
+    return;
+
+  ExtendedVFOContext *vfo = &state->vfos[vfo_index];
+  vfo->mode = storage->isChMode;
+
+  // Set basic parameters
+  RADIO_SetParam(&vfo->context, PARAM_FREQUENCY, storage->rxF);
+  RADIO_SetParam(&vfo->context, PARAM_MODULATION, storage->modulation);
+  // RADIO_SetParam(&vfo->context, PARAM_VOLUME, storage->volume);
+  RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, storage->bw);
+  vfo->context.code = storage->code.rx;
+  vfo->context.tx_state.code = storage->code.tx;
+
+  // Handle channel mode
+  if (vfo->mode == MODE_CHANNEL) {
+    vfo->channel_index = storage->channel;
+    // Optionally validate the channel here
+  }
+
+  RADIO_ApplySettings(&vfo->context);
+}
+
+// Save VFO settings to EEPROM storage
+void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
+                            VFO *storage) {
+  if (vfo_index >= state->num_vfos)
+    return;
+
+  const ExtendedVFOContext *vfo = &state->vfos[vfo_index];
+
+  storage->isChMode = vfo->mode;
+  storage->rxF = vfo->context.frequency;
+  storage->modulation = vfo->context.modulation;
+  // storage->volume = vfo->context.volume;
+  storage->bw = vfo->context.bandwidth;
+  storage->channel = vfo->channel_index;
+  storage->code.rx = vfo->context.code;
+  storage->code.tx = vfo->context.tx_state.code;
+}
+
+// Load channel into VFO
+void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
+                            uint16_t channel_index) {
+  if (vfo_index >= state->num_vfos)
+    return;
+
+  ExtendedVFOContext *vfo = &state->vfos[vfo_index];
+  CH channel;
+  CHANNELS_Load(channel_index, &channel);
+
+  vfo->mode = MODE_CHANNEL;
+  vfo->channel_index = channel_index;
+
+  // Set parameters from channel
+  RADIO_SetParam(&vfo->context, PARAM_FREQUENCY, channel.rxF);
+  RADIO_SetParam(&vfo->context, PARAM_MODULATION, channel.modulation);
+  RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, channel.bw);
+  vfo->context.code = channel.code.rx;
+  vfo->context.tx_state.code = channel.code.tx;
+
+  RADIO_ApplySettings(&vfo->context);
+}
+
+// Toggle multiwatch on/off
+void RADIO_ToggleMultiwatch(RadioState *state, bool enable) {
+  state->multiwatch.enabled = enable;
+  if (!enable) {
+    // Return to the primary VFO when disabling multiwatch
+    RADIO_SwitchVFO(state, 0);
+  }
+}
+
+// Check if a VFO is a broadcast receiver
+static bool isBroadcastReceiver(const VFOContext *ctx) {
+  return (ctx->radio_type == RADIO_SI4732 || ctx->radio_type == RADIO_BK1080);
+}
+
+uint8_t RADIO_GetSNR(VFOContext *ctx) {
+  switch (ctx->radio_type) {
+  case RADIO_BK4819:
+    return ConvertDomain(BK4819_GetSNR(), 24, 170, 0, 30);
+  case RADIO_BK1080:
+    return gShowAllRSSI ? BK1080_GetSNR() : 0;
+  case RADIO_SI4732:
+    if (gShowAllRSSI) {
+      RSQ_GET();
+      return rsqStatus.resp.SNR;
+    }
+    return 0;
+  default:
+    return 0;
+  }
+}
+
+bool RADIO_CheckSquelch(VFOContext *ctx) {
+  if (gMonitorMode) {
+    return true;
+  }
+  if (ctx->radio_type == RADIO_BK4819) {
+    return BK4819_IsSquelchOpen();
+  }
+
+  return gShowAllRSSI ? RADIO_GetSNR(ctx) > ctx->squelch.value : true;
+}
+
+// Update multiwatch state (should be called periodically)
+void RADIO_UpdateMultiwatch(RadioState *state) {
+  if (!state->multiwatch.enabled)
+    return;
+
+  uint32_t current_time = Now();
+  if (current_time - state->multiwatch.last_scan_time <
+      state->multiwatch.scan_interval_ms) {
+    return;
+  }
+
+  state->multiwatch.last_scan_time = current_time;
+
+  // Get current active VFO
+  uint8_t current_vfo = state->multiwatch.active_vfo_index;
+  const ExtendedVFOContext *active_vfo = &state->vfos[current_vfo];
+
+  // If current VFO is a broadcast receiver, we can switch away from it
+  if (isBroadcastReceiver(&active_vfo->context)) {
+    // Check other VFOs for activity
+    for (uint8_t i = 0; i < state->num_vfos; i++) {
+      if (i == current_vfo)
+        continue;
+
+      ExtendedVFOContext *vfo = &state->vfos[i];
+
+      // Skip broadcast receivers in multiwatch
+      if (isBroadcastReceiver(&vfo->context))
+        continue;
+
+      // Check for activity (implementation depends on your hardware)
+      bool has_activity = RADIO_CheckSquelch(&vfo->context);
+
+      if (has_activity) {
+        // Switch to this VFO
+        RADIO_SwitchVFO(state, i);
+        return;
+      }
+    }
+  }
+
+  // If we're on a non-broadcast VFO, check if we should return to broadcast
+  if (!isBroadcastReceiver(&active_vfo->context)) {
+    bool still_active = RADIO_CheckSquelch(&active_vfo->context);
+
+    if (!still_active) {
+      // Return to the first broadcast receiver we find
+      for (uint8_t i = 0; i < state->num_vfos; i++) {
+        ExtendedVFOContext *vfo = &state->vfos[i];
+        if (isBroadcastReceiver(&vfo->context)) {
+          RADIO_SwitchVFO(state, i);
+          return;
+        }
+      }
+    }
+  }
 }

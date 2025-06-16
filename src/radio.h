@@ -6,6 +6,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define MAX_VFOS 16
+extern bool gShowAllRSSI;
+extern bool gMonitorMode;
+
 // Параметры
 typedef enum {
   PARAM_FREQUENCY,
@@ -45,6 +49,7 @@ typedef struct {
   const FreqBand *current_band; // Активный диапазон
   bool dirty[PARAM_COUNT];      // Флаги изменений
   Code code;
+  Squelch squelch;
   struct {
     bool is_active; // true, если идёт передача
     TXStatus last_error;
@@ -56,6 +61,45 @@ typedef struct {
     bool pa_enabled;
   } tx_state;
 } VFOContext;
+
+// Channel/VFO mode
+typedef enum { MODE_VFO, MODE_CHANNEL } VFOMode;
+
+// Multiwatch context
+typedef struct {
+  uint8_t active_vfo_index;  // Currently active VFO
+  uint8_t num_vfos;          // Number of VFOs in use
+  uint32_t scan_interval_ms; // How often to check other VFOs
+  uint32_t last_scan_time;   // Last scan time
+  bool enabled;              // Whether multiwatch is enabled
+} MultiwatchContext;
+
+// Extended VFO context
+typedef struct {
+  VFOContext context;     // Existing VFO context
+  VFOMode mode;           // VFO or channel mode
+  uint16_t channel_index; // Channel index if in channel mode
+  bool is_active;         // Whether this is the active VFO
+} ExtendedVFOContext;
+
+// Global radio state
+typedef struct {
+  ExtendedVFOContext vfos[MAX_VFOS]; // Array of VFOs
+  MultiwatchContext multiwatch;
+  uint8_t num_vfos; // Number of configured VFOs
+} RadioState;
+
+// New functions for multi-VFO and multiwatch support
+void RADIO_InitState(RadioState *state, uint8_t num_vfos);
+bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index);
+void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
+                              const VFO *storage);
+void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
+                            VFO *storage);
+void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
+                            uint16_t channel_index);
+void RADIO_ToggleMultiwatch(RadioState *state, bool enable);
+void RADIO_UpdateMultiwatch(RadioState *state);
 
 // Инициализация
 void RADIO_Init(VFOContext *ctx, Radio radio_type);

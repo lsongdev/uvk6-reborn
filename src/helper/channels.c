@@ -71,14 +71,11 @@ uint16_t CHANNELS_Scanlists(int16_t num) {
 }
 static int16_t chScanlistIndex = 0;
 
-void CHANNELS_LoadCurrentScanlistCH() {
+int16_t CHANNELS_GetCurrentScanlistCH() {
   if (gScanlistSize) {
-    uint16_t chNum = gScanlist[chScanlistIndex];
-    radio.channel = chNum;
-    radio.isChMode = true;
-    RADIO_VfoLoadCH();
-    RADIO_SetupByCurrentVFO();
+    return gScanlist[chScanlistIndex];
   }
+  return -1;
 }
 
 void CHANNELS_Next(bool next) {
