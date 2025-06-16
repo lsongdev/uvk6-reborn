@@ -7,6 +7,8 @@
 #include "driver/system.h"
 #include "helper/battery.h"
 #include "helper/channels.h"
+#include "helper/measurements.h"
+#include "misc.h"
 #include <string.h>
 
 // Диапазоны для BK4819
@@ -40,13 +42,13 @@ static const FreqBand si4732_bands[] = {
         .available_mods = {SI47XX_AM, SI47XX_LSB, SI47XX_USB},
         .available_bandwidths =
             {
-                SI47XX_BW_6_kHz,
-                SI47XX_BW_4_kHz,
-                SI47XX_BW_3_kHz,
-                SI47XX_BW_2_kHz,
                 SI47XX_BW_1_kHz,
                 SI47XX_BW_1_8_kHz,
+                SI47XX_BW_2_kHz,
                 SI47XX_BW_2_5_kHz,
+                SI47XX_BW_3_kHz,
+                SI47XX_BW_4_kHz,
+                SI47XX_BW_6_kHz,
             },
     },
     {
@@ -55,12 +57,12 @@ static const FreqBand si4732_bands[] = {
         .available_mods = {SI47XX_LSB, SI47XX_USB},
         .available_bandwidths =
             {
+                SI47XX_SSB_BW_0_5_kHz,
+                SI47XX_SSB_BW_1_0_kHz,
                 SI47XX_SSB_BW_1_2_kHz,
                 SI47XX_SSB_BW_2_2_kHz,
                 SI47XX_SSB_BW_3_kHz,
                 SI47XX_SSB_BW_4_kHz,
-                SI47XX_SSB_BW_0_5_kHz,
-                SI47XX_SSB_BW_1_0_kHz,
             },
     },
     {
@@ -230,6 +232,62 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value) {
   ctx->dirty[param] = true;
 }
 
+uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
+  switch (param) {
+  case PARAM_FREQUENCY:
+    return ctx->frequency;
+  case PARAM_MODULATION:
+    return ctx->modulation;
+  case PARAM_BANDWIDTH:
+    return ctx->bandwidth;
+  case PARAM_VOLUME:
+    return ctx->volume;
+  default:
+    return 0;
+  }
+  ctx->dirty[param] = true;
+}
+
+bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc) {
+  uint32_t mi, ma, v = RADIO_GetParam(ctx, param);
+  const FreqBand *band = ctx->current_band;
+  if (!band)
+    return false;
+
+  switch (param) {
+  case PARAM_FREQUENCY:
+    mi = band->min_freq;
+    ma = band->max_freq;
+    break;
+  case PARAM_MODULATION:
+    v = band->available_mods[0];
+    for (size_t i = 0; i < ARRAY_SIZE(band->available_mods); i++) {
+      if (band->available_mods[i] == v) {
+        v = AdjustU(i, 0, ARRAY_SIZE(band->available_mods), inc);
+      }
+    }
+    RADIO_SetParam(ctx, param, v);
+    return true;
+  case PARAM_BANDWIDTH:
+    v = band->available_bandwidths[0];
+    for (size_t i = 0; i < ARRAY_SIZE(band->available_bandwidths); i++) {
+      if (band->available_bandwidths[i] == v) {
+        v = AdjustU(i, 0, ARRAY_SIZE(band->available_bandwidths), inc);
+      }
+    }
+    RADIO_SetParam(ctx, param, v);
+    return true;
+  default:
+    return false;
+  }
+  RADIO_SetParam(ctx, param, AdjustU(v, mi, ma, inc));
+  return true;
+}
+
+bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc) {
+  return RADIO_AdjustParam(ctx, param, inc ? 1 : -1);
+}
+
 // Применение настроек
 void RADIO_ApplySettings(VFOContext *ctx) {
   switch (ctx->radio_type) {
@@ -275,7 +333,7 @@ bool RADIO2_StartTX(VFOContext *ctx) {
   BK4819_PrepareTransmit();
 
   SYS_DelayMs(10);
-  BK4819_ToggleGpioOut(BK4819_GPIO1_PIN29_PA_ENABLE, paEnabled);
+  BK4819_ToggleGpioOut(BK4819_GPIO1_PIN29_PA_ENABLE, ctx->tx_state.pa_enabled);
   SYS_DelayMs(5);
   BK4819_SetupPowerAmplifier(power, ctx->tx_state.frequency);
   SYS_DelayMs(10);
@@ -293,17 +351,15 @@ void RADIO2_StopTX(VFOContext *ctx) {
   BK4819_ExitDTMF_TX(true); // also prepares to tx ste
 
   sendEOT();
-  toggleBK1080SI4732(false);
 
   ctx->tx_state.is_active = false;
   BOARD_ToggleRed(false);
   BK4819_TurnsOffTones_TurnsOnRX();
 
-  gCurrentTxPower = 0;
   BK4819_SetupPowerAmplifier(0, 0);
   BK4819_ToggleGpioOut(BK4819_GPIO1_PIN29_PA_ENABLE, false);
   BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_RX_ENABLE, true);
 
-  setupToneDetection();
+  setupToneDetection(ctx);
   BK4819_TuneTo(ctx->frequency, true);
 }

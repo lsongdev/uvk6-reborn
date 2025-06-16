@@ -53,6 +53,7 @@ typedef struct {
     uint8_t power_level;       // Уровень мощности
     bool dirty; // Флаг изменения параметров TX
     Code code;
+    bool pa_enabled;
   } tx_state;
 } VFOContext;
 
@@ -67,5 +68,9 @@ void RADIO_ApplySettings(VFOContext *ctx);
 
 // Проверка поддержки параметра в текущем диапазоне
 bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value);
+
+uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param);
+bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc);
+bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc);
 
 #endif // RADIO_H

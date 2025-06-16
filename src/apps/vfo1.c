@@ -24,11 +24,7 @@ static char String[16];
 
 static void setChannel(uint16_t v) { RADIO_TuneToCH(v); }
 
-static void tuneTo(uint32_t f) {
-  RADIO_TuneToSave(GetTuneF(f));
-  radio.fixedBoundsMode = false;
-  RADIO_SaveCurrentVFO();
-}
+static void tuneTo(uint32_t f) { RADIO_SetParam(ctx, PARAM_FREQUENCY, f); }
 
 void VFO1_init(void) {
   VFO_LoadScanlist(0);
