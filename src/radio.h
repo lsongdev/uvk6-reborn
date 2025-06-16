@@ -93,6 +93,7 @@ typedef struct {
 // Global radio state
 typedef struct {
   ExtendedVFOContext vfos[MAX_VFOS]; // Array of VFOs
+  uint16_t vfosChannels[MAX_VFOS];   // Array of VFOs ch nums
   MultiwatchContext multiwatch;
   uint8_t num_vfos; // Number of configured VFOs
   bool audio_routing_enabled; // Флаг управления аудио маршрутизацией

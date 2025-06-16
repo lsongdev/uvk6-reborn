@@ -475,10 +475,30 @@ void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
   state->multiwatch.enabled = false;
 }
 
+// Функция проверки необходимости сохранения и собственно сохранения
+void RADIO_CheckAndSaveVFO(RadioState *state, uint8_t vfo_index) {
+  if (vfo_index >= state->num_vfos)
+    return;
+
+  VFOContext *ctx = &state->vfos[vfo_index].context;
+  uint16_t num = state->vfosChannels[vfo_index];
+
+  if (ctx->save_to_eeprom && (Now() - ctx->last_save_time >= 1000)) {
+    VFO ch;
+
+    RADIO_SaveVFOToStorage(state, vfo_index, &ch);
+    CHANNELS_Save(num, &ch);
+
+    ctx->save_to_eeprom = false;
+  }
+}
+
 // Switch to a different VFO
 bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
   if (vfo_index >= state->num_vfos)
     return false;
+
+  RADIO_CheckAndSaveVFO(state, state->multiwatch.active_vfo_index);
 
   // Deactivate current VFO
   state->vfos[state->multiwatch.active_vfo_index].is_active = false;
