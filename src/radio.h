@@ -7,12 +7,16 @@
 #include <stdint.h>
 
 #define MAX_VFOS 16
+
 extern bool gShowAllRSSI;
 extern bool gMonitorMode;
+
+extern const uint16_t StepFrequencyTable[15];
 
 // Параметры
 typedef enum {
   PARAM_FREQUENCY,
+  PARAM_STEP,
   PARAM_MODULATION,
   PARAM_SQUELCH,
   PARAM_VOLUME,
@@ -49,6 +53,7 @@ typedef struct {
   const FreqBand *current_band; // Активный диапазон
   bool dirty[PARAM_COUNT];      // Флаги изменений
   Code code;
+  Step step;
   Squelch squelch;
   struct {
     bool is_active; // true, если идёт передача
@@ -60,6 +65,9 @@ typedef struct {
     Code code;
     bool pa_enabled;
   } tx_state;
+
+  bool save_to_eeprom; // Флаг необходимости сохранения в EEPROM
+  uint32_t last_save_time; // Время последнего сохранения
 } VFOContext;
 
 // Channel/VFO mode
@@ -107,7 +115,8 @@ void RADIO_UpdateMultiwatch(RadioState *state);
 void RADIO_Init(VFOContext *ctx, Radio radio_type);
 
 // Установка параметра
-void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value);
+void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
+                    bool save_to_eeprom);
 
 // Применение настроек
 void RADIO_ApplySettings(VFOContext *ctx);
@@ -116,11 +125,16 @@ void RADIO_ApplySettings(VFOContext *ctx);
 bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value);
 
 uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param);
-bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc);
-bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc);
+bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
+                       bool save_to_eeprom);
+bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc,
+                       bool save_to_eeprom);
 void RADIO_LoadVFOs(RadioState *state);
 
 void RADIO_EnableAudioRouting(RadioState *state, bool enable);
 void RADIO_UpdateAudioRouting(RadioState *state);
+
+void RADIO_ToggleTX(VFOContext *ctx, bool on);
+bool RADIO_IsSSB(VFOContext *ctx);
 
 #endif // RADIO_H

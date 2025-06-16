@@ -26,7 +26,10 @@ static RadioState radio_state;
 
 static void setChannel(uint16_t v) { RADIO_TuneToCH(v); }
 
-static void tuneTo(uint32_t f) { RADIO_SetParam(ctx, PARAM_FREQUENCY, f); }
+static void tuneTo(uint32_t f) {
+  RADIO_SetParam(&radio_state.vfos[radio_state.last_active_vfo].context,
+                 PARAM_FREQUENCY, f, true);
+}
 
 void VFO1_init(void) {
   RADIO_InitState(&radio_state, 16);
@@ -34,7 +37,6 @@ void VFO1_init(void) {
   gLastActiveLoot = NULL;
 }
 
-static uint32_t lastUpdate;
 static uint32_t lastRender;
 
 static const Step liveStep = STEP_5_0kHz;
@@ -45,12 +47,7 @@ static VFO *shadowVfo;
 static VFO *mWatchVfo;
 
 void VFO1_update(void) {
-  if (Now() - lastUpdate >= SQL_DELAY) {
-    RADIO_CheckAndListen();
-    lastUpdate = Now();
-
-    RADIO_UpdateMultiwatch(&radio_state);
-  }
+  RADIO_UpdateMultiwatch(&radio_state);
 
   if (Now() - lastRender >= 1000) {
     lastRender = Now();
@@ -63,9 +60,13 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
     return true;
   }
 
-  if (state == KEY_RELEASED && RADIO_IsChMode()) {
+  const ExtendedVFOContext *ctxEx =
+      &radio_state.vfos[radio_state.last_active_vfo];
+  const VFOContext *ctx = &ctxEx->context;
+
+  if (state == KEY_RELEASED && ctxEx->mode == MODE_CHANNEL) {
     if (!gIsNumNavInput && key <= KEY_9) {
-      NUMNAV_Init(radio.channel, 0, CHANNELS_GetCountMax() - 1);
+      NUMNAV_Init(ctxEx->channel_index, 0, CHANNELS_GetCountMax() - 1);
       gNumNavCallback = setChannel;
     }
     if (gIsNumNavInput) {
@@ -75,27 +76,29 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
   }
 
   if (key == KEY_PTT && !gIsNumNavInput) {
-    RADIO_ToggleTX(state == KEY_PRESSED);
+    RADIO_ToggleTX(ctx, state == KEY_PRESSED);
     return true;
   }
 
   // pressed or hold continue
   if (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT) {
-    bool isSsb = RADIO_IsSSB();
+    bool isSsb = RADIO_IsSSB(ctx);
     switch (key) {
     case KEY_UP:
     case KEY_DOWN:
-      if (RADIO_IsChMode()) {
+      if (ctxEx->mode == MODE_CHANNEL) {
         CHANNELS_Next(key == KEY_UP);
       } else {
-        RADIO_NextF(key == KEY_UP);
+        RADIO_IncDecParam(ctx, PARAM_FREQUENCY, key == KEY_UP, true);
       }
-      RADIO_SaveCurrentVFODelayed();
+      // RADIO_SaveCurrentVFODelayed();
       return true;
     case KEY_SIDE1:
     case KEY_SIDE2:
-      if (RADIO_GetRadio() == RADIO_SI4732 && isSsb) {
-        RADIO_TuneToSave(radio.rxF + (key == KEY_SIDE1 ? 5 : -5));
+      if (ctx->radio_type == RADIO_SI4732 && isSsb) {
+        RADIO_AdjustParam(ctx, PARAM_FREQUENCY, key == KEY_SIDE1 ? 5 : -5,
+                          true);
+        // TODO: SAVE
         return true;
       }
       break;
@@ -130,13 +133,13 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       RADIO_ToggleTxPower();
       return true;
     case KEY_7:
-      RADIO_UpdateStep(true);
+      RADIO_IncDecParam(ctx, PARAM_STEP, true, true);
       return true;
     case KEY_8:
       radio.offsetDir = IncDecU(radio.offsetDir, 0, OFFSET_MINUS, true);
       return true;
     case KEY_0:
-      RADIO_ToggleModulation();
+      RADIO_IncDecParam(ctx, PARAM_MODULATION, true, true);
       return true;
     case KEY_STAR:
       APPS_run(APP_SCANER);
@@ -154,7 +157,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
             return true;
           }
         }
-        RADIO_TuneToSave(gLastActiveLoot->f);
+        tuneTo(gLastActiveLoot->f);
         return true;
       }
       break;

@@ -11,10 +11,17 @@
 #include "helper/measurements.h"
 #include "misc.h"
 #include "scheduler.h"
+#include <stdint.h>
 #include <string.h>
 
 bool gShowAllRSSI;
 bool gMonitorMode;
+
+const uint16_t StepFrequencyTable[15] = {
+    2,   5,   50,  100,
+
+    250, 500, 625, 833, 900, 1000, 1250, 2500, 5000, 10000, 50000,
+};
 
 // Диапазоны для BK4819
 static const FreqBand bk4819_bands[] = {
@@ -266,9 +273,12 @@ bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value) {
 }
 
 // Установка параметра (всегда uint32_t!)
-void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value) {
+void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
+                    bool save_to_eeprom) {
   if (!RADIO_IsParamValid(ctx, param, value))
     return;
+
+  uint32_t old_value = RADIO_GetParam(ctx, param);
 
   switch (param) {
   case PARAM_FREQUENCY:
@@ -287,6 +297,12 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value) {
     return;
   }
   ctx->dirty[param] = true;
+
+  // Если значение изменилось и требуется сохранение - устанавливаем флаг
+  if (save_to_eeprom && (old_value != value)) {
+    ctx->save_to_eeprom = true;
+    ctx->last_save_time = Now();
+  }
 }
 
 uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
@@ -305,7 +321,8 @@ uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
   ctx->dirty[param] = true;
 }
 
-bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc) {
+bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
+                       bool save_to_eeprom) {
   uint32_t mi, ma, v = RADIO_GetParam(ctx, param);
   const FreqBand *band = ctx->current_band;
   if (!band)
@@ -323,7 +340,7 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc) {
         v = AdjustU(i, 0, ARRAY_SIZE(band->available_mods), inc);
       }
     }
-    RADIO_SetParam(ctx, param, v);
+    RADIO_SetParam(ctx, param, v, save_to_eeprom);
     return true;
   case PARAM_BANDWIDTH:
     v = band->available_bandwidths[0];
@@ -332,17 +349,22 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc) {
         v = AdjustU(i, 0, ARRAY_SIZE(band->available_bandwidths), inc);
       }
     }
-    RADIO_SetParam(ctx, param, v);
+    RADIO_SetParam(ctx, param, v, save_to_eeprom);
     return true;
   default:
     return false;
   }
-  RADIO_SetParam(ctx, param, AdjustU(v, mi, ma, inc));
+  RADIO_SetParam(ctx, param, AdjustU(v, mi, ma, inc), save_to_eeprom);
   return true;
 }
 
-bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc) {
-  return RADIO_AdjustParam(ctx, param, inc ? 1 : -1);
+bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc,
+                       bool save_to_eeprom) {
+  uint32_t v = 1;
+  if (param == PARAM_FREQUENCY) {
+    v = StepFrequencyTable[ctx->step];
+  }
+  return RADIO_AdjustParam(ctx, param, inc ? v : -v, save_to_eeprom);
 }
 
 // Применение настроек
@@ -371,7 +393,7 @@ void RADIO_ApplySettings(VFOContext *ctx) {
 }
 
 // Начать передачу
-bool RADIO2_StartTX(VFOContext *ctx) {
+bool RADIO_StartTX(VFOContext *ctx) {
   TXStatus status = checkTX(ctx);
   if (status != TX_ON) {
     ctx->tx_state.last_error = status;
@@ -401,7 +423,7 @@ bool RADIO2_StartTX(VFOContext *ctx) {
 }
 
 // Завершить передачу
-void RADIO2_StopTX(VFOContext *ctx) {
+void RADIO_StopTX(VFOContext *ctx) {
   if (!ctx->tx_state.is_active)
     return;
 
@@ -419,6 +441,18 @@ void RADIO2_StopTX(VFOContext *ctx) {
 
   setupToneDetection(ctx);
   BK4819_TuneTo(ctx->frequency, true);
+}
+
+void RADIO_ToggleTX(VFOContext *ctx, bool on) {
+  if (on) {
+    RADIO_StartTX(ctx);
+  } else {
+    RADIO_StopTX(ctx);
+  }
+}
+
+bool RADIO_IsSSB(VFOContext *ctx) {
+  return ctx->modulation == MOD_LSB || ctx->modulation == MOD_USB;
 }
 
 // Initialize radio state
@@ -469,10 +503,10 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
   vfo->mode = storage->isChMode;
 
   // Set basic parameters
-  RADIO_SetParam(&vfo->context, PARAM_FREQUENCY, storage->rxF);
-  RADIO_SetParam(&vfo->context, PARAM_MODULATION, storage->modulation);
-  // RADIO_SetParam(&vfo->context, PARAM_VOLUME, storage->volume);
-  RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, storage->bw);
+  RADIO_SetParam(&vfo->context, PARAM_FREQUENCY, storage->rxF, false);
+  RADIO_SetParam(&vfo->context, PARAM_MODULATION, storage->modulation, false);
+  // RADIO_SetParam(&vfo->context, PARAM_VOLUME, storage->volume, false);
+  RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, storage->bw, false);
 
   vfo->context.code = storage->code.rx;
   vfo->context.tx_state.code = storage->code.tx;
@@ -518,9 +552,10 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
   vfo->channel_index = channel_index;
 
   // Set parameters from channel
-  RADIO_SetParam(&vfo->context, PARAM_FREQUENCY, channel.rxF);
-  RADIO_SetParam(&vfo->context, PARAM_MODULATION, channel.modulation);
-  RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, channel.bw);
+  RADIO_SetParam(&vfo->context, PARAM_FREQUENCY, channel.rxF, false);
+  RADIO_SetParam(&vfo->context, PARAM_MODULATION, channel.modulation, false);
+  RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, channel.bw, false);
+
   vfo->context.code = channel.code.rx;
   vfo->context.tx_state.code = channel.code.tx;
 
