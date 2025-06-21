@@ -51,19 +51,19 @@ AppType_t APPS_Peek(void) {
 }
 
 const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {
-    APP_VFO1,      //
-    APP_CH_LIST,   //
+    APP_VFO1, //
+    /* APP_CH_LIST,   //
     APP_SCANER,    //
     APP_CH_SCAN,   //
     APP_BAND_SCAN, //
     APP_FC,        //
-    APP_LOOT_LIST, //
-    APP_ABOUT,     //
+    APP_LOOT_LIST, // */
+    APP_ABOUT, //
 };
 
 const App apps[APPS_COUNT] = {
-    {"None", NULL, NULL, NULL, NULL, NULL},
-    {"Spectrum", SCANER_init, SCANER_update, SCANER_render, SCANER_key,
+    [APP_NONE] = {"None", NULL, NULL, NULL, NULL, NULL},
+    /* {"Spectrum", SCANER_init, SCANER_update, SCANER_render, SCANER_key,
      SCANER_deinit},
     {"CH Scan", CHSCAN_init, CHSCAN_update, CHSCAN_render, CHSCAN_key,
      CHSCAN_deinit},
@@ -80,9 +80,9 @@ const App apps[APPS_COUNT] = {
     {"Text input", TEXTINPUT_init, NULL, TEXTINPUT_render, TEXTINPUT_key,
      TEXTINPUT_deinit},
     {"CH cfg", CHCFG_init, NULL, CHCFG_render, CHCFG_key, CHCFG_deinit},
-    {"Settings", NULL, NULL, SETTINGS_render, SETTINGS_key, SETTINGS_deinit},
-    {"1 VFO", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL},
-    {"ABOUT", NULL, NULL, ABOUT_Render, ABOUT_key, NULL},
+    {"Settings", NULL, NULL, SETTINGS_render, SETTINGS_key, SETTINGS_deinit}, */
+    [APP_VFO1] = {"1 VFO", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL},
+    [APP_ABOUT] = {"ABOUT", NULL, NULL, ABOUT_Render, ABOUT_key, NULL},
 };
 
 bool APPS_key(KEY_Code_t Key, Key_State_t state) {

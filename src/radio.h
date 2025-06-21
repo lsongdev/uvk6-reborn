@@ -10,6 +10,7 @@
 
 extern bool gShowAllRSSI;
 extern bool gMonitorMode;
+extern const char *TX_STATE_NAMES[7];
 
 extern const uint16_t StepFrequencyTable[15];
 
@@ -17,6 +18,8 @@ extern const uint16_t StepFrequencyTable[15];
 typedef enum {
   PARAM_FREQUENCY,
   PARAM_STEP,
+  PARAM_POWER,
+  PARAM_TX_OFFSET,
   PARAM_MODULATION,
   PARAM_SQUELCH,
   PARAM_VOLUME,
@@ -111,6 +114,7 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
                             uint16_t channel_index);
 void RADIO_ToggleMultiwatch(RadioState *state, bool enable);
 void RADIO_UpdateMultiwatch(RadioState *state);
+bool RADIO_ToggleVFOMode(RadioState *state, uint8_t vfo_index);
 
 // Инициализация
 void RADIO_Init(VFOContext *ctx, Radio radio_type);
@@ -137,5 +141,6 @@ void RADIO_UpdateAudioRouting(RadioState *state);
 
 void RADIO_ToggleTX(VFOContext *ctx, bool on);
 bool RADIO_IsSSB(VFOContext *ctx);
+const char *RADIO_GetModulationName(VFOContext *ctx);
 
 #endif // RADIO_H

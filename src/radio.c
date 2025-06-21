@@ -5,6 +5,7 @@
 #include "driver/bk1080.h"
 #include "driver/bk4819.h"
 #include "driver/si473x.h"
+#include "driver/st7565.h"
 #include "driver/system.h"
 #include "helper/battery.h"
 #include "helper/channels.h"
@@ -16,6 +17,25 @@
 
 bool gShowAllRSSI;
 bool gMonitorMode;
+
+const char *TX_STATE_NAMES[7] = {"TX Off",   "TX On",  "CHARGING", "BAT LOW",
+                                 "DISABLED", "UPCONV", "HIGH POW"};
+
+const char *MOD_NAMES_BK4819[8] = {
+    [MOD_FM] = "FM",   //
+    [MOD_AM] = "AM",   //
+    [MOD_LSB] = "LSB", //
+    [MOD_USB] = "USB", //
+    [MOD_BYP] = "BYP", //
+    [MOD_RAW] = "RAW", //
+    [MOD_WFM] = "WFM", //
+};
+const char *MOD_NAMES_SI47XX[8] = {
+    [SI47XX_AM] = "AM",
+    [SI47XX_FM] = "FM",
+    [SI47XX_LSB] = "LSB",
+    [SI47XX_USB] = "USB",
+};
 
 const uint16_t StepFrequencyTable[15] = {
     2,   5,   50,  100,
@@ -582,6 +602,42 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
   RADIO_ApplySettings(&vfo->context);
 }
 
+/**
+ * @brief Переключает режим работы VFO между частотным и канальным
+ * @param state Указатель на состояние радио
+ * @param vfo_index Индекс VFO (0..MAX_VFOS-1)
+ * @return true если переключение успешно, false при ошибке
+ */
+bool RADIO_ToggleVFOMode(RadioState *state, uint8_t vfo_index) {
+  // Проверка допустимости индекса VFO
+  if (vfo_index >= state->num_vfos) {
+    return false;
+  }
+
+  ExtendedVFOContext *vfo = &state->vfos[vfo_index];
+  VFOContext *ctx = &vfo->context;
+
+  // Определяем новый режим (инвертируем текущий)
+  VFOMode new_mode = (vfo->mode == MODE_VFO) ? MODE_CHANNEL : MODE_VFO;
+
+  if (new_mode == MODE_CHANNEL) { // Если переключаемся в канальный режим
+
+    // TODO: set next channel if invalid
+    RADIO_SaveVFOToStorage(state, vfo_index, vfo);
+    RADIO_LoadChannelToVFO(state, vfo_index, vfo->channel_index);
+  } else { // Если переключаемся в частотный режим
+    RADIO_LoadVFOFromStorage(state, vfo_index, vfo);
+  }
+
+  // Помечаем для сохранения в EEPROM
+  ctx->save_to_eeprom = true;
+  ctx->last_save_time = Now();
+
+  gRedrawScreen = true;
+
+  return true;
+}
+
 // Toggle multiwatch on/off
 void RADIO_ToggleMultiwatch(RadioState *state, bool enable) {
   state->multiwatch.enabled = enable;
@@ -754,4 +810,14 @@ void RADIO_UpdateAudioRouting(RadioState *state) {
     RADIO_SwitchAudioToVFO(state, state->multiwatch.active_vfo_index);
     state->last_active_vfo = state->multiwatch.active_vfo_index;
   }
+}
+
+const char *RADIO_GetModulationName(VFOContext *ctx) {
+  if (ctx->radio_type == RADIO_BK4819) {
+    return MOD_NAMES_BK4819[ctx->modulation];
+  }
+  if (ctx->radio_type == RADIO_SI4732) {
+    return MOD_NAMES_SI47XX[ctx->modulation];
+  }
+  return "WFM";
 }
