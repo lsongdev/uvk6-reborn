@@ -10,6 +10,7 @@
 
 extern bool gShowAllRSSI;
 extern bool gMonitorMode;
+extern const char *PARAM_NAMES[];
 extern const char *TX_STATE_NAMES[7];
 
 extern const uint16_t StepFrequencyTable[15];
@@ -24,6 +25,7 @@ typedef enum {
   PARAM_SQUELCH,
   PARAM_VOLUME,
   PARAM_BANDWIDTH,
+  PARAM_TX_STATE,
 
   PARAM_COUNT
 } ParamType;
@@ -58,6 +60,7 @@ typedef struct {
   Code code;
   Step step;
   Squelch squelch;
+  TXOutputPower power;
   struct {
     bool is_active; // true, если идёт передача
     TXStatus last_error;
@@ -141,6 +144,6 @@ void RADIO_UpdateAudioRouting(RadioState *state);
 
 void RADIO_ToggleTX(VFOContext *ctx, bool on);
 bool RADIO_IsSSB(VFOContext *ctx);
-const char *RADIO_GetModulationName(VFOContext *ctx);
+const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param);
 
 #endif // RADIO_H

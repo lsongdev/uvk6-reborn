@@ -58,7 +58,9 @@ void VFO1_update(void) {
 }
 
 bool VFO1_key(KEY_Code_t key, Key_State_t state) {
-  if (!gIsNumNavInput && state == KEY_RELEASED && REGSMENU_Key(key, state)) {
+  if (!gIsNumNavInput && state == KEY_RELEASED &&
+      REGSMENU_Key(key, state,
+                   &radio_state.vfos[radio_state.last_active_vfo].context)) {
     return true;
   }
 
@@ -113,7 +115,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
     switch (key) {
     case KEY_1:
       gChListFilter = TYPE_FILTER_BAND;
-      APPS_run(APP_CH_LIST);
+      // APPS_run(APP_CH_LIST);
       return true;
     case KEY_2:
       if (gCurrentApp == APP_VFO1) {
@@ -144,7 +146,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       RADIO_IncDecParam(ctx, PARAM_MODULATION, true, true);
       return true;
     case KEY_STAR:
-      APPS_run(APP_SCANER);
+      // APPS_run(APP_SCANER);
       return true;
     case KEY_SIDE1:
     case KEY_SIDE2:
@@ -245,7 +247,7 @@ void VFO1_render(void) {
 
   uint32_t f =
       ctx->tx_state.is_active ? ctx->tx_state.frequency : ctx->frequency;
-  const char *mod = RADIO_GetModulationName(ctx);
+  const char *mod = RADIO_GetParamValueString(ctx, PARAM_MODULATION);
 
   if (ctxEx->mode == MODE_CHANNEL) {
     PrintMediumEx(LCD_XCENTER, BASE - 16, POS_C, C_FILL, "VFO %u",
@@ -353,5 +355,5 @@ void VFO1_render(void) {
     }
   }
 
-  REGSMENU_Draw();
+  REGSMENU_Draw(ctx);
 }

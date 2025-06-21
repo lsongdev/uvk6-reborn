@@ -7,6 +7,7 @@
 #include "driver/si473x.h"
 #include "driver/st7565.h"
 #include "driver/system.h"
+#include "external/printf/printf.h"
 #include "helper/battery.h"
 #include "helper/channels.h"
 #include "helper/measurements.h"
@@ -18,8 +19,27 @@
 bool gShowAllRSSI;
 bool gMonitorMode;
 
-const char *TX_STATE_NAMES[7] = {"TX Off",   "TX On",  "CHARGING", "BAT LOW",
-                                 "DISABLED", "UPCONV", "HIGH POW"};
+const char *PARAM_NAMES[] = {
+    [PARAM_FREQUENCY] = "f",         //
+    [PARAM_STEP] = "Step",           //
+    [PARAM_POWER] = "Power",         //
+    [PARAM_TX_OFFSET] = "TX offset", //
+    [PARAM_MODULATION] = "Mod",      //
+    [PARAM_SQUELCH] = "SQL",         //
+    [PARAM_VOLUME] = "Volume",       //
+    [PARAM_BANDWIDTH] = "BW",        //
+    [PARAM_TX_STATE] = "TX state",   //
+};
+
+const char *TX_STATE_NAMES[7] = {
+    [TX_UNKNOWN] = "TX Off",              //
+    [TX_ON] = "TX On",                    //
+    [TX_VOL_HIGH] = "CHARGING",           //
+    [TX_BAT_LOW] = "BAT LOW",             //
+    [TX_DISABLED] = "DISABLED",           //
+    [TX_DISABLED_UPCONVERTER] = "UPCONV", //
+    [TX_POW_OVERDRIVE] = "HIGH POW",      //
+};
 
 const char *MOD_NAMES_BK4819[8] = {
     [MOD_FM] = "FM",   //
@@ -30,11 +50,44 @@ const char *MOD_NAMES_BK4819[8] = {
     [MOD_RAW] = "RAW", //
     [MOD_WFM] = "WFM", //
 };
+
 const char *MOD_NAMES_SI47XX[8] = {
     [SI47XX_AM] = "AM",
     [SI47XX_FM] = "FM",
     [SI47XX_LSB] = "LSB",
     [SI47XX_USB] = "USB",
+};
+
+const char *BW_NAMES_BK4819[10] = {
+    [BK4819_FILTER_BW_6k] = "U6K",   //
+    [BK4819_FILTER_BW_7k] = "U7K",   //
+    [BK4819_FILTER_BW_9k] = "N9k",   //
+    [BK4819_FILTER_BW_10k] = "N10k", //
+    [BK4819_FILTER_BW_12k] = "W12k", //
+    [BK4819_FILTER_BW_14k] = "W14k", //
+    [BK4819_FILTER_BW_17k] = "W17k", //
+    [BK4819_FILTER_BW_20k] = "W20k", //
+    [BK4819_FILTER_BW_23k] = "W23k", //
+    [BK4819_FILTER_BW_26k] = "W26k", //
+};
+
+const char *BW_NAMES_SI47XX[] = {
+    [SI47XX_BW_1_8_kHz] = "1.8k", //
+    [SI47XX_BW_1_kHz] = "1k",     //
+    [SI47XX_BW_2_kHz] = "2k",     //
+    [SI47XX_BW_2_5_kHz] = "2.5k", //
+    [SI47XX_BW_3_kHz] = "3k",     //
+    [SI47XX_BW_4_kHz] = "4k",     //
+    [SI47XX_BW_6_kHz] = "6k",     //
+};
+
+const char *BW_NAMES_SI47XX_SSB[] = {
+    [SI47XX_SSB_BW_0_5_kHz] = "0.5k", //
+    [SI47XX_SSB_BW_1_0_kHz] = "1.0k", //
+    [SI47XX_SSB_BW_1_2_kHz] = "1.2k", //
+    [SI47XX_SSB_BW_2_2_kHz] = "2.2k", //
+    [SI47XX_SSB_BW_3_kHz] = "3k",     //
+    [SI47XX_SSB_BW_4_kHz] = "4k",     //
 };
 
 const uint16_t StepFrequencyTable[15] = {
@@ -812,7 +865,7 @@ void RADIO_UpdateAudioRouting(RadioState *state) {
   }
 }
 
-const char *RADIO_GetModulationName(VFOContext *ctx) {
+static const char *RADIO_GetModulationName(VFOContext *ctx) {
   if (ctx->radio_type == RADIO_BK4819) {
     return MOD_NAMES_BK4819[ctx->modulation];
   }
@@ -820,4 +873,36 @@ const char *RADIO_GetModulationName(VFOContext *ctx) {
     return MOD_NAMES_SI47XX[ctx->modulation];
   }
   return "WFM";
+}
+
+const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
+  static char buf[16];
+  uint32_t v = RADIO_GetParam(ctx, param);
+  switch (param) {
+  case PARAM_MODULATION:
+    return RADIO_GetModulationName(ctx);
+  case PARAM_TX_STATE:
+    return TX_STATE_NAMES[ctx->tx_state.last_error];
+  case PARAM_BANDWIDTH:
+    if (ctx->radio_type == RADIO_BK4819) {
+      return BW_NAMES_BK4819[ctx->bandwidth];
+    }
+    if (ctx->radio_type == RADIO_SI4732) {
+      if (RADIO_IsSSB(ctx)) {
+        return BW_NAMES_SI47XX_SSB[ctx->bandwidth];
+      }
+      return BW_NAMES_SI47XX[ctx->bandwidth];
+    }
+    return "?(WIP)";
+  case PARAM_STEP:
+    snprintf(buf, 15, "%d.%02d", StepFrequencyTable[ctx->step] / KHZ,
+             StepFrequencyTable[ctx->step] % KHZ);
+    break;
+  case PARAM_FREQUENCY:
+    snprintf(buf, 15, "%u.%05u", ctx->frequency / MHZ, ctx->frequency % MHZ);
+    break;
+  case PARAM_POWER:
+    return TX_POWER_NAMES[ctx->power];
+  }
+  return buf;
 }
