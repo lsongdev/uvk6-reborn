@@ -63,15 +63,15 @@ bool APPSLIST_key(KEY_Code_t key, Key_State_t state) {
       return true;
     case KEY_MENU:
       APPS_exit();
-      if (app == APP_LOOT_LIST || app == APP_CH_LIST) {
+      /* if (app == APP_LOOT_LIST || app == APP_CH_LIST) {
         if (app == APP_CH_LIST) {
           gChListFilter = TYPE_FILTER_CH;
           gChSaveMode = false;
         }
         APPS_run(app);
-      } else {
+      } else { */
         APPS_runManual(app);
-      }
+      // }
       return true;
     case KEY_EXIT:
       APPS_exit();

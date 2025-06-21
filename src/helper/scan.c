@@ -1,4 +1,4 @@
-#include "scan.h"
+/* #include "scan.h"
 #include "../driver/st7565.h"
 #include "../driver/system.h"
 #include "../driver/systick.h"
@@ -195,4 +195,4 @@ void SCAN_Check(bool isAnalyserMode) {
   }
 
   nextWithTimeout();
-}
+} */

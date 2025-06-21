@@ -122,9 +122,9 @@ void STATUSLINE_render(void) {
     icons[idx++] = SYM_MONITOR;
   }
 
-  if (RADIO_GetRadio() == RADIO_BK1080 || isSi4732On) {
+  /* if (RADIO_GetRadio() == RADIO_BK1080 || isSi4732On) {
     icons[idx++] = SYM_BROADCAST;
-  }
+  } */
 
   if (gSettings.upconverter) {
     icons[idx++] = SYM_CONVERTER;
@@ -134,9 +134,9 @@ void STATUSLINE_render(void) {
     icons[idx++] = SYM_LOCK;
   }
 
-  if (gCurrentApp == APP_CH_LIST || gCurrentApp == APP_LOOT_LIST) {
+  /* if (gCurrentApp == APP_CH_LIST || gCurrentApp == APP_LOOT_LIST) {
     UI_Scanlists(LCD_XCENTER - 13, 0, gSettings.currentScanlist);
-  }
+  } */
 
   PrintSymbolsEx(LCD_WIDTH - 1 -
                      (gSettings.batteryStyle == BAT_VOLTAGE ? 38 : 18),
@@ -147,7 +147,7 @@ void STATUSLINE_render(void) {
 }
 
 void STATUSLINE_RenderRadioSettings() {
-  const int8_t vGain = -gainTable[radio.gainIndex].gainDb + 33;
+  /* const int8_t vGain = -gainTable[radio.gainIndex].gainDb + 33;
 
   STATUSLINE_SetText(                              //
       "%+d %s AFC%u %s %u %s",                     //
@@ -157,5 +157,5 @@ void STATUSLINE_RenderRadioSettings() {
       sqTypeNames[radio.squelch.type],             //
       radio.squelch.value,                         //
       modulationTypeOptions[RADIO_GetModulation()] //
-  );
+  ); */
 }

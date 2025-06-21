@@ -173,14 +173,14 @@ static void accept(void) {
     SETTINGS_Save();
     break;
   case M_SQL_OPEN_T:
-    gSettings.sqlOpenTime = subMenuIndex;
+    /* gSettings.sqlOpenTime = subMenuIndex;
     RADIO_SetupByCurrentVFO();
-    SETTINGS_Save();
+    SETTINGS_Save(); */
     break;
   case M_SQL_CLOSE_T:
-    gSettings.sqlCloseTime = subMenuIndex;
+    /* gSettings.sqlCloseTime = subMenuIndex;
     RADIO_SetupByCurrentVFO();
-    SETTINGS_Save();
+    SETTINGS_Save(); */
     break;
   case M_SQL_TO_OPEN:
     gSettings.sqOpenedTimeout = subMenuIndex;
@@ -370,8 +370,8 @@ static void onSubChange(void) {
     gSettings.contrast = subMenuIndex;
     break;
   case M_FLT_BOUND:
-    gSettings.bound_240_280 = subMenuIndex;
-    BK4819_SelectFilter(radio.rxF);
+    /* gSettings.bound_240_280 = subMenuIndex;
+    BK4819_SelectFilter(radio.rxF); */
     break;
   default:
     break;
@@ -480,10 +480,10 @@ static void setMenuIndexAndRun(uint16_t v) {
 }
 
 static void setUpconverterFreq(uint32_t f) {
-  uint32_t _f = GetScreenF(radio.rxF);
+  /* uint32_t _f = GetScreenF(radio.rxF);
   gSettings.upconverter = f;
   RADIO_TuneToSave(GetTuneF(_f));
-  SETTINGS_Save();
+  SETTINGS_Save(); */
 }
 
 static void upDown(bool inc) {
@@ -521,13 +521,13 @@ bool SETTINGS_key(KEY_Code_t key, Key_State_t state) {
   if (state == KEY_RELEASED) {
     switch (key) {
     case KEY_MENU:
-      if (item->type == M_UPCONVERTER) {
+      /* if (item->type == M_UPCONVERTER) {
         gTextInputSize = 9;
         gFInputTempFreq = gSettings.upconverter;
         gFInputCallback = setUpconverterFreq;
         APPS_run(APP_FINPUT);
         return true;
-      }
+      } */
       if (isSubMenu) {
         accept();
         isSubMenu = false;

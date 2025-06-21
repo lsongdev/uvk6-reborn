@@ -10,6 +10,7 @@
 #include "external/printf/printf.h"
 #include "helper/battery.h"
 #include "helper/channels.h"
+#include "helper/lootlist.h"
 #include "helper/measurements.h"
 #include "misc.h"
 #include "scheduler.h"
@@ -18,6 +19,8 @@
 
 bool gShowAllRSSI;
 bool gMonitorMode;
+
+Measurement gLoot;
 
 const char *PARAM_NAMES[] = {
     [PARAM_FREQUENCY] = "f",         //

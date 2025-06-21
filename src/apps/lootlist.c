@@ -1,4 +1,4 @@
-#include "lootlist.h"
+/* #include "lootlist.h"
 #include "../dcs.h"
 #include "../driver/st7565.h"
 #include "../driver/system.h"
@@ -281,4 +281,4 @@ bool LOOTLIST_key(KEY_Code_t key, Key_State_t state) {
   }
 
   return false;
-}
+} */

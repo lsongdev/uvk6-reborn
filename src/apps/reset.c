@@ -1,4 +1,4 @@
-#include "reset.h"
+/* #include "reset.h"
 #include "../driver/eeprom.h"
 #include "../driver/st7565.h"
 #include "../driver/uart.h"
@@ -237,4 +237,4 @@ bool RESET_key(KEY_Code_t k, Key_State_t state) {
     }
   }
   return false;
-}
+} */

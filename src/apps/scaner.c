@@ -1,4 +1,4 @@
-#include "scaner.h"
+/* #include "scaner.h"
 #include "../driver/st7565.h"
 #include "../driver/uart.h"
 #include "../helper/bands.h"
@@ -253,4 +253,4 @@ void SCANER_render(void) {
   REGSMENU_Draw();
 }
 
-void SCANER_deinit(void) {}
+void SCANER_deinit(void) {} */

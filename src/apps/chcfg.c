@@ -1,4 +1,4 @@
-#include "chcfg.h"
+/* #include "chcfg.h"
 #include "../dcs.h"
 #include "../driver/st7565.h"
 #include "../driver/uart.h"
@@ -278,15 +278,6 @@ static void acceptRadioConfig(const MenuItem *item, uint8_t subMenuIndex) {
   case M_BANK:
     gChEd.misc.bank = subMenuIndex;
     break;
-  /* case M_P_CAL_L:
-    gChEd.misc.powCalib.s = subMenuIndex;
-    break;
-  case M_P_CAL_M:
-    gChEd.misc.powCalib.m = subMenuIndex;
-    break;
-  case M_P_CAL_H:
-    gChEd.misc.powCalib.e = subMenuIndex;
-    break; */
   case M_RADIO:
     if (RADIO_HasSi() && subMenuIndex > 0) {
       gChEd.radio = RADIO_SI4732;
@@ -358,15 +349,6 @@ static void setInitialSubmenuIndex(void) {
   case M_BANK:
     subMenuIndex = gChEd.misc.bank;
     break;
-  /* case M_P_CAL_L:
-    subMenuIndex = gChEd.misc.powCalib.s;
-    break;
-  case M_P_CAL_M:
-    subMenuIndex = gChEd.misc.powCalib.m;
-    break;
-  case M_P_CAL_H:
-    subMenuIndex = gChEd.misc.powCalib.e;
-    break; */
   case M_RADIO:
     if (RADIO_HasSi() && gChEd.radio > 0) {
       subMenuIndex = RADIO_SI4732;
@@ -654,4 +636,4 @@ void CHCFG_render(void) {
     getMenuItemValue(item->type, Output);
     PrintMediumEx(LCD_XCENTER, LCD_HEIGHT - 4, POS_C, C_FILL, Output);
   }
-}
+} */

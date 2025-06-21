@@ -1,4 +1,4 @@
-#include "vfo.h"
+/* #include "vfo.h"
 #include "../driver/uart.h"
 #include "../radio.h"
 #include "channels.h"
@@ -67,4 +67,4 @@ void VFO_SaveCurrent() {
   CHANNELS_Save(VFO_GetCh(gSettings.activeVFO), &radio);
 }
 
-uint8_t VFO_GetSize() { return vfoScanlistSize; }
+uint8_t VFO_GetSize() { return vfoScanlistSize; } */

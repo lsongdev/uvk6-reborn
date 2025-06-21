@@ -3,6 +3,7 @@
 
 #include "../radio.h"
 #include "graphics.h"
+#include "../helper/lootlist.h"
 #include <stdbool.h>
 #include <stdint.h>
 

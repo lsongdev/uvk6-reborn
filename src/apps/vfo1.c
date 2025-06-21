@@ -43,11 +43,6 @@ static uint32_t lastRender;
 
 static const Step liveStep = STEP_5_0kHz;
 
-static uint8_t mWatchVfoIndex = 0;
-
-static VFO *shadowVfo;
-static VFO *mWatchVfo;
-
 void VFO1_update(void) {
   RADIO_UpdateMultiwatch(&radio_state);
 
@@ -183,7 +178,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       APPS_run(APP_CH_CFG); */
       return true;
     case KEY_STAR:
-      APPS_run(APP_LOOT_LIST);
+      // APPS_run(APP_LOOT_LIST);
       return true;
     case KEY_SIDE1:
       gMonitorMode = !gMonitorMode;

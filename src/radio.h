@@ -3,10 +3,12 @@
 
 #include "driver/bk4819.h"
 #include "helper/channels.h"
+#include "helper/lootlist.h"
 #include <stdbool.h>
 #include <stdint.h>
 
 #define MAX_VFOS 16
+extern Measurement gLoot;
 
 extern bool gShowAllRSSI;
 extern bool gMonitorMode;

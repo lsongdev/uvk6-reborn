@@ -1,4 +1,4 @@
-#include "chscan.h"
+/* #include "chscan.h"
 
 #include "../driver/system.h"
 #include "../driver/uart.h"
@@ -97,4 +97,4 @@ void CHSCAN_render(void) {
   }
 
   UI_RenderScanScreen();
-}
+} */

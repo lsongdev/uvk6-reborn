@@ -1,4 +1,4 @@
-#include "chscan.h"
+/* #include "chscan.h"
 
 #include "../driver/uart.h"
 #include "../helper/bands.h"
@@ -82,4 +82,4 @@ void BANDSCAN_render(void) {
 
   UI_RenderScanScreen();
   REGSMENU_Draw();
-}
+} */

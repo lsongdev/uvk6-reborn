@@ -1,4 +1,4 @@
-#include "chlist.h"
+/* #include "chlist.h"
 #include "../driver/uart.h"
 #include "../helper/bands.h"
 #include "../helper/numnav.h"
@@ -94,10 +94,6 @@ static void getChItem(uint16_t i, uint16_t index, bool isCurrent) {
     PrintSmallEx(LCD_WIDTH - 5, y + 7, POS_R, C_INVERT, "%s",
                  ch.allowTx ? "ON" : "OFF");
     break;
-    /* case MODE_SELECT:
-      break;
-    case MODE_TYPE:
-      break; */
   }
 }
 
@@ -275,4 +271,4 @@ void CHLIST_render() {
     STATUSLINE_SetText("%s %s", CH_TYPE_FILTER_NAMES[gChListFilter],
                        VIEW_MODE_NAMES[viewMode]);
   }
-}
+} */

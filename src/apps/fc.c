@@ -1,4 +1,4 @@
-#include "fc.h"
+/* #include "fc.h"
 #include "../dcs.h"
 #include "../driver/system.h"
 #include "../driver/uart.h"
@@ -209,4 +209,4 @@ void FC_render() {
                    DCS_Options[gLastActiveLoot->cd]);
     }
   }
-}
+} */
