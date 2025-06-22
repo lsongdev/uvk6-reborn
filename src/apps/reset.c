@@ -1,4 +1,4 @@
-/* #include "reset.h"
+#include "reset.h"
 #include "../driver/eeprom.h"
 #include "../driver/st7565.h"
 #include "../driver/uart.h"
@@ -107,29 +107,29 @@ static bool resetFull() {
   }
 
   if (stats.vfos < total.vfos) {
-    memset(&radio, 0, sizeof(CH));
-    VFO *vfo = &radio;
+    VFO vfo;
+    memset(&vfo, 0, sizeof(VFO));
 
     if (stats.vfos == 0) {
-      sprintf(vfo->name, "%s", "VFO-A");
-      vfo->rxF = 14550000;
+      sprintf(vfo.name, "%s", "VFO-A");
+      vfo.rxF = 14550000;
     }
 
-    vfo->channel = -1;
-    vfo->modulation = MOD_FM;
-    vfo->bw = BK4819_FILTER_BW_12k;
-    vfo->radio = RADIO_BK4819;
-    vfo->txF = 0;
-    vfo->offsetDir = OFFSET_NONE;
-    vfo->allowTx = false;
-    vfo->gainIndex = AUTO_GAIN_INDEX;
-    vfo->code.rx.type = 0;
-    vfo->code.tx.type = 0;
-    vfo->meta.readonly = false;
-    vfo->meta.type = TYPE_VFO;
-    vfo->squelch.value = 4;
-    vfo->step = STEP_25_0kHz;
-    CHANNELS_Save(total.mr - total.vfos + stats.vfos, vfo);
+    vfo.channel = -1;
+    vfo.modulation = MOD_FM;
+    vfo.bw = BK4819_FILTER_BW_12k;
+    vfo.radio = RADIO_BK4819;
+    vfo.txF = 0;
+    vfo.offsetDir = OFFSET_NONE;
+    vfo.allowTx = false;
+    vfo.gainIndex = AUTO_GAIN_INDEX;
+    vfo.code.rx.type = 0;
+    vfo.code.tx.type = 0;
+    vfo.meta.readonly = false;
+    vfo.meta.type = TYPE_VFO;
+    vfo.squelch.value = 4;
+    vfo.step = STEP_25_0kHz;
+    CHANNELS_Save(total.mr - total.vfos + stats.vfos, &vfo);
     stats.vfos++;
     stats.bytes += CH_SIZE;
     return false;
@@ -237,4 +237,4 @@ bool RESET_key(KEY_Code_t k, Key_State_t state) {
     }
   }
   return false;
-} */
+}

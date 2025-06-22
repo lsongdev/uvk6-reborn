@@ -53,7 +53,7 @@ static void appRender() {
 }
 
 static void systemUpdate() {
-  RADIO_Update();
+  // RADIO_Update();
   BATTERY_UpdateBatteryInfo();
   BACKLIGHT_Update();
 }
@@ -148,8 +148,8 @@ void SYS_Main() {
     Log("LOAD BANDS");
     BANDS_Load();
 
-    Log("INIT RADIO");
-    RADIO_Init();
+    // Log("INIT RADIO");
+    // RADIO_Init();
 
     Log("RUN DEFAULT APP");
     APPS_run(gSettings.mainApp);

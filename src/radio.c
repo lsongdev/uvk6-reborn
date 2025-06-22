@@ -7,6 +7,7 @@
 #include "driver/si473x.h"
 #include "driver/st7565.h"
 #include "driver/system.h"
+#include "driver/uart.h"
 #include "external/printf/printf.h"
 #include "helper/battery.h"
 #include "helper/channels.h"
@@ -92,6 +93,8 @@ const char *BW_NAMES_SI47XX_SSB[] = {
     [SI47XX_SSB_BW_3_kHz] = "3k",     //
     [SI47XX_SSB_BW_4_kHz] = "4k",     //
 };
+
+static const char *SQ_TYPE_NAMES[4] = {"RNG", "RG", "RN", "R"};
 
 const uint16_t StepFrequencyTable[15] = {
     2,   5,   50,  100,
@@ -251,7 +254,7 @@ static TXStatus checkTX(VFOContext *ctx) {
 }
 
 static void toggleBK4819(bool on) {
-  // Log("Toggle bk4819 audio %u", on);
+  Log("Toggle bk4819 audio %u", on);
   if (on) {
     BK4819_ToggleAFDAC(true);
     BK4819_ToggleAFBit(true);
@@ -266,7 +269,7 @@ static void toggleBK4819(bool on) {
 }
 
 static void toggleBK1080SI4732(bool on) {
-  // Log("Toggle bk1080si audio %u", on);
+  Log("Toggle bk1080si audio %u", on);
   if (on) {
     SYS_DelayMs(8);
     AUDIO_ToggleSpeaker(true);
@@ -304,6 +307,7 @@ static void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
 
 // Инициализация VFO
 void RADIO_Init(VFOContext *ctx, Radio radio_type) {
+  Log("RADIO INIT");
   memset(ctx, 0, sizeof(VFOContext));
   ctx->radio_type = radio_type;
 
@@ -351,8 +355,10 @@ bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value) {
 // Установка параметра (всегда uint32_t!)
 void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
                     bool save_to_eeprom) {
+  Log("trying to Set %s to %u", PARAM_NAMES[param], value);
   if (!RADIO_IsParamValid(ctx, param, value))
     return;
+  Log("Set %s to %u", PARAM_NAMES[param], value);
 
   uint32_t old_value = RADIO_GetParam(ctx, param);
 
@@ -533,6 +539,7 @@ bool RADIO_IsSSB(VFOContext *ctx) {
 
 // Initialize radio state
 void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
+  Log("RADIO_InitState()");
   memset(state, 0, sizeof(RadioState));
   state->num_vfos = (num_vfos > MAX_VFOS) ? MAX_VFOS : num_vfos;
 
@@ -573,6 +580,7 @@ void RADIO_CheckAndSaveVFO(RadioState *state, uint8_t vfo_index) {
 bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
   if (vfo_index >= state->num_vfos)
     return false;
+  Log("RADIO_SwitchVFO");
 
   RADIO_CheckAndSaveVFO(state, state->multiwatch.active_vfo_index);
 
@@ -594,6 +602,7 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
                               const VFO *storage) {
   if (vfo_index >= state->num_vfos)
     return;
+  Log("RADIO_LoadVFOFromStorage");
 
   ExtendedVFOContext *vfo = &state->vfos[vfo_index];
   vfo->mode = storage->isChMode;
@@ -621,6 +630,7 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
                             VFO *storage) {
   if (vfo_index >= state->num_vfos)
     return;
+  Log("RADIO_SaveVFOToStorage");
 
   const ExtendedVFOContext *vfo = &state->vfos[vfo_index];
 
@@ -639,6 +649,7 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
                             uint16_t channel_index) {
   if (vfo_index >= state->num_vfos)
     return;
+  Log("RADIO_LoadChannel %u ToVFO", channel_index);
 
   ExtendedVFOContext *vfo = &state->vfos[vfo_index];
   CH channel;
@@ -669,20 +680,27 @@ bool RADIO_ToggleVFOMode(RadioState *state, uint8_t vfo_index) {
   if (vfo_index >= state->num_vfos) {
     return false;
   }
+  Log("RADIO_ToggleVFOMode()");
 
   ExtendedVFOContext *vfo = &state->vfos[vfo_index];
   VFOContext *ctx = &vfo->context;
 
   // Определяем новый режим (инвертируем текущий)
-  VFOMode new_mode = (vfo->mode == MODE_VFO) ? MODE_CHANNEL : MODE_VFO;
+  VFOMode new_mode = (vfo->mode == MODE_CHANNEL) ? MODE_VFO : MODE_CHANNEL;
+  MR ch;
+  CHANNELS_Load(vfo->vfo_ch_index, &ch);
 
-  if (new_mode == MODE_CHANNEL) { // Если переключаемся в канальный режим
+  Log("RADIO_ToggleVFOMode(%s)",
+      (const char[][16]){[MODE_VFO] = "VFO", [MODE_CHANNEL] = "CH"});
 
-    // TODO: set next channel if invalid
-    RADIO_SaveVFOToStorage(state, vfo_index, vfo);
-    RADIO_LoadChannelToVFO(state, vfo_index, vfo->channel_index);
-  } else { // Если переключаемся в частотный режим
-    RADIO_LoadVFOFromStorage(state, vfo_index, vfo);
+  ch.isChMode = new_mode == MODE_CHANNEL;
+
+  CHANNELS_Save(vfo->vfo_ch_index, &ch);
+
+  if (new_mode) {
+    RADIO_LoadChannelToVFO(state, vfo_index, ch.channel);
+  } else {
+    RADIO_LoadVFOFromStorage(state, vfo_index, &ch);
   }
 
   // Помечаем для сохранения в EEPROM
@@ -798,6 +816,12 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
 }
 
 void RADIO_LoadVFOs(RadioState *state) {
+  Log("RADIO_LoadVFOs()");
+
+  // NOTE: temporary
+  Log("BK4819 INIT");
+  BK4819_Init();
+
   uint8_t vfoIdx = 0;
   for (uint16_t i = 0; i < CHANNELS_GetCountMax(); ++i) {
     CHMeta meta = CHANNELS_GetMeta(i);
@@ -806,6 +830,8 @@ void RADIO_LoadVFOs(RadioState *state) {
     if (!isOurType) {
       continue;
     }
+
+    state->vfos[vfoIdx].vfo_ch_index = i;
 
     MR ch;
     CHANNELS_Load(i, &ch);
@@ -906,6 +932,44 @@ const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
     break;
   case PARAM_POWER:
     return TX_POWER_NAMES[ctx->power];
+  case PARAM_SQUELCH:
+    snprintf(buf, 15, "%s.%u", SQ_TYPE_NAMES[ctx->squelch.type],
+             ctx->squelch.value);
+    break;
   }
   return buf;
+}
+
+/**
+ * @brief Получает номер текущего активного VFO
+ * @param state Указатель на состояние радио
+ * @return Номер VFO (0..MAX_VFOS-1) или 0xFF если не найдено
+ */
+uint8_t RADIO_GetCurrentVFONumber(const RadioState *state) {
+  for (uint8_t i = 0; i < state->num_vfos; i++) {
+    if (state->vfos[i].is_active) {
+      return i;
+    }
+  }
+  return 0xFF; // Ошибка - активный VFO не найден
+}
+
+/**
+ * @brief Получает указатель на текущий активный VFO
+ * @param state Указатель на состояние радио
+ * @return Указатель на ExtendedVFOContext или NULL если ошибка
+ */
+ExtendedVFOContext *RADIO_GetCurrentVFO(RadioState *state) {
+  uint8_t current = RADIO_GetCurrentVFONumber(state);
+  return (current != 0xFF) ? &state->vfos[current] : NULL;
+}
+
+/**
+ * @brief Получает константный указатель на текущий активный VFO
+ * @param state Указатель на состояние радио
+ * @return Константный указатель на ExtendedVFOContext или NULL если ошибка
+ */
+const ExtendedVFOContext *RADIO_GetCurrentVFOConst(const RadioState *state) {
+  uint8_t current = RADIO_GetCurrentVFONumber(state);
+  return (current != 0xFF) ? &state->vfos[current] : NULL;
 }

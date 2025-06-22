@@ -25,12 +25,12 @@ static char String[16];
 static RadioState radio_state;
 
 static void setChannel(uint16_t v) {
-  RADIO_LoadChannelToVFO(&radio_state, radio_state.last_active_vfo, v);
+  RADIO_LoadChannelToVFO(&radio_state, RADIO_GetCurrentVFONumber(&radio_state),
+                         v);
 }
 
 static void tuneTo(uint32_t f) {
-  RADIO_SetParam(&radio_state.vfos[radio_state.last_active_vfo].context,
-                 PARAM_FREQUENCY, f, true);
+  RADIO_SetParam(RADIO_GetCurrentVFO(&radio_state), PARAM_FREQUENCY, f, true);
 }
 
 void VFO1_init(void) {
@@ -53,14 +53,13 @@ void VFO1_update(void) {
 }
 
 bool VFO1_key(KEY_Code_t key, Key_State_t state) {
+  uint8_t vfoN = RADIO_GetCurrentVFONumber(&radio_state);
   if (!gIsNumNavInput && state == KEY_RELEASED &&
-      REGSMENU_Key(key, state,
-                   &radio_state.vfos[radio_state.last_active_vfo].context)) {
+      REGSMENU_Key(key, state, &radio_state.vfos[vfoN].context)) {
     return true;
   }
 
-  const ExtendedVFOContext *ctxEx =
-      &radio_state.vfos[radio_state.last_active_vfo];
+  const ExtendedVFOContext *ctxEx = &radio_state.vfos[vfoN];
   const VFOContext *ctx = &ctxEx->context;
 
   if (state == KEY_RELEASED && ctxEx->mode == MODE_CHANNEL) {
@@ -109,7 +108,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
   if (state == KEY_LONG_PRESSED) {
     switch (key) {
     case KEY_1:
-      gChListFilter = TYPE_FILTER_BAND;
+      // gChListFilter = TYPE_FILTER_BAND;
       // APPS_run(APP_CH_LIST);
       return true;
     case KEY_2:
@@ -120,7 +119,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       }
       return false;
     case KEY_3:
-      RADIO_ToggleVFOMode(&radio_state, radio_state.last_active_vfo);
+      RADIO_ToggleVFOMode(&radio_state, vfoN);
       VFO1_init();
       return true;
     case KEY_4:
@@ -188,8 +187,8 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       break;
     case KEY_EXIT:
       if (!APPS_exit()) {
-        RADIO_SwitchVFO(&radio_state, IncDecU(radio_state.last_active_vfo, 0,
-                                              radio_state.num_vfos, true));
+        RADIO_SwitchVFO(&radio_state,
+                        IncDecU(vfoN, 0, radio_state.num_vfos, true));
       }
       return true;
     default:
@@ -200,7 +199,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
 }
 
 static void renderTxRxState(uint8_t y, bool isTx) {
-  VFOContext *ctx = &radio_state.vfos[radio_state.last_active_vfo].context;
+  VFOContext *ctx = &RADIO_GetCurrentVFO(&radio_state)->context;
   if (isTx && ctx->tx_state.is_active) {
     PrintMediumBoldEx(LCD_XCENTER, y, POS_C, C_FILL, "%s",
                       TX_STATE_NAMES[ctx->tx_state.last_error]);
@@ -208,10 +207,11 @@ static void renderTxRxState(uint8_t y, bool isTx) {
 }
 
 static void renderChannelName(uint8_t y, uint16_t channel) {
+  uint8_t vfoN = RADIO_GetCurrentVFONumber(&radio_state);
   FillRect(0, y - 14, 30, 7, C_FILL);
-  PrintSmallEx(15, y - 9, POS_C, C_INVERT, "VFO %u/%u", gSettings.activeVFO + 1,
-               VFO_GetSize());
-  if (radio_state.vfos[radio_state.last_active_vfo].mode == MODE_CHANNEL) {
+  PrintSmallEx(15, y - 9, POS_C, C_INVERT, "VFO %u/%u", vfoN + 1,
+               radio_state.num_vfos);
+  if (radio_state.vfos[vfoN].mode == MODE_CHANNEL) {
     PrintSmallEx(32, y - 9, POS_L, C_FILL, "MR %03u", channel);
     UI_Scanlists(LCD_WIDTH - 25, y - 13, gSettings.currentScanlist);
   }
@@ -228,8 +228,9 @@ static void renderProModeInfo(uint8_t y) {
 
 void VFO1_render(void) {
   const uint8_t BASE = 40;
-  const ExtendedVFOContext *ctxEx =
-      &radio_state.vfos[radio_state.last_active_vfo];
+
+  uint8_t vfoN = RADIO_GetCurrentVFONumber(&radio_state);
+  const ExtendedVFOContext *ctxEx = &radio_state.vfos[vfoN];
   const VFOContext *ctx = &ctxEx->context;
 
   if (gIsNumNavInput) {
@@ -245,8 +246,7 @@ void VFO1_render(void) {
   const char *mod = RADIO_GetParamValueString(ctx, PARAM_MODULATION);
 
   if (ctxEx->mode == MODE_CHANNEL) {
-    PrintMediumEx(LCD_XCENTER, BASE - 16, POS_C, C_FILL, "VFO %u",
-                  radio_state.last_active_vfo + 1);
+    PrintMediumEx(LCD_XCENTER, BASE - 16, POS_C, C_FILL, "VFO %u", vfoN + 1);
   } else {
     if (gCurrentBand.meta.type == TYPE_BAND_DETACHED) {
       PrintSmallEx(32, 12, POS_L, C_FILL, "*%s", gCurrentBand.name);

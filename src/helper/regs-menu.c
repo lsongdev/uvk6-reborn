@@ -31,7 +31,7 @@ const uint8_t MENU_LINES_TO_SHOW = 7;
 void REGSMENU_Draw(VFOContext *ctx) {
   if (inMenu) {
 
-    const uint8_t size = PARAM_COUNT;
+    const uint8_t size = ARRAY_SIZE(PARAM_ITEMS);
     const uint16_t maxItems =
         size < MENU_LINES_TO_SHOW ? size : MENU_LINES_TO_SHOW;
     const uint16_t offset = Clamp(currentIndex - 2, 0, size - maxItems);
@@ -50,9 +50,10 @@ void REGSMENU_Draw(VFOContext *ctx) {
         FillRect(0, ry, LCD_XCENTER, MENU_ITEM_H, C_FILL);
       }
 
-      PrintSmallEx(5, y, POS_L, color, "%s", PARAM_NAMES[itemIndex]);
+      PrintSmallEx(5, y, POS_L, color, "%s",
+                   PARAM_NAMES[PARAM_ITEMS[itemIndex]]);
       PrintSmallEx(LCD_XCENTER - 5, y, POS_R, color, "%s",
-                   RADIO_GetParamValueString(ctx, itemIndex));
+                   RADIO_GetParamValueString(ctx, PARAM_ITEMS[itemIndex]));
     }
   }
 }

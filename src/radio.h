@@ -95,6 +95,7 @@ typedef struct {
   VFOContext context;     // Existing VFO context
   VFOMode mode;           // VFO or channel mode
   uint16_t channel_index; // Channel index if in channel mode
+  uint16_t vfo_ch_index;  // MR index of VFO
   bool is_active;         // Whether this is the active VFO
 } ExtendedVFOContext;
 
@@ -147,5 +148,9 @@ void RADIO_UpdateAudioRouting(RadioState *state);
 void RADIO_ToggleTX(VFOContext *ctx, bool on);
 bool RADIO_IsSSB(VFOContext *ctx);
 const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param);
+
+uint8_t RADIO_GetCurrentVFONumber(const RadioState *state);
+ExtendedVFOContext *RADIO_GetCurrentVFO(RadioState *state);
+const ExtendedVFOContext *RADIO_GetCurrentVFOConst(const RadioState *state);
 
 #endif // RADIO_H
