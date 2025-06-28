@@ -1070,10 +1070,8 @@ void BK4819_ToggleAFDAC(bool on) {
 void BK4819_TuneTo(uint32_t f, bool precise) {
   static uint32_t oldFreq;
   if (oldFreq == f) { // TODO: maybe save current freq locally
-    Log("BK tuneTo(%u) [-]", f);
     return;
   }
-  Log("BK tuneTo(%u) [+]", f);
   BK4819_SelectFilter(f);
   BK4819_SetFrequency(f);
   oldFreq = f;

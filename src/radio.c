@@ -381,7 +381,8 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     LogC(LOG_C_RED, "[ERR] %-12s -> %u", PARAM_NAMES[param], value);
     return;
   }
-  LogC(LOG_C_GREEN, "[SET] %-12s -> %u", PARAM_NAMES[param], value);
+  LogC(LOG_C_GREEN, "[SET] %-12s -> %u (%s)", PARAM_NAMES[param], value,
+       save_to_eeprom ? "Save" : "No save");
 
   uint32_t old_value = RADIO_GetParam(ctx, param);
 
@@ -412,6 +413,9 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     break;
   case PARAM_RADIO:
     ctx->radio_type = value;
+    for (uint8_t i = 0; i < PARAM_COUNT; ++i) {
+      ctx->dirty[i] = true;
+    }
     break;
   case PARAM_POWER:
     ctx->power = value;
@@ -509,73 +513,97 @@ bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc,
   return RADIO_AdjustParam(ctx, param, inc ? v : -v, save_to_eeprom);
 }
 
+static bool setParamBK4819(VFOContext *ctx, ParamType p) {
+  switch (p) {
+  case PARAM_GAIN:
+    BK4819_SetAGC(ctx->modulation != MOD_AM, ctx->gain);
+    return true;
+  case PARAM_BANDWIDTH:
+    BK4819_SetFilterBandwidth(ctx->bandwidth);
+    return true;
+  case PARAM_SQUELCH_VALUE:
+    BK4819_Squelch(ctx->squelch.value, gSettings.sqlOpenTime,
+                   gSettings.sqlCloseTime);
+    return true;
+  case PARAM_MODULATION:
+    BK4819_SetModulation(ctx->modulation);
+    return true;
+  case PARAM_FREQUENCY:
+    BK4819_TuneTo(ctx->frequency, true); // TODO: check if SetFreq needed
+    return true;
+  }
+  return false;
+}
+
+static bool setParamSI4732(VFOContext *ctx, ParamType p) {
+  switch (p) {
+  case PARAM_FREQUENCY:
+    SI47XX_TuneTo(ctx->frequency);
+    return true;
+  case PARAM_MODULATION:
+    SI47XX_SwitchMode((SI47XX_MODE)ctx->modulation);
+    return true;
+  case PARAM_GAIN:
+    SI47XX_SetAutomaticGainControl(ctx->gain == 0,
+                                   ctx->gain == 0 ? 0 : ctx->gain);
+    return true;
+  case PARAM_BANDWIDTH:
+    if (RADIO_IsSSB(ctx)) {
+      SI47XX_SetSsbBandwidth(ctx->bandwidth);
+    } else {
+      SI47XX_SetBandwidth(ctx->bandwidth, true);
+    }
+    return true;
+  }
+  return false;
+}
+
+static bool setParamBK1080(VFOContext *ctx, ParamType p) {
+  if (p == PARAM_FREQUENCY) {
+    BK1080_SetFrequency(ctx->frequency);
+    return true;
+  }
+  return false;
+}
+
 // Применение настроек
 void RADIO_ApplySettings(VFOContext *ctx) {
-  switch (ctx->radio_type) {
-  case RADIO_BK4819:
-    if (ctx->dirty[PARAM_GAIN]) {
-      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u", PARAM_NAMES[PARAM_GAIN],
-           ctx->gain);
-      BK4819_SetAGC(ctx->modulation != MOD_AM, ctx->gain);
-      ctx->dirty[PARAM_GAIN] = false;
-    }
-    if (ctx->dirty[PARAM_BANDWIDTH]) {
-      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
-           PARAM_NAMES[PARAM_BANDWIDTH], ctx->bandwidth);
-      BK4819_SetFilterBandwidth(ctx->bandwidth);
-      ctx->dirty[PARAM_BANDWIDTH] = false;
-    }
-    if (ctx->dirty[PARAM_SQUELCH_VALUE]) {
-      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
-           PARAM_NAMES[PARAM_SQUELCH_VALUE], ctx->squelch.value);
-      BK4819_Squelch(ctx->squelch.value, gSettings.sqlOpenTime,
-                     gSettings.sqlCloseTime);
-      ctx->dirty[PARAM_SQUELCH_VALUE] = false;
-    }
-    if (ctx->dirty[PARAM_MODULATION]) {
-      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
-           PARAM_NAMES[PARAM_MODULATION], ctx->modulation);
-      BK4819_SetModulation(ctx->modulation);
-      ctx->dirty[PARAM_MODULATION] = false;
-    }
-    if (ctx->dirty[PARAM_FREQUENCY]) {
-      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
-           PARAM_NAMES[PARAM_FREQUENCY], ctx->frequency);
-      BK4819_TuneTo(ctx->frequency, true); // TODO: check if SetFreq needed
-      ctx->dirty[PARAM_FREQUENCY] = false;
-    }
-    break;
-
-  case RADIO_SI4732:
-    if (ctx->dirty[PARAM_FREQUENCY]) {
-      SI47XX_TuneTo(ctx->frequency);
-      ctx->dirty[PARAM_FREQUENCY] = false;
-    }
-    if (ctx->dirty[PARAM_MODULATION]) {
-      SI47XX_SwitchMode((SI47XX_MODE)ctx->modulation);
-      ctx->dirty[PARAM_MODULATION] = false;
-    }
-    if (ctx->dirty[PARAM_GAIN]) {
-      SI47XX_SetAutomaticGainControl(ctx->gain == 0,
-                                     ctx->gain == 0 ? 0 : ctx->gain);
-      ctx->dirty[PARAM_GAIN] = false;
-    }
-    if (ctx->dirty[PARAM_BANDWIDTH]) {
-      if (RADIO_IsSSB(ctx)) {
-        SI47XX_SetSsbBandwidth(ctx->bandwidth);
-      } else {
-        SI47XX_SetBandwidth(ctx->bandwidth, true);
-      }
-      ctx->dirty[PARAM_BANDWIDTH] = false;
-    }
-    break;
-  case RADIO_BK1080:
-    if (ctx->dirty[PARAM_FREQUENCY]) {
-      BK1080_SetFrequency(ctx->frequency);
-      ctx->dirty[PARAM_FREQUENCY] = false;
-    }
-    break;
+  if (ctx->dirty[PARAM_RADIO]) {
+    LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %s", PARAM_NAMES[PARAM_RADIO],
+         RADIO_GetParamValueString(ctx, PARAM_RADIO));
+    ctx->dirty[PARAM_RADIO] = false;
   }
+
+  for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
+    if (!ctx->dirty[p]) {
+      continue;
+    }
+    ctx->dirty[p] = false;
+
+    switch (ctx->radio_type) {
+    case RADIO_BK4819:
+      if (!setParamBK4819(ctx, p)) {
+        LogC(LOG_C_YELLOW, "[W] Param %s not set for BK4819", PARAM_NAMES[p]);
+        continue;
+      }
+      break;
+    case RADIO_SI4732:
+      if (!setParamSI4732(ctx, p)) {
+        LogC(LOG_C_YELLOW, "[W] Param %s not set for SI4732", PARAM_NAMES[p]);
+        continue;
+      }
+      break;
+    case RADIO_BK1080:
+      if (!setParamBK1080(ctx, p)) {
+        LogC(LOG_C_YELLOW, "[W] Param %s not set for BK1080", PARAM_NAMES[p]);
+        continue;
+      }
+      break;
+    }
+    LogC(LOG_C_BRIGHT_WHITE, "[SET] %-12s -> %s", PARAM_NAMES[p],
+         RADIO_GetParamValueString(ctx, p));
+  }
+
   setupToneDetection(ctx); // TODO: check if needed each time
 }
 
@@ -757,6 +785,7 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
   storage->gainIndex = vfo->context.gain;
   storage->channel = vfo->channel_index;
   storage->squelch = vfo->context.squelch;
+  storage->radio = vfo->context.radio_type;
   storage->code.rx = vfo->context.code;
   storage->code.tx = vfo->context.tx_state.code;
 }
@@ -777,11 +806,14 @@ bool RADIO_SaveCurrentVFO(RadioState *state) {
 // Load channel into VFO
 void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
                             uint16_t channel_index) {
-  if (vfo_index >= state->num_vfos)
+  if (vfo_index >= state->num_vfos) {
     return;
+  }
+
   Log("RADIO_LoadChannel %u ToVFO", channel_index);
 
   ExtendedVFOContext *vfo = &state->vfos[vfo_index];
+  VFOContext *ctx = &vfo->context;
   CH channel;
   CHANNELS_Load(channel_index, &channel);
 
@@ -789,17 +821,16 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
   vfo->channel_index = channel_index;
 
   // Set parameters from channel
-  RADIO_SetParam(&vfo->context, PARAM_FREQUENCY, channel.rxF, false);
-  RADIO_SetParam(&vfo->context, PARAM_MODULATION, channel.modulation, false);
-  RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, channel.bw, false);
-  RADIO_SetParam(&vfo->context, PARAM_GAIN, channel.gainIndex, false);
-  RADIO_SetParam(&vfo->context, PARAM_SQUELCH_TYPE, channel.squelch.type,
-                 false);
-  RADIO_SetParam(&vfo->context, PARAM_SQUELCH_VALUE, channel.squelch.value,
-                 false);
+  RADIO_SetParam(ctx, PARAM_RADIO, channel.radio, false);
+  RADIO_SetParam(ctx, PARAM_FREQUENCY, channel.rxF, false);
+  RADIO_SetParam(ctx, PARAM_MODULATION, channel.modulation, false);
+  RADIO_SetParam(ctx, PARAM_BANDWIDTH, channel.bw, false);
+  RADIO_SetParam(ctx, PARAM_GAIN, channel.gainIndex, false);
+  RADIO_SetParam(ctx, PARAM_SQUELCH_TYPE, channel.squelch.type, false);
+  RADIO_SetParam(ctx, PARAM_SQUELCH_VALUE, channel.squelch.value, false);
 
-  vfo->context.code = channel.code.rx;
-  vfo->context.tx_state.code = channel.code.tx;
+  ctx->code = channel.code.rx;
+  ctx->tx_state.code = channel.code.tx;
 
   RADIO_ApplySettings(&vfo->context);
 }
