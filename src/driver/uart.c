@@ -534,7 +534,7 @@ void Log(const char *pattern, ...) {
   va_start(args, pattern);
   vsnprintf(text, sizeof(text), pattern, args);
   va_end(args);
-  UART_printf("%u %s\n", Now(), text);
+  UART_printf("%+10u %s\n", Now(), text);
 }
 #else
 void Log(const char *pattern, ...) {}

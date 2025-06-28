@@ -335,17 +335,9 @@ bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value) {
   case PARAM_FREQUENCY:
     return (value >= band->min_freq && value <= band->max_freq);
   case PARAM_MODULATION:
-    for (size_t i = 0; i < sizeof(band->available_mods); i++) {
-      if (band->available_mods[i] == (ModulationType)value)
-        return true;
-    }
-    return false;
+    return value < ARRAY_SIZE(band->available_mods);
   case PARAM_BANDWIDTH:
-    for (size_t i = 0; i < sizeof(band->available_bandwidths); i++) {
-      if (band->available_bandwidths[i] == (uint16_t)value)
-        return true;
-    }
-    return false;
+    return value < ARRAY_SIZE(band->available_bandwidths);
   default:
     return true; // Остальные параметры не зависят от диапазона
   }
@@ -409,10 +401,12 @@ uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
 
 bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
                        bool save_to_eeprom) {
-  uint32_t mi, ma, v = RADIO_GetParam(ctx, param);
   const FreqBand *band = ctx->current_band;
-  if (!band)
+  if (!band) {
     return false;
+  }
+
+  uint32_t mi = 0, ma, v = RADIO_GetParam(ctx, param);
 
   switch (param) {
   case PARAM_FREQUENCY:
@@ -420,23 +414,14 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
     ma = band->max_freq;
     break;
   case PARAM_MODULATION:
-    v = band->available_mods[0];
-    for (size_t i = 0; i < ARRAY_SIZE(band->available_mods); i++) {
-      if (band->available_mods[i] == v) {
-        v = AdjustU(i, 0, ARRAY_SIZE(band->available_mods), inc);
-      }
-    }
-    RADIO_SetParam(ctx, param, v, save_to_eeprom);
-    return true;
+    ma = ARRAY_SIZE(band->available_mods);
+    break;
   case PARAM_BANDWIDTH:
-    v = band->available_bandwidths[0];
-    for (size_t i = 0; i < ARRAY_SIZE(band->available_bandwidths); i++) {
-      if (band->available_bandwidths[i] == v) {
-        v = AdjustU(i, 0, ARRAY_SIZE(band->available_bandwidths), inc);
-      }
-    }
-    RADIO_SetParam(ctx, param, v, save_to_eeprom);
-    return true;
+    ma = ARRAY_SIZE(band->available_bandwidths);
+    break;
+  case PARAM_STEP:
+    ma = STEP_COUNT;
+    break;
   default:
     return false;
   }
