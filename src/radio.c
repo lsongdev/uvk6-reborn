@@ -699,7 +699,7 @@ bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc,
 // Применение настроек
 void RADIO_ApplySettings(VFOContext *ctx) {
   if (ctx->dirty[PARAM_RADIO]) {
-    LogC(LOG_C_BRIGHT_MAGENTA, "[RADIO] Change to %s", PARAM_NAMES[PARAM_RADIO],
+    LogC(LOG_C_BRIGHT_MAGENTA, "[RADIO] Change to %s",
          RADIO_GetParamValueString(ctx, PARAM_RADIO));
     ctx->dirty[PARAM_RADIO] = false;
   }
@@ -734,7 +734,9 @@ void RADIO_ApplySettings(VFOContext *ctx) {
          RADIO_GetParamValueString(ctx, p));
   }
 
-  setupToneDetection(ctx); // TODO: check if needed each time
+  if (ctx->radio_type == RADIO_BK4819) {
+    setupToneDetection(ctx); // TODO: check if needed each time
+  }
 }
 
 // Начать передачу
@@ -853,11 +855,17 @@ bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
   // Deactivate current VFO
   state->vfos[state->active_vfo_index].is_active = false;
 
+  VFOContext *oldCtx = &state->vfos[state->active_vfo_index].context;
+  VFOContext *newCtx = &state->vfos[vfo_index].context;
+
   for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
-    VFOContext *oldCtx = &state->vfos[state->active_vfo_index].context;
-    VFOContext *newCtx = &state->vfos[vfo_index].context;
     newCtx->dirty[p] = RADIO_GetParam(oldCtx, p) != RADIO_GetParam(newCtx, p);
   }
+
+  // mute previous vfo (fast fix)
+  state->vfos[state->active_vfo_index].is_open = false;
+  RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
+  RADIO_SwitchAudioToVFO(state, vfo_index);
 
   // Activate new VFO
   state->active_vfo_index = vfo_index;
@@ -865,6 +873,9 @@ bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
 
   // Apply settings for the new VFO
   RADIO_ApplySettings(&state->vfos[vfo_index].context);
+
+  gSettings.activeVFO = vfo_index;
+  SETTINGS_DelayedSave();
 
   return true;
 }
@@ -914,19 +925,23 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
   LogC(LOG_C_BRIGHT_CYAN, "[RADIO] SaveVFOToStorage");
 
   const ExtendedVFOContext *vfo = &state->vfos[vfo_index];
+  const VFOContext *ctx = &vfo->context;
 
   storage->meta.type = TYPE_VFO;
+
   storage->isChMode = vfo->mode;
-  storage->rxF = vfo->context.frequency;
-  storage->modulation = vfo->context.modulation;
-  // storage->volume = vfo->context.volume;
-  storage->bw = vfo->context.bandwidth;
-  storage->gainIndex = vfo->context.gain;
   storage->channel = vfo->channel_index;
-  storage->squelch = vfo->context.squelch;
-  storage->radio = vfo->context.radio_type;
-  storage->code.rx = vfo->context.code;
-  storage->code.tx = vfo->context.tx_state.code;
+
+  storage->bw = ctx->bandwidth;
+  storage->gainIndex = ctx->gain;
+  storage->modulation = ctx->modulation;
+  storage->radio = ctx->radio_type;
+  storage->rxF = ctx->frequency;
+  storage->squelch = ctx->squelch;
+  storage->step = ctx->step;
+
+  storage->code.rx = ctx->code;
+  storage->code.tx = ctx->tx_state.code;
 }
 
 bool RADIO_SaveCurrentVFO(RadioState *state) {
@@ -1231,7 +1246,7 @@ static const char *RADIO_GetModulationName(VFOContext *ctx) {
 }
 
 const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
-  static char buf[16];
+  static char buf[16] = "unk";
   uint32_t v = RADIO_GetParam(ctx, param);
   switch (param) {
   case PARAM_MODULATION:
@@ -1276,11 +1291,11 @@ const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
   case PARAM_DEV:
   case PARAM_MIC:
   case PARAM_XTAL:
+  case PARAM_SQUELCH_VALUE:
     snprintf(buf, 15, "%u", v);
     break;
-  case PARAM_SQUELCH_VALUE:
-    snprintf(buf, 15, "%s %u", SQ_TYPE_NAMES[ctx->squelch.type],
-             ctx->squelch.value);
+  case PARAM_SQUELCH_TYPE:
+    snprintf(buf, 15, "%s", SQ_TYPE_NAMES[ctx->squelch.type]);
     break;
   }
   return buf;
