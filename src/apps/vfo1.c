@@ -248,6 +248,9 @@ void VFO1_render(void) {
                (!gSettings.mWatch || gIsListening)) { // NOTE mwatch is
     temporary STATUSLINE_RenderRadioSettings(); } else {
       STATUSLINE_SetText(radio.name); */
+  } else {
+    STATUSLINE_SetText("Radio: %s",
+                       RADIO_GetParamValueString(ctx, PARAM_RADIO));
   }
 
   uint32_t f =

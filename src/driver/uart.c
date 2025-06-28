@@ -536,6 +536,14 @@ void Log(const char *pattern, ...) {
   va_end(args);
   UART_printf("%+10u %s\n", Now(), text);
 }
+void LogC(LogColor c, const char *pattern, ...) {
+  char text[128];
+  va_list args;
+  va_start(args, pattern);
+  vsnprintf(text, sizeof(text), pattern, args);
+  va_end(args);
+  UART_printf("%+10u \033[%um%s\033[%um\n", Now(), c, text, LOG_C_RESET);
+}
 #else
 void Log(const char *pattern, ...) {}
 #endif

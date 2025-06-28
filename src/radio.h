@@ -30,6 +30,7 @@ typedef enum {
   PARAM_VOLUME,
   PARAM_BANDWIDTH,
   PARAM_TX_STATE,
+  PARAM_RADIO,
 
   PARAM_COUNT
 } ParamType;

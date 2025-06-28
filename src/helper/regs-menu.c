@@ -16,7 +16,7 @@ static uint8_t PARAM_ITEMS[] = {
     PARAM_SQUELCH_VALUE,
     PARAM_MODULATION,
     PARAM_STEP,
-    // PARAM_RADIO,
+    PARAM_RADIO,
     /* PARAM_AFC,
     PARAM_DEV,
     PARAM_MIC,

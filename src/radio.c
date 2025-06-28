@@ -25,6 +25,12 @@ bool gMonitorMode;
 
 Measurement gLoot;
 
+const char *RADIO_NAMES[] = {
+    [RADIO_BK4819] = "BK4819",
+    [RADIO_BK1080] = "BK1080",
+    [RADIO_SI4732] = "SI4732",
+};
+
 const char *PARAM_NAMES[] = {
     [PARAM_FREQUENCY] = "f",         //
     [PARAM_STEP] = "Step",           //
@@ -257,6 +263,12 @@ static TXStatus checkTX(VFOContext *ctx) {
 }
 
 static void toggleBK4819(bool on) {
+  static bool bk4819_listen;
+  if (bk4819_listen == on) {
+    return;
+  }
+  bk4819_listen = on;
+
   Log("Toggle bk4819 audio %u", on);
   if (on) {
     BK4819_ToggleAFDAC(true);
@@ -272,6 +284,11 @@ static void toggleBK4819(bool on) {
 }
 
 static void toggleBK1080SI4732(bool on) {
+  static bool bc_listen;
+  if (bc_listen == on) {
+    return;
+  }
+  bc_listen = on;
   Log("Toggle bk1080si audio %u", on);
   if (on) {
     SYS_DelayMs(8);
@@ -288,6 +305,7 @@ static void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
     return;
 
   const ExtendedVFOContext *vfo = &state->vfos[vfo_index];
+  BOARD_ToggleGreen(vfo->is_open);
 
   // Реализация зависит от вашего аппаратного обеспечения
   switch (vfo->context.radio_type) {
@@ -358,10 +376,10 @@ bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value) {
 void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
                     bool save_to_eeprom) {
   if (!RADIO_IsParamValid(ctx, param, value)) {
-    Log("\031[32m[ERR] %-12s -> %u\033[0m", PARAM_NAMES[param], value);
+    LogC(LOG_C_RED, "[ERR] %-12s -> %u", PARAM_NAMES[param], value);
     return;
   }
-  Log("\033[32m[SET] %-12s -> %u\033[0m", PARAM_NAMES[param], value);
+  LogC(LOG_C_GREEN, "[SET] %-12s -> %u", PARAM_NAMES[param], value);
 
   uint32_t old_value = RADIO_GetParam(ctx, param);
 
@@ -380,8 +398,22 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     break;
   case PARAM_STEP:
     ctx->step = (Step)value;
-  default:
-    return;
+    break;
+  case PARAM_GAIN:
+    ctx->gain = value;
+    break;
+  case PARAM_SQUELCH_VALUE:
+    ctx->squelch.value = value;
+    break;
+  case PARAM_SQUELCH_TYPE:
+    ctx->squelch.type = value;
+    break;
+  case PARAM_RADIO:
+    ctx->radio_type = value;
+    break;
+  case PARAM_POWER:
+    ctx->power = value;
+    break;
   }
   ctx->dirty[param] = true;
 
@@ -405,11 +437,13 @@ uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
   case PARAM_VOLUME:
     return ctx->volume;
   case PARAM_GAIN:
-    return ctx->volume;
+    return ctx->gain;
   case PARAM_SQUELCH_TYPE:
     return ctx->squelch.type;
   case PARAM_SQUELCH_VALUE:
     return ctx->squelch.value;
+  case PARAM_RADIO:
+    return ctx->radio_type;
   }
   return 0;
 }
@@ -421,7 +455,7 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
     return false;
   }
 
-  uint32_t mi = 0, ma, v = RADIO_GetParam(ctx, param);
+  uint32_t mi = 0, ma = UINT32_MAX, v = RADIO_GetParam(ctx, param);
 
   switch (param) {
   case PARAM_FREQUENCY:
@@ -445,6 +479,7 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
     } else {
       ma = 0;
     }
+    break;
   default:
     return false;
   }
@@ -466,20 +501,35 @@ void RADIO_ApplySettings(VFOContext *ctx) {
   switch (ctx->radio_type) {
   case RADIO_BK4819:
     if (ctx->dirty[PARAM_FREQUENCY]) {
+      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
+           PARAM_NAMES[PARAM_FREQUENCY], ctx->frequency);
       BK4819_SetFrequency(ctx->frequency);
       ctx->dirty[PARAM_FREQUENCY] = false;
     }
     if (ctx->dirty[PARAM_MODULATION]) {
+      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
+           PARAM_NAMES[PARAM_MODULATION], ctx->modulation);
       BK4819_SetModulation(ctx->modulation);
       ctx->dirty[PARAM_MODULATION] = false;
     }
     if (ctx->dirty[PARAM_BANDWIDTH]) {
+      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
+           PARAM_NAMES[PARAM_BANDWIDTH], ctx->bandwidth);
       BK4819_SetFilterBandwidth(ctx->bandwidth);
       ctx->dirty[PARAM_BANDWIDTH] = false;
     }
     if (ctx->dirty[PARAM_GAIN]) {
+      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u", PARAM_NAMES[PARAM_GAIN],
+           ctx->gain);
       BK4819_SetAGC(ctx->modulation != MOD_AM, ctx->gain);
       ctx->dirty[PARAM_GAIN] = false;
+    }
+    if (ctx->dirty[PARAM_SQUELCH_VALUE]) {
+      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
+           PARAM_NAMES[PARAM_SQUELCH_VALUE], ctx->squelch.value);
+      BK4819_Squelch(ctx->squelch.value, gSettings.sqlOpenTime,
+                     gSettings.sqlCloseTime);
+      ctx->dirty[PARAM_SQUELCH_VALUE] = false;
     }
     break;
 
@@ -656,6 +706,9 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
   RADIO_SetParam(&vfo->context, PARAM_MODULATION, storage->modulation, false);
   RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, storage->bw, false);
   RADIO_SetParam(&vfo->context, PARAM_POWER, storage->power, false);
+  RADIO_SetParam(&vfo->context, PARAM_GAIN, storage->gainIndex, false);
+  RADIO_SetParam(&vfo->context, PARAM_SQUELCH_VALUE, storage->squelch.value,
+                 false);
   // RADIO_SetParam(&vfo->context, PARAM_VOLUME, storage->volume, false);
 
   vfo->context.code = storage->code.rx;
@@ -685,6 +738,7 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
   storage->modulation = vfo->context.modulation;
   // storage->volume = vfo->context.volume;
   storage->bw = vfo->context.bandwidth;
+  storage->gainIndex = vfo->context.gain;
   storage->channel = vfo->channel_index;
   storage->code.rx = vfo->context.code;
   storage->code.tx = vfo->context.tx_state.code;
@@ -721,6 +775,11 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
   RADIO_SetParam(&vfo->context, PARAM_FREQUENCY, channel.rxF, false);
   RADIO_SetParam(&vfo->context, PARAM_MODULATION, channel.modulation, false);
   RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, channel.bw, false);
+  RADIO_SetParam(&vfo->context, PARAM_GAIN, channel.gainIndex, false);
+  RADIO_SetParam(&vfo->context, PARAM_SQUELCH_TYPE, channel.squelch.type,
+                 false);
+  RADIO_SetParam(&vfo->context, PARAM_SQUELCH_VALUE, channel.squelch.value,
+                 false);
 
   vfo->context.code = channel.code.rx;
   vfo->context.tx_state.code = channel.code.tx;
@@ -816,10 +875,7 @@ bool RADIO_CheckSquelch(VFOContext *ctx) {
 void RADIO_UpdateSquelch(RadioState *state) {
   ExtendedVFOContext *active_vfo = &state->vfos[state->active_vfo_index];
   active_vfo->is_open = RADIO_CheckSquelch(&active_vfo->context);
-  if (active_vfo->is_open) {
-    Log("OPEN!");
-    RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
-  }
+  RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
 }
 
 // Update multiwatch state (should be called periodically)
@@ -888,6 +944,7 @@ void RADIO_LoadVFOs(RadioState *state) {
   // NOTE: temporary
   Log("BK4819 INIT");
   BK4819_Init();
+  BK4819_RX_TurnOn();
 
   uint8_t vfoIdx = 0;
   for (uint16_t i = 0; i < CHANNELS_GetCountMax(); ++i) {
@@ -996,6 +1053,9 @@ const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
     break;
   case PARAM_FREQUENCY:
     snprintf(buf, 15, "%u.%05u", ctx->frequency / MHZ, ctx->frequency % MHZ);
+    break;
+  case PARAM_RADIO:
+    snprintf(buf, 15, "%s", RADIO_NAMES[ctx->radio_type]);
     break;
   case PARAM_GAIN:
     if (ctx->radio_type == RADIO_BK4819) {
