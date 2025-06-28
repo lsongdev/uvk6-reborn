@@ -10,18 +10,41 @@ static const uint8_t MENU_ITEM_H = 7;
 static uint8_t currentIndex;
 static bool inMenu;
 
-static uint8_t PARAM_ITEMS[] = {
-    PARAM_GAIN,
-    PARAM_BANDWIDTH,
-    PARAM_SQUELCH_VALUE,
-    PARAM_MODULATION,
-    PARAM_STEP,
-    PARAM_RADIO,
-    PARAM_AFC,
-    PARAM_DEV,
-    PARAM_MIC,
-    PARAM_XTAL,
-    PARAM_POWER,
+static uint8_t PARAM_ITEMS[3][PARAM_COUNT] = {
+    [RADIO_BK4819] =
+        {
+            PARAM_RADIO,
+            PARAM_GAIN,
+            PARAM_BANDWIDTH,
+            PARAM_SQUELCH_VALUE,
+            PARAM_MODULATION,
+            PARAM_STEP,
+            PARAM_AFC,
+            PARAM_DEV,
+            PARAM_MIC,
+            PARAM_XTAL,
+            PARAM_POWER,
+        },
+    [RADIO_SI4732] =
+        {
+            PARAM_RADIO,
+            PARAM_GAIN,
+            PARAM_BANDWIDTH,
+            PARAM_SQUELCH_VALUE,
+            PARAM_MODULATION,
+            PARAM_STEP,
+        },
+    [RADIO_BK1080] =
+        {
+            PARAM_RADIO,
+            PARAM_STEP,
+        },
+};
+
+static uint8_t PARAM_SIZE[] = {
+    [RADIO_BK4819] = 11,
+    [RADIO_SI4732] = 6,
+    [RADIO_BK1080] = 2,
 };
 
 static void updateValueAlt(bool inc) {}
@@ -31,7 +54,7 @@ const uint8_t MENU_LINES_TO_SHOW = 7;
 void REGSMENU_Draw(VFOContext *ctx) {
   if (inMenu) {
 
-    const uint8_t size = ARRAY_SIZE(PARAM_ITEMS);
+    const uint8_t size = PARAM_SIZE[ctx->radio_type];
     const uint16_t maxItems =
         size < MENU_LINES_TO_SHOW ? size : MENU_LINES_TO_SHOW;
     const uint16_t offset = Clamp(currentIndex - 2, 0, size - maxItems);
@@ -51,9 +74,10 @@ void REGSMENU_Draw(VFOContext *ctx) {
       }
 
       PrintSmallEx(5, y, POS_L, color, "%s",
-                   PARAM_NAMES[PARAM_ITEMS[itemIndex]]);
+                   PARAM_NAMES[PARAM_ITEMS[ctx->radio_type][itemIndex]]);
       PrintSmallEx(LCD_XCENTER - 5, y, POS_R, color, "%s",
-                   RADIO_GetParamValueString(ctx, PARAM_ITEMS[itemIndex]));
+                   RADIO_GetParamValueString(
+                       ctx, PARAM_ITEMS[ctx->radio_type][itemIndex]));
     }
   }
 }
@@ -66,7 +90,8 @@ bool REGSMENU_Key(KEY_Code_t key, Key_State_t state, VFOContext *ctx) {
   case KEY_UP:
   case KEY_DOWN:
     if (inMenu) {
-      currentIndex = IncDecU(currentIndex, 0, PARAM_COUNT, key == KEY_DOWN);
+      currentIndex = IncDecU(currentIndex, 0, PARAM_SIZE[ctx->radio_type],
+                             key == KEY_DOWN);
       return true;
     }
     break;
@@ -74,7 +99,8 @@ bool REGSMENU_Key(KEY_Code_t key, Key_State_t state, VFOContext *ctx) {
   case KEY_8:
     if (inMenu) {
       // radio.fixedBoundsMode = false;
-      RADIO_IncDecParam(ctx, PARAM_ITEMS[currentIndex], key == KEY_2, true);
+      RADIO_IncDecParam(ctx, PARAM_ITEMS[ctx->radio_type][currentIndex],
+                        key == KEY_2, true);
       return true;
     }
     break;

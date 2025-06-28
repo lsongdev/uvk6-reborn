@@ -16,6 +16,7 @@
 #include "helper/measurements.h"
 #include "misc.h"
 #include "scheduler.h"
+#include "settings.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -863,7 +864,7 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
                               const VFO *storage) {
   if (vfo_index >= state->num_vfos)
     return;
-  Log("RADIO_LoadVFOFromStorage");
+  LogC(LOG_C_BRIGHT_CYAN, "[RADIO] LoadVFOFromStorage");
 
   ExtendedVFOContext *vfo = &state->vfos[vfo_index];
   vfo->mode = storage->isChMode;
@@ -879,6 +880,9 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
   RADIO_SetParam(ctx, PARAM_SQUELCH_TYPE, storage->squelch.type, false);
   RADIO_SetParam(ctx, PARAM_SQUELCH_VALUE, storage->squelch.value, false);
   RADIO_SetParam(ctx, PARAM_STEP, storage->step, false);
+
+  RADIO_SetParam(ctx, PARAM_MIC, gSettings.mic, false);
+  RADIO_SetParam(ctx, PARAM_DEV, gSettings.deviation * 10, false);
 
   vfo->context.code = storage->code.rx;
   vfo->context.tx_state.code = storage->code.tx;
@@ -897,7 +901,7 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
                             VFO *storage) {
   if (vfo_index >= state->num_vfos)
     return;
-  Log("RADIO_SaveVFOToStorage");
+  LogC(LOG_C_BRIGHT_CYAN, "[RADIO] SaveVFOToStorage");
 
   const ExtendedVFOContext *vfo = &state->vfos[vfo_index];
 
@@ -935,7 +939,7 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
     return;
   }
 
-  Log("RADIO_LoadChannel %u ToVFO", channel_index);
+  LogC(LOG_C_BRIGHT_CYAN, "[RADIO] LoadChannel %u to VFO", channel_index);
 
   ExtendedVFOContext *vfo = &state->vfos[vfo_index];
   VFOContext *ctx = &vfo->context;
