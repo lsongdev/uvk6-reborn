@@ -364,24 +364,18 @@ static void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
 
   const ExtendedVFOContext *vfo = &state->vfos[vfo_index];
 
-  BOARD_ToggleGreen(vfo->is_open);
-
-  // Реализация зависит от вашего аппаратного обеспечения
   switch (vfo->context.radio_type) {
   case RADIO_BK4819:
     rxTurnOff(RADIO_HasSi() ? RADIO_SI4732 : RADIO_BK1080);
     toggleBK1080SI4732(false);
-    toggleBK4819(vfo->is_open);
     break;
   case RADIO_SI4732:
     toggleBK4819(false);
     rxTurnOff(RADIO_BK4819);
-    toggleBK1080SI4732(vfo->is_open);
     break;
   case RADIO_BK1080:
     toggleBK4819(false);
     rxTurnOff(RADIO_BK4819);
-    toggleBK1080SI4732(vfo->is_open);
     break;
   default:
     break;
@@ -392,6 +386,19 @@ static void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
   } else {
     rxTurnOff(vfo->context.radio_type);
   }
+
+  switch (vfo->context.radio_type) {
+  case RADIO_BK4819:
+    toggleBK4819(vfo->is_open);
+    break;
+  case RADIO_SI4732:
+  case RADIO_BK1080:
+    toggleBK1080SI4732(vfo->is_open);
+    break;
+  default:
+    break;
+  }
+  BOARD_ToggleGreen(vfo->is_open);
 
   // Устанавливаем громкость для выбранного VFO
   // AUDIO_SetVolume(vfo->context.volume);
