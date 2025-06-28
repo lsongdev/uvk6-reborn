@@ -17,10 +17,10 @@ static uint8_t PARAM_ITEMS[] = {
     PARAM_MODULATION,
     PARAM_STEP,
     PARAM_RADIO,
-    /* PARAM_AFC,
+    PARAM_AFC,
     PARAM_DEV,
     PARAM_MIC,
-    PARAM_XTAL, */
+    PARAM_XTAL,
     PARAM_POWER,
 };
 

@@ -32,6 +32,11 @@ typedef enum {
   PARAM_TX_STATE,
   PARAM_RADIO,
 
+  PARAM_AFC,
+  PARAM_DEV,
+  PARAM_MIC,
+  PARAM_XTAL,
+
   PARAM_COUNT
 } ParamType;
 
@@ -67,6 +72,12 @@ typedef struct {
   Squelch squelch;
   TXOutputPower power;
   uint8_t gain;
+
+  uint8_t afc;
+  uint16_t dev;
+  uint8_t mic;
+  XtalMode xtal;
+
   struct {
     bool is_active; // true, если идёт передача
     TXStatus last_error;

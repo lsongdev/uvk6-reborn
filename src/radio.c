@@ -3,6 +3,7 @@
 #include "dcs.h"
 #include "driver/audio.h"
 #include "driver/bk1080.h"
+#include "driver/bk4819-regs.h"
 #include "driver/bk4819.h"
 #include "driver/si473x.h"
 #include "driver/st7565.h"
@@ -44,6 +45,11 @@ const char *PARAM_NAMES[] = {
     [PARAM_BANDWIDTH] = "BW",         //
     [PARAM_TX_STATE] = "TX state",    //
     [PARAM_RADIO] = "Radio",          //
+
+    [PARAM_AFC] = "AFC",   //
+    [PARAM_DEV] = "DEV",   //
+    [PARAM_MIC] = "MIC",   //
+    [PARAM_XTAL] = "XTAL", //
 };
 
 const char *TX_STATE_NAMES[7] = {
@@ -400,6 +406,12 @@ void RADIO_Init(VFOContext *ctx, Radio radio_type) {
   case RADIO_BK4819:
     ctx->current_band = &bk4819_bands[0];
     ctx->frequency = 145500000; // 145.5 МГц (диапазон FM)
+
+    ctx->xtal = BK4819_GetRegValue(RS_XTAL_MODE);
+    ctx->afc = BK4819_GetAFC();
+    ctx->dev = BK4819_GetRegValue(RS_DEV);
+    ctx->mic = BK4819_GetRegValue(RS_MIC);
+
     break;
   case RADIO_SI4732:
     ctx->current_band = &si4732_bands[0];
@@ -465,6 +477,18 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   case PARAM_GAIN:
     ctx->gain = value;
     break;
+  case PARAM_AFC:
+    ctx->afc = value;
+    break;
+  case PARAM_DEV:
+    ctx->dev = value;
+    break;
+  case PARAM_MIC:
+    ctx->mic = value;
+    break;
+  case PARAM_XTAL:
+    ctx->xtal = (XtalMode)value;
+    break;
   case PARAM_SQUELCH_VALUE:
     ctx->squelch.value = value;
     break;
@@ -519,6 +543,14 @@ uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
     return ctx->radio_type;
   case PARAM_POWER:
     return ctx->tx_state.power_level;
+  case PARAM_AFC:
+    return ctx->afc;
+  case PARAM_XTAL:
+    return ctx->xtal;
+  case PARAM_MIC:
+    return ctx->mic;
+  case PARAM_DEV:
+    return ctx->dev;
   case PARAM_COUNT:
     break;
   }
@@ -553,6 +585,18 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
     break;
   case PARAM_SQUELCH_TYPE:
     ma = 4;
+    break;
+  case PARAM_AFC:
+    ma = 11;
+    break;
+  case PARAM_DEV:
+    ma = 1451;
+    break;
+  case PARAM_MIC:
+    ma = 16;
+    break;
+  case PARAM_XTAL:
+    ma = XTAL_3_38_4M + 1;
     break;
   case PARAM_GAIN:
     if (ctx->radio_type == RADIO_BK4819) {
@@ -600,6 +644,18 @@ static bool setParamBK4819(VFOContext *ctx, ParamType p) {
     return true;
   case PARAM_FREQUENCY:
     BK4819_TuneTo(ctx->frequency, true); // TODO: check if SetFreq needed
+    return true;
+  case PARAM_AFC:
+    BK4819_SetAFC(ctx->afc);
+    return true;
+  case PARAM_XTAL:
+    BK4819_XtalSet(ctx->xtal);
+    return true;
+  case PARAM_MIC:
+    BK4819_SetRegValue(RS_MIC, ctx->mic);
+    return true;
+  case PARAM_DEV:
+    BK4819_SetRegValue(RS_DEV, ctx->dev);
     return true;
   }
   return false;
@@ -1194,6 +1250,12 @@ const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
     break;
   case PARAM_POWER:
     return TX_POWER_NAMES[ctx->power];
+  case PARAM_AFC:
+  case PARAM_DEV:
+  case PARAM_MIC:
+  case PARAM_XTAL:
+    snprintf(buf, 15, "%u", v);
+    break;
   case PARAM_SQUELCH_VALUE:
     snprintf(buf, 15, "%s %u", SQ_TYPE_NAMES[ctx->squelch.type],
              ctx->squelch.value);
