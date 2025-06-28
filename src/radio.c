@@ -422,6 +422,7 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     ctx->save_to_eeprom = true;
     ctx->last_save_time = Now();
   }
+  RADIO_ApplySettings(ctx);
 }
 
 uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
@@ -471,6 +472,12 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
   case PARAM_STEP:
     ma = STEP_COUNT;
     break;
+  case PARAM_SQUELCH_VALUE:
+    ma = 11;
+    break;
+  case PARAM_SQUELCH_TYPE:
+    ma = 4;
+    break;
   case PARAM_GAIN:
     if (ctx->radio_type == RADIO_BK4819) {
       ma = ARRAY_SIZE(gainTable);
@@ -481,6 +488,7 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
     }
     break;
   default:
+    LogC(LOG_C_RED, "IDK range of %s", PARAM_NAMES[param]);
     return false;
   }
   RADIO_SetParam(ctx, param, AdjustU(v, mi, ma, inc), save_to_eeprom);
@@ -710,6 +718,8 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
   RADIO_SetParam(&vfo->context, PARAM_GAIN, storage->gainIndex, false);
   RADIO_SetParam(&vfo->context, PARAM_SQUELCH_VALUE, storage->squelch.value,
                  false);
+  RADIO_SetParam(&vfo->context, PARAM_SQUELCH_TYPE, storage->squelch.type,
+                 false);
   // RADIO_SetParam(&vfo->context, PARAM_VOLUME, storage->volume, false);
 
   vfo->context.code = storage->code.rx;
@@ -741,6 +751,7 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
   storage->bw = vfo->context.bandwidth;
   storage->gainIndex = vfo->context.gain;
   storage->channel = vfo->channel_index;
+  storage->squelch = vfo->context.squelch;
   storage->code.rx = vfo->context.code;
   storage->code.tx = vfo->context.tx_state.code;
 }
