@@ -521,7 +521,8 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     LogC(LOG_C_RED, "[ERR] %-12s -> %u", PARAM_NAMES[param], value);
     return;
   }
-  LogC(LOG_C_WHITE, "[SET] %-12s -> %u (%s)", PARAM_NAMES[param], value,
+  LogC(LOG_C_WHITE, "[SET] %-12s -> %s (%s)", PARAM_NAMES[param],
+       RADIO_GetParamValueString(ctx, param),
        save_to_eeprom ? "Save" : "No save");
 
   uint32_t old_value = RADIO_GetParam(ctx, param);
@@ -586,7 +587,6 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     ctx->save_to_eeprom = true;
     ctx->last_save_time = Now();
   }
-  RADIO_ApplySettings(ctx);
 }
 
 uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
@@ -683,6 +683,7 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
     return false;
   }
   RADIO_SetParam(ctx, param, AdjustU(v, mi, ma, inc), save_to_eeprom);
+  RADIO_ApplySettings(ctx);
   return true;
 }
 
@@ -698,7 +699,7 @@ bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc,
 // Применение настроек
 void RADIO_ApplySettings(VFOContext *ctx) {
   if (ctx->dirty[PARAM_RADIO]) {
-    LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %s", PARAM_NAMES[PARAM_RADIO],
+    LogC(LOG_C_BRIGHT_MAGENTA, "[RADIO] Change to %s", PARAM_NAMES[PARAM_RADIO],
          RADIO_GetParamValueString(ctx, PARAM_RADIO));
     ctx->dirty[PARAM_RADIO] = false;
   }
@@ -852,6 +853,12 @@ bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
   // Deactivate current VFO
   state->vfos[state->active_vfo_index].is_active = false;
 
+  for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
+    VFOContext *oldCtx = &state->vfos[state->active_vfo_index].context;
+    VFOContext *newCtx = &state->vfos[vfo_index].context;
+    newCtx->dirty[p] = RADIO_GetParam(oldCtx, p) != RADIO_GetParam(newCtx, p);
+  }
+
   // Activate new VFO
   state->active_vfo_index = vfo_index;
   state->vfos[vfo_index].is_active = true;
@@ -896,7 +903,7 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
     // Optionally validate the channel here
   }
 
-  RADIO_ApplySettings(&vfo->context);
+  // RADIO_ApplySettings(&vfo->context);
 }
 
 // Save VFO settings to EEPROM storage
@@ -966,7 +973,7 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
   ctx->code = channel.code.rx;
   ctx->tx_state.code = channel.code.tx;
 
-  RADIO_ApplySettings(&vfo->context);
+  // RADIO_ApplySettings(&vfo->context);
 }
 
 /**
@@ -1002,6 +1009,7 @@ bool RADIO_ToggleVFOMode(RadioState *state, uint8_t vfo_index) {
   } else {
     RADIO_LoadVFOFromStorage(state, vfo_index, &ch);
   }
+  RADIO_ApplySettings(&vfo->context);
 
   // Помечаем для сохранения в EEPROM
   ctx->save_to_eeprom = true;
@@ -1154,6 +1162,13 @@ void RADIO_LoadVFOs(RadioState *state) {
     vfoIdx++;
   }
   state->num_vfos = vfoIdx;
+
+  VFOContext *ctx = &state->vfos[state->active_vfo_index].context;
+  for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
+    ctx->dirty[p] = true;
+  }
+
+  RADIO_ApplySettings(ctx);
 }
 
 // Включаем/выключаем маршрутизацию аудио

@@ -57,7 +57,7 @@ static void selectEeprom(EEPROMType t) {
   total.mr = CHANNELS_GetCountMax();
 
   total.settings = 1;
-  total.vfos = 1;
+  total.vfos = 4;
   total.bands = 0; // default bands
   total.channels = total.mr - total.vfos - total.bands;
 }
@@ -110,15 +110,16 @@ static bool resetFull() {
     VFO vfo;
     memset(&vfo, 0, sizeof(VFO));
 
-    if (stats.vfos == 0) {
-      sprintf(vfo.name, "%s", "VFO-A");
-      vfo.rxF = 14550000;
-    }
+    sprintf(vfo.name, "%s", "VFO-%c", "ABCDEFGHIJKLMNOP"[stats.vfos]);
+    vfo.rxF = (uint32_t[]){
+        10440000, 14550000, 17230000, 25355000,
+        40065000, 43392500, 43780000, 86800000,
+    }[stats.vfos];
 
     vfo.channel = -1;
     vfo.modulation = MOD_FM;
     vfo.bw = BK4819_FILTER_BW_12k;
-    vfo.radio = RADIO_BK4819;
+    vfo.radio = stats.vfos == 0 ? RADIO_BK1080 : RADIO_BK4819;
     vfo.txF = 0;
     vfo.offsetDir = OFFSET_NONE;
     vfo.allowTx = false;
