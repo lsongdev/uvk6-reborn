@@ -32,16 +32,18 @@ const char *RADIO_NAMES[] = {
 };
 
 const char *PARAM_NAMES[] = {
-    [PARAM_FREQUENCY] = "f",         //
-    [PARAM_STEP] = "Step",           //
-    [PARAM_POWER] = "Power",         //
-    [PARAM_TX_OFFSET] = "TX offset", //
-    [PARAM_MODULATION] = "Mod",      //
-    [PARAM_SQUELCH_VALUE] = "SQL",   //
-    [PARAM_VOLUME] = "Volume",       //
-    [PARAM_GAIN] = "Gain",           //
-    [PARAM_BANDWIDTH] = "BW",        //
-    [PARAM_TX_STATE] = "TX state",   //
+    [PARAM_FREQUENCY] = "f",          //
+    [PARAM_STEP] = "Step",            //
+    [PARAM_POWER] = "Power",          //
+    [PARAM_TX_OFFSET] = "TX offset",  //
+    [PARAM_MODULATION] = "Mod",       //
+    [PARAM_SQUELCH_VALUE] = "SQ",     //
+    [PARAM_SQUELCH_TYPE] = "SQ type", //
+    [PARAM_VOLUME] = "Volume",        //
+    [PARAM_GAIN] = "Gain",            //
+    [PARAM_BANDWIDTH] = "BW",         //
+    [PARAM_TX_STATE] = "TX state",    //
+    [PARAM_RADIO] = "Radio",          //
 };
 
 const char *TX_STATE_NAMES[7] = {
@@ -486,6 +488,9 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
     } else {
       ma = 0;
     }
+    break;
+  case PARAM_RADIO:
+    ma = 3;
     break;
   default:
     LogC(LOG_C_RED, "IDK range of %s", PARAM_NAMES[param]);
