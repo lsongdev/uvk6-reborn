@@ -293,12 +293,12 @@ static void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
   switch (vfo->context.radio_type) {
   case RADIO_BK4819:
     toggleBK1080SI4732(false);
-    toggleBK4819(true);
+    toggleBK4819(vfo->is_open);
     break;
   case RADIO_SI4732:
   case RADIO_BK1080:
     toggleBK4819(false);
-    toggleBK1080SI4732(true);
+    toggleBK1080SI4732(vfo->is_open);
     break;
   default:
     break;
@@ -811,6 +811,15 @@ bool RADIO_CheckSquelch(VFOContext *ctx) {
   }
 
   return gShowAllRSSI ? RADIO_GetSNR(ctx) > ctx->squelch.value : true;
+}
+
+void RADIO_UpdateSquelch(RadioState *state) {
+  ExtendedVFOContext *active_vfo = &state->vfos[state->active_vfo_index];
+  active_vfo->is_open = RADIO_CheckSquelch(&active_vfo->context);
+  if (active_vfo->is_open) {
+    Log("OPEN!");
+    RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
+  }
 }
 
 // Update multiwatch state (should be called periodically)

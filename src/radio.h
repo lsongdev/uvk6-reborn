@@ -92,6 +92,7 @@ typedef struct {
   uint16_t vfo_ch_index;       // MR index of VFO
   bool is_active;              // Whether this is the active VFO
   uint32_t last_activity_time; // for multiwatch
+  bool is_open;
 } ExtendedVFOContext;
 
 // Global radio state
@@ -151,5 +152,7 @@ const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param);
 uint8_t RADIO_GetCurrentVFONumber(const RadioState *state);
 ExtendedVFOContext *RADIO_GetCurrentVFO(RadioState *state);
 const ExtendedVFOContext *RADIO_GetCurrentVFOConst(const RadioState *state);
+
+void RADIO_UpdateSquelch(RadioState *state);
 
 #endif // RADIO_H

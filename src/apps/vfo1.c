@@ -40,12 +40,18 @@ void VFO1_init(void) {
 }
 
 static uint32_t lastRender;
+static uint32_t lastSqCheck;
 
 static const Step liveStep = STEP_5_0kHz;
 
 void VFO1_update(void) {
   RADIO_UpdateMultiwatch(&radio_state);
   RADIO_CheckAndSaveVFO(&radio_state);
+
+  if (Now() - lastSqCheck >= 55) {
+    RADIO_UpdateSquelch(&radio_state);
+    lastSqCheck = Now();
+  }
 
   if (Now() - lastRender >= 1000) {
     lastRender = Now();
