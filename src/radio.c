@@ -524,9 +524,6 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     LogC(LOG_C_RED, "[ERR] %-12s -> %u", PARAM_NAMES[param], value);
     return;
   }
-  LogC(LOG_C_WHITE, "[SET] %-12s -> %s (%s)", PARAM_NAMES[param],
-       RADIO_GetParamValueString(ctx, param),
-       save_to_eeprom ? "Save" : "No save");
 
   uint32_t old_value = RADIO_GetParam(ctx, param);
 
@@ -579,6 +576,9 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   case PARAM_COUNT:
     return;
   }
+  LogC(LOG_C_WHITE, "[SET] %-12s -> %s%s", PARAM_NAMES[param],
+       RADIO_GetParamValueString(ctx, param),
+       save_to_eeprom ? " [W]" : "");
 
   // TODO: make dirty only when changed.
   // but, potential BUG: param not applied when 0
