@@ -307,7 +307,6 @@ static void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
 
 // Инициализация VFO
 void RADIO_Init(VFOContext *ctx, Radio radio_type) {
-  Log("RADIO INIT");
   memset(ctx, 0, sizeof(VFOContext));
   ctx->radio_type = radio_type;
 
@@ -355,10 +354,11 @@ bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value) {
 // Установка параметра (всегда uint32_t!)
 void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
                     bool save_to_eeprom) {
-  Log("trying to Set %s to %u", PARAM_NAMES[param], value);
-  if (!RADIO_IsParamValid(ctx, param, value))
+  if (!RADIO_IsParamValid(ctx, param, value)) {
+    Log("\031[32m[ERR] %-12s -> %u\033[0m", PARAM_NAMES[param], value);
     return;
-  Log("Set %s to %u", PARAM_NAMES[param], value);
+  }
+  Log("\033[32m[SET] %-12s -> %u\033[0m", PARAM_NAMES[param], value);
 
   uint32_t old_value = RADIO_GetParam(ctx, param);
 
@@ -375,6 +375,8 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   case PARAM_VOLUME:
     ctx->volume = (uint8_t)value;
     break;
+  case PARAM_STEP:
+    ctx->step = (Step)value;
   default:
     return;
   }
@@ -395,6 +397,8 @@ uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
     return ctx->modulation;
   case PARAM_BANDWIDTH:
     return ctx->bandwidth;
+  case PARAM_STEP:
+    return ctx->step;
   case PARAM_VOLUME:
     return ctx->volume;
   default:
@@ -609,9 +613,11 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
 
   // Set basic parameters
   RADIO_SetParam(&vfo->context, PARAM_FREQUENCY, storage->rxF, false);
+  RADIO_SetParam(&vfo->context, PARAM_STEP, storage->step, false);
   RADIO_SetParam(&vfo->context, PARAM_MODULATION, storage->modulation, false);
-  // RADIO_SetParam(&vfo->context, PARAM_VOLUME, storage->volume, false);
   RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, storage->bw, false);
+  RADIO_SetParam(&vfo->context, PARAM_POWER, storage->power, false);
+  // RADIO_SetParam(&vfo->context, PARAM_VOLUME, storage->volume, false);
 
   vfo->context.code = storage->code.rx;
   vfo->context.tx_state.code = storage->code.tx;
@@ -842,6 +848,7 @@ void RADIO_LoadVFOs(RadioState *state) {
     }
     vfoIdx++;
   }
+  state->num_vfos = vfoIdx;
 }
 
 // Включаем/выключаем маршрутизацию аудио
