@@ -18,6 +18,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#define RADIO_SAVE_DELAY_MS 1000
+
 bool gShowAllRSSI;
 bool gMonitorMode;
 
@@ -29,8 +31,9 @@ const char *PARAM_NAMES[] = {
     [PARAM_POWER] = "Power",         //
     [PARAM_TX_OFFSET] = "TX offset", //
     [PARAM_MODULATION] = "Mod",      //
-    [PARAM_SQUELCH] = "SQL",         //
+    [PARAM_SQUELCH_VALUE] = "SQL",   //
     [PARAM_VOLUME] = "Volume",       //
+    [PARAM_GAIN] = "Gain",           //
     [PARAM_BANDWIDTH] = "BW",        //
     [PARAM_TX_STATE] = "TX state",   //
 };
@@ -338,6 +341,14 @@ bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value) {
     return value < ARRAY_SIZE(band->available_mods);
   case PARAM_BANDWIDTH:
     return value < ARRAY_SIZE(band->available_bandwidths);
+  case PARAM_GAIN:
+    if (ctx->radio_type == RADIO_BK4819) {
+      return value < ARRAY_SIZE(gainTable);
+    }
+    if (ctx->radio_type == RADIO_SI4732) {
+      return value <= 27; // 0..26 + auto
+    }
+    return false;
   default:
     return true; // Остальные параметры не зависят от диапазона
   }
@@ -393,10 +404,14 @@ uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
     return ctx->step;
   case PARAM_VOLUME:
     return ctx->volume;
-  default:
-    return 0;
+  case PARAM_GAIN:
+    return ctx->volume;
+  case PARAM_SQUELCH_TYPE:
+    return ctx->squelch.type;
+  case PARAM_SQUELCH_VALUE:
+    return ctx->squelch.value;
   }
-  ctx->dirty[param] = true;
+  return 0;
 }
 
 bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
@@ -422,6 +437,14 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
   case PARAM_STEP:
     ma = STEP_COUNT;
     break;
+  case PARAM_GAIN:
+    if (ctx->radio_type == RADIO_BK4819) {
+      ma = ARRAY_SIZE(gainTable);
+    } else if (ctx->radio_type == RADIO_SI4732) {
+      ma = 28;
+    } else {
+      ma = 0;
+    }
   default:
     return false;
   }
@@ -450,6 +473,14 @@ void RADIO_ApplySettings(VFOContext *ctx) {
       BK4819_SetModulation(ctx->modulation);
       ctx->dirty[PARAM_MODULATION] = false;
     }
+    if (ctx->dirty[PARAM_BANDWIDTH]) {
+      BK4819_SetFilterBandwidth(ctx->bandwidth);
+      ctx->dirty[PARAM_BANDWIDTH] = false;
+    }
+    if (ctx->dirty[PARAM_GAIN]) {
+      BK4819_SetAGC(ctx->modulation != MOD_AM, ctx->gain);
+      ctx->dirty[PARAM_GAIN] = false;
+    }
     break;
 
   case RADIO_SI4732:
@@ -457,8 +488,29 @@ void RADIO_ApplySettings(VFOContext *ctx) {
       SI47XX_TuneTo(ctx->frequency);
       ctx->dirty[PARAM_FREQUENCY] = false;
     }
+    if (ctx->dirty[PARAM_MODULATION]) {
+      SI47XX_SwitchMode((SI47XX_MODE)ctx->modulation);
+      ctx->dirty[PARAM_MODULATION] = false;
+    }
+    if (ctx->dirty[PARAM_GAIN]) {
+      SI47XX_SetAutomaticGainControl(ctx->gain == 0,
+                                     ctx->gain == 0 ? 0 : ctx->gain);
+      ctx->dirty[PARAM_GAIN] = false;
+    }
+    if (ctx->dirty[PARAM_BANDWIDTH]) {
+      if (RADIO_IsSSB(ctx)) {
+        SI47XX_SetSsbBandwidth(ctx->bandwidth);
+      } else {
+        SI47XX_SetBandwidth(ctx->bandwidth, true);
+      }
+      ctx->dirty[PARAM_BANDWIDTH] = false;
+    }
     break;
   case RADIO_BK1080:
+    if (ctx->dirty[PARAM_FREQUENCY]) {
+      BK1080_SetFrequency(ctx->frequency);
+      ctx->dirty[PARAM_FREQUENCY] = false;
+    }
     break;
   }
 }
@@ -540,22 +592,22 @@ void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
   }
 
   // Initialize multiwatch
-  state->multiwatch.active_vfo_index = 0;
-  state->multiwatch.num_vfos = state->num_vfos;
-  state->multiwatch.scan_interval_ms = 100; // 1 second scan interval
-  state->multiwatch.last_scan_time = 0;
-  state->multiwatch.enabled = false;
+  state->active_vfo_index = 0;
+  state->last_scan_time = 0;
+  state->multiwatch_enabled = false;
 }
 
 // Функция проверки необходимости сохранения и собственно сохранения
-void RADIO_CheckAndSaveVFO(RadioState *state, uint8_t vfo_index) {
+void RADIO_CheckAndSaveVFO(RadioState *state) {
+  uint8_t vfo_index = RADIO_GetCurrentVFONumber(state);
   if (vfo_index >= state->num_vfos)
     return;
 
   VFOContext *ctx = &state->vfos[vfo_index].context;
-  uint16_t num = state->vfosChannels[vfo_index];
+  uint16_t num = state->vfos[vfo_index].vfo_ch_index;
 
-  if (ctx->save_to_eeprom && (Now() - ctx->last_save_time >= 1000)) {
+  if (ctx->save_to_eeprom &&
+      (Now() - ctx->last_save_time >= RADIO_SAVE_DELAY_MS)) {
     VFO ch;
 
     RADIO_SaveVFOToStorage(state, vfo_index, &ch);
@@ -567,17 +619,19 @@ void RADIO_CheckAndSaveVFO(RadioState *state, uint8_t vfo_index) {
 
 // Switch to a different VFO
 bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
-  if (vfo_index >= state->num_vfos)
+  if (vfo_index >= state->num_vfos) {
     return false;
+  }
+
   Log("RADIO_SwitchVFO");
 
-  RADIO_CheckAndSaveVFO(state, state->multiwatch.active_vfo_index);
+  RADIO_CheckAndSaveVFO(state);
 
   // Deactivate current VFO
-  state->vfos[state->multiwatch.active_vfo_index].is_active = false;
+  state->vfos[state->active_vfo_index].is_active = false;
 
   // Activate new VFO
-  state->multiwatch.active_vfo_index = vfo_index;
+  state->active_vfo_index = vfo_index;
   state->vfos[vfo_index].is_active = true;
 
   // Apply settings for the new VFO
@@ -625,6 +679,7 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
 
   const ExtendedVFOContext *vfo = &state->vfos[vfo_index];
 
+  storage->meta.type = TYPE_VFO;
   storage->isChMode = vfo->mode;
   storage->rxF = vfo->context.frequency;
   storage->modulation = vfo->context.modulation;
@@ -633,6 +688,19 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
   storage->channel = vfo->channel_index;
   storage->code.rx = vfo->context.code;
   storage->code.tx = vfo->context.tx_state.code;
+}
+
+bool RADIO_SaveCurrentVFO(RadioState *state) {
+  if (!state)
+    return false;
+
+  uint8_t current = state->active_vfo_index;
+  VFO storage;
+
+  RADIO_SaveVFOToStorage(state, current, &storage);
+  CHANNELS_Save(state->vfos[current].vfo_ch_index, &storage);
+
+  return true;
 }
 
 // Load channel into VFO
@@ -705,7 +773,7 @@ bool RADIO_ToggleVFOMode(RadioState *state, uint8_t vfo_index) {
 
 // Toggle multiwatch on/off
 void RADIO_ToggleMultiwatch(RadioState *state, bool enable) {
-  state->multiwatch.enabled = enable;
+  state->multiwatch_enabled = enable;
   if (!enable) {
     // Return to the primary VFO when disabling multiwatch
     RADIO_SwitchVFO(state, 0);
@@ -747,22 +815,21 @@ bool RADIO_CheckSquelch(VFOContext *ctx) {
 
 // Update multiwatch state (should be called periodically)
 void RADIO_UpdateMultiwatch(RadioState *state) {
-  if (!state->multiwatch.enabled)
+  if (!state->multiwatch_enabled)
     return;
 
   uint32_t current_time = Now();
-  if (current_time - state->multiwatch.last_scan_time <
-      state->multiwatch.scan_interval_ms) {
+  if (current_time - state->last_scan_time < 100) {
     return;
   }
 
-  state->multiwatch.last_scan_time = current_time;
+  state->last_scan_time = current_time;
 
   // Обновляем маршрутизацию аудио
   RADIO_UpdateAudioRouting(state);
 
   // Get current active VFO
-  uint8_t current_vfo = state->multiwatch.active_vfo_index;
+  uint8_t current_vfo = state->active_vfo_index;
   const ExtendedVFOContext *active_vfo = &state->vfos[current_vfo];
 
   // If current VFO is a broadcast receiver, we can switch away from it
@@ -841,7 +908,7 @@ void RADIO_EnableAudioRouting(RadioState *state, bool enable) {
   state->audio_routing_enabled = enable;
   if (!enable) {
     // При выключении возвращаем аудио на активный VFO
-    RADIO_SwitchAudioToVFO(state, state->multiwatch.active_vfo_index);
+    RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
   }
 }
 
@@ -851,14 +918,13 @@ void RADIO_UpdateAudioRouting(RadioState *state) {
     return;
 
   // Если текущий VFO - вещательный приемник, оставляем аудио на нем
-  if (isBroadcastReceiver(
-          &state->vfos[state->multiwatch.active_vfo_index].context)) {
+  if (isBroadcastReceiver(&state->vfos[state->active_vfo_index].context)) {
     return;
   }
 
   // Проверяем активность на других VFO
   for (uint8_t i = 0; i < state->num_vfos; i++) {
-    if (i == state->multiwatch.active_vfo_index)
+    if (i == state->active_vfo_index)
       continue;
 
     ExtendedVFOContext *vfo = &state->vfos[i];
@@ -880,9 +946,9 @@ void RADIO_UpdateAudioRouting(RadioState *state) {
   }
 
   // Если активность не обнаружена - возвращаем аудио на основной VFO
-  if (state->last_active_vfo != state->multiwatch.active_vfo_index) {
-    RADIO_SwitchAudioToVFO(state, state->multiwatch.active_vfo_index);
-    state->last_active_vfo = state->multiwatch.active_vfo_index;
+  if (state->last_active_vfo != state->active_vfo_index) {
+    RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
+    state->last_active_vfo = state->active_vfo_index;
   }
 }
 
@@ -922,10 +988,21 @@ const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
   case PARAM_FREQUENCY:
     snprintf(buf, 15, "%u.%05u", ctx->frequency / MHZ, ctx->frequency % MHZ);
     break;
+  case PARAM_GAIN:
+    if (ctx->radio_type == RADIO_BK4819) {
+      snprintf(buf, 15, ctx->gain == AUTO_GAIN_INDEX ? "Auto" : "%+ddB",
+               -gainTable[ctx->gain].gainDb + 33);
+      break;
+    } else if (ctx->radio_type == RADIO_SI4732) {
+      snprintf(buf, 15, ctx->gain == 0 ? "Auto" : "%u", ctx->gain - 1);
+      break;
+    }
+    snprintf(buf, 15, "Auto");
+    break;
   case PARAM_POWER:
     return TX_POWER_NAMES[ctx->power];
-  case PARAM_SQUELCH:
-    snprintf(buf, 15, "%s.%u", SQ_TYPE_NAMES[ctx->squelch.type],
+  case PARAM_SQUELCH_VALUE:
+    snprintf(buf, 15, "%s %u", SQ_TYPE_NAMES[ctx->squelch.type],
              ctx->squelch.value);
     break;
   }

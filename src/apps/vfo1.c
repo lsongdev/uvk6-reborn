@@ -45,6 +45,7 @@ static const Step liveStep = STEP_5_0kHz;
 
 void VFO1_update(void) {
   RADIO_UpdateMultiwatch(&radio_state);
+  RADIO_CheckAndSaveVFO(&radio_state);
 
   if (Now() - lastRender >= 1000) {
     lastRender = Now();
@@ -119,8 +120,9 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       }
       return false;
     case KEY_3:
+      RADIO_SaveCurrentVFO(&radio_state);
       RADIO_ToggleVFOMode(&radio_state, vfoN);
-      VFO1_init();
+      // VFO1_init();
       return true;
     case KEY_4:
       gShowAllRSSI = !gShowAllRSSI;
@@ -187,6 +189,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       break;
     case KEY_EXIT:
       if (!APPS_exit()) {
+        RADIO_SaveCurrentVFO(&radio_state);
         RADIO_SwitchVFO(&radio_state,
                         IncDecU(vfoN, 0, radio_state.num_vfos, true));
       }

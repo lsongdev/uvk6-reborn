@@ -11,9 +11,9 @@ static uint8_t currentIndex;
 static bool inMenu;
 
 static uint8_t PARAM_ITEMS[] = {
-    // PARAM_GAIN,
+    PARAM_GAIN,
     PARAM_BANDWIDTH,
-    PARAM_SQUELCH,
+    PARAM_SQUELCH_VALUE,
     PARAM_MODULATION,
     PARAM_STEP,
     // PARAM_RADIO,
