@@ -3,11 +3,13 @@
 #include "bk4819.h"
 #include "gpio.h"
 #include "system.h"
+#include "uart.h"
 
 static bool speakerOn = false;
 
 void AUDIO_ToggleSpeaker(bool on) {
   speakerOn = on;
+  Log("[i] Speaker=%u", on);
   if (on) {
     GPIO_SetBit(&GPIOC->DATA, GPIOC_PIN_AUDIO_PATH);
   } else {

@@ -20,8 +20,8 @@
 
 #define RADIO_SAVE_DELAY_MS 1000
 
-bool gShowAllRSSI;
-bool gMonitorMode;
+bool gShowAllRSSI = false;
+bool gMonitorMode = false;
 
 Measurement gLoot;
 
@@ -175,6 +175,8 @@ static const FreqBand si4732_bands[] = {
     },
 };
 
+static bool RADIO_HasSi() { return BK1080_ReadRegister(1) != 0x1080; }
+
 static void enableCxCSS(VFOContext *ctx) {
   switch (ctx->tx_state.code.type) {
   case CODE_TYPE_CONTINUOUS_TONE:
@@ -285,6 +287,53 @@ static void toggleBK4819(bool on) {
   }
 }
 
+static void rxTurnOff(Radio r) {
+  switch (r) {
+  case RADIO_BK4819:
+    BK4819_Idle();
+    break;
+  case RADIO_BK1080:
+    BK1080_Mute(true);
+    break;
+  case RADIO_SI4732:
+    if (gSettings.si4732PowerOff) {
+      SI47XX_PowerDown();
+    } else {
+      SI47XX_SetVolume(0);
+    }
+    break;
+  default:
+    break;
+  }
+}
+
+static void rxTurnOn(VFOContext *ctx) {
+  switch (ctx->radio_type) {
+  case RADIO_BK4819:
+    BK4819_RX_TurnOn();
+    break;
+  case RADIO_BK1080:
+    BK4819_Idle();
+    BK1080_Mute(false);
+    BK1080_Init(ctx->frequency, true);
+    break;
+  case RADIO_SI4732:
+    BK4819_Idle();
+    if (gSettings.si4732PowerOff || !isSi4732On) {
+      if (RADIO_IsSSB(ctx)) {
+        SI47XX_PatchPowerUp();
+      } else {
+        SI47XX_PowerUp();
+      }
+    } else {
+      SI47XX_SetVolume(63);
+    }
+    break;
+  default:
+    break;
+  }
+}
+
 static void toggleBK1080SI4732(bool on) {
   static bool bc_listen;
   if (bc_listen == on) {
@@ -307,21 +356,34 @@ static void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
     return;
 
   const ExtendedVFOContext *vfo = &state->vfos[vfo_index];
+
   BOARD_ToggleGreen(vfo->is_open);
 
   // Реализация зависит от вашего аппаратного обеспечения
   switch (vfo->context.radio_type) {
   case RADIO_BK4819:
+    rxTurnOff(RADIO_HasSi() ? RADIO_SI4732 : RADIO_BK1080);
     toggleBK1080SI4732(false);
     toggleBK4819(vfo->is_open);
     break;
   case RADIO_SI4732:
+    toggleBK4819(false);
+    rxTurnOff(RADIO_BK4819);
+    toggleBK1080SI4732(vfo->is_open);
+    break;
   case RADIO_BK1080:
     toggleBK4819(false);
+    rxTurnOff(RADIO_BK4819);
     toggleBK1080SI4732(vfo->is_open);
     break;
   default:
     break;
+  }
+
+  if (vfo->is_open) {
+    rxTurnOn(&vfo->context);
+  } else {
+    rxTurnOff(vfo->context.radio_type);
   }
 
   // Устанавливаем громкость для выбранного VFO
@@ -381,7 +443,7 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     LogC(LOG_C_RED, "[ERR] %-12s -> %u", PARAM_NAMES[param], value);
     return;
   }
-  LogC(LOG_C_GREEN, "[SET] %-12s -> %u (%s)", PARAM_NAMES[param], value,
+  LogC(LOG_C_WHITE, "[SET] %-12s -> %u (%s)", PARAM_NAMES[param], value,
        save_to_eeprom ? "Save" : "No save");
 
   switch (param) {
@@ -749,19 +811,18 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
 
   ExtendedVFOContext *vfo = &state->vfos[vfo_index];
   vfo->mode = storage->isChMode;
+  VFOContext *ctx = &vfo->context;
 
   // Set basic parameters
-  RADIO_SetParam(&vfo->context, PARAM_FREQUENCY, storage->rxF, false);
-  RADIO_SetParam(&vfo->context, PARAM_STEP, storage->step, false);
-  RADIO_SetParam(&vfo->context, PARAM_MODULATION, storage->modulation, false);
-  RADIO_SetParam(&vfo->context, PARAM_BANDWIDTH, storage->bw, false);
-  RADIO_SetParam(&vfo->context, PARAM_POWER, storage->power, false);
-  RADIO_SetParam(&vfo->context, PARAM_GAIN, storage->gainIndex, false);
-  RADIO_SetParam(&vfo->context, PARAM_SQUELCH_VALUE, storage->squelch.value,
-                 false);
-  RADIO_SetParam(&vfo->context, PARAM_SQUELCH_TYPE, storage->squelch.type,
-                 false);
-  // RADIO_SetParam(&vfo->context, PARAM_VOLUME, storage->volume, false);
+  RADIO_SetParam(ctx, PARAM_RADIO, storage->radio, false);
+  RADIO_SetParam(ctx, PARAM_BANDWIDTH, storage->bw, false);
+  RADIO_SetParam(ctx, PARAM_FREQUENCY, storage->rxF, false);
+  RADIO_SetParam(ctx, PARAM_GAIN, storage->gainIndex, false);
+  RADIO_SetParam(ctx, PARAM_MODULATION, storage->modulation, false);
+  RADIO_SetParam(ctx, PARAM_POWER, storage->power, false);
+  RADIO_SetParam(ctx, PARAM_SQUELCH_TYPE, storage->squelch.type, false);
+  RADIO_SetParam(ctx, PARAM_SQUELCH_VALUE, storage->squelch.value, false);
+  RADIO_SetParam(ctx, PARAM_STEP, storage->step, false);
 
   vfo->context.code = storage->code.rx;
   vfo->context.tx_state.code = storage->code.tx;
@@ -830,12 +891,14 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
 
   // Set parameters from channel
   RADIO_SetParam(ctx, PARAM_RADIO, channel.radio, false);
-  RADIO_SetParam(ctx, PARAM_FREQUENCY, channel.rxF, false);
-  RADIO_SetParam(ctx, PARAM_MODULATION, channel.modulation, false);
   RADIO_SetParam(ctx, PARAM_BANDWIDTH, channel.bw, false);
+  RADIO_SetParam(ctx, PARAM_FREQUENCY, channel.rxF, false);
   RADIO_SetParam(ctx, PARAM_GAIN, channel.gainIndex, false);
+  RADIO_SetParam(ctx, PARAM_MODULATION, channel.modulation, false);
+  RADIO_SetParam(ctx, PARAM_POWER, channel.power, false);
   RADIO_SetParam(ctx, PARAM_SQUELCH_TYPE, channel.squelch.type, false);
   RADIO_SetParam(ctx, PARAM_SQUELCH_VALUE, channel.squelch.value, false);
+  RADIO_SetParam(ctx, PARAM_STEP, channel.step, false);
 
   ctx->code = channel.code.rx;
   ctx->tx_state.code = channel.code.tx;
@@ -930,8 +993,11 @@ bool RADIO_CheckSquelch(VFOContext *ctx) {
 
 void RADIO_UpdateSquelch(RadioState *state) {
   ExtendedVFOContext *active_vfo = &state->vfos[state->active_vfo_index];
-  active_vfo->is_open = RADIO_CheckSquelch(&active_vfo->context);
-  RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
+  bool is_open = RADIO_CheckSquelch(&active_vfo->context);
+  if (is_open != active_vfo->is_open) {
+    active_vfo->is_open = is_open;
+    RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
+  }
 }
 
 // Update multiwatch state (should be called periodically)
@@ -1001,6 +1067,8 @@ void RADIO_LoadVFOs(RadioState *state) {
   Log("BK4819 INIT");
   BK4819_Init();
   BK4819_RX_TurnOn();
+
+  BK1080_Init(0, false);
 
   uint8_t vfoIdx = 0;
   for (uint16_t i = 0; i < CHANNELS_GetCountMax(); ++i) {
