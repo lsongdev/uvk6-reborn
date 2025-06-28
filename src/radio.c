@@ -381,11 +381,7 @@ static void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
     break;
   }
 
-  if (vfo->is_open) {
-    rxTurnOn(&vfo->context);
-  } else {
-    rxTurnOff(vfo->context.radio_type);
-  }
+  rxTurnOn(&vfo->context);
 
   switch (vfo->context.radio_type) {
   case RADIO_BK4819:
@@ -823,7 +819,7 @@ void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
   }
 
   // Initialize multiwatch
-  state->active_vfo_index = 0;
+  state->active_vfo_index = gSettings.activeVFO;
   state->last_scan_time = 0;
   state->multiwatch_enabled = false;
 }
@@ -939,13 +935,15 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
   storage->isChMode = vfo->mode;
   storage->channel = vfo->channel_index;
 
-  storage->bw = ctx->bandwidth;
-  storage->gainIndex = ctx->gain;
-  storage->modulation = ctx->modulation;
   storage->radio = ctx->radio_type;
+
   storage->rxF = ctx->frequency;
-  storage->squelch = ctx->squelch;
   storage->step = ctx->step;
+
+  storage->bw = ctx->bandwidth;
+  storage->modulation = ctx->modulation;
+  storage->gainIndex = ctx->gain;
+  storage->squelch = ctx->squelch;
 
   storage->code.rx = ctx->code;
   storage->code.tx = ctx->tx_state.code;
@@ -1314,12 +1312,13 @@ const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
  * @return Номер VFO (0..MAX_VFOS-1) или 0xFF если не найдено
  */
 uint8_t RADIO_GetCurrentVFONumber(const RadioState *state) {
-  for (uint8_t i = 0; i < state->num_vfos; i++) {
+  /* for (uint8_t i = 0; i < state->num_vfos; i++) {
     if (state->vfos[i].is_active) {
       return i;
     }
   }
-  return 0xFF; // Ошибка - активный VFO не найден
+  return 0xFF; // Ошибка - активный VFO не найден */
+  return state->active_vfo_index;
 }
 
 /**
