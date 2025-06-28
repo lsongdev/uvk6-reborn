@@ -500,17 +500,11 @@ bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc,
 void RADIO_ApplySettings(VFOContext *ctx) {
   switch (ctx->radio_type) {
   case RADIO_BK4819:
-    if (ctx->dirty[PARAM_FREQUENCY]) {
-      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
-           PARAM_NAMES[PARAM_FREQUENCY], ctx->frequency);
-      BK4819_SetFrequency(ctx->frequency);
-      ctx->dirty[PARAM_FREQUENCY] = false;
-    }
-    if (ctx->dirty[PARAM_MODULATION]) {
-      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
-           PARAM_NAMES[PARAM_MODULATION], ctx->modulation);
-      BK4819_SetModulation(ctx->modulation);
-      ctx->dirty[PARAM_MODULATION] = false;
+    if (ctx->dirty[PARAM_GAIN]) {
+      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u", PARAM_NAMES[PARAM_GAIN],
+           ctx->gain);
+      BK4819_SetAGC(ctx->modulation != MOD_AM, ctx->gain);
+      ctx->dirty[PARAM_GAIN] = false;
     }
     if (ctx->dirty[PARAM_BANDWIDTH]) {
       LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
@@ -518,18 +512,24 @@ void RADIO_ApplySettings(VFOContext *ctx) {
       BK4819_SetFilterBandwidth(ctx->bandwidth);
       ctx->dirty[PARAM_BANDWIDTH] = false;
     }
-    if (ctx->dirty[PARAM_GAIN]) {
-      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u", PARAM_NAMES[PARAM_GAIN],
-           ctx->gain);
-      BK4819_SetAGC(ctx->modulation != MOD_AM, ctx->gain);
-      ctx->dirty[PARAM_GAIN] = false;
-    }
     if (ctx->dirty[PARAM_SQUELCH_VALUE]) {
       LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
            PARAM_NAMES[PARAM_SQUELCH_VALUE], ctx->squelch.value);
       BK4819_Squelch(ctx->squelch.value, gSettings.sqlOpenTime,
                      gSettings.sqlCloseTime);
       ctx->dirty[PARAM_SQUELCH_VALUE] = false;
+    }
+    if (ctx->dirty[PARAM_MODULATION]) {
+      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
+           PARAM_NAMES[PARAM_MODULATION], ctx->modulation);
+      BK4819_SetModulation(ctx->modulation);
+      ctx->dirty[PARAM_MODULATION] = false;
+    }
+    if (ctx->dirty[PARAM_FREQUENCY]) {
+      LogC(LOG_C_BG_BRIGHT_WHITE, "[SET] %-12s -> %u",
+           PARAM_NAMES[PARAM_FREQUENCY], ctx->frequency);
+      BK4819_TuneTo(ctx->frequency, true); // TODO: check if SetFreq needed
+      ctx->dirty[PARAM_FREQUENCY] = false;
     }
     break;
 
@@ -563,6 +563,7 @@ void RADIO_ApplySettings(VFOContext *ctx) {
     }
     break;
   }
+  setupToneDetection(ctx); // TODO: check if needed each time
 }
 
 // Начать передачу
