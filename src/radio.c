@@ -384,8 +384,6 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   LogC(LOG_C_GREEN, "[SET] %-12s -> %u (%s)", PARAM_NAMES[param], value,
        save_to_eeprom ? "Save" : "No save");
 
-  uint32_t old_value = RADIO_GetParam(ctx, param);
-
   switch (param) {
   case PARAM_FREQUENCY:
     ctx->frequency = value;
@@ -420,9 +418,15 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   case PARAM_POWER:
     ctx->power = value;
     break;
+  case PARAM_COUNT:
+    return;
   }
+
+  // TODO: make dirty only when changed.
+  // but, potential BUG: param not applied when 0
   ctx->dirty[param] = true;
 
+  uint32_t old_value = RADIO_GetParam(ctx, param);
   // Если значение изменилось и требуется сохранение - устанавливаем флаг
   if (save_to_eeprom && (old_value != value)) {
     ctx->save_to_eeprom = true;
@@ -451,6 +455,10 @@ uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
     return ctx->squelch.value;
   case PARAM_RADIO:
     return ctx->radio_type;
+  case PARAM_POWER:
+    return ctx->tx_state.power_level;
+  case PARAM_COUNT:
+    break;
   }
   return 0;
 }
