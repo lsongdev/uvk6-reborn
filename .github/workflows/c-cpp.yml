@@ -14,12 +14,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: apt-update
-      run: configure
-           sudo apt-get install gcc-arm-none-eabi
-           git submodule update --init --recursive --depth=1
+      run: sudo apt-get update
+    - name: install build tool
+      run: sudo apt-get install gcc-arm-none-eabi
+    - name: pre build
+      run: git submodule update --init --recursive --depth=1
     - name: make
       run: make
-    - name: make check
-      run: make check
-    - name: make distcheck
-      run: make distcheck
+    - name: Archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifact
+        path: |
+          bin/firmware.bin
+          bin/firmware
