@@ -58,7 +58,7 @@ void BK4819_Init(void) {
   for (uint8_t i = 0; i < ARRAY_SIZE(DTMF_COEFFS); ++i) {
     BK4819_WriteRegister(0x09, (i << 12) | DTMF_COEFFS[i]);
   }
-
+  BK4819_WriteRegister(BK4819_REG_1E, 0x4c58);
   BK4819_WriteRegister(BK4819_REG_1F, 0x5454);
   BK4819_WriteRegister(BK4819_REG_3E, 0xA037);
   gBK4819_GpioOutState = 0x9000;
