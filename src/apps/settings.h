@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+void SETTINGS_init();
 void SETTINGS_deinit();
 bool SETTINGS_key(KEY_Code_t key, Key_State_t state);
 void SETTINGS_render();

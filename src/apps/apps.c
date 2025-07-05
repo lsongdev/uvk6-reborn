@@ -68,7 +68,7 @@ const App apps[APPS_COUNT] = {
                     FINPUT_key, FINPUT_deinit},
     [APP_TEXTINPUT] = {"Text input", TEXTINPUT_init, NULL, TEXTINPUT_render,
                        TEXTINPUT_key, TEXTINPUT_deinit},
-    [APP_SETTINGS] = {"Settings", NULL, NULL, SETTINGS_render, SETTINGS_key,
+    [APP_SETTINGS] = {"Settings", SETTINGS_init, NULL, SETTINGS_render, SETTINGS_key,
                       SETTINGS_deinit},
     [APP_APPS_LIST] = {"Run app", APPSLIST_init, NULL, APPSLIST_render,
                        APPSLIST_key, NULL},

@@ -44,26 +44,13 @@ typedef enum {
   M_PPM,
 } BandCfgMenu;
 
-typedef struct MenuItem {
-  const char *name;
-  uint8_t type;
-  uint8_t size;
-} MenuItem;
-
-/* typedef enum {
-  MT_ITEMS,
-  MT_RANGE,
-  MT_INPUT,
-  MT_RUN,
-} MenuItemType; */
-
 void UI_ShowMenuItem(uint8_t line, const char *name, bool isCurrent);
-void UI_ShowMenuSimple(const MenuItem *menu, uint16_t size,
-                       uint16_t currentIndex);
 void UI_ShowMenu(void (*getItemText)(uint16_t index, char *name), uint16_t size,
                  uint16_t currentIndex);
 void UI_ShowMenuEx(void (*showItem)(uint16_t i, uint16_t index, bool isCurrent),
                    uint16_t size, uint16_t currentIndex, uint16_t linesMax);
+void UI_DrawScrollBar(const uint16_t size, const uint16_t currentIndex,
+                      const uint8_t linesCount);
 
 void PrintRTXCode(char *Output, uint8_t codeType, uint8_t code);
 

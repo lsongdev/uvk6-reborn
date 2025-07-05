@@ -5,27 +5,35 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef struct MenuItem MenuItem;
-typedef struct Menu Menu;
+typedef void (*MenuAction)(void);
+typedef void (*MenuOnEnter)(void);
 
-typedef void (*MenuDrawFunc)(MenuItem *item, bool isCurrent);
-typedef void (*MenuSelectFunc)(Menu *menu, MenuItem *item);
-
-struct MenuItem {
+typedef struct MenuItem {
   const char *name;
-  MenuDrawFunc draw; // функция отрисовки конкретного пункта (опционально)
-  MenuSelectFunc on_select; // вызывается при выборе пункта
-  void *
-      user_data; // любые данные (например, ParamType или указатель на параметр)
-};
+  void (*action)(void *user_data);
+  const void *user_data; // Данные для action
+  struct Menu *submenu; // если не NULL — переход в подменю
+  void (*get_value_text)(const void *user_data, char *buf, uint8_t buf_size);
+  void (*change_value)(const void *user_data, bool up);
+} MenuItem;
 
-struct Menu {
-  MenuItem *items;
-  uint16_t item_count;
-  uint16_t cursor;
-  uint16_t visible_lines;
-  void (*on_exit)(Menu *menu); // колбек при выходе из меню
-  void *context;               // любые внешние данные
-};
+typedef struct Menu {
+  const char *title;
+  const MenuItem *items;
+  uint16_t num_items;
+  MenuOnEnter on_enter; // вызывается при входе в это меню
+} Menu;
+
+// Инициализация меню-системы с главным меню
+void MENU_Init(Menu *main_menu);
+
+// Отрисовка текущего активного меню
+void MENU_Render(void);
+
+// Обработка нажатия клавиши
+bool MENU_HandleInput(uint8_t key);
+
+// Выход из текущего подменю (возврат к предыдущему)
+void MENU_Back(void);
 
 #endif /* end of include guard: MENU_H */

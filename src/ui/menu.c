@@ -26,24 +26,6 @@ void UI_ShowMenuItem(uint8_t line, const char *name, bool isCurrent) {
   }
 }
 
-void UI_ShowMenuSimple(const MenuItem *menu, uint16_t size,
-                       uint16_t currentIndex) {
-  const uint16_t maxItems =
-      size < MENU_LINES_TO_SHOW ? size : MENU_LINES_TO_SHOW;
-  const uint16_t offset = Clamp(currentIndex - 2, 0, size - maxItems);
-  char name[32] = "";
-
-  for (uint16_t i = 0; i < maxItems; ++i) {
-    uint16_t itemIndex = i + offset;
-    strncpy(name, menu[itemIndex].name, 31);
-    PrintSmallEx(LCD_WIDTH - 4, MENU_Y + i * MENU_ITEM_H + 8, POS_R, C_FILL,
-                 "%u", itemIndex + 1);
-    UI_ShowMenuItem(i, name, currentIndex == itemIndex);
-  }
-
-  UI_DrawScrollBar(size, currentIndex, MENU_LINES_TO_SHOW);
-}
-
 void UI_ShowMenu(void (*getItemText)(uint16_t index, char *name), uint16_t size,
                  uint16_t currentIndex) {
   const uint16_t maxItems =
@@ -54,7 +36,7 @@ void UI_ShowMenu(void (*getItemText)(uint16_t index, char *name), uint16_t size,
     char name[32] = "";
     uint16_t itemIndex = i + offset;
     getItemText(itemIndex, name);
-    PrintSmallEx(LCD_WIDTH - 5, MENU_Y + i * MENU_ITEM_H + 8, POS_R, C_FILL,
+    PrintMediumEx(LCD_WIDTH - 7, MENU_Y + i * MENU_ITEM_H + 8, POS_R, C_FILL,
                  "%u", itemIndex + 1);
     UI_ShowMenuItem(i, name, currentIndex == itemIndex);
   }

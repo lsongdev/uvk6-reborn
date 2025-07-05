@@ -1,56 +1,129 @@
 #include "menu.h"
-#include "../ui/components.h"
-#include "../ui/menu.h"
+#include "../ui/graphics.h"
+#include "../ui/statusline.h"
+#include <stdbool.h>
 
-void MENU_Init(Menu *menu, MenuItem *items, uint16_t item_count,
-               uint16_t visible_lines, void *context) {
-  menu->items = items;
-  menu->item_count = item_count;
-  menu->cursor = 0;
-  menu->visible_lines = visible_lines;
-  menu->context = context;
+#define MENU_STACK_DEPTH 3
+static const uint8_t MENU_Y = 8;
+static const uint8_t MENU_ITEM_H = 11;
+static const uint8_t MENU_LINES_TO_SHOW = 4;
+
+static Menu *menu_stack[MENU_STACK_DEPTH];
+static uint8_t menu_stack_top = 0;
+
+static Menu *active_menu = NULL;
+static uint16_t current_index = 0;
+
+static void UI_DrawScrollBar(const uint16_t size, const uint16_t i,
+                             const uint8_t nLines) {
+  const uint8_t y = ConvertDomain(i, 0, size - 1, MENU_Y, LCD_HEIGHT - 3);
+
+  DrawVLine(LCD_WIDTH - 2, MENU_Y, LCD_HEIGHT - MENU_Y, C_FILL);
+
+  FillRect(LCD_WIDTH - 3, y, 3, 3, C_FILL);
 }
 
-void MENU_Render(Menu *menu) {
-  uint16_t max_items = (menu->item_count < menu->visible_lines)
-                           ? menu->item_count
-                           : menu->visible_lines;
-  uint16_t offset = (menu->cursor < 2) ? 0
-                    : (menu->cursor > menu->item_count - max_items + 2)
-                        ? menu->item_count - max_items
-                        : menu->cursor - 2;
+static void UI_ShowMenuItem(uint8_t line, const MenuItem *item,
+                            bool isCurrent) {
+  uint8_t by = MENU_Y + line * MENU_ITEM_H + 8;
+  PrintMedium(4, by, "%s", item->name);
+  if (item->get_value_text) {
+    char value_buf[32];
+    item->get_value_text(item->user_data, value_buf, sizeof(value_buf));
+    PrintSmallEx(LCD_WIDTH - 4, by + 8, POS_R, C_FILL, "%s", value_buf);
+  }
+  if (isCurrent) {
+    FillRect(0, MENU_Y + line * MENU_ITEM_H, LCD_WIDTH - 4, MENU_ITEM_H,
+             C_INVERT);
+  }
+}
 
-  for (uint16_t i = 0; i < max_items; i++) {
-    uint16_t item_idx = i + offset;
-    bool is_current = (menu->cursor == item_idx);
-    MenuItem *item = &menu->items[item_idx];
+void MENU_Init(Menu *main_menu) {
+  active_menu = main_menu;
+  current_index = 0;
+  menu_stack_top = 0;
+  if (main_menu->on_enter)
+    main_menu->on_enter();
+}
 
-    if (item->draw) {
-      item->draw(item, is_current);
-    } else {
-      UI_ShowMenuItem(i, item->name, is_current);
-    }
+void MENU_Render(void) {
+  if (!active_menu)
+    return;
+
+  STATUSLINE_SetText(active_menu->title);
+
+  const uint16_t max_lines = 4;
+  const uint16_t offset = (current_index >= 2) ? current_index - 2 : 0;
+  const uint16_t visible =
+      (active_menu->num_items < max_lines) ? active_menu->num_items : max_lines;
+
+  for (uint16_t i = 0; i < visible; ++i) {
+    uint16_t idx = i + offset;
+    if (idx >= active_menu->num_items)
+      break;
+
+    UI_ShowMenuItem(i, &active_menu->items[idx], idx == current_index);
   }
 
-  UI_DrawScrollBar(menu->item_count, menu->cursor, menu->visible_lines);
+  UI_DrawScrollBar(active_menu->num_items, current_index, max_lines);
 }
 
-void MENU_Next(Menu *menu) {
-    if (menu->cursor + 1 < menu->item_count) {
-        menu->cursor++;
+bool MENU_HandleInput(uint8_t key) {
+  if (!active_menu) {
+    return false;
+  }
+
+  switch (key) {
+  case KEY_UP:
+    if (current_index > 0) {
+      current_index--;
+      return true;
     }
-}
-
-void MENU_Prev(Menu *menu) {
-    if (menu->cursor > 0) {
-        menu->cursor--;
+    break;
+  case KEY_DOWN:
+    if (current_index + 1 < active_menu->num_items) {
+      current_index++;
+      return true;
     }
-}
-
-void MENU_Select(Menu *menu) {
-    MenuItem *item = &menu->items[menu->cursor];
-    if (item->on_select) {
-        item->on_select(menu, item);
+    break;
+  case KEY_MENU: {
+    const MenuItem *item = &active_menu->items[current_index];
+    if (item->action) {
+      item->action((void *)item->user_data);
     }
+    if (item->submenu) {
+      if (menu_stack_top < MENU_STACK_DEPTH) {
+        menu_stack[menu_stack_top++] = active_menu;
+        active_menu = item->submenu;
+        current_index = 0;
+        if (active_menu->on_enter) {
+          active_menu->on_enter();
+        }
+      }
+    }
+    return true;
+  }
+  case KEY_STAR:
+  case KEY_F: {
+    const MenuItem *item = &active_menu->items[current_index];
+    if (item->change_value) {
+      item->change_value(item->user_data, key == KEY_STAR);
+      return true;
+    }
+  }
+    return true;
+  case KEY_EXIT:
+    MENU_Back();
+    return true;
+  }
+  return false;
 }
 
+void MENU_Back(void) {
+  if (menu_stack_top > 0) {
+    active_menu = menu_stack[--menu_stack_top];
+    current_index = 0;
+    if (active_menu->on_enter)
+      active_menu->on_enter();
+  }
+}
