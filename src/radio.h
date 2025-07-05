@@ -14,6 +14,7 @@ extern bool gShowAllRSSI;
 extern bool gMonitorMode;
 extern const char *PARAM_NAMES[];
 extern const char *TX_STATE_NAMES[7];
+extern const char *FLT_BOUND_NAMES[2];
 
 extern const uint16_t StepFrequencyTable[15];
 

@@ -112,6 +112,8 @@ const char *BW_NAMES_SI47XX_SSB[] = {
     [SI47XX_SSB_BW_4_kHz] = "4k",     //
 };
 
+const char *FLT_BOUND_NAMES[2] = {"240MHz", "280MHz"};
+
 static const char *SQ_TYPE_NAMES[4] = {"RNG", "RG", "RN", "R"};
 
 const uint16_t StepFrequencyTable[15] = {

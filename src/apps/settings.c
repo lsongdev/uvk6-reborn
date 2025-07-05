@@ -21,8 +21,6 @@
 
 static uint8_t DEAD_BUF[] = {0xDE, 0xAD};
 
-static const char *fltBound[] = {"240MHz", "280MHz"};
-
 static const uint16_t BAT_CAL_MIN = 1900;
 
 static void getSqlOpenT(const void *user_data, char *buf, uint8_t buf_size) {
@@ -74,6 +72,7 @@ static void onMainAppSubmenu(void *user_data) {
   for (uint8_t i = 0; i < RUN_APPS_COUNT; ++i) {
     dynamicItems[i].name = apps[appsAvailableToRun[i]].name;
     dynamicItems[i].action = onMainAppChoose;
+    dynamicItems[i].user_data = &i;
   }
 }
 
@@ -138,11 +137,7 @@ bool SETTINGS_key(KEY_Code_t key, Key_State_t state) {
     }
   } */
 
-  if ((state == KEY_RELEASED) && MENU_HandleInput(key)) {
-    return true;
-  }
-
-  return false;
+  return state == KEY_RELEASED && MENU_HandleInput(key);
 }
 
 void SETTINGS_render(void) {
