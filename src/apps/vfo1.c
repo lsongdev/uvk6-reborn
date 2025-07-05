@@ -16,7 +16,6 @@
 #include "../ui/spectrum.h"
 #include "../ui/statusline.h"
 #include "apps.h"
-#include "chcfg.h"
 #include "chlist.h"
 #include "finput.h"
 

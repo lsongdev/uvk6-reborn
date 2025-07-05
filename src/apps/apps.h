@@ -4,7 +4,7 @@
 #include "../driver/keyboard.h"
 
 // #define APPS_COUNT 15
-#define APPS_COUNT 10
+#define APPS_COUNT 9
 // #define RUN_APPS_COUNT 8
 #define RUN_APPS_COUNT 3
 
@@ -20,7 +20,7 @@ typedef enum {
   // APP_LOOT_LIST,
   APP_RESET,
   APP_TEXTINPUT,
-  APP_CH_CFG,
+  // APP_CH_CFG,
   APP_SETTINGS,
   APP_VFO1,
   APP_ABOUT,

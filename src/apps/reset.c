@@ -57,7 +57,7 @@ static void selectEeprom(EEPROMType t) {
   total.mr = CHANNELS_GetCountMax();
 
   total.settings = 1;
-  total.vfos = 4;
+  total.vfos = 9;
   total.bands = 0; // default bands
   total.channels = total.mr - total.vfos - total.bands;
 }
@@ -97,6 +97,64 @@ static void startReset(ResetType t) {
                 (total.channels - stats.channels) * CH_SIZE;
 }
 
+VFO vfos[9] = {
+    (VFO){
+        .rxF = 10440000,
+        .meta.type = TYPE_VFO,
+        .gainIndex = AUTO_GAIN_INDEX,
+        .radio = RADIO_BK1080,
+    },
+    (VFO){
+        .rxF = 14550000,
+        .meta.type = TYPE_VFO,
+        .gainIndex = AUTO_GAIN_INDEX,
+        .radio = RADIO_BK4819,
+    },
+    (VFO){
+        .rxF = 17230000,
+        .meta.type = TYPE_VFO,
+        .gainIndex = AUTO_GAIN_INDEX,
+        .radio = RADIO_BK4819,
+    },
+    (VFO){
+        .rxF = 25355000,
+        .meta.type = TYPE_VFO,
+        .gainIndex = AUTO_GAIN_INDEX,
+        .radio = RADIO_BK4819,
+    },
+    (VFO){
+        .rxF = 40065000,
+        .meta.type = TYPE_VFO,
+        .gainIndex = AUTO_GAIN_INDEX,
+        .radio = RADIO_BK4819,
+    },
+    (VFO){
+        .rxF = 43392500,
+        .meta.type = TYPE_VFO,
+        .gainIndex = AUTO_GAIN_INDEX,
+        .radio = RADIO_BK4819,
+    },
+    (VFO){
+        .rxF = 43780000,
+        .meta.type = TYPE_VFO,
+        .gainIndex = AUTO_GAIN_INDEX,
+        .radio = RADIO_BK4819,
+    },
+    (VFO){
+        .rxF = 86800000,
+        .meta.type = TYPE_VFO,
+        .gainIndex = AUTO_GAIN_INDEX,
+        .radio = RADIO_BK4819,
+    },
+    (VFO){
+        .rxF = 25220000,
+        .meta.type = TYPE_CH,
+        .gainIndex = ARRAY_SIZE(gainTable) - 1,
+        .radio = RADIO_BK4819,
+        .name = "Test CH",
+    },
+};
+
 static bool resetFull() {
   if (stats.settings < total.settings) {
     SETTINGS_Save();
@@ -107,27 +165,22 @@ static bool resetFull() {
   }
 
   if (stats.vfos < total.vfos) {
-    VFO vfo;
-    memset(&vfo, 0, sizeof(VFO));
+    VFO vfo = vfos[stats.vfos];
+    // memset(&vfo, 0, sizeof(VFO));
 
-    sprintf(vfo.name, "%s", "VFO-%c", "ABCDEFGHIJKLMNOP"[stats.vfos]);
-    vfo.rxF = (uint32_t[]){
-        10440000, 14550000, 17230000, 25355000,
-        40065000, 43392500, 43780000, 86800000,
-    }[stats.vfos];
+    if (vfo.meta.type == TYPE_VFO) {
+      sprintf(vfo.name, "%s", "VFO-%c", 'A' + stats.vfos);
+    }
 
-    vfo.channel = -1;
+    vfo.channel = 0;
     vfo.modulation = MOD_FM;
     vfo.bw = BK4819_FILTER_BW_12k;
-    vfo.radio = stats.vfos == 0 ? RADIO_BK1080 : RADIO_BK4819;
     vfo.txF = 0;
     vfo.offsetDir = OFFSET_NONE;
     vfo.allowTx = false;
-    vfo.gainIndex = AUTO_GAIN_INDEX;
     vfo.code.rx.type = 0;
     vfo.code.tx.type = 0;
     vfo.meta.readonly = false;
-    vfo.meta.type = TYPE_VFO;
     vfo.squelch.value = 4;
     vfo.step = STEP_25_0kHz;
     CHANNELS_Save(total.mr - total.vfos + stats.vfos, &vfo);
