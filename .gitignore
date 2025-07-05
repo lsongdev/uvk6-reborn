@@ -6,6 +6,7 @@ src/external/CMSIS_5/
 .vscode/
 .clangd/
 .DS_Store
+cache.db
 
 *.log
 *.log.bak
