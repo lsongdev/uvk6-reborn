@@ -1,4 +1,4 @@
-/* #include "chlist.h"
+#include "chlist.h"
 #include "../driver/uart.h"
 #include "../helper/bands.h"
 #include "../helper/numnav.h"
@@ -271,4 +271,4 @@ void CHLIST_render() {
     STATUSLINE_SetText("%s %s", CH_TYPE_FILTER_NAMES[gChListFilter],
                        VIEW_MODE_NAMES[viewMode]);
   }
-} */
+}

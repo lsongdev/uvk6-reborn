@@ -4,9 +4,9 @@
 #include "../ui/statusline.h"
 #include "about.h"
 #include "appslist.h"
-/* #include "bandscan.h"
 #include "chcfg.h"
 #include "chlist.h"
+/* #include "bandscan.h"
 #include "chscan.h"
 #include "fc.h" */
 #include "finput.h"
@@ -51,8 +51,9 @@ AppType_t APPS_Peek(void) {
 }
 
 const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {
-    APP_VFO1, //
-    /* APP_CH_LIST,   //
+    APP_VFO1,    //
+    APP_CH_LIST, //
+    /*
     APP_SCANER,    //
     APP_CH_SCAN,   //
     APP_BAND_SCAN, //
@@ -73,15 +74,19 @@ const App apps[APPS_COUNT] = {
                        APPSLIST_key, NULL},
     [APP_RESET] = {"Reset", RESET_Init, RESET_Update, RESET_Render, RESET_key,
                    NULL},
+    [APP_CH_CFG] = {"CH cfg", CHCFG_init, NULL, CHCFG_render, CHCFG_key,
+                    CHCFG_deinit},
+    [APP_CH_LIST] = {"Channels", CHLIST_init, NULL, CHLIST_render, CHLIST_key,
+                     CHLIST_deinit},
     /* [APP_SPECTRUM] = {"Spectrum", SCANER_init, SCANER_update, SCANER_render,
     SCANER_key, SCANER_deinit}, [APP_LOOT_LIST] = {"Loot", LOOTLIST_init,
     LOOTLIST_update, LOOTLIST_render, LOOTLIST_key, NULL}, [APP_CH_SCAN] = {"CH
     Scan", CHSCAN_init, CHSCAN_update, CHSCAN_render, CHSCAN_key,
-    CHSCAN_deinit}, [APP_CHCFG] = {"CH cfg", CHCFG_init, NULL, CHCFG_render,
-    CHCFG_key, CHCFG_deinit}, [APP_BAND_SCAN] = {"Band Scan", BANDSCAN_init,
-    BANDSCAN_update, BANDSCAN_render, BANDSCAN_key, BANDSCAN_deinit}, [APP_FC] =
-    {"FC", FC_init, FC_update, FC_render, FC_key, FC_deinit}, [APP_CHANNELS] =
-    {"Channels", CHLIST_init, NULL, CHLIST_render, CHLIST_key, CHLIST_deinit},
+    CHSCAN_deinit},
+    [APP_BAND_SCAN] = {"Band Scan", BANDSCAN_init,
+    BANDSCAN_update, BANDSCAN_render, BANDSCAN_key, BANDSCAN_deinit},
+    [APP_FC] =
+    {"FC", FC_init, FC_update, FC_render, FC_key, FC_deinit},
   */
     [APP_VFO1] = {"1 VFO", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL},
     [APP_ABOUT] = {"ABOUT", NULL, NULL, ABOUT_Render, ABOUT_key, NULL},

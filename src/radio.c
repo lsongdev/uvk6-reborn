@@ -577,8 +577,7 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     return;
   }
   LogC(LOG_C_WHITE, "[SET] %-12s -> %s%s", PARAM_NAMES[param],
-       RADIO_GetParamValueString(ctx, param),
-       save_to_eeprom ? " [W]" : "");
+       RADIO_GetParamValueString(ctx, param), save_to_eeprom ? " [W]" : "");
 
   // TODO: make dirty only when changed.
   // but, potential BUG: param not applied when 0
@@ -1007,24 +1006,22 @@ bool RADIO_ToggleVFOMode(RadioState *state, uint8_t vfo_index) {
   if (vfo_index >= state->num_vfos) {
     return false;
   }
-  Log("RADIO_ToggleVFOMode()");
 
   ExtendedVFOContext *vfo = &state->vfos[vfo_index];
   VFOContext *ctx = &vfo->context;
 
   // Определяем новый режим (инвертируем текущий)
-  VFOMode new_mode = (vfo->mode == MODE_CHANNEL) ? MODE_VFO : MODE_CHANNEL;
+  VFOMode new_mode = vfo->mode == MODE_CHANNEL ? MODE_VFO : MODE_CHANNEL;
   MR ch;
   CHANNELS_Load(vfo->vfo_ch_index, &ch);
 
-  Log("RADIO_ToggleVFOMode(%s)",
-      (const char[][16]){[MODE_VFO] = "VFO", [MODE_CHANNEL] = "CH"});
-
   ch.isChMode = new_mode == MODE_CHANNEL;
+  LogC(LOG_C_BRIGHT_CYAN, "[RADIO] ToggleVFOMode to %s",
+       ch.isChMode ? "MR" : "VFO");
 
   CHANNELS_Save(vfo->vfo_ch_index, &ch);
 
-  if (new_mode) {
+  if (new_mode == MODE_CHANNEL) {
     RADIO_LoadChannelToVFO(state, vfo_index, ch.channel);
   } else {
     RADIO_LoadVFOFromStorage(state, vfo_index, &ch);
