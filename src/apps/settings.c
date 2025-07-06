@@ -24,7 +24,7 @@ static uint8_t DEAD_BUF[] = {0xDE, 0xAD};
 static const uint16_t BAT_CAL_MIN = 1900;
 
 static void getValueString(const MenuItem *item, char *buf, uint8_t buf_size) {
-  snprintf(buf, buf_size, "%s", SETTINGS_GetValue(item->setting));
+  snprintf(buf, buf_size, "%s", SETTINGS_GetValueString(item->setting));
 }
 
 static void updateValue(const MenuItem *item, bool up) {
@@ -43,17 +43,25 @@ static Menu sqlMenu = {
     .items =
         (MenuItem[]){
             {"Level"},
-            (MenuItem){"Open t", SETTING_SQLOPENTIME,
-                       .get_value_text = getValueString,
-                       .change_value = updateValue},
-            (MenuItem){.name = "Close t", .get_value_text = getValueString},
+            {"Open t", SETTING_SQLOPENTIME, getValueString, updateValue},
+            {"Close t", SETTING_SQLCLOSETIME, getValueString, updateValue},
         },
     .num_items = 3,
 };
 
 static Menu scanMenu = {
     .title = "Scan options",
-    .items = (MenuItem[]){{"SQL", .submenu = &sqlMenu}, {"Preferences"}},
+    .items =
+        (MenuItem[]){
+            {"SQL", .submenu = &sqlMenu},
+            {"Preferences"},
+            {"SCAN listen t/o", SETTING_SQOPENEDTIMEOUT, getValueString,
+             updateValue},
+            {"SCAN stay t", SETTING_SQCLOSEDTIMEOUT, getValueString,
+             updateValue},
+            {"SCAN skip X_X", SETTING_SKIPGARBAGEFREQUENCIES, getValueString,
+             updateValue},
+        },
     .num_items = 2,
 };
 
@@ -73,20 +81,16 @@ static void onMainAppSubmenu(const MenuItem *item) {
 }
 
 static const MenuItem menuItems[] = {
-    {"Main app", SETTING_MAINAPP, getValueString, updateValue, &submenu},
+    {"Main app", SETTING_MAINAPP, getValueString, updateValue},
+    {"FC t", SETTING_FCTIME, getValueString, updateValue},
+    {"DTMF decode", SETTING_DTMFDECODE, getValueString, updateValue},
     {"SCAN", .submenu = &scanMenu},
-    /* {"SQL open t", M_SQL_OPEN_T, 7},
-    {"SQL close t", M_SQL_CLOSE_T, 3},
-    {"FC t", M_FC_TIME, 4},
-    {"SCAN listen t/o", M_SQL_TO_OPEN, ARRAY_SIZE(SCAN_TIMEOUT_NAMES)},
-    {"SCAN stay t", M_SQL_TO_CLOSE, ARRAY_SIZE(SCAN_TIMEOUT_NAMES)},
-    {"SCAN skip X_X", M_SKIP_GARBAGE_FREQS, 2},
+    /*
     {"Contrast", M_CONTRAST, 16},
     {"BL high", M_BRIGHTNESS, 16},
     {"BL low", M_BRIGHTNESS_L, 16},
     {"BL time", M_BL_TIME, ARRAY_SIZE(BL_TIME_VALUES)},
     {"BL SQL mode", M_BL_SQL, ARRAY_SIZE(BL_SQL_MODE_NAMES)},
-    {"DTMF decode", M_DTMF_DECODE, 2},
     {"SI power off", M_SI4732_POWER_OFF, 2},
     {"Upconv", M_UPCONVERTER, 0},
     {"Filter bound", M_FLT_BOUND, 2},

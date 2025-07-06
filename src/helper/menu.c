@@ -30,7 +30,7 @@ static void UI_ShowMenuItem(uint8_t line, const MenuItem *item,
   if (item->get_value_text) {
     char value_buf[32];
     item->get_value_text(item, value_buf, sizeof(value_buf));
-    PrintSmallEx(LCD_WIDTH - 4, by + 8, POS_R, C_FILL, "%s", value_buf);
+    PrintSmallEx(LCD_WIDTH - 4, by, POS_R, C_FILL, "%s", value_buf);
   }
   if (isCurrent) {
     FillRect(0, MENU_Y + line * MENU_ITEM_H, LCD_WIDTH - 4, MENU_ITEM_H,

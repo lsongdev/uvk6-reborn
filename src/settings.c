@@ -122,6 +122,8 @@ bool dirty[SETTING_COUNT];
 
 uint32_t SETTINGS_GetValue(Setting s) {
   switch (s) {
+  case SETTING_FCTIME:
+    return gSettings.fcTime;
   case SETTING_EEPROMTYPE:
     return gSettings.eepromType;
   case SETTING_BATSAVE:
@@ -200,6 +202,10 @@ uint32_t SETTINGS_GetValue(Setting s) {
 
 void SETTINGS_SetValue(Setting s, uint32_t v) {
   switch (s) {
+  case SETTING_FCTIME:
+    gSettings.fcTime = v;
+    dirty[s] = true;
+    break;
   case SETTING_EEPROMTYPE:
     gSettings.eepromType = v;
     dirty[s] = true;
@@ -383,6 +389,8 @@ const char *SETTINGS_GetValueString(Setting s) {
     return BATTERY_TYPE_NAMES[v];
   case SETTING_BATTERYSTYLE:
     return BATTERY_STYLE_NAMES[v];
+  case SETTING_FCTIME:
+    return FC_TIME_NAMES[v];
 
   case SETTING_BATTERYCALIBRATION:
     break;
@@ -464,6 +472,9 @@ void SETTINGS_IncDecValue(Setting s, bool inc) {
     break;
   case SETTING_BATTERYSTYLE:
     ma = ARRAY_SIZE(BATTERY_STYLE_NAMES);
+    break;
+  case SETTING_FCTIME:
+    ma = ARRAY_SIZE(FC_TIME_NAMES);
     break;
 
   case SETTING_BATTERYCALIBRATION:
