@@ -62,7 +62,7 @@ static Menu scanMenu = {
             {"SCAN skip X_X", SETTING_SKIPGARBAGEFREQUENCIES, getValueString,
              updateValue},
         },
-    .num_items = 2,
+    .num_items = 5,
 };
 
 static void onMainAppChoose(const MenuItem *item) {
@@ -83,7 +83,12 @@ static void onMainAppSubmenu(const MenuItem *item) {
 static const MenuItem menuItems[] = {
     {"Main app", SETTING_MAINAPP, getValueString, updateValue},
     {"FC t", SETTING_FCTIME, getValueString, updateValue},
+    {"Beep", SETTING_BEEP, getValueString, updateValue},
+    {"CH display", SETTING_CHDISPLAYMODE, getValueString, updateValue},
     {"DTMF decode", SETTING_DTMFDECODE, getValueString, updateValue},
+    {"Filter bound", SETTING_BOUND240_280, getValueString, updateValue},
+    {"Bat type", SETTING_BATTERYTYPE, getValueString, updateValue},
+    {"Bat style", SETTING_BATTERYSTYLE, getValueString, updateValue},
     {"SCAN", .submenu = &scanMenu},
     /*
     {"Contrast", M_CONTRAST, 16},
@@ -93,12 +98,8 @@ static const MenuItem menuItems[] = {
     {"BL SQL mode", M_BL_SQL, ARRAY_SIZE(BL_SQL_MODE_NAMES)},
     {"SI power off", M_SI4732_POWER_OFF, 2},
     {"Upconv", M_UPCONVERTER, 0},
-    {"Filter bound", M_FLT_BOUND, 2},
     {"BAT cal", M_BAT_CAL, 255},
-    {"BAT type", M_BAT_TYPE, ARRAY_SIZE(BATTERY_TYPE_NAMES)},
-    {"BAT style", M_BAT_STYLE, ARRAY_SIZE(BATTERY_STYLE_NAMES)},
     {"CH Display", M_CH_DISP_MODE, ARRAY_SIZE(CH_DISPLAY_MODE_NAMES)},
-    {"Beep", M_BEEP, 2},
     {"Level in VFO", M_LEVEL_IN_VFO, 2},
     {"STE", M_STE, 2},
     {"Roger", M_ROGER, ARRAY_SIZE(rogerNames)},
