@@ -7,7 +7,6 @@
 #include "helper/measurements.h"
 #include "misc.h"
 #include "radio.h"
-#include <cstdint>
 #include <string.h>
 
 static const char *YES_NO[] = {"No", "Yes"};

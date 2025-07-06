@@ -7,6 +7,7 @@
 
 typedef void (*MenuAction)(void);
 typedef void (*MenuOnEnter)(void);
+typedef struct MenuItem MenuItem;
 
 typedef struct MenuItem {
   const char *name;
