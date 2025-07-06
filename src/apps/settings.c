@@ -23,16 +23,12 @@ static uint8_t DEAD_BUF[] = {0xDE, 0xAD};
 
 static const uint16_t BAT_CAL_MIN = 1900;
 
-static void getSqlOpenT(const void *user_data, char *buf, uint8_t buf_size) {
-  snprintf(buf, buf_size, "%ums", gSettings.sqlOpenTime * 5);
+static void getValueString(const MenuItem *item, char *buf, uint8_t buf_size) {
+  snprintf(buf, buf_size, "%s", SETTINGS_GetValue(item->setting));
 }
 
-static void getSqlCloseT(const void *user_data, char *buf, uint8_t buf_size) {
-  snprintf(buf, buf_size, "%ums", gSettings.sqlCloseTime * 5);
-}
-
-static void updateSqlOpenT(const void *user_data, bool up) {
-  gSettings.sqlOpenTime = IncDecU(gSettings.sqlOpenTime, 0, 4, up);
+static void updateValue(const MenuItem *item, bool up) {
+  SETTINGS_IncDecValue(item->setting, up);
 }
 
 static MenuItem dynamicItems[RUN_APPS_COUNT];
@@ -47,25 +43,25 @@ static Menu sqlMenu = {
     .items =
         (MenuItem[]){
             {"Level"},
-            {.name = "Open t",
-             .get_value_text = getSqlOpenT,
-             .change_value = updateSqlOpenT},
-            {.name = "Close t", .get_value_text = getSqlCloseT},
+            (MenuItem){"Open t", SETTING_SQLOPENTIME,
+                       .get_value_text = getValueString,
+                       .change_value = updateValue},
+            (MenuItem){.name = "Close t", .get_value_text = getValueString},
         },
     .num_items = 3,
 };
 
 static Menu scanMenu = {
     .title = "Scan options",
-    .items = (MenuItem[]){{"SQL", NULL, NULL, &sqlMenu}, {"Preferences"}},
+    .items = (MenuItem[]){{"SQL", .submenu = &sqlMenu}, {"Preferences"}},
     .num_items = 2,
 };
 
-static void onMainAppChoose(void *user_data) {
+static void onMainAppChoose(const MenuItem *item) {
   // gSettings.mainApp = *(AppType_t *)(user_data);
 }
 
-static void onMainAppSubmenu(void *user_data) {
+static void onMainAppSubmenu(const MenuItem *item) {
   Log("Submenu enter");
   submenu.title = "LALALA";
   submenu.num_items = RUN_APPS_COUNT;
@@ -77,8 +73,8 @@ static void onMainAppSubmenu(void *user_data) {
 }
 
 static const MenuItem menuItems[] = {
-    {"Main app", onMainAppSubmenu, NULL, &submenu},
-    {"SCAN", NULL, NULL, &scanMenu},
+    {"Main app", SETTING_MAINAPP, getValueString, updateValue, &submenu},
+    {"SCAN", .submenu = &scanMenu},
     /* {"SQL open t", M_SQL_OPEN_T, 7},
     {"SQL close t", M_SQL_CLOSE_T, 3},
     {"FC t", M_FC_TIME, 4},

@@ -10,14 +10,16 @@ typedef void (*MenuOnEnter)(void);
 
 typedef struct MenuItem {
   const char *name;
-  void (*action)(void *user_data);
-  const void *user_data; // Данные для action
+  const uint8_t setting; // настройка, которую меняем
+  void (*get_value_text)(const MenuItem *item, char *buf, uint8_t buf_size);
+  void (*change_value)(const MenuItem *item, bool up);
   struct Menu *submenu; // если не NULL — переход в подменю
-  void (*get_value_text)(const void *user_data, char *buf, uint8_t buf_size);
-  void (*change_value)(const void *user_data, bool up);
 
-  int64_t (*get_value)(const void *user_data);
-  void (*set_value)(const void *user_data, int64_t);
+  /* int64_t (*get_value)(const MenuItem *item);
+  void (*set_value)(const MenuItem *item, int64_t); */
+
+  void (*action)(const MenuItem *item);
+  const void *user_data; // Данные для action
 } MenuItem;
 
 typedef struct Menu {

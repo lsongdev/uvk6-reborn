@@ -29,7 +29,7 @@ static void UI_ShowMenuItem(uint8_t line, const MenuItem *item,
   PrintMedium(4, by, "%s", item->name);
   if (item->get_value_text) {
     char value_buf[32];
-    item->get_value_text(item->user_data, value_buf, sizeof(value_buf));
+    item->get_value_text(item, value_buf, sizeof(value_buf));
     PrintSmallEx(LCD_WIDTH - 4, by + 8, POS_R, C_FILL, "%s", value_buf);
   }
   if (isCurrent) {
@@ -89,7 +89,7 @@ bool MENU_HandleInput(uint8_t key) {
   case KEY_MENU: {
     const MenuItem *item = &active_menu->items[current_index];
     if (item->action) {
-      item->action((void *)item->user_data);
+      item->action(item);
     }
     if (item->submenu) {
       if (menu_stack_top < MENU_STACK_DEPTH) {
@@ -107,7 +107,7 @@ bool MENU_HandleInput(uint8_t key) {
   case KEY_F: {
     const MenuItem *item = &active_menu->items[current_index];
     if (item->change_value) {
-      item->change_value(item->user_data, key == KEY_STAR);
+      item->change_value(item, key == KEY_STAR);
       return true;
     }
   }

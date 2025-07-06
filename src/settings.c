@@ -4,7 +4,10 @@
 #include "driver/eeprom.h"
 #include "external/printf/printf.h"
 #include "helper/battery.h"
+#include "helper/measurements.h"
+#include "misc.h"
 #include "radio.h"
+#include <cstdint>
 #include <string.h>
 
 static const char *YES_NO[] = {"No", "Yes"};
@@ -115,46 +118,6 @@ bool SETTINGS_IsPatchPresent() {
   EEPROM_ReadBuffer(SETTINGS_GetEEPROMSize() - PATCH_SIZE, buf, 8);
   return memcmp(buf, PATCH3_PREAMBLE, 8) == 0;
 }
-
-typedef enum {
-  SETTING_EEPROMTYPE,
-  SETTING_BATSAVE,
-  SETTING_VOX,
-  SETTING_BACKLIGHT,
-  SETTING_TXTIME,
-  SETTING_CURRENTSCANLIST,
-  SETTING_ROGER,
-  SETTING_SCANMODE,
-  SETTING_CHDISPLAYMODE,
-  SETTING_BEEP,
-  SETTING_KEYLOCK,
-  SETTING_BUSYCHANNELTXLOCK,
-  SETTING_STE,
-  SETTING_REPEATERSTE,
-  SETTING_DTMFDECODE,
-  SETTING_BRIGHTNESS,
-  SETTING_CONTRAST,
-  SETTING_MAINAPP,
-  SETTING_SQOPENEDTIMEOUT,
-  SETTING_SQCLOSEDTIMEOUT,
-  SETTING_SQLOPENTIME,
-  SETTING_SQLCLOSETIME,
-  SETTING_SKIPGARBAGEFREQUENCIES,
-  SETTING_ACTIVEVFO,
-  SETTING_BACKLIGHTONSQUELCH,
-  SETTING_BATTERYCALIBRATION,
-  SETTING_BATTERYTYPE,
-  SETTING_BATTERYSTYLE,
-  SETTING_UPCONVERTER,
-  SETTING_DEVIATION,
-  SETTING_SHOWLEVELINVFO,
-  SETTING_BOUND240_280,
-  SETTING_NOLISTEN,
-  SETTING_SI4732POWEROFF,
-  SETTING_TONELOCAL,
-
-  SETTING_COUNT,
-} Setting;
 
 bool dirty[SETTING_COUNT];
 
@@ -383,7 +346,7 @@ void SETTINGS_SetValue(Setting s, uint32_t v) {
   }
 }
 
-const char *SETTINGS_GetParamValueString(Setting s) {
+const char *SETTINGS_GetValueString(Setting s) {
   static char buf[16] = "unk";
   uint32_t v = SETTINGS_GetValue(s);
 
@@ -395,11 +358,13 @@ const char *SETTINGS_GetParamValueString(Setting s) {
   case SETTING_SKIPGARBAGEFREQUENCIES:
   case SETTING_DTMFDECODE:
     return YES_NO[v];
+
   case SETTING_BEEP:
   case SETTING_REPEATERSTE:
   case SETTING_KEYLOCK:
   case SETTING_STE:
     return ON_OFF[v];
+
   case SETTING_EEPROMTYPE:
     return EEPROM_TYPE_NAMES[v];
   case SETTING_BOUND240_280:
@@ -413,23 +378,13 @@ const char *SETTINGS_GetParamValueString(Setting s) {
   case SETTING_SQOPENEDTIMEOUT:
   case SETTING_SQCLOSEDTIMEOUT:
     return SCAN_TIMEOUT_NAMES[v];
-  case SETTING_SQLOPENTIME:
-  case SETTING_SQLCLOSETIME:
-    snprintf(buf, 15, "%ums", v * 5);
-    break;
-  case SETTING_COUNT:
-  case SETTING_ACTIVEVFO:
-    snprintf(buf, 15, "%u", v);
-    break;
-  case SETTING_DEVIATION:
-    snprintf(buf, 15, "%u", v * 10);
-    break;
   case SETTING_BACKLIGHTONSQUELCH:
     return BL_SQL_MODE_NAMES[v];
   case SETTING_BATTERYTYPE:
     return BATTERY_TYPE_NAMES[v];
   case SETTING_BATTERYSTYLE:
     return BATTERY_STYLE_NAMES[v];
+
   case SETTING_BATTERYCALIBRATION:
     break;
   case SETTING_UPCONVERTER:
@@ -443,6 +398,19 @@ const char *SETTINGS_GetParamValueString(Setting s) {
   case SETTING_CONTRAST:
     break;
 
+  case SETTING_SQLOPENTIME:
+  case SETTING_SQLCLOSETIME:
+    snprintf(buf, 15, "%ums", v * 5);
+    break;
+  case SETTING_DEVIATION:
+    snprintf(buf, 15, "%u", v * 10);
+    break;
+
+  case SETTING_COUNT:
+  case SETTING_ACTIVEVFO:
+    snprintf(buf, 15, "%u", v);
+    break;
+
   case SETTING_BATSAVE:
   case SETTING_VOX:
   case SETTING_TXTIME:
@@ -451,4 +419,89 @@ const char *SETTINGS_GetParamValueString(Setting s) {
     return "N/a";
   }
   return buf;
+}
+
+void SETTINGS_IncDecValue(Setting s, bool inc) {
+  uint32_t mi = 0;
+  uint32_t ma = UINT32_MAX;
+  switch (s) {
+  case SETTING_SHOWLEVELINVFO:
+  case SETTING_NOLISTEN:
+  case SETTING_SI4732POWEROFF:
+  case SETTING_TONELOCAL:
+  case SETTING_SKIPGARBAGEFREQUENCIES:
+  case SETTING_DTMFDECODE:
+  case SETTING_BEEP:
+  case SETTING_REPEATERSTE:
+  case SETTING_KEYLOCK:
+  case SETTING_STE:
+    ma = 2;
+    break;
+
+  case SETTING_EEPROMTYPE:
+    ma = ARRAY_SIZE(EEPROM_TYPE_NAMES);
+    break;
+  case SETTING_BOUND240_280:
+    ma = ARRAY_SIZE(FLT_BOUND_NAMES);
+    break;
+  case SETTING_ROGER:
+    ma = ARRAY_SIZE(rogerNames);
+    break;
+  case SETTING_CHDISPLAYMODE:
+    ma = ARRAY_SIZE(CH_DISPLAY_MODE_NAMES);
+    break;
+  case SETTING_MAINAPP:
+    ma = RUN_APPS_COUNT;
+    break;
+  case SETTING_SQOPENEDTIMEOUT:
+  case SETTING_SQCLOSEDTIMEOUT:
+    ma = ARRAY_SIZE(SCAN_TIMEOUT_NAMES);
+    break;
+  case SETTING_BACKLIGHTONSQUELCH:
+    ma = ARRAY_SIZE(BL_SQL_MODE_NAMES);
+    break;
+  case SETTING_BATTERYTYPE:
+    ma = ARRAY_SIZE(BATTERY_TYPE_NAMES);
+    break;
+  case SETTING_BATTERYSTYLE:
+    ma = ARRAY_SIZE(BATTERY_STYLE_NAMES);
+    break;
+
+  case SETTING_BATTERYCALIBRATION:
+    break;
+  case SETTING_UPCONVERTER:
+    break;
+  case SETTING_BACKLIGHT:
+    break;
+  case SETTING_CURRENTSCANLIST:
+    break;
+  case SETTING_BRIGHTNESS:
+    break;
+  case SETTING_CONTRAST:
+    break;
+
+  case SETTING_SQLOPENTIME:
+  case SETTING_SQLCLOSETIME:
+    // TODO: see datasheet
+    break;
+  case SETTING_DEVIATION:
+    ma = 256;
+    break;
+
+  case SETTING_COUNT:
+    ma = SETTING_COUNT;
+    break;
+  case SETTING_ACTIVEVFO:
+    // TODO: radio get vfo count
+    break;
+
+  case SETTING_BATSAVE:
+  case SETTING_VOX:
+  case SETTING_TXTIME:
+  case SETTING_SCANMODE:
+  case SETTING_BUSYCHANNELTXLOCK:
+    break;
+  }
+
+  SETTINGS_SetValue(s, IncDecI(SETTINGS_GetValue(s), mi, ma, inc));
 }
