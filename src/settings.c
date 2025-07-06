@@ -1,7 +1,11 @@
 #include "settings.h"
 #include "driver/bk4819.h"
 #include "driver/eeprom.h"
+#include "radio.h"
 #include <string.h>
+
+static const char *YES_NO[] = {"No", "Yes"};
+static const char *ON_OFF[] = {"Off", "On"};
 
 uint8_t BL_TIME_VALUES[7] = {0, 5, 10, 20, 60, 120, 255};
 const char *BL_TIME_NAMES[7] = {"Off",  "5s",   "10s", "20s",
@@ -107,4 +111,342 @@ bool SETTINGS_IsPatchPresent() {
   uint8_t buf[8];
   EEPROM_ReadBuffer(SETTINGS_GetEEPROMSize() - PATCH_SIZE, buf, 8);
   return memcmp(buf, PATCH3_PREAMBLE, 8) == 0;
+}
+
+typedef enum {
+  SETTING_EEPROMTYPE,
+  SETTING_BATSAVE,
+  SETTING_VOX,
+  SETTING_BACKLIGHT,
+  SETTING_TXTIME,
+  SETTING_CURRENTSCANLIST,
+  SETTING_ROGER,
+  SETTING_SCANMODE,
+  SETTING_CHDISPLAYMODE,
+  SETTING_BEEP,
+  SETTING_KEYLOCK,
+  SETTING_BUSYCHANNELTXLOCK,
+  SETTING_STE,
+  SETTING_REPEATERSTE,
+  SETTING_DTMFDECODE,
+  SETTING_BRIGHTNESS,
+  SETTING_CONTRAST,
+  SETTING_MAINAPP,
+  SETTING_SQOPENEDTIMEOUT,
+  SETTING_SQCLOSEDTIMEOUT,
+  SETTING_SQLOPENTIME,
+  SETTING_SQLCLOSETIME,
+  SETTING_SKIPGARBAGEFREQUENCIES,
+  SETTING_ACTIVEVFO,
+  SETTING_BACKLIGHTONSQUELCH,
+  SETTING_BATTERYCALIBRATION,
+  SETTING_BATTERYTYPE,
+  SETTING_BATTERYSTYLE,
+  SETTING_UPCONVERTER,
+  SETTING_DEVIATION,
+  SETTING_SHOWLEVELINVFO,
+  SETTING_BOUND240_280,
+  SETTING_NOLISTEN,
+  SETTING_SI4732POWEROFF,
+  SETTING_TONELOCAL,
+
+  SETTING_COUNT,
+} Setting;
+
+bool dirty[SETTING_COUNT];
+
+uint32_t SETTINGS_GetValue(Setting s) {
+  switch (s) {
+  case SETTING_EEPROMTYPE:
+    return gSettings.eepromType;
+  case SETTING_BATSAVE:
+    return gSettings.batsave;
+  case SETTING_VOX:
+    return gSettings.vox;
+  case SETTING_BACKLIGHT:
+    return gSettings.backlight;
+  case SETTING_TXTIME:
+    return gSettings.txTime;
+  case SETTING_CURRENTSCANLIST:
+    return gSettings.currentScanlist;
+  case SETTING_ROGER:
+    return gSettings.roger;
+  case SETTING_SCANMODE:
+    return gSettings.scanmode;
+  case SETTING_CHDISPLAYMODE:
+    return gSettings.chDisplayMode;
+  case SETTING_BEEP:
+    return gSettings.beep;
+  case SETTING_KEYLOCK:
+    return gSettings.keylock;
+  case SETTING_BUSYCHANNELTXLOCK:
+    return gSettings.busyChannelTxLock;
+  case SETTING_STE:
+    return gSettings.ste;
+  case SETTING_REPEATERSTE:
+    return gSettings.repeaterSte;
+  case SETTING_DTMFDECODE:
+    return gSettings.dtmfdecode;
+  case SETTING_BRIGHTNESS:
+    return gSettings.brightness;
+  case SETTING_CONTRAST:
+    return gSettings.contrast;
+  case SETTING_MAINAPP:
+    return gSettings.mainApp;
+  case SETTING_SQOPENEDTIMEOUT:
+    return gSettings.sqOpenedTimeout;
+  case SETTING_SQCLOSEDTIMEOUT:
+    return gSettings.sqClosedTimeout;
+  case SETTING_SQLOPENTIME:
+    return gSettings.sqlOpenTime;
+  case SETTING_SQLCLOSETIME:
+    return gSettings.sqlCloseTime;
+  case SETTING_SKIPGARBAGEFREQUENCIES:
+    return gSettings.skipGarbageFrequencies;
+  case SETTING_ACTIVEVFO:
+    return gSettings.activeVFO;
+  case SETTING_BACKLIGHTONSQUELCH:
+    return gSettings.backlightOnSquelch;
+  case SETTING_BATTERYCALIBRATION:
+    return gSettings.batteryCalibration;
+  case SETTING_BATTERYTYPE:
+    return gSettings.batteryType;
+  case SETTING_BATTERYSTYLE:
+    return gSettings.batteryStyle;
+  case SETTING_UPCONVERTER:
+    return gSettings.upconverter;
+  case SETTING_DEVIATION:
+    return gSettings.deviation;
+  case SETTING_COUNT:
+    return SETTING_COUNT;
+  case SETTING_SHOWLEVELINVFO:
+    return gSettings.showLevelInVFO;
+  case SETTING_BOUND240_280:
+    return gSettings.bound_240_280;
+  case SETTING_NOLISTEN:
+    return gSettings.noListen;
+  case SETTING_SI4732POWEROFF:
+    return gSettings.si4732PowerOff;
+  case SETTING_TONELOCAL:
+    return gSettings.toneLocal;
+  }
+  return 0;
+}
+
+void SETTINGS_SetValue(Setting s, uint32_t v) {
+  switch (s) {
+  case SETTING_EEPROMTYPE:
+    gSettings.eepromType = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BATSAVE:
+    gSettings.batsave = v;
+    dirty[s] = true;
+    break;
+  case SETTING_VOX:
+    gSettings.vox = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BACKLIGHT:
+    gSettings.backlight = v;
+    dirty[s] = true;
+    break;
+  case SETTING_TXTIME:
+    gSettings.txTime = v;
+    dirty[s] = true;
+    break;
+  case SETTING_CURRENTSCANLIST:
+    gSettings.currentScanlist = v;
+    dirty[s] = true;
+    break;
+  case SETTING_ROGER:
+    gSettings.roger = v;
+    dirty[s] = true;
+    break;
+  case SETTING_SCANMODE:
+    gSettings.scanmode = v;
+    dirty[s] = true;
+    break;
+  case SETTING_CHDISPLAYMODE:
+    gSettings.chDisplayMode = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BEEP:
+    gSettings.beep = v;
+    dirty[s] = true;
+    break;
+  case SETTING_KEYLOCK:
+    gSettings.keylock = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BUSYCHANNELTXLOCK:
+    gSettings.busyChannelTxLock = v;
+    dirty[s] = true;
+    break;
+  case SETTING_STE:
+    gSettings.ste = v;
+    dirty[s] = true;
+    break;
+  case SETTING_REPEATERSTE:
+    gSettings.repeaterSte = v;
+    dirty[s] = true;
+    break;
+  case SETTING_DTMFDECODE:
+    gSettings.dtmfdecode = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BRIGHTNESS:
+    gSettings.brightness = v;
+    dirty[s] = true;
+    break;
+  case SETTING_CONTRAST:
+    gSettings.contrast = v;
+    dirty[s] = true;
+    break;
+  case SETTING_MAINAPP:
+    gSettings.mainApp = v;
+    dirty[s] = true;
+    break;
+  case SETTING_SQOPENEDTIMEOUT:
+    gSettings.sqOpenedTimeout = v;
+    dirty[s] = true;
+    break;
+  case SETTING_SQCLOSEDTIMEOUT:
+    gSettings.sqClosedTimeout = v;
+    dirty[s] = true;
+    break;
+  case SETTING_SQLOPENTIME:
+    gSettings.sqlOpenTime = v;
+    dirty[s] = true;
+    break;
+  case SETTING_SQLCLOSETIME:
+    gSettings.sqlCloseTime = v;
+    dirty[s] = true;
+    break;
+  case SETTING_SKIPGARBAGEFREQUENCIES:
+    gSettings.skipGarbageFrequencies = v;
+    dirty[s] = true;
+    break;
+  case SETTING_ACTIVEVFO:
+    gSettings.activeVFO = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BACKLIGHTONSQUELCH:
+    gSettings.backlightOnSquelch = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BATTERYCALIBRATION:
+    gSettings.batteryCalibration = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BATTERYTYPE:
+    gSettings.batteryType = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BATTERYSTYLE:
+    gSettings.batteryStyle = v;
+    dirty[s] = true;
+    break;
+  case SETTING_UPCONVERTER:
+    gSettings.upconverter = v;
+    dirty[s] = true;
+    break;
+  case SETTING_DEVIATION:
+    gSettings.deviation = v;
+    dirty[s] = true;
+    break;
+  case SETTING_COUNT:
+    return;
+  case SETTING_SHOWLEVELINVFO:
+    gSettings.showLevelInVFO = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BOUND240_280:
+    gSettings.bound_240_280 = v;
+    dirty[s] = true;
+    break;
+  case SETTING_NOLISTEN:
+    gSettings.noListen = v;
+    dirty[s] = true;
+    break;
+  case SETTING_SI4732POWEROFF:
+    gSettings.si4732PowerOff = v;
+    dirty[s] = true;
+    break;
+  case SETTING_TONELOCAL:
+    gSettings.toneLocal = v;
+    dirty[s] = true;
+    break;
+  }
+}
+
+const char *SETTINGS_GetParamValueString(Setting s) {
+  static char buf[16] = "unk";
+  uint32_t v = SETTINGS_GetValue(s);
+
+  switch (s) {
+  case SETTING_SHOWLEVELINVFO:
+  case SETTING_NOLISTEN:
+  case SETTING_SI4732POWEROFF:
+  case SETTING_TONELOCAL:
+  case SETTING_SKIPGARBAGEFREQUENCIES:
+    return YES_NO[v];
+  case SETTING_EEPROMTYPE:
+    return EEPROM_TYPE_NAMES[v];
+  case SETTING_BOUND240_280:
+    return FLT_BOUND_NAMES[v];
+  case SETTING_BATSAVE:
+    break;
+  case SETTING_VOX:
+    break;
+  case SETTING_BACKLIGHT:
+    break;
+  case SETTING_TXTIME:
+    break;
+  case SETTING_CURRENTSCANLIST:
+    break;
+  case SETTING_ROGER:
+    break;
+  case SETTING_SCANMODE:
+    break;
+  case SETTING_CHDISPLAYMODE:
+    break;
+  case SETTING_BEEP:
+    break;
+  case SETTING_BUSYCHANNELTXLOCK:
+    break;
+  case SETTING_REPEATERSTE:
+    break;
+  case SETTING_DTMFDECODE:
+    break;
+  case SETTING_BRIGHTNESS:
+    break;
+  case SETTING_CONTRAST:
+    break;
+  case SETTING_MAINAPP:
+    break;
+  case SETTING_SQOPENEDTIMEOUT:
+    break;
+  case SETTING_SQCLOSEDTIMEOUT:
+    break;
+  case SETTING_SQLOPENTIME:
+    break;
+  case SETTING_SQLCLOSETIME:
+    break;
+  case SETTING_ACTIVEVFO:
+    break;
+  case SETTING_BACKLIGHTONSQUELCH:
+    break;
+  case SETTING_BATTERYCALIBRATION:
+    break;
+  case SETTING_BATTERYTYPE:
+    break;
+  case SETTING_BATTERYSTYLE:
+    break;
+  case SETTING_UPCONVERTER:
+    break;
+  case SETTING_DEVIATION:
+    break;
+  }
+  return buf;
 }
