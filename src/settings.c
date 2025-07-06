@@ -1,6 +1,9 @@
 #include "settings.h"
+#include "apps/apps.h"
 #include "driver/bk4819.h"
 #include "driver/eeprom.h"
+#include "external/printf/printf.h"
+#include "helper/battery.h"
 #include "radio.h"
 #include <string.h>
 
@@ -390,63 +393,62 @@ const char *SETTINGS_GetParamValueString(Setting s) {
   case SETTING_SI4732POWEROFF:
   case SETTING_TONELOCAL:
   case SETTING_SKIPGARBAGEFREQUENCIES:
+  case SETTING_DTMFDECODE:
     return YES_NO[v];
+  case SETTING_BEEP:
+  case SETTING_REPEATERSTE:
+  case SETTING_KEYLOCK:
+  case SETTING_STE:
+    return ON_OFF[v];
   case SETTING_EEPROMTYPE:
     return EEPROM_TYPE_NAMES[v];
   case SETTING_BOUND240_280:
     return FLT_BOUND_NAMES[v];
-  case SETTING_BATSAVE:
+  case SETTING_ROGER:
+    return rogerNames[v];
+  case SETTING_CHDISPLAYMODE:
+    return CH_DISPLAY_MODE_NAMES[v];
+  case SETTING_MAINAPP:
+    return apps[v].name;
+  case SETTING_SQOPENEDTIMEOUT:
+  case SETTING_SQCLOSEDTIMEOUT:
+    return SCAN_TIMEOUT_NAMES[v];
+  case SETTING_SQLOPENTIME:
+  case SETTING_SQLCLOSETIME:
+    snprintf(buf, 15, "%ums", v * 5);
     break;
-  case SETTING_VOX:
+  case SETTING_COUNT:
+  case SETTING_ACTIVEVFO:
+    snprintf(buf, 15, "%u", v);
+    break;
+  case SETTING_DEVIATION:
+    snprintf(buf, 15, "%u", v * 10);
+    break;
+  case SETTING_BACKLIGHTONSQUELCH:
+    return BL_SQL_MODE_NAMES[v];
+  case SETTING_BATTERYTYPE:
+    return BATTERY_TYPE_NAMES[v];
+  case SETTING_BATTERYSTYLE:
+    return BATTERY_STYLE_NAMES[v];
+  case SETTING_BATTERYCALIBRATION:
+    break;
+  case SETTING_UPCONVERTER:
     break;
   case SETTING_BACKLIGHT:
     break;
-  case SETTING_TXTIME:
-    break;
   case SETTING_CURRENTSCANLIST:
-    break;
-  case SETTING_ROGER:
-    break;
-  case SETTING_SCANMODE:
-    break;
-  case SETTING_CHDISPLAYMODE:
-    break;
-  case SETTING_BEEP:
-    break;
-  case SETTING_BUSYCHANNELTXLOCK:
-    break;
-  case SETTING_REPEATERSTE:
-    break;
-  case SETTING_DTMFDECODE:
     break;
   case SETTING_BRIGHTNESS:
     break;
   case SETTING_CONTRAST:
     break;
-  case SETTING_MAINAPP:
-    break;
-  case SETTING_SQOPENEDTIMEOUT:
-    break;
-  case SETTING_SQCLOSEDTIMEOUT:
-    break;
-  case SETTING_SQLOPENTIME:
-    break;
-  case SETTING_SQLCLOSETIME:
-    break;
-  case SETTING_ACTIVEVFO:
-    break;
-  case SETTING_BACKLIGHTONSQUELCH:
-    break;
-  case SETTING_BATTERYCALIBRATION:
-    break;
-  case SETTING_BATTERYTYPE:
-    break;
-  case SETTING_BATTERYSTYLE:
-    break;
-  case SETTING_UPCONVERTER:
-    break;
-  case SETTING_DEVIATION:
-    break;
+
+  case SETTING_BATSAVE:
+  case SETTING_VOX:
+  case SETTING_TXTIME:
+  case SETTING_SCANMODE:
+  case SETTING_BUSYCHANNELTXLOCK:
+    return "N/a";
   }
   return buf;
 }
