@@ -46,7 +46,6 @@ typedef enum {
   SETTING_TONELOCAL,
   SETTING_FCTIME,
 
-
   SETTING_COUNT,
 } Setting;
 
@@ -214,5 +213,7 @@ uint32_t SETTINGS_GetValue(Setting s);
 void SETTINGS_SetValue(Setting s, uint32_t v);
 const char *SETTINGS_GetValueString(Setting s);
 void SETTINGS_IncDecValue(Setting s, bool inc);
+
+void SETTINGS_UpdateSave();
 
 #endif /* end of include guard: SETTINGS_H */

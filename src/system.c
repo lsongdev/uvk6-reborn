@@ -157,6 +157,7 @@ void SYS_Main() {
 
   for (;;) {
 
+    SETTINGS_UpdateSave();
     APPS_update();
 
     if (Now() - appsKeyboardTimer > 12) {

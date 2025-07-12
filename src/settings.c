@@ -7,7 +7,10 @@
 #include "helper/measurements.h"
 #include "misc.h"
 #include "radio.h"
+#include "scheduler.h"
 #include <string.h>
+
+static uint32_t saveTime;
 
 static const char *YES_NO[] = {"No", "Yes"};
 static const char *ON_OFF[] = {"Off", "On"};
@@ -349,6 +352,17 @@ void SETTINGS_SetValue(Setting s, uint32_t v) {
     dirty[s] = true;
     break;
   }
+
+  bool needSave = false;
+  for (uint8_t i = 0; i < SETTING_COUNT; ++i) {
+    if (dirty[i]) {
+      needSave = true;
+      dirty[i] = false;
+    }
+  }
+  if (needSave) {
+    saveTime = Now() + 1000;
+  }
 }
 
 const char *SETTINGS_GetValueString(Setting s) {
@@ -431,6 +445,7 @@ const char *SETTINGS_GetValueString(Setting s) {
 void SETTINGS_IncDecValue(Setting s, bool inc) {
   uint32_t mi = 0;
   uint32_t ma = UINT32_MAX;
+  uint32_t v = SETTINGS_GetValue(s);
   switch (s) {
   case SETTING_SHOWLEVELINVFO:
   case SETTING_NOLISTEN:
@@ -457,9 +472,24 @@ void SETTINGS_IncDecValue(Setting s, bool inc) {
   case SETTING_CHDISPLAYMODE:
     ma = ARRAY_SIZE(CH_DISPLAY_MODE_NAMES);
     break;
-  case SETTING_MAINAPP:
-    ma = RUN_APPS_COUNT;
-    break;
+  case SETTING_MAINAPP: {
+    int8_t found_index = -1;
+    for (uint8_t i = 0; i < RUN_APPS_COUNT; i++) {
+      if (appsAvailableToRun[i] == v) {
+        found_index = i;
+        break;
+      }
+    }
+
+    if (found_index == -1) {
+      v = appsAvailableToRun[0];
+    }
+
+    int8_t next_index = IncDecI(found_index, 0, RUN_APPS_COUNT, inc);
+    v = appsAvailableToRun[next_index];
+    SETTINGS_SetValue(s, v);
+    return;
+  }
   case SETTING_SQOPENEDTIMEOUT:
   case SETTING_SQCLOSEDTIMEOUT:
     ma = ARRAY_SIZE(SCAN_TIMEOUT_NAMES);
@@ -513,5 +543,12 @@ void SETTINGS_IncDecValue(Setting s, bool inc) {
     break;
   }
 
-  SETTINGS_SetValue(s, IncDecI(SETTINGS_GetValue(s), mi, ma, inc));
+  SETTINGS_SetValue(s, IncDecI(v, mi, ma, inc));
+}
+
+void SETTINGS_UpdateSave() {
+  if (saveTime && Now() > saveTime) {
+    saveTime = 0;
+    SETTINGS_Save();
+  }
 }

@@ -23,11 +23,11 @@ static uint8_t DEAD_BUF[] = {0xDE, 0xAD};
 
 static const uint16_t BAT_CAL_MIN = 1900;
 
-static void getValueString(const MenuItem *item, char *buf, uint8_t buf_size) {
+static void getValS(const MenuItem *item, char *buf, uint8_t buf_size) {
   snprintf(buf, buf_size, "%s", SETTINGS_GetValueString(item->setting));
 }
 
-static void updateValue(const MenuItem *item, bool up) {
+static void updateValS(const MenuItem *item, bool up) {
   SETTINGS_IncDecValue(item->setting, up);
 }
 
@@ -43,8 +43,8 @@ static Menu sqlMenu = {
     .items =
         (MenuItem[]){
             {"Level"},
-            {"Open t", SETTING_SQLOPENTIME, getValueString, updateValue},
-            {"Close t", SETTING_SQLCLOSETIME, getValueString, updateValue},
+            {"Open t", SETTING_SQLOPENTIME, getValS, updateValS},
+            {"Close t", SETTING_SQLCLOSETIME, getValS, updateValS},
         },
     .num_items = 3,
 };
@@ -55,12 +55,10 @@ static Menu scanMenu = {
         (MenuItem[]){
             {"SQL", .submenu = &sqlMenu},
             {"Preferences"},
-            {"SCAN listen t/o", SETTING_SQOPENEDTIMEOUT, getValueString,
-             updateValue},
-            {"SCAN stay t", SETTING_SQCLOSEDTIMEOUT, getValueString,
-             updateValue},
-            {"SCAN skip X_X", SETTING_SKIPGARBAGEFREQUENCIES, getValueString,
-             updateValue},
+            {"SCAN listen t/o", SETTING_SQOPENEDTIMEOUT, getValS, updateValS},
+            {"SCAN stay t", SETTING_SQCLOSEDTIMEOUT, getValS, updateValS},
+            {"SCAN skip X_X", SETTING_SKIPGARBAGEFREQUENCIES, getValS,
+             updateValS},
         },
     .num_items = 5,
 };
@@ -81,14 +79,14 @@ static void onMainAppSubmenu(const MenuItem *item) {
 }
 
 static const MenuItem menuItems[] = {
-    {"Main app", SETTING_MAINAPP, getValueString, updateValue},
-    {"FC t", SETTING_FCTIME, getValueString, updateValue},
-    {"Beep", SETTING_BEEP, getValueString, updateValue},
-    {"CH display", SETTING_CHDISPLAYMODE, getValueString, updateValue},
-    {"DTMF decode", SETTING_DTMFDECODE, getValueString, updateValue},
-    {"Filter bound", SETTING_BOUND240_280, getValueString, updateValue},
-    {"Bat type", SETTING_BATTERYTYPE, getValueString, updateValue},
-    {"Bat style", SETTING_BATTERYSTYLE, getValueString, updateValue},
+    {"Main app", SETTING_MAINAPP, getValS, updateValS},
+    {"FC t", SETTING_FCTIME, getValS, updateValS},
+    {"Beep", SETTING_BEEP, getValS, updateValS},
+    {"CH display", SETTING_CHDISPLAYMODE, getValS, updateValS},
+    {"DTMF decode", SETTING_DTMFDECODE, getValS, updateValS},
+    {"Filter bound", SETTING_BOUND240_280, getValS, updateValS},
+    {"Bat type", SETTING_BATTERYTYPE, getValS, updateValS},
+    {"Bat style", SETTING_BATTERYSTYLE, getValS, updateValS},
     {"SCAN", .submenu = &scanMenu},
     /*
     {"Contrast", M_CONTRAST, 16},
