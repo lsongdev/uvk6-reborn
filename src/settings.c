@@ -147,8 +147,12 @@ uint32_t SETTINGS_GetValue(Setting s) {
     return gSettings.chDisplayMode;
   case SETTING_BEEP:
     return gSettings.beep;
+  case SETTING_PTT_LOCK:
+    return gSettings.pttLock;
   case SETTING_KEYLOCK:
     return gSettings.keylock;
+  case SETTING_MULTIWATCH:
+    return gSettings.mWatch;
   case SETTING_BUSYCHANNELTXLOCK:
     return gSettings.busyChannelTxLock;
   case SETTING_STE:
@@ -157,8 +161,10 @@ uint32_t SETTINGS_GetValue(Setting s) {
     return gSettings.repeaterSte;
   case SETTING_DTMFDECODE:
     return gSettings.dtmfdecode;
-  case SETTING_BRIGHTNESS:
+  case SETTING_BRIGHTNESS_H:
     return gSettings.brightness;
+  case SETTING_BRIGHTNESS_L:
+    return gSettings.brightnessLow;
   case SETTING_CONTRAST:
     return gSettings.contrast;
   case SETTING_MAINAPP:
@@ -253,6 +259,14 @@ void SETTINGS_SetValue(Setting s, uint32_t v) {
     gSettings.keylock = v;
     dirty[s] = true;
     break;
+  case SETTING_MULTIWATCH:
+    gSettings.mWatch = v;
+    dirty[s] = true;
+    break;
+  case SETTING_PTT_LOCK:
+    gSettings.pttLock = v;
+    dirty[s] = true;
+    break;
   case SETTING_BUSYCHANNELTXLOCK:
     gSettings.busyChannelTxLock = v;
     dirty[s] = true;
@@ -269,8 +283,12 @@ void SETTINGS_SetValue(Setting s, uint32_t v) {
     gSettings.dtmfdecode = v;
     dirty[s] = true;
     break;
-  case SETTING_BRIGHTNESS:
+  case SETTING_BRIGHTNESS_H:
     gSettings.brightness = v;
+    dirty[s] = true;
+    break;
+  case SETTING_BRIGHTNESS_L:
+    gSettings.brightnessLow = v;
     dirty[s] = true;
     break;
   case SETTING_CONTRAST:
@@ -381,8 +399,11 @@ const char *SETTINGS_GetValueString(Setting s) {
   case SETTING_BEEP:
   case SETTING_REPEATERSTE:
   case SETTING_KEYLOCK:
+  case SETTING_PTT_LOCK:
   case SETTING_STE:
     return ON_OFF[v];
+  case SETTING_MULTIWATCH:
+    return MW_NAMES[v];
 
   case SETTING_EEPROMTYPE:
     return EEPROM_TYPE_NAMES[v];
@@ -414,7 +435,9 @@ const char *SETTINGS_GetValueString(Setting s) {
     break;
   case SETTING_CURRENTSCANLIST:
     break;
-  case SETTING_BRIGHTNESS:
+  case SETTING_BRIGHTNESS_L:
+    break;
+  case SETTING_BRIGHTNESS_H:
     break;
   case SETTING_CONTRAST:
     break;
@@ -456,8 +479,12 @@ void SETTINGS_IncDecValue(Setting s, bool inc) {
   case SETTING_BEEP:
   case SETTING_REPEATERSTE:
   case SETTING_KEYLOCK:
+  case SETTING_PTT_LOCK:
   case SETTING_STE:
     ma = 2;
+    break;
+  case SETTING_MULTIWATCH:
+    ma = ARRAY_SIZE(MW_NAMES);
     break;
 
   case SETTING_EEPROMTYPE:
@@ -515,7 +542,9 @@ void SETTINGS_IncDecValue(Setting s, bool inc) {
     break;
   case SETTING_CURRENTSCANLIST:
     break;
-  case SETTING_BRIGHTNESS:
+  case SETTING_BRIGHTNESS_L:
+    break;
+  case SETTING_BRIGHTNESS_H:
     break;
   case SETTING_CONTRAST:
     break;

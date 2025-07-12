@@ -63,21 +63,6 @@ static Menu scanMenu = {
     .num_items = 5,
 };
 
-static void onMainAppChoose(const MenuItem *item) {
-  // gSettings.mainApp = *(AppType_t *)(user_data);
-}
-
-static void onMainAppSubmenu(const MenuItem *item) {
-  Log("Submenu enter");
-  submenu.title = "LALALA";
-  submenu.num_items = RUN_APPS_COUNT;
-  for (uint8_t i = 0; i < RUN_APPS_COUNT; ++i) {
-    dynamicItems[i].name = apps[appsAvailableToRun[i]].name;
-    dynamicItems[i].action = onMainAppChoose;
-    dynamicItems[i].user_data = &i;
-  }
-}
-
 static const MenuItem menuItems[] = {
     {"Main app", SETTING_MAINAPP, getValS, updateValS},
     {"FC t", SETTING_FCTIME, getValS, updateValS},
@@ -87,33 +72,30 @@ static const MenuItem menuItems[] = {
     {"Filter bound", SETTING_BOUND240_280, getValS, updateValS},
     {"Bat type", SETTING_BATTERYTYPE, getValS, updateValS},
     {"Bat style", SETTING_BATTERYSTYLE, getValS, updateValS},
+    {"Contrast", SETTING_CONTRAST, getValS, updateValS},
+    {"BL max", SETTING_BRIGHTNESS_H, getValS, updateValS},
+    {"BL min", SETTING_BRIGHTNESS_L, getValS, updateValS},
+    {"BL time", SETTING_BACKLIGHT, getValS, updateValS},
+    {"BL SQL mode", SETTING_BACKLIGHTONSQUELCH, getValS, updateValS},
+    {"SI power off", SETTING_SI4732POWEROFF, getValS, updateValS},
+    {"BAT cal", SETTING_BATTERYCALIBRATION, getValS, updateValS},
+    {"STE", SETTING_STE, getValS, updateValS},
+    {"Tone local", SETTING_TONELOCAL, getValS, updateValS},
+    {"Lock PTT", SETTING_PTT_LOCK, getValS, updateValS},
+    {"Roger", SETTING_ROGER, getValS, updateValS},
+    {"Multiwatch", SETTING_MULTIWATCH, getValS, updateValS},
     {"SCAN", .submenu = &scanMenu},
     /*
-    {"Contrast", M_CONTRAST, 16},
-    {"BL high", M_BRIGHTNESS, 16},
-    {"BL low", M_BRIGHTNESS_L, 16},
-    {"BL time", M_BL_TIME, ARRAY_SIZE(BL_TIME_VALUES)},
-    {"BL SQL mode", M_BL_SQL, ARRAY_SIZE(BL_SQL_MODE_NAMES)},
-    {"SI power off", M_SI4732_POWER_OFF, 2},
     {"Upconv", M_UPCONVERTER, 0},
-    {"BAT cal", M_BAT_CAL, 255},
-    {"CH Display", M_CH_DISP_MODE, ARRAY_SIZE(CH_DISPLAY_MODE_NAMES)},
     {"Level in VFO", M_LEVEL_IN_VFO, 2},
-    {"STE", M_STE, 2},
-    {"Roger", M_ROGER, ARRAY_SIZE(rogerNames)},
-    {"Tone local", M_TONE_LOCAL, 2},
-    {"Lock PTT", M_PTT_LOCK, 2},
     {"Mutliwatch", M_MWATCH, 4},
     {"Reset", M_RESET, 2}, */
 };
-
-static void onSettingsEnter() { Log("Settings enter"); }
 
 static Menu settingsMenu = {
     .title = "Settings",
     .items = menuItems,
     .num_items = ARRAY_SIZE(menuItems),
-    .on_enter = onSettingsEnter,
 };
 
 void setMenuIndexAndRun(uint16_t v) {
