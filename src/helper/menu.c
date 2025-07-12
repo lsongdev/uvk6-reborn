@@ -6,7 +6,7 @@
 #define MENU_STACK_DEPTH 3
 static const uint8_t MENU_Y = 8;
 static const uint8_t MENU_ITEM_H = 11;
-static const uint8_t MENU_LINES_TO_SHOW = 4;
+static const uint8_t MENU_LINES_TO_SHOW = 5;
 
 static Menu *menu_stack[MENU_STACK_DEPTH];
 static uint8_t menu_stack_top = 0;
@@ -26,11 +26,11 @@ static void UI_DrawScrollBar(const uint16_t size, const uint16_t i,
 static void UI_ShowMenuItem(uint8_t line, const MenuItem *item,
                             bool isCurrent) {
   uint8_t by = MENU_Y + line * MENU_ITEM_H + 8;
-  PrintMedium(4, by, "%s", item->name);
+  PrintMedium(3, by, "%s", item->name);
   if (item->get_value_text) {
     char value_buf[32];
     item->get_value_text(item, value_buf, sizeof(value_buf));
-    PrintSmallEx(LCD_WIDTH - 4, by, POS_R, C_FILL, "%s", value_buf);
+    PrintSmallEx(LCD_WIDTH - 7, by, POS_R, C_FILL, "%s", value_buf);
   }
   if (isCurrent) {
     FillRect(0, MENU_Y + line * MENU_ITEM_H, LCD_WIDTH - 4, MENU_ITEM_H,
@@ -52,7 +52,7 @@ void MENU_Render(void) {
 
   STATUSLINE_SetText(active_menu->title);
 
-  const uint16_t max_lines = 4;
+  const uint16_t max_lines = MENU_LINES_TO_SHOW;
   const uint16_t offset = (current_index >= 2) ? current_index - 2 : 0;
   const uint16_t visible =
       (active_menu->num_items < max_lines) ? active_menu->num_items : max_lines;
