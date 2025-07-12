@@ -71,6 +71,7 @@ static Menu displayMenu = {
             {"BL SQL mode", SETTING_BACKLIGHTONSQUELCH, getValS, updateValS},
             {"CH display", SETTING_CHDISPLAYMODE, getValS, updateValS},
         },
+    .num_items = 6,
 };
 
 static Menu radioMenu = {
@@ -85,6 +86,7 @@ static Menu radioMenu = {
             {"Roger", SETTING_ROGER, getValS, updateValS},
             {"Multiwatch", SETTING_MULTIWATCH, getValS, updateValS},
         },
+    .num_items = 7,
 };
 
 static Menu batteryMenu = {
@@ -95,6 +97,7 @@ static Menu batteryMenu = {
             {"Bat style", SETTING_BATTERYSTYLE, getValS, updateValS},
             {"BAT cal", SETTING_BATTERYCALIBRATION, getValS, updateValS},
         },
+    .num_items = 3,
 };
 
 static const MenuItem menuItems[] = {
