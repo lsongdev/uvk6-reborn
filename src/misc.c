@@ -20,3 +20,14 @@ unsigned int SQRT16(unsigned int value) {
 }
 
 void _putchar(char c) { UART_Send((uint8_t *)&c, 1); }
+
+void ScanlistStr(uint32_t sl, char *buf) {
+  for (uint8_t i = 0; i < 16; i++) {
+    bool sel = sl & (1 << i);
+    if (i < 8) {
+      buf[i] = sel ? '1' + i : '_';
+    } else {
+      buf[i] = sel ? 'A' + (i - 8) : '_';
+    }
+  }
+}

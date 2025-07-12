@@ -21,8 +21,6 @@
 
 static uint8_t DEAD_BUF[] = {0xDE, 0xAD};
 
-static const uint16_t BAT_CAL_MIN = 1900;
-
 static void getValS(const MenuItem *item, char *buf, uint8_t buf_size) {
   snprintf(buf, buf_size, "%s", SETTINGS_GetValueString(item->setting));
 }

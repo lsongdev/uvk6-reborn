@@ -12,6 +12,8 @@
 
 static uint32_t saveTime;
 
+static const uint16_t BAT_CAL_MIN = 1900;
+
 static const char *YES_NO[] = {"No", "Yes"};
 static const char *ON_OFF[] = {"Off", "On"};
 
@@ -426,20 +428,15 @@ const char *SETTINGS_GetValueString(Setting s) {
     return BATTERY_STYLE_NAMES[v];
   case SETTING_FCTIME:
     return FC_TIME_NAMES[v];
-
-  case SETTING_BATTERYCALIBRATION:
-    break;
-  case SETTING_UPCONVERTER:
-    break;
   case SETTING_BACKLIGHT:
-    break;
-  case SETTING_CURRENTSCANLIST:
-    break;
-  case SETTING_BRIGHTNESS_L:
-    break;
-  case SETTING_BRIGHTNESS_H:
-    break;
-  case SETTING_CONTRAST:
+    return BL_TIME_NAMES[v];
+
+  case SETTING_BATTERYCALIBRATION: {
+    uint32_t vol = BATTERY_GetPreciseVoltage(v + BAT_CAL_MIN);
+    sprintf(buf, "%u.%04u (%u)", vol / 10000, vol % 10000, v + BAT_CAL_MIN);
+  } break;
+  case SETTING_UPCONVERTER:
+    sprintf(buf, "%u.%05u", v / MHZ, v % MHZ);
     break;
 
   case SETTING_SQLOPENTIME:
@@ -449,10 +446,19 @@ const char *SETTINGS_GetValueString(Setting s) {
   case SETTING_DEVIATION:
     snprintf(buf, 15, "%u", v * 10);
     break;
+  case SETTING_CONTRAST:
+    sprintf(buf, "%d", v - 8);
+    break;
 
   case SETTING_COUNT:
   case SETTING_ACTIVEVFO:
+  case SETTING_BRIGHTNESS_L:
+  case SETTING_BRIGHTNESS_H:
     snprintf(buf, 15, "%u", v);
+    break;
+
+  case SETTING_CURRENTSCANLIST:
+    ScanlistStr(v, buf);
     break;
 
   case SETTING_BATSAVE:

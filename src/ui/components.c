@@ -149,14 +149,7 @@ void UI_DisplayScanlists(uint32_t y) {
   uint16_t sl = gSettings.currentScanlist;
   char buf[17] = {0}; // 16 бит + нуль-терминатор
 
-  for (uint8_t i = 0; i < 16; i++) {
-    bool sel = sl & (1 << i);
-    if (i < 8) {
-      buf[i] = sel ? '1' + i : '_';
-    } else {
-      buf[i] = sel ? 'A' + (i - 8) : '_';
-    }
-  }
+  ScanlistStr(sl, buf);
 
   PrintMediumEx(LCD_XCENTER, y, POS_C, C_FILL, "%.4s %.4s %.4s %.4s", buf,
                 buf + 4, buf + 8, buf + 12);
