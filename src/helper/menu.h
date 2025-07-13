@@ -11,7 +11,7 @@ typedef struct MenuItem MenuItem;
 
 typedef struct MenuItem {
   const char *name;
-  const uint8_t setting; // настройка, которую меняем
+  uint8_t setting; // настройка, которую меняем
   void (*get_value_text)(const MenuItem *item, char *buf, uint8_t buf_size);
   void (*change_value)(const MenuItem *item, bool up);
   struct Menu *submenu; // если не NULL — переход в подменю
