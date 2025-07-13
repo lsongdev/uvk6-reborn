@@ -26,7 +26,7 @@ static void UI_DrawScrollBar(const uint16_t size, const uint16_t i,
 static void UI_ShowMenuItem(uint8_t line, const MenuItem *item,
                             bool isCurrent) {
   uint8_t by = MENU_Y + line * MENU_ITEM_H + 8;
-  PrintMedium(3, by, "%s", item->name);
+  PrintMedium(3, by, "%s %c", item->name, item->submenu ? '>' : ' ');
   if (item->get_value_text) {
     char value_buf[32];
     item->get_value_text(item, value_buf, sizeof(value_buf));
