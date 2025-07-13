@@ -11,8 +11,6 @@ static void run(const MenuItem *item) {
   APPS_runManual(item->setting);
 }
 
-void APPSLIST_render(void) { MENU_Render(); }
-
 void APPSLIST_init(void) {
   for (uint8_t i = 0; i < RUN_APPS_COUNT; ++i) {
     AppType_t app = appsAvailableToRun[i];
@@ -29,3 +27,5 @@ bool APPSLIST_key(KEY_Code_t key, Key_State_t state) {
   }
   return false;
 }
+
+void APPSLIST_render(void) { MENU_Render(); }

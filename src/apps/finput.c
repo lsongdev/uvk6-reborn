@@ -5,19 +5,27 @@
 #include "../ui/graphics.h"
 #include "apps.h"
 
+// Константы для преобразования частот
+#define HZ 1       // 1 * 10Hz
+#define KHZ 100    // 100 * 10Hz = 1kHz
+#define MHZ 100000 // 100000 * 10Hz = 1MHz
+
 static const uint8_t BIG_DIGIT_HEIGHT = 11;
+static const uint8_t BIG_DIGIT_WIDTH = 11;
+static const uint8_t MAX_FRACTION_DIGITS = 6;
 
 typedef struct {
   uint32_t min;
   uint32_t max;
   InputUnit unit;
-  bool is_range;      // Whether we're inputting a range
-  uint8_t max_digits; // Maximum allowed digits
-  bool allow_dot;     // Whether to allow decimal point input
+  bool is_range;
+  uint8_t max_digits;
+  bool allow_dot;
+  uint32_t multiplier; // Множитель для преобразования в 10Hz
 } InputConfig;
 
-uint32_t gFInputValue1; // Primary value (or start of range)
-uint32_t gFInputValue2; // End of range (if is_range is true)
+uint32_t gFInputValue1;
+uint32_t gFInputValue2;
 void (*gFInputCallback)(uint32_t value1, uint32_t value2);
 
 #define MAX_INPUT_LENGTH 10
@@ -27,124 +35,98 @@ static uint8_t cursorPos = 0;
 static uint8_t blinkState = 0;
 static uint32_t lastUpdate;
 static bool dotEntered = false;
+static uint8_t fractionalDigits = 0;
 
-static InputConfig currentConfig = {
-    .min = 0,
-    .max = UINT32_MAX,
-    .unit = UNIT_RAW,
-    .is_range = false,
-    .max_digits = MAX_INPUT_LENGTH,
-    .allow_dot = false,
+static InputConfig currentConfig = {.min = 0,
+                                    .max = UINT32_MAX,
+                                    .unit = UNIT_RAW,
+                                    .is_range = false,
+                                    .max_digits = MAX_INPUT_LENGTH,
+                                    .allow_dot = false,
+                                    .multiplier = 1};
+
+static const uint32_t POW10[] = {
+    1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
 };
 
-static uint32_t getCurrentValue() {
-  uint32_t value = 0;
-
-  for (uint8_t i = 0; i < cursorPos && inputBuffer[i] != '\0'; i++) {
-    if (inputBuffer[i] >= '0' && inputBuffer[i] <= '9') {
-      value = value * 10 + (inputBuffer[i] - '0');
-    }
-  }
-
-  return value;
-}
-
-static uint32_t convertFromDisplayValue(uint32_t integerPart,
-                                        uint32_t fractionalPart,
-                                        uint8_t fractionalDigits) {
-  switch (currentConfig.unit) {
-  case UNIT_HZ:
-    return integerPart * 10 + fractionalPart; // 10.5 -> 105Hz
-  case UNIT_KHZ:
-    return integerPart * 1000 + fractionalPart * 10; // 123.4 -> 123400Hz
-  case UNIT_MHZ:
-    return integerPart * 1000000 + fractionalPart * 100; // 27.135 -> 27135000Hz
-  case UNIT_VOLTS:
-    return integerPart * 100 + fractionalPart; // 8.24 -> 824
-  default:
-    return integerPart; // Raw value
-  }
-}
-
-static void parseInputBuffer(uint32_t *integerPart, uint32_t *fractionalPart,
-                             uint8_t *fractionalDigits) {
-  *integerPart = 0;
-  *fractionalPart = 0;
-  *fractionalDigits = 0;
+static uint32_t convertFromDisplayValue() {
+  uint32_t integerPart = 0;
+  uint32_t fractionalPart = 0;
   bool isFractional = false;
+  fractionalDigits = 0;
 
   for (uint8_t i = 0; i < cursorPos && inputBuffer[i] != '\0'; i++) {
     if (inputBuffer[i] == '.') {
       isFractional = true;
     } else if (inputBuffer[i] >= '0' && inputBuffer[i] <= '9') {
       if (isFractional) {
-        *fractionalPart = *fractionalPart * 10 + (inputBuffer[i] - '0');
-        (*fractionalDigits)++;
+        fractionalPart = fractionalPart * 10 + (inputBuffer[i] - '0');
+        fractionalDigits++;
       } else {
-        *integerPart = *integerPart * 10 + (inputBuffer[i] - '0');
+        integerPart = integerPart * 10 + (inputBuffer[i] - '0');
       }
     }
   }
-}
 
-static void updateDisplayValue() {
-  uint32_t integerPart, fractionalPart;
-  uint8_t fractionalDigits;
+  // Для частот используем множитель (храним в 10Hz)
+  if (currentConfig.unit == UNIT_HZ || currentConfig.unit == UNIT_KHZ ||
+      currentConfig.unit == UNIT_MHZ) {
+    return (integerPart * currentConfig.multiplier) +
+           (fractionalPart * currentConfig.multiplier /
+            POW10[fractionalDigits]);
+  }
 
-  parseInputBuffer(&integerPart, &fractionalPart, &fractionalDigits);
-  gFInputValue1 =
-      convertFromDisplayValue(integerPart, fractionalPart, fractionalDigits);
-}
-
-static void updateDisplayValue2() {
-  uint32_t integerPart, fractionalPart;
-  uint8_t fractionalDigits;
-
-  parseInputBuffer(&integerPart, &fractionalPart, &fractionalDigits);
-  gFInputValue2 =
-      convertFromDisplayValue(integerPart, fractionalPart, fractionalDigits);
+  // Для напряжения и других величин
+  switch (currentConfig.unit) {
+  case UNIT_VOLTS:
+    return integerPart * 100 + fractionalPart; // 8.24V -> 824
+  default:
+    return integerPart;
+  }
 }
 
 static void reset() {
   cursorPos = 0;
   blinkState = 0;
   dotEntered = false;
+  fractionalDigits = 0;
   memset(inputBuffer, 0, MAX_INPUT_LENGTH);
 }
 
 static void fillFromCurrentValue() {
+  uint32_t value = gFInputValue1;
   uint32_t integerPart = 0;
   uint32_t fractionalPart = 0;
-  uint8_t fractionalDigits = 0;
+  fractionalDigits = 0;
 
   switch (currentConfig.unit) {
   case UNIT_HZ:
-    integerPart = gFInputValue1 / 10;
-    fractionalPart = gFInputValue1 % 10;
+    integerPart = value / (HZ);
+    fractionalPart = value % (HZ);
     fractionalDigits = 1;
     break;
   case UNIT_KHZ:
-    integerPart = gFInputValue1 / 1000;
-    fractionalPart = (gFInputValue1 % 1000) / 10;
-    fractionalDigits = 2;
+    integerPart = value / (KHZ);
+    fractionalPart = value % (KHZ);
+    fractionalDigits = 3;
     break;
   case UNIT_MHZ:
-    integerPart = gFInputValue1 / 1000000;
-    fractionalPart = (gFInputValue1 % 1000000) / 100;
-    fractionalDigits = 4;
+    integerPart = value / (MHZ);
+    fractionalPart = value % (MHZ);
+    fractionalDigits = 5;
     break;
   case UNIT_VOLTS:
-    integerPart = gFInputValue1 / 100;
-    fractionalPart = gFInputValue1 % 100;
+    integerPart = value / 100;
+    fractionalPart = value % 100;
     fractionalDigits = 2;
     break;
   default:
-    integerPart = gFInputValue1;
+    integerPart = value;
     break;
   }
 
   if (fractionalDigits > 0 && fractionalPart > 0) {
-    // Remove trailing zeros
+    // Убираем trailing zeros
     while (fractionalPart % 10 == 0 && fractionalDigits > 0) {
       fractionalPart /= 10;
       fractionalDigits--;
@@ -154,6 +136,7 @@ static void fillFromCurrentValue() {
   } else {
     snprintf(inputBuffer, MAX_INPUT_LENGTH + 1, "%lu", integerPart);
   }
+
   cursorPos = strlen(inputBuffer);
   dotEntered = strchr(inputBuffer, '.') != NULL;
 }
@@ -165,20 +148,35 @@ void FINPUT_setup(uint32_t min, uint32_t max, InputUnit unit, bool is_range) {
   currentConfig.is_range = is_range;
   currentConfig.allow_dot =
       (unit == UNIT_MHZ || unit == UNIT_KHZ || unit == UNIT_VOLTS);
+
+  // Устанавливаем множитель для преобразования
+  switch (unit) {
+  case UNIT_HZ:
+    currentConfig.multiplier = HZ;
+    break;
+  case UNIT_KHZ:
+    currentConfig.multiplier = KHZ;
+    break;
+  case UNIT_MHZ:
+    currentConfig.multiplier = MHZ;
+    break;
+  default:
+    currentConfig.multiplier = 1;
+    break;
+  }
 }
 
 void FINPUT_init() {
-  // Set max digits based on unit and max value
   uint32_t maxDisplayValue;
   switch (currentConfig.unit) {
   case UNIT_MHZ:
-    maxDisplayValue = currentConfig.max / 1000000;
+    maxDisplayValue = currentConfig.max / MHZ;
     break;
   case UNIT_KHZ:
-    maxDisplayValue = currentConfig.max / 1000;
+    maxDisplayValue = currentConfig.max / KHZ;
     break;
   case UNIT_HZ:
-    maxDisplayValue = currentConfig.max / 10;
+    maxDisplayValue = currentConfig.max / HZ;
     break;
   case UNIT_VOLTS:
     maxDisplayValue = currentConfig.max / 100;
@@ -194,8 +192,7 @@ void FINPUT_init() {
     currentConfig.max_digits++;
   }
 
-  if (currentConfig.max_digits >
-      MAX_INPUT_LENGTH - 1) { // -1 to account for possible dot
+  if (currentConfig.max_digits > MAX_INPUT_LENGTH - 1) {
     currentConfig.max_digits = MAX_INPUT_LENGTH - 1;
   }
 
@@ -203,9 +200,20 @@ void FINPUT_init() {
   fillFromCurrentValue();
 }
 
+void FINPUT_update() {
+  if (Now() - lastUpdate >= 500) {
+    blinkState = !blinkState;
+    gRedrawScreen = true;
+    lastUpdate = Now();
+  }
+}
+
+void FINPUT_deinit(void) {}
+
 bool FINPUT_key(KEY_Code_t key, Key_State_t state) {
   if (state == KEY_LONG_PRESSED && key == KEY_EXIT) {
     reset();
+    gRedrawScreen = true;
     return true;
   }
 
@@ -221,20 +229,22 @@ bool FINPUT_key(KEY_Code_t key, Key_State_t state) {
     case KEY_7:
     case KEY_8:
     case KEY_9:
-      if (cursorPos <
-          currentConfig.max_digits +
-              (dotEntered ? 4 : 0)) { // Allow extra digits after dot
+      if (cursorPos < MAX_INPUT_LENGTH - 1) {
+        if (dotEntered && fractionalDigits >= MAX_FRACTION_DIGITS) {
+          break;
+        }
         inputBuffer[cursorPos++] = '0' + (key - KEY_0);
         inputBuffer[cursorPos] = '\0';
-        updateDisplayValue();
+        if (dotEntered)
+          fractionalDigits++;
+        gFInputValue1 = convertFromDisplayValue();
         gRedrawScreen = true;
       }
       return true;
 
     case KEY_STAR:
       if (currentConfig.allow_dot && !dotEntered && cursorPos > 0 &&
-          cursorPos < currentConfig.max_digits) {
-        // Add decimal point
+          cursorPos < MAX_INPUT_LENGTH - 1) {
         inputBuffer[cursorPos++] = '.';
         inputBuffer[cursorPos] = '\0';
         dotEntered = true;
@@ -242,11 +252,9 @@ bool FINPUT_key(KEY_Code_t key, Key_State_t state) {
         return true;
       }
       if (currentConfig.is_range && cursorPos > 0) {
-        // Save first value and start entering second
-        gFInputValue1 = convertFromDisplayValue(
-            0, 0, 0); // Will be updated by parseInputBuffer
-        updateDisplayValue();
+        gFInputValue1 = convertFromDisplayValue();
         reset();
+        gRedrawScreen = true;
         return true;
       }
       break;
@@ -254,26 +262,26 @@ bool FINPUT_key(KEY_Code_t key, Key_State_t state) {
     case KEY_EXIT:
       if (cursorPos == 0) {
         if (currentConfig.is_range && gFInputValue1 != 0) {
-          // We were entering second value, go back to first
           uint32_t temp = gFInputValue1;
           reset();
           gFInputValue1 = temp;
           fillFromCurrentValue();
+          gRedrawScreen = true;
           return true;
         }
-
         gFInputCallback = NULL;
         APPS_exit();
         return true;
       }
 
-      // Backspace
       if (cursorPos > 0) {
         if (inputBuffer[cursorPos - 1] == '.') {
           dotEntered = false;
+        } else if (dotEntered && fractionalDigits > 0) {
+          fractionalDigits--;
         }
         inputBuffer[--cursorPos] = '\0';
-        updateDisplayValue();
+        gFInputValue1 = convertFromDisplayValue();
         gRedrawScreen = true;
       }
       return true;
@@ -283,13 +291,9 @@ bool FINPUT_key(KEY_Code_t key, Key_State_t state) {
     case KEY_PTT:
       if (gFInputValue1 >= currentConfig.min &&
           gFInputValue1 <= currentConfig.max) {
-
         if (currentConfig.is_range) {
-          // If we're in range mode and haven't entered second value, use first
-          // value for both
           if (cursorPos > 0) {
-            // gFInputValue2 = convertFromDisplayValue(getCurrentValue());
-            updateDisplayValue2();
+            gFInputValue2 = convertFromDisplayValue();
           } else {
             gFInputValue2 = gFInputValue1;
           }
@@ -313,30 +317,16 @@ bool FINPUT_key(KEY_Code_t key, Key_State_t state) {
   return false;
 }
 
-void FINPUT_update() {
-  if (Now() - lastUpdate >= 500) {
-    blinkState = !blinkState;
-    gRedrawScreen = true;
-    lastUpdate = Now();
-  }
-}
-
-void FINPUT_deinit(void) {}
-
 void FINPUT_render(void) {
   const uint8_t BASE_Y = 24;
-  char displayStr[MAX_INPUT_LENGTH + 3] =
-      ""; // Extra space for possible range separator
+  char displayStr[MAX_INPUT_LENGTH + 3] = "";
 
-  // Prepare display string
   strncpy(displayStr, inputBuffer, MAX_INPUT_LENGTH);
 
-  // Add range separator if we're in range mode and have first value
   if (currentConfig.is_range && gFInputValue1 != 0 && cursorPos > 0) {
     strncat(displayStr, "-", 1);
   }
 
-  // Add unit suffix
   const char *unitSuffix = "";
   switch (currentConfig.unit) {
   case UNIT_HZ:
@@ -362,28 +352,25 @@ void FINPUT_render(void) {
     break;
   }
 
-  // Display the input with blinking cursor
   PrintBigDigitsEx(LCD_WIDTH - 3, BASE_Y, POS_R, C_FILL, "%s", displayStr);
   PrintMediumEx(LCD_WIDTH - 3, BASE_Y + 8, POS_R, C_FILL, "%s", unitSuffix);
 
-  // Show cursor if not at max length
-  if (blinkState && cursorPos < currentConfig.max_digits) {
-    // Draw cursor at current position
-    FillRect(LCD_WIDTH - 1, BASE_Y - BIG_DIGIT_HEIGHT + 1, 1, BIG_DIGIT_HEIGHT,
+  if (blinkState && cursorPos < currentConfig.max_digits +
+                                    (dotEntered ? MAX_FRACTION_DIGITS : 0)) {
+    uint8_t cursorX =
+        LCD_WIDTH - 3 - (strlen(displayStr) - cursorPos) * BIG_DIGIT_WIDTH;
+    FillRect(cursorX, BASE_Y - BIG_DIGIT_HEIGHT + 1, 1, BIG_DIGIT_HEIGHT,
              C_FILL);
   }
 
-  // Show range info if applicable
   if (currentConfig.is_range && gFInputValue1 != 0) {
     char rangeStr[20];
     if (cursorPos == 0) {
-      // Showing first value before entering second
       snprintf(rangeStr, sizeof(rangeStr), "Range: %lu", gFInputValue1);
     } else {
-      // Showing both values
-      /* uint32_t displayValue2 = convertFromDisplayValue(getCurrentValue());
+      uint32_t displayValue2 = convertFromDisplayValue();
       snprintf(rangeStr, sizeof(rangeStr), "Range: %lu-%lu", gFInputValue1,
-               displayValue2); */
+               displayValue2);
     }
     PrintSmall(0, 0, rangeStr);
   }
