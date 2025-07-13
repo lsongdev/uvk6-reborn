@@ -28,7 +28,7 @@ static void setChannel(uint16_t v) {
                          v);
 }
 
-static void tuneTo(uint32_t f) {
+static void tuneTo(uint32_t f, uint32_t _) {
   RADIO_SetParam(RADIO_GetCurrentVFO(&radio_state), PARAM_FREQUENCY, f, true);
 }
 
@@ -173,6 +173,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
     case KEY_8:
     case KEY_9:
       gFInputCallback = tuneTo;
+      FINPUT_setup(0, 1340 * MHZ, UNIT_HZ, false);
       APPS_run(APP_FINPUT);
       APPS_key(key, state);
       return true;
