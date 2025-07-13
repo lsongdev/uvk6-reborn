@@ -87,7 +87,7 @@ static Menu settingsMenu = {
 };
 
 void SETTINGS_init(void) { MENU_Init(&settingsMenu); }
-void SETTINGS_deinit(void) { BACKLIGHT_SetBrightness(gSettings.brightness); }
+void SETTINGS_deinit(void) {}
 
 bool SETTINGS_key(KEY_Code_t key, Key_State_t state) {
   return state == KEY_RELEASED && MENU_HandleInput(key);
