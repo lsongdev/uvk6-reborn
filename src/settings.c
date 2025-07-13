@@ -1,7 +1,9 @@
 #include "settings.h"
 #include "apps/apps.h"
+#include "driver/backlight.h"
 #include "driver/bk4819.h"
 #include "driver/eeprom.h"
+#include "driver/st7565.h"
 #include "external/printf/printf.h"
 #include "helper/battery.h"
 #include "helper/measurements.h"
@@ -212,175 +214,134 @@ uint32_t SETTINGS_GetValue(Setting s) {
 }
 
 void SETTINGS_SetValue(Setting s, uint32_t v) {
+  uint32_t ov = SETTINGS_GetValue(s);
+
   switch (s) {
   case SETTING_FCTIME:
     gSettings.fcTime = v;
-    dirty[s] = true;
     break;
   case SETTING_EEPROMTYPE:
     gSettings.eepromType = v;
-    dirty[s] = true;
     break;
   case SETTING_BATSAVE:
     gSettings.batsave = v;
-    dirty[s] = true;
     break;
   case SETTING_VOX:
     gSettings.vox = v;
-    dirty[s] = true;
     break;
   case SETTING_BACKLIGHT:
     gSettings.backlight = v;
-    dirty[s] = true;
     break;
   case SETTING_TXTIME:
     gSettings.txTime = v;
-    dirty[s] = true;
     break;
   case SETTING_CURRENTSCANLIST:
     gSettings.currentScanlist = v;
-    dirty[s] = true;
     break;
   case SETTING_ROGER:
     gSettings.roger = v;
-    dirty[s] = true;
     break;
   case SETTING_SCANMODE:
     gSettings.scanmode = v;
-    dirty[s] = true;
     break;
   case SETTING_CHDISPLAYMODE:
     gSettings.chDisplayMode = v;
-    dirty[s] = true;
     break;
   case SETTING_BEEP:
     gSettings.beep = v;
-    dirty[s] = true;
     break;
   case SETTING_KEYLOCK:
     gSettings.keylock = v;
-    dirty[s] = true;
     break;
   case SETTING_MULTIWATCH:
     gSettings.mWatch = v;
-    dirty[s] = true;
     break;
   case SETTING_PTT_LOCK:
     gSettings.pttLock = v;
-    dirty[s] = true;
     break;
   case SETTING_BUSYCHANNELTXLOCK:
     gSettings.busyChannelTxLock = v;
-    dirty[s] = true;
     break;
   case SETTING_STE:
     gSettings.ste = v;
-    dirty[s] = true;
     break;
   case SETTING_REPEATERSTE:
     gSettings.repeaterSte = v;
-    dirty[s] = true;
     break;
   case SETTING_DTMFDECODE:
     gSettings.dtmfdecode = v;
-    dirty[s] = true;
     break;
   case SETTING_BRIGHTNESS_H:
     gSettings.brightness = v;
-    dirty[s] = true;
+    BACKLIGHT_SetBrightness(v);
     break;
   case SETTING_BRIGHTNESS_L:
     gSettings.brightnessLow = v;
-    dirty[s] = true;
     break;
   case SETTING_CONTRAST:
     gSettings.contrast = v;
-    dirty[s] = true;
+    ST7565_Init(false);
     break;
   case SETTING_MAINAPP:
     gSettings.mainApp = v;
-    dirty[s] = true;
     break;
   case SETTING_SQOPENEDTIMEOUT:
     gSettings.sqOpenedTimeout = v;
-    dirty[s] = true;
     break;
   case SETTING_SQCLOSEDTIMEOUT:
     gSettings.sqClosedTimeout = v;
-    dirty[s] = true;
     break;
   case SETTING_SQLOPENTIME:
     gSettings.sqlOpenTime = v;
-    dirty[s] = true;
     break;
   case SETTING_SQLCLOSETIME:
     gSettings.sqlCloseTime = v;
-    dirty[s] = true;
     break;
   case SETTING_SKIPGARBAGEFREQUENCIES:
     gSettings.skipGarbageFrequencies = v;
-    dirty[s] = true;
     break;
   case SETTING_ACTIVEVFO:
     gSettings.activeVFO = v;
-    dirty[s] = true;
     break;
   case SETTING_BACKLIGHTONSQUELCH:
     gSettings.backlightOnSquelch = v;
-    dirty[s] = true;
     break;
   case SETTING_BATTERYCALIBRATION:
     gSettings.batteryCalibration = v;
-    dirty[s] = true;
     break;
   case SETTING_BATTERYTYPE:
     gSettings.batteryType = v;
-    dirty[s] = true;
     break;
   case SETTING_BATTERYSTYLE:
     gSettings.batteryStyle = v;
-    dirty[s] = true;
     break;
   case SETTING_UPCONVERTER:
     gSettings.upconverter = v;
-    dirty[s] = true;
     break;
   case SETTING_DEVIATION:
     gSettings.deviation = v;
-    dirty[s] = true;
     break;
-  case SETTING_COUNT:
-    return;
   case SETTING_SHOWLEVELINVFO:
     gSettings.showLevelInVFO = v;
-    dirty[s] = true;
     break;
   case SETTING_BOUND240_280:
     gSettings.bound_240_280 = v;
-    dirty[s] = true;
     break;
   case SETTING_NOLISTEN:
     gSettings.noListen = v;
-    dirty[s] = true;
     break;
   case SETTING_SI4732POWEROFF:
     gSettings.si4732PowerOff = v;
-    dirty[s] = true;
     break;
   case SETTING_TONELOCAL:
     gSettings.toneLocal = v;
-    dirty[s] = true;
     break;
+  case SETTING_COUNT:
+    return;
   }
 
-  bool needSave = false;
-  for (uint8_t i = 0; i < SETTING_COUNT; ++i) {
-    if (dirty[i]) {
-      needSave = true;
-      dirty[i] = false;
-    }
-  }
-  if (needSave) {
+  if (v != ov) {
+    dirty[s] = true;
     saveTime = Now() + 1000;
   }
 }
@@ -585,5 +546,8 @@ void SETTINGS_UpdateSave() {
   if (saveTime && Now() > saveTime) {
     saveTime = 0;
     SETTINGS_Save();
+    for (uint8_t i = 0; i < SETTING_COUNT; ++i) {
+      dirty[i] = false;
+    }
   }
 }
