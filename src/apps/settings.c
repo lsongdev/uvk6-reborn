@@ -1,10 +1,13 @@
 #include "settings.h"
 #include "../driver/backlight.h"
 #include "../external/printf/printf.h"
+#include "../helper/battery.h"
 #include "../helper/menu.h"
 #include "../misc.h"
 #include "../settings.h"
 #include "../ui/menu.h"
+#include "apps.h"
+#include "finput.h"
 
 static uint8_t DEAD_BUF[] = {0xDE, 0xAD};
 
@@ -14,6 +17,20 @@ static void getValS(const MenuItem *item, char *buf, uint8_t buf_size) {
 
 static void updateValS(const MenuItem *item, bool up) {
   SETTINGS_IncDecValue(item->setting, up);
+}
+
+static void doCalibrate(uint32_t v, uint32_t _) {
+  uint32_t cal = BATTERY_GetCal(v * 100);
+  SETTINGS_SetValue(SETTING_BATTERYCALIBRATION, cal); // TODO: by val
+}
+
+static void calibrate(const MenuItem *item) {
+  gFInputValue1 =
+      BATTERY_GetPreciseVoltage(SETTINGS_GetValue(SETTING_BATTERYCALIBRATION)) /
+      100;
+  gFInputCallback = doCalibrate;
+  FINPUT_setup(500, 860, UNIT_VOLTS, false);
+  APPS_run(APP_FINPUT);
 }
 
 static const MenuItem sqlMenuItems[] = {
@@ -60,7 +77,7 @@ static Menu radioMenu = {"Radio", radioMenuItems, ARRAY_SIZE(radioMenuItems)};
 static const MenuItem batMenuItems[] = {
     {"Bat type", SETTING_BATTERYTYPE, getValS, updateValS},
     {"Bat style", SETTING_BATTERYSTYLE, getValS, updateValS},
-    {"BAT cal", SETTING_BATTERYCALIBRATION, getValS, updateValS},
+    {"BAT cal", SETTING_BATTERYCALIBRATION, getValS, .action = calibrate},
 };
 
 static Menu batteryMenu = {"Battery", batMenuItems, ARRAY_SIZE(batMenuItems)};

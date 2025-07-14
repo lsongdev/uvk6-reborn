@@ -22,7 +22,8 @@ void FINPUT_render();
 void FINPUT_deinit();
 void FINPUT_setup(uint32_t min, uint32_t max, InputUnit unit, bool is_range);
 
-extern uint32_t gFInputTempFreq;
+extern uint32_t gFInputValue1;
+extern uint32_t gFInputValue2;
 extern void (*gFInputCallback)(uint32_t, uint32_t);
 
 #endif /* end of include guard: FINPUT_H */

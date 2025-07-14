@@ -105,3 +105,7 @@ void BATTERY_UpdateBatteryInfo() {
 uint32_t BATTERY_GetPreciseVoltage(uint16_t cal) {
   return batAvgV * 76000 / cal;
 }
+
+uint32_t BATTERY_GetCal(uint16_t v) {
+  return batAvgV * 76000 / v;
+}
