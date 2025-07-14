@@ -410,4 +410,50 @@ void FINPUT_render(void) {
     }
     PrintSmall(0, 16, rangeStr);
   }
+
+  if (currentConfig.min) {
+    switch (currentConfig.unit) {
+    case UNIT_MHZ:
+      PrintSmall(0, 32, "Min: %u.%05u MHz", currentConfig.min / MHZ,
+                 currentConfig.min % MHZ);
+      break;
+    case UNIT_KHZ:
+      PrintSmall(0, 32, "Min: %u.%05u kHz", currentConfig.min / KHZ,
+                 currentConfig.min % KHZ);
+      break;
+    case UNIT_HZ:
+      PrintSmall(0, 32, "Min: %u", currentConfig.min * 10);
+      break;
+    case UNIT_VOLTS:
+      PrintSmall(0, 32, "Min: %u.%02u", currentConfig.min / 100,
+                 currentConfig.min % 100);
+      break;
+    default:
+      PrintSmall(0, 32, "Min: %u", currentConfig.min);
+      break;
+    }
+  }
+
+  if (currentConfig.max) {
+    switch (currentConfig.unit) {
+    case UNIT_MHZ:
+      PrintSmall(0, 42, "max: %u.%05u MHz", currentConfig.max / MHZ,
+                 currentConfig.max % MHZ);
+      break;
+    case UNIT_KHZ:
+      PrintSmall(0, 42, "max: %u.%05u kHz", currentConfig.max / KHZ,
+                 currentConfig.max % KHZ);
+      break;
+    case UNIT_HZ:
+      PrintSmall(0, 42, "max: %u", currentConfig.max * 10);
+      break;
+    case UNIT_VOLTS:
+      PrintSmall(0, 42, "max: %u.%02u", currentConfig.max / 100,
+                 currentConfig.max % 100);
+      break;
+    default:
+      PrintSmall(0, 42, "max: %u", currentConfig.max);
+      break;
+    }
+  }
 }

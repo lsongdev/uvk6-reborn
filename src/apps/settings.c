@@ -20,8 +20,7 @@ static void updateValS(const MenuItem *item, bool up) {
 }
 
 static void doCalibrate(uint32_t v, uint32_t _) {
-  uint32_t cal = BATTERY_GetCal(v * 100);
-  SETTINGS_SetValue(SETTING_BATTERYCALIBRATION, cal); // TODO: by val
+  SETTINGS_SetValue(SETTING_BATTERYCALIBRATION, BATTERY_GetCal(v * 100));
 }
 
 static void calibrate(const MenuItem *item) {

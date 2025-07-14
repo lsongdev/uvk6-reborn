@@ -393,8 +393,8 @@ const char *SETTINGS_GetValueString(Setting s) {
     return BL_TIME_NAMES[v];
 
   case SETTING_BATTERYCALIBRATION: {
-    uint32_t vol = BATTERY_GetPreciseVoltage(v + BAT_CAL_MIN);
-    sprintf(buf, "%u.%04u (%u)", vol / 10000, vol % 10000, v + BAT_CAL_MIN);
+    uint32_t vol = BATTERY_GetPreciseVoltage(v);
+    sprintf(buf, "%u.%04u (%u)", vol / 10000, vol % 10000, v);
   } break;
   case SETTING_UPCONVERTER:
     sprintf(buf, "%u.%05u", v / MHZ, v % MHZ);
