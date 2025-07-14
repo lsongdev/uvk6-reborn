@@ -27,7 +27,7 @@ bool gMonitorMode = false;
 
 Measurement gLoot;
 
-const char *RADIO_NAMES[] = {
+const char *RADIO_NAMES[3] = {
     [RADIO_BK4819] = "BK4819",
     [RADIO_BK1080] = "BK1080",
     [RADIO_SI4732] = "SI4732",

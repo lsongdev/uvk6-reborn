@@ -20,6 +20,7 @@ extern const char *BW_NAMES_SI47XX[7];
 extern const char *BW_NAMES_SI47XX_SSB[6];
 extern const char *SQ_TYPE_NAMES[4];
 extern const char *MOD_NAMES_BK4819[8];
+extern const char *RADIO_NAMES[3];
 
 extern const uint16_t StepFrequencyTable[15];
 

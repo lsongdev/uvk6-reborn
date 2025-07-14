@@ -11,9 +11,7 @@
 #include "finput.h"
 #include "textinput.h"
 
-static uint8_t menuIndex = 0;
-static uint8_t subMenuIndex = 0;
-static bool isSubMenu = false;
+static const char *YES_NO[] = {"No", "Yes"};
 
 MR gChEd;
 int16_t gChNum = -1;
@@ -53,6 +51,19 @@ typedef enum {
 
   MEM_COUNT,
 } MemProp;
+
+static void PrintRTXCode(char *Output, uint8_t codeType, uint8_t code) {
+  if (codeType == CODE_TYPE_CONTINUOUS_TONE) {
+    sprintf(Output, "CT:%u.%uHz", CTCSS_Options[code] / 10,
+            CTCSS_Options[code] % 10);
+  } else if (codeType == CODE_TYPE_DIGITAL) {
+    sprintf(Output, "DCS:D%03oN", DCS_Options[code]);
+  } else if (codeType == CODE_TYPE_REVERSE_DIGITAL) {
+    sprintf(Output, "DCS:D%03oI", DCS_Options[code]);
+  } else {
+    sprintf(Output, "No code");
+  }
+}
 
 static void getValS(const MenuItem *item, char *buf, uint8_t _) {
   uint32_t fs = gChEd.rxF;
@@ -117,7 +128,7 @@ static void getValS(const MenuItem *item, char *buf, uint8_t _) {
             StepFrequencyTable[gChEd.step] % 100);
     break;
   case MEM_TX:
-    strncpy(buf, yesNo[gChEd.allowTx], 31);
+    strncpy(buf, YES_NO[gChEd.allowTx], 31);
     break;
   case MEM_F_RX:
     sprintf(buf, "%u.%05u", gChEd.rxF / MHZ, gChEd.rxF % MHZ);
@@ -151,13 +162,13 @@ static void getValS(const MenuItem *item, char *buf, uint8_t _) {
     snprintf(buf, 15, TX_POWER_NAMES[gChEd.power]);
     break;
   case MEM_READONLY:
-    snprintf(buf, 15, yesNo[gChEd.meta.readonly]);
+    snprintf(buf, 15, YES_NO[gChEd.meta.readonly]);
     break;
   case MEM_TYPE:
     snprintf(buf, 15, CH_TYPE_NAMES[gChEd.meta.type]);
     break;
   case MEM_RADIO:
-    snprintf(buf, 15, radioNames[gChEd.radio]);
+    snprintf(buf, 15, RADIO_NAMES[gChEd.radio]);
     break;
   default:
     break;
