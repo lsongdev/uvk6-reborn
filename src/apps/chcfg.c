@@ -8,6 +8,7 @@
 #include "../misc.h"
 #include "../radio.h"
 #include "../ui/menu.h"
+#include "apps.h"
 #include "finput.h"
 #include "textinput.h"
 
@@ -304,8 +305,93 @@ static uint32_t getValue(MemProp p) {
   }
 }
 
+static void updVal(const MenuItem *item, bool inc);
+
+static MenuItem pCalMenuItems[] = {
+    {"L", MEM_P_CAL_L, getValS, updVal},
+    {"M", MEM_P_CAL_M, getValS, updVal},
+    {"H", MEM_P_CAL_H, getValS, updVal},
+};
+
+static Menu pCalMenu = {"P cal", pCalMenuItems, ARRAY_SIZE(pCalMenuItems)};
+
+static MenuItem radioMenuItems[] = {
+    {"Step", MEM_STEP, getValS, updVal},
+    {"Mod", MEM_MODULATION, getValS, updVal},
+    {"BW", MEM_BW, getValS, updVal},
+    {"Gain", MEM_GAIN, getValS, updVal},
+    {"Radio", MEM_RADIO, getValS, updVal},
+    {"SQ type", MEM_SQ_TYPE, getValS, updVal},
+    {"SQ level", MEM_SQ, getValS, updVal},
+    {"RX code type", MEM_RX_CODE_TYPE, getValS, updVal},
+    {"RX code", MEM_RX_CODE, getValS, updVal},
+    {"TX code type", MEM_TX_CODE_TYPE, getValS, updVal},
+    {"TX code", MEM_TX_CODE, getValS, updVal},
+    {"TX power", MEM_F_TXP, getValS, updVal},
+    {"Scrambler", MEM_SCRAMBLER, getValS, updVal},
+    {"Enable TX", MEM_TX, getValS, updVal},
+};
+
+static Menu radioMenu = {"Radio", radioMenuItems, ARRAY_SIZE(radioMenuItems)};
+
+// TODO: code type change by #
+
+static MenuItem menuChVfo[] = {
+    {"Type", MEM_TYPE, getValS, updVal},
+    {"Name", MEM_NAME, getValS, updVal},
+
+    {"RX f", MEM_F_RX, getValS, updVal},
+    {"TX f / offset", MEM_F_TX, getValS, updVal},
+    {"TX offset dir", MEM_TX_OFFSET_DIR, getValS, updVal},
+
+    {"Radio", .submenu = &radioMenu},
+
+    {"Readonly", MEM_READONLY, getValS, updVal},
+    {"Save CH", MEM_SAVE, getValS, updVal},
+};
+
+static void applyBounds(uint32_t fs, uint32_t fe) {
+  gChEd.rxF = fs;
+  gChEd.txF = fe;
+}
+
+static void setBounds(const MenuItem *item) {
+  FINPUT_setup(0, 1340 * MHZ, UNIT_MHZ, true);
+  gFInputCallback = applyBounds;
+  APPS_run(APP_FINPUT);
+}
+
+static MenuItem menuBand[] = {
+    {"Type", MEM_TYPE, getValS, updVal},
+    {"Name", MEM_NAME, getValS, updVal},
+
+    (MenuItem){"Bounds", MEM_BOUNDS, getValS, .action = setBounds},
+
+    {"Radio", .submenu = &radioMenu},
+
+    {"P cal", .submenu = &pCalMenu},
+    {"Last f", MEM_LAST_F, getValS, updVal},
+    {"PPM", MEM_PPM, getValS, updVal},
+
+    {"Bank", MEM_BANK, getValS, updVal},
+    {"Readonly", MEM_READONLY, getValS, updVal},
+    {"Save BAND", MEM_SAVE, getValS, updVal},
+};
+
+static Menu *menu;
+
+static Menu chMenu = {"CH ed", menuChVfo, ARRAY_SIZE(menuChVfo)};
+static Menu bandMenu = {"CH ed", menuBand, ARRAY_SIZE(menuBand)};
+
 static void updVal(const MenuItem *item, bool inc) {
+  uint32_t v = getValue(item->setting);
   switch (item->setting) {
+  case MEM_TYPE:
+    v = IncDecU(v, 0, TYPE_SETTING, inc);
+    setValue(item->setting, v);
+    menu = v == TYPE_BAND ? &bandMenu : &chMenu;
+    MENU_Init(menu);
+    break;
   case MEM_START:
     break;
   case MEM_END:
@@ -360,69 +446,12 @@ static void updVal(const MenuItem *item, bool inc) {
     break;
   case MEM_READONLY:
     break;
-  case MEM_TYPE:
-    break;
   case MEM_RADIO:
     break;
   default:
     break;
   }
 }
-
-static MenuItem menuChVfo[] = {
-    {"Name", MEM_NAME, getValS, updVal},
-    {"Step", MEM_STEP, getValS, updVal},
-    {"Modulation", MEM_MODULATION, getValS, updVal},
-    {"BW", MEM_BW, getValS, updVal},
-    {"Gain", MEM_GAIN, getValS, updVal},
-    {"Radio", MEM_RADIO, getValS, updVal},
-    {"SQ type", MEM_SQ_TYPE, getValS, updVal},
-    {"SQ level", MEM_SQ, getValS, updVal},
-    {"RX f", MEM_F_RX, getValS, updVal},
-    {"TX f / offset", MEM_F_TX, getValS, updVal},
-    {"TX offset dir", MEM_TX_OFFSET_DIR, getValS, updVal},
-    {"RX code type", MEM_RX_CODE_TYPE, getValS, updVal},
-    {"RX code", MEM_RX_CODE, getValS, updVal},
-    {"TX code type", MEM_TX_CODE_TYPE, getValS, updVal},
-    {"TX code", MEM_TX_CODE, getValS, updVal},
-    {"TX power", MEM_F_TXP, getValS, updVal},
-    {"Scrambler", MEM_SCRAMBLER, getValS, updVal},
-    {"Enable TX", MEM_TX, getValS, updVal},
-    {"Readonly", MEM_READONLY, getValS, updVal},
-    {"Save CH", MEM_SAVE, getValS, updVal},
-};
-
-static MenuItem menuBand[] = {
-    {"Name", MEM_NAME, getValS, updVal},
-    {"Step", MEM_STEP, getValS, updVal},
-    {"Modulation", MEM_MODULATION, getValS, updVal},
-    {"BW", MEM_BW, getValS, updVal},
-    {"Gain", MEM_GAIN, getValS, updVal},
-    {"Radio", MEM_RADIO, getValS, updVal},
-    {"SQ type", MEM_SQ_TYPE, getValS, updVal},
-    {"SQ level", MEM_SQ, getValS, updVal},
-    {"RX f", MEM_F_RX, getValS, updVal},
-    {"TX f / offset", MEM_F_TX, getValS, updVal},
-    {"TX offset dir", MEM_TX_OFFSET_DIR, getValS, updVal},
-
-    {"Bank", MEM_BANK, getValS, updVal},
-    {"P cal L", MEM_P_CAL_L, getValS, updVal},
-    {"P cal M", MEM_P_CAL_M, getValS, updVal},
-    {"P cal H", MEM_P_CAL_H, getValS, updVal},
-    {"Last f", MEM_LAST_F, getValS, updVal},
-    {"ppm", MEM_PPM, getValS, updVal},
-
-    {"TX power", MEM_F_TXP, getValS, updVal},
-    {"Scrambler", MEM_SCRAMBLER, getValS, updVal},
-    {"Enable TX", MEM_TX, getValS, updVal},
-    {"Readonly", MEM_READONLY, getValS, updVal},
-    {"Save BAND", MEM_SAVE, getValS, updVal},
-};
-
-static Menu *menu;
-
-static Menu chMenu = {"CH ed", menuChVfo, ARRAY_SIZE(menuChVfo)};
-static Menu bandMenu = {"CH ed", menuBand, ARRAY_SIZE(menuBand)};
 
 static void setPCalL(uint32_t f) {
   gChEd.misc.powCalib.s = Clamp(f / MHZ, 0, 255);
@@ -467,6 +496,12 @@ static void setLastF(uint32_t f) { gChEd.misc.lastUsedFreq = f; }
 
 void CHCFG_init(void) {
   // updateTxCodeListSize();
+
+  if (gChEd.meta.type == TYPE_BAND) {
+    menu = &bandMenu;
+  } else {
+    menu = &chMenu;
+  }
 
   MENU_Init(menu);
 }
