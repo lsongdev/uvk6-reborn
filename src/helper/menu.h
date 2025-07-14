@@ -7,6 +7,8 @@
 
 typedef void (*MenuAction)(void);
 typedef void (*MenuOnEnter)(void);
+typedef void (*MenuRenderItem)(uint16_t index, bool is_selected);
+
 typedef struct MenuItem MenuItem;
 
 typedef struct MenuItem {
@@ -27,7 +29,9 @@ typedef struct Menu {
   const char *title;
   const MenuItem *items;
   uint16_t num_items;
+  MenuRenderItem render_item;
   MenuOnEnter on_enter;
+  uint8_t itemHeight;
 } Menu;
 
 void MENU_Init(Menu *main_menu);

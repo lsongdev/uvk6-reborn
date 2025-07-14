@@ -24,19 +24,7 @@ static void UI_DrawScrollBar(const uint16_t size, const uint16_t i,
 }
 
 static void UI_ShowMenuItem(uint8_t line, const MenuItem *item,
-                            bool isCurrent) {
-  uint8_t by = MENU_Y + line * MENU_ITEM_H + 8;
-  PrintMedium(3, by, "%s %c", item->name, item->submenu ? '>' : ' ');
-  if (item->get_value_text) {
-    char value_buf[32];
-    item->get_value_text(item, value_buf, sizeof(value_buf));
-    PrintSmallEx(LCD_WIDTH - 7, by, POS_R, C_FILL, "%s", value_buf);
-  }
-  if (isCurrent) {
-    FillRect(0, MENU_Y + line * MENU_ITEM_H, LCD_WIDTH - 4, MENU_ITEM_H,
-             C_INVERT);
-  }
-}
+                            bool isCurrent) {}
 
 void MENU_Init(Menu *main_menu) {
   active_menu = main_menu;
@@ -51,21 +39,41 @@ void MENU_Render(void) {
     return;
 
   STATUSLINE_SetText(active_menu->title);
+  const uint8_t menuItemH =
+      active_menu->itemHeight ? active_menu->itemHeight : MENU_ITEM_H;
+  const uint8_t linesToShow = (LCD_HEIGHT - MENU_Y) / menuItemH;
 
-  const uint16_t max_lines = MENU_LINES_TO_SHOW;
   const uint16_t offset = (current_index >= 2) ? current_index - 2 : 0;
-  const uint16_t visible =
-      (active_menu->num_items < max_lines) ? active_menu->num_items : max_lines;
+  const uint16_t visible = (active_menu->num_items < linesToShow)
+                               ? active_menu->num_items
+                               : linesToShow;
 
   for (uint16_t i = 0; i < visible; ++i) {
     uint16_t idx = i + offset;
     if (idx >= active_menu->num_items)
       break;
 
-    UI_ShowMenuItem(i, &active_menu->items[idx], idx == current_index);
+    const bool isActive = idx == current_index;
+
+    if (active_menu->render_item) {
+      active_menu->render_item(idx, isActive);
+    } else {
+      const MenuItem *item = &active_menu->items[idx];
+      uint8_t by = MENU_Y + i * MENU_ITEM_H + 8;
+      PrintMedium(3, by, "%s %c", item->name, item->submenu ? '>' : ' ');
+      if (item->get_value_text) {
+        char value_buf[32];
+        item->get_value_text(item, value_buf, sizeof(value_buf));
+        PrintSmallEx(LCD_WIDTH - 7, by, POS_R, C_FILL, "%s", value_buf);
+      }
+    }
+
+    if (isActive) {
+      FillRect(0, MENU_Y + i * menuItemH, LCD_WIDTH - 4, menuItemH, C_INVERT);
+    }
   }
 
-  UI_DrawScrollBar(active_menu->num_items, current_index, max_lines);
+  UI_DrawScrollBar(active_menu->num_items, current_index, linesToShow);
 }
 
 bool MENU_HandleInput(uint8_t key) {
