@@ -16,6 +16,7 @@
 #include "../ui/spectrum.h"
 #include "../ui/statusline.h"
 #include "apps.h"
+#include "chcfg.h"
 #include "chlist.h"
 #include "finput.h"
 
@@ -178,11 +179,9 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       APPS_key(key, state);
       return true;
     case KEY_F:
-      /* gChEd = radio;
-      if (RADIO_IsChMode()) {
-        gChEd.meta.type = TYPE_CH;
-      }
-      APPS_run(APP_CH_CFG); */
+      RADIO_LoadVFOFromStorage(&radio_state, radio_state.active_vfo_index,
+                               &gChEd);
+      APPS_run(APP_CH_CFG);
       return true;
     case KEY_STAR:
       // APPS_run(APP_LOOT_LIST);
