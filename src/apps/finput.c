@@ -72,14 +72,14 @@ static uint32_t convertFromDisplayValue() {
   }
 
   if (currentConfig.unit == UNIT_HZ || currentConfig.unit == UNIT_KHZ ||
-      currentConfig.unit == UNIT_MHZ) {
+      currentConfig.unit == UNIT_MHZ || currentConfig.unit == UNIT_VOLTS) {
     return (integerPart * currentConfig.multiplier) +
            (fractionalPart * currentConfig.multiplier / POW[fractionalDigits]);
   }
 
   switch (currentConfig.unit) {
-  case UNIT_VOLTS:
-    return integerPart * 100 + fractionalPart;
+  /* case UNIT_VOLTS:
+    return integerPart * 100 + fractionalPart; */
   default:
     return integerPart;
   }
@@ -163,6 +163,9 @@ void FINPUT_setup(uint32_t min, uint32_t max, InputUnit unit, bool is_range) {
     break;
   case UNIT_MHZ:
     currentConfig.multiplier = MHZ;
+    break;
+  case UNIT_VOLTS:
+    currentConfig.multiplier = 100;
     break;
   default:
     currentConfig.multiplier = 1;

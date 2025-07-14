@@ -106,6 +106,7 @@ uint32_t BATTERY_GetPreciseVoltage(uint16_t cal) {
   return batAvgV * 76000 / cal;
 }
 
-uint32_t BATTERY_GetCal(uint16_t v) {
-  return batAvgV * 76000 / v;
+uint16_t BATTERY_GetCal(uint32_t v) {
+  return (uint32_t)gSettings.batteryCalibration *
+         BATTERY_GetPreciseVoltage(gSettings.batteryCalibration) / v;
 }

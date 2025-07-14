@@ -32,6 +32,6 @@ extern const char *BATTERY_STYLE_NAMES[3];
 
 void BATTERY_UpdateBatteryInfo();
 uint32_t BATTERY_GetPreciseVoltage(uint16_t cal);
-uint32_t BATTERY_GetCal(uint16_t v);
+uint16_t BATTERY_GetCal(uint32_t v);
 
 #endif

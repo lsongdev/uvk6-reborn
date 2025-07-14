@@ -1,5 +1,6 @@
 #include "settings.h"
 #include "../driver/backlight.h"
+#include "../driver/uart.h"
 #include "../external/printf/printf.h"
 #include "../helper/battery.h"
 #include "../helper/menu.h"
@@ -20,6 +21,9 @@ static void updateValS(const MenuItem *item, bool up) {
 }
 
 static void doCalibrate(uint32_t v, uint32_t _) {
+  Log("v=%u, c=%u, nv=%u, nc=%u",
+      BATTERY_GetPreciseVoltage(gSettings.batteryCalibration),
+      gSettings.batteryCalibration, v, BATTERY_GetCal(v * 100));
   SETTINGS_SetValue(SETTING_BATTERYCALIBRATION, BATTERY_GetCal(v * 100));
 }
 
