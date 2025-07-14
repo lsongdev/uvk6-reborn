@@ -2,7 +2,9 @@
 #include "../dcs.h"
 #include "../driver/st7565.h"
 #include "../driver/uart.h"
+#include "../helper/channels.h"
 #include "../helper/measurements.h"
+#include "../helper/menu.h"
 #include "../helper/numnav.h"
 #include "../misc.h"
 #include "../radio.h"
@@ -18,62 +20,89 @@ static uint8_t menuIndex = 0;
 static uint8_t subMenuIndex = 0;
 static bool isSubMenu = false;
 
-CH gChEd;
+MR gChEd;
 int16_t gChNum = -1;
 
-static MenuItem *menu;
+typedef enum {
+  MEM_BANK,
+  MEM_BW,
+  MEM_F_RX,
+  MEM_F_TX,
+  MEM_F_TXP,
+  MEM_GAIN,
+  MEM_LAST_F,
+  MEM_MODULATION,
+  MEM_NAME,
+  MEM_P_CAL_H,
+  MEM_P_CAL_L,
+  MEM_P_CAL_M,
+  MEM_PPM,
+  MEM_RADIO,
+  MEM_READONLY,
+  MEM_RX_CODE,
+  MEM_RX_CODE_TYPE,
+  MEM_SAVE,
+  MEM_SCRAMBLER,
+  MEM_SQ,
+  MEM_SQ_TYPE,
+  MEM_STEP,
+  MEM_TX,
+  MEM_TX_CODE,
+  MEM_TX_CODE_TYPE,
+  MEM_TX_OFFSET_DIR,
+
+  MEM_COUNT,
+} MemProp;
+
 static MenuItem menuChVfo[] = {
-    {"Type", M_TYPE, ARRAY_SIZE(CH_TYPE_NAMES)},
-    {"Name", M_NAME, 0},
-    {"Step", M_STEP, ARRAY_SIZE(StepFrequencyTable)},
-    {"Modulation", M_MODULATION, ARRAY_SIZE(modulationTypeOptions)},
-    {"BW", M_BW, 10},
-    {"Gain", M_GAIN, ARRAY_SIZE(gainTable)},
-    {"Radio", M_RADIO, 2},
-    {"SQ type", M_SQ_TYPE, ARRAY_SIZE(sqTypeNames)},
-    {"SQ level", M_SQ, 10},
-    {"RX f", M_F_RX, 0},
-    {"TX f / offset", M_F_TX, 0},
-    {"TX offset dir", M_TX_OFFSET_DIR, ARRAY_SIZE(TX_OFFSET_NAMES)},
-    {"RX code type", M_RX_CODE_TYPE, ARRAY_SIZE(TX_CODE_TYPES)},
-    {"RX code", M_RX_CODE, 0},
-    {"TX code type", M_TX_CODE_TYPE, ARRAY_SIZE(TX_CODE_TYPES)},
-    {"TX code", M_TX_CODE, 0},
-    {"TX power", M_F_TXP, ARRAY_SIZE(TX_POWER_NAMES)},
-    {"Scrambler", M_SCRAMBLER, 16},
-    {"Enable TX", M_TX, 2},
-    {"Readonly", M_READONLY, 2},
-    {"Save CH", M_SAVE, 0},
+    {"Name", MEM_NAME, getValS, updVal},
+    {"Step", MEM_STEP, getValS, updVal},
+    {"Modulation", MEM_MODULATION, getValS, updVal},
+    {"BW", MEM_BW, getValS, updVal},
+    {"Gain", MEM_GAIN, getValS, updVal},
+    {"Radio", MEM_RADIO, getValS, updVal},
+    {"SQ type", MEM_SQ_TYPE, getValS, updVal},
+    {"SQ level", MEM_SQ, getValS, updVal},
+    {"RX f", MEM_F_RX, getValS, updVal},
+    {"TX f / offset", MEM_F_TX, getValS, updVal},
+    {"TX offset dir", MEM_TX_OFFSET_DIR, getValS, updVal},
+    {"RX code type", MEM_RX_CODE_TYPE, getValS, updVal},
+    {"RX code", MEM_RX_CODE, getValS, updVal},
+    {"TX code type", MEM_TX_CODE_TYPE, getValS, updVal},
+    {"TX code", MEM_TX_CODE, getValS, updVal},
+    {"TX power", MEM_F_TXP, getValS, updVal},
+    {"Scrambler", MEM_SCRAMBLER, getValS, updVal},
+    {"Enable TX", MEM_TX, getValS, updVal},
+    {"Readonly", MEM_READONLY, getValS, updVal},
+    {"Save CH", MEM_SAVE, getValS, updVal},
 };
 
 static MenuItem menuBand[] = {
-    {"Type", M_TYPE, ARRAY_SIZE(CH_TYPE_NAMES)},
-    {"Name", M_NAME, 0},
-    {"Step", M_STEP, ARRAY_SIZE(StepFrequencyTable)},
-    {"Modulation", M_MODULATION, ARRAY_SIZE(modulationTypeOptions)},
-    {"BW", M_BW, 10},
-    {"Gain", M_GAIN, ARRAY_SIZE(gainTable)},
-    {"Radio", M_RADIO, 2},
-    {"SQ type", M_SQ_TYPE, ARRAY_SIZE(sqTypeNames)},
-    {"SQ level", M_SQ, 10},
-    {"RX f", M_F_RX, 0},
-    {"TX f / offset", M_F_TX, 0},
-    {"TX offset dir", M_TX_OFFSET_DIR, ARRAY_SIZE(TX_OFFSET_NAMES)},
+    {"Name", MEM_NAME, getValS, updVal},
+    {"Step", MEM_STEP, getValS, updVal},
+    {"Modulation", MEM_MODULATION, getValS, updVal},
+    {"BW", MEM_BW, getValS, updVal},
+    {"Gain", MEM_GAIN, getValS, updVal},
+    {"Radio", MEM_RADIO, getValS, updVal},
+    {"SQ type", MEM_SQ_TYPE, getValS, updVal},
+    {"SQ level", MEM_SQ, getValS, updVal},
+    {"RX f", MEM_F_RX, getValS, updVal},
+    {"TX f / offset", MEM_F_TX, getValS, updVal},
+    {"TX offset dir", MEM_TX_OFFSET_DIR, getValS, updVal},
 
-    {"Bank", M_BANK, 128},
-    {"P cal L", M_P_CAL_L, 0},
-    {"P cal M", M_P_CAL_M, 0},
-    {"P cal H", M_P_CAL_H, 0},
-    {"Last f", M_LAST_F, 0},
-    {"ppm", M_PPM, 31},
+    {"Bank", MEM_BANK, getValS, updVal},
+    {"P cal L", MEM_P_CAL_L, getValS, updVal},
+    {"P cal M", MEM_P_CAL_M, getValS, updVal},
+    {"P cal H", MEM_P_CAL_H, getValS, updVal},
+    {"Last f", MEM_LAST_F, getValS, updVal},
+    {"ppm", MEM_PPM, getValS, updVal},
 
-    {"TX power", M_F_TXP, ARRAY_SIZE(TX_POWER_NAMES)},
-    {"Scrambler", M_SCRAMBLER, 16},
-    {"Enable TX", M_TX, 2},
-    {"Readonly", M_READONLY, 2},
-    {"Save BAND", M_SAVE, 0},
+    {"TX power", MEM_F_TXP, getValS, updVal},
+    {"Scrambler", MEM_SCRAMBLER, getValS, updVal},
+    {"Enable TX", MEM_TX, getValS, updVal},
+    {"Readonly", MEM_READONLY, getValS, updVal},
+    {"Save BAND", MEM_SAVE, getValS, updVal},
 };
-static uint8_t menuSize = 0;
 
 static void apply() {
   switch (gChEd.meta.type) {
@@ -119,97 +148,97 @@ static void setLastF(uint32_t f) {
   apply();
 }
 
-static void getMenuItemValue(BandCfgMenu type, char *Output) {
+static void getValS(MenuItem *item) {
   uint32_t fs = gChEd.rxF;
   uint32_t fe = gChEd.txF;
-  switch (type) {
-  case M_START:
+  switch (item->setting) {
+  case MEM_START:
     sprintf(Output, "%lu.%03lu", fs / MHZ, fs / 100 % 1000);
     break;
-  case M_END:
+  case MEM_END:
     sprintf(Output, "%lu.%03lu", fe / MHZ, fe / 100 % 1000);
     break;
-  case M_NAME:
+  case MEM_NAME:
     strncpy(Output, gChEd.name, 31);
     break;
-  case M_BW:
+  case MEM_BW:
     strncpy(Output, RADIO_GetBWName(), 31);
     break;
-  case M_SQ_TYPE:
+  case MEM_SQ_TYPE:
     strncpy(Output, sqTypeNames[gChEd.squelch.type], 31);
     break;
-  case M_PPM:
+  case MEM_PPM:
     sprintf(Output, "%+d", gChEd.ppm);
     break;
-  case M_SQ:
+  case MEM_SQ:
     sprintf(Output, "%u", gChEd.squelch.value);
     break;
-  case M_SCRAMBLER:
+  case MEM_SCRAMBLER:
     sprintf(Output, "%u", gChEd.scrambler);
     break;
-  case M_BANK:
+  case MEM_BANK:
     sprintf(Output, "%u", gChEd.misc.bank);
     break;
-  case M_P_CAL_L:
+  case MEM_P_CAL_L:
     sprintf(Output, "%u", gChEd.misc.powCalib.s);
     break;
-  case M_P_CAL_M:
+  case MEM_P_CAL_M:
     sprintf(Output, "%u", gChEd.misc.powCalib.m);
     break;
-  case M_P_CAL_H:
+  case MEM_P_CAL_H:
     sprintf(Output, "%u", gChEd.misc.powCalib.e);
     break;
-  case M_GAIN:
+  case MEM_GAIN:
     sprintf(Output, "%ddB", -gainTable[gChEd.gainIndex].gainDb + 33);
     break;
-  case M_MODULATION:
+  case MEM_MODULATION:
     strncpy(Output, modulationTypeOptions[gChEd.modulation], 31);
     break;
-  case M_STEP:
+  case MEM_STEP:
     sprintf(Output, "%u.%02uKHz", StepFrequencyTable[gChEd.step] / 100,
             StepFrequencyTable[gChEd.step] % 100);
     break;
-  case M_TX:
+  case MEM_TX:
     strncpy(Output, yesNo[gChEd.allowTx], 31);
     break;
-  case M_F_RX:
+  case MEM_F_RX:
     sprintf(Output, "%u.%05u", gChEd.rxF / MHZ, gChEd.rxF % MHZ);
     break;
-  case M_F_TX:
+  case MEM_F_TX:
     sprintf(Output, "%u.%05u", gChEd.txF / MHZ, gChEd.txF % MHZ);
     break;
-  case M_LAST_F:
+  case MEM_LAST_F:
     sprintf(Output, "%u.%05u", gChEd.misc.lastUsedFreq / MHZ,
             gChEd.misc.lastUsedFreq % MHZ);
     break;
-  case M_RX_CODE_TYPE:
+  case MEM_RX_CODE_TYPE:
     strncpy(Output, TX_CODE_TYPES[gChEd.code.rx.type], 31);
     break;
-  case M_RX_CODE:
+  case MEM_RX_CODE:
     PrintRTXCode(Output, gChEd.code.rx.type, gChEd.code.rx.value);
     break;
-  case M_TX_CODE_TYPE:
+  case MEM_TX_CODE_TYPE:
     strncpy(Output, TX_CODE_TYPES[gChEd.code.tx.type], 31);
     break;
-  case M_TX_CODE:
+  case MEM_TX_CODE:
     PrintRTXCode(Output, gChEd.code.tx.type, gChEd.code.tx.value);
     break;
-  case M_TX_OFFSET:
+  case MEM_TX_OFFSET:
     sprintf(Output, "%u.%05u", gChEd.txF / MHZ, gChEd.txF % MHZ);
     break;
-  case M_TX_OFFSET_DIR:
+  case MEM_TX_OFFSET_DIR:
     snprintf(Output, 15, TX_OFFSET_NAMES[gChEd.offsetDir]);
     break;
-  case M_F_TXP:
+  case MEM_F_TXP:
     snprintf(Output, 15, TX_POWER_NAMES[gChEd.power]);
     break;
-  case M_READONLY:
+  case MEM_READONLY:
     snprintf(Output, 15, yesNo[gChEd.meta.readonly]);
     break;
-  case M_TYPE:
+  case MEM_TYPE:
     snprintf(Output, 15, CH_TYPE_NAMES[gChEd.meta.type]);
     break;
-  case M_RADIO:
+  case MEM_RADIO:
     snprintf(Output, 15, radioNames[gChEd.radio]);
     break;
   default:
