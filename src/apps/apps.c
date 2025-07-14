@@ -4,7 +4,7 @@
 #include "../ui/statusline.h"
 #include "about.h"
 #include "appslist.h"
-// #include "chcfg.h"
+#include "chcfg.h"
 #include "chlist.h"
 /* #include "bandscan.h"
 #include "chscan.h"
@@ -68,14 +68,14 @@ const App apps[APPS_COUNT] = {
                     FINPUT_key, FINPUT_deinit},
     [APP_TEXTINPUT] = {"Text input", TEXTINPUT_init, NULL, TEXTINPUT_render,
                        TEXTINPUT_key, TEXTINPUT_deinit},
-    [APP_SETTINGS] = {"Settings", SETTINGS_init, NULL, SETTINGS_render, SETTINGS_key,
-                      SETTINGS_deinit},
+    [APP_SETTINGS] = {"Settings", SETTINGS_init, NULL, SETTINGS_render,
+                      SETTINGS_key, SETTINGS_deinit},
     [APP_APPS_LIST] = {"Run app", APPSLIST_init, NULL, APPSLIST_render,
                        APPSLIST_key, NULL},
     [APP_RESET] = {"Reset", RESET_Init, RESET_Update, RESET_Render, RESET_key,
                    NULL},
-    /* [APP_CH_CFG] = {"CH cfg", CHCFG_init, NULL, CHCFG_render, CHCFG_key,
-                    CHCFG_deinit}, */
+    [APP_CH_CFG] = {"CH cfg", CHCFG_init, NULL, CHCFG_render, CHCFG_key,
+                    CHCFG_deinit},
     [APP_CH_LIST] = {"Channels", CHLIST_init, NULL, CHLIST_render, CHLIST_key,
                      CHLIST_deinit},
     /* [APP_SPECTRUM] = {"Spectrum", SCANER_init, SCANER_update, SCANER_render,

@@ -93,7 +93,7 @@ const char *BW_NAMES_BK4819[10] = {
     [BK4819_FILTER_BW_26k] = "W26k", //
 };
 
-const char *BW_NAMES_SI47XX[] = {
+const char *BW_NAMES_SI47XX[7] = {
     [SI47XX_BW_1_8_kHz] = "1.8k", //
     [SI47XX_BW_1_kHz] = "1k",     //
     [SI47XX_BW_2_kHz] = "2k",     //
@@ -103,7 +103,7 @@ const char *BW_NAMES_SI47XX[] = {
     [SI47XX_BW_6_kHz] = "6k",     //
 };
 
-const char *BW_NAMES_SI47XX_SSB[] = {
+const char *BW_NAMES_SI47XX_SSB[6] = {
     [SI47XX_SSB_BW_0_5_kHz] = "0.5k", //
     [SI47XX_SSB_BW_1_0_kHz] = "1.0k", //
     [SI47XX_SSB_BW_1_2_kHz] = "1.2k", //
@@ -114,7 +114,7 @@ const char *BW_NAMES_SI47XX_SSB[] = {
 
 const char *FLT_BOUND_NAMES[2] = {"240MHz", "280MHz"};
 
-static const char *SQ_TYPE_NAMES[4] = {"RNG", "RG", "RN", "R"};
+const char *SQ_TYPE_NAMES[4] = {"RNG", "RG", "RN", "R"};
 
 const uint16_t StepFrequencyTable[15] = {
     2,   5,   50,  100,
