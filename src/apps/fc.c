@@ -20,7 +20,7 @@ static const char *FILTER_NAMES[] = {
 };
 static Filter filter = FILTER_VHF;
 
-static bool bandAutoSwitch = false;
+static bool bandAutoSwitch = true;
 
 static uint32_t bound;
 

@@ -1,6 +1,7 @@
 #include "menu.h"
 #include "../ui/graphics.h"
 #include "../ui/statusline.h"
+#include "measurements.h"
 #include <stdbool.h>
 
 #define MENU_STACK_DEPTH 3
@@ -76,62 +77,69 @@ void MENU_Render(void) {
   UI_DrawScrollBar(active_menu->num_items, current_index, linesToShow);
 }
 
-bool MENU_HandleInput(uint8_t key) {
+bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
   if (!active_menu) {
     return false;
   }
 
-  switch (key) {
-  case KEY_UP:
-    if (current_index > 0) {
-      current_index--;
+  if (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT) {
+    switch (key) {
+    case KEY_UP:
+    case KEY_DOWN:
+      current_index =
+          IncDecU(current_index, 0, active_menu->num_items, key == KEY_DOWN);
       return true;
-    }
-    break;
-  case KEY_DOWN:
-    if (current_index + 1 < active_menu->num_items) {
-      current_index++;
-      return true;
-    }
-    break;
-  case KEY_MENU: {
-    const MenuItem *item = &active_menu->items[current_index];
-    if (item->action) {
-      item->action(item);
-    }
-    if (item->submenu) {
-      if (menu_stack_top < MENU_STACK_DEPTH) {
-        menu_stack[menu_stack_top++] = active_menu;
-        active_menu = item->submenu;
-        current_index = 0;
-        if (active_menu->on_enter) {
-          active_menu->on_enter();
-        }
+      break;
+    case KEY_STAR:
+    case KEY_F: {
+      const MenuItem *item = &active_menu->items[current_index];
+      if (item->change_value) {
+        item->change_value(item, key == KEY_STAR);
+        return true;
       }
     }
-    return true;
-  }
-  case KEY_STAR:
-  case KEY_F: {
-    const MenuItem *item = &active_menu->items[current_index];
-    if (item->change_value) {
-      item->change_value(item, key == KEY_STAR);
       return true;
+    default:
+      break;
     }
   }
-    return true;
-  case KEY_EXIT:
-    MENU_Back();
-    return true;
+
+  if (state == KEY_RELEASED) {
+    switch (key) {
+    case KEY_MENU: {
+      const MenuItem *item = &active_menu->items[current_index];
+      if (item->action) {
+        item->action(item);
+      }
+      if (item->submenu) {
+        if (menu_stack_top < MENU_STACK_DEPTH) {
+          menu_stack[menu_stack_top++] = active_menu;
+          active_menu = item->submenu;
+          current_index = 0;
+          if (active_menu->on_enter) {
+            active_menu->on_enter();
+          }
+        }
+      }
+      return true;
+    }
+    case KEY_EXIT:
+      return MENU_Back();
+    default:
+      break;
+    }
   }
   return false;
 }
 
-void MENU_Back(void) {
+bool MENU_Back() {
   if (menu_stack_top > 0) {
     active_menu = menu_stack[--menu_stack_top];
     current_index = 0;
     if (active_menu->on_enter)
       active_menu->on_enter();
+
+    return true;
   }
+  return false;
 }

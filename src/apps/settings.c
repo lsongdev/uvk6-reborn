@@ -110,7 +110,10 @@ void SETTINGS_init(void) { MENU_Init(&settingsMenu); }
 void SETTINGS_deinit(void) {}
 
 bool SETTINGS_key(KEY_Code_t key, Key_State_t state) {
-  return state == KEY_RELEASED && MENU_HandleInput(key);
+  if (MENU_HandleInput(key, state)) {
+    return true;
+  }
+  return false;
 }
 
 void SETTINGS_render(void) { MENU_Render(); }

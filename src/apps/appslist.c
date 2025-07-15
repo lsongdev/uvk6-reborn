@@ -22,8 +22,8 @@ void APPSLIST_init(void) {
 }
 
 bool APPSLIST_key(KEY_Code_t key, Key_State_t state) {
-  if (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT) {
-    return MENU_HandleInput(key);
+  if (MENU_HandleInput(key, state)) {
+    return true;
   }
   return false;
 }

@@ -2,6 +2,7 @@
 
 #define MENU_H
 
+#include "../driver/keyboard.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -36,7 +37,7 @@ typedef struct Menu {
 
 void MENU_Init(Menu *main_menu);
 void MENU_Render(void);
-bool MENU_HandleInput(uint8_t key);
-void MENU_Back(void);
+bool MENU_HandleInput(KEY_Code_t key, Key_State_t state);
+bool MENU_Back(void);
 
 #endif /* end of include guard: MENU_H */

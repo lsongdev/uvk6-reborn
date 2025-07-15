@@ -509,8 +509,8 @@ void CHCFG_init(void) {
 void CHCFG_deinit(void) { gChNum = -1; }
 
 bool CHCFG_key(KEY_Code_t key, Key_State_t state) {
-  if (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT) {
-    return MENU_HandleInput(key);
+  if (MENU_HandleInput(key, state)) {
+    return true;
   }
   return false;
 }
