@@ -30,7 +30,7 @@ TS := $(shell date -u +'"%Y-%m-%d %H:%M UTC"')
 TS_FILE := $(shell date -u +'"%Y%m%d_%H%M"')
 
 ASFLAGS = -c -mcpu=cortex-m0
-CFLAGS = -Os -Wall -Wno-error -mcpu=cortex-m0 -fno-builtin -fno-builtin-printf -fshort-enums -fno-delete-null-pointer-checks -Wno-error=incompatible-pointer-types -std=c2x -MMD -flto=auto -Wextra
+CFLAGS = -Os -Wall -Wno-error -mcpu=cortex-m0 -fno-builtin -fno-builtin-printf -fshort-enums -fno-delete-null-pointer-checks -Wno-error=incompatible-pointer-types -nostdlib -MMD -flto=auto -Wextra
 CFLAGS += -DPRINTF_INCLUDE_CONFIG_H
 CFLAGS += -DGIT_HASH=\"$(GIT_HASH)\"
 CFLAGS += -DTIME_STAMP=\"$(TS)\"
