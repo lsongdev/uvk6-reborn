@@ -4,7 +4,6 @@
 #include "../settings.h"
 #include "uart.h"
 #include <stddef.h>
-#include <string.h>
 
 bool gEepromWrite = false;
 

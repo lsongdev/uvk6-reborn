@@ -5,7 +5,6 @@
 #include "../radio.h"
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 
 bool SCANER_key(KEY_Code_t Key, Key_State_t state);
 void SCANER_init(void);

@@ -10,7 +10,6 @@
 #include "misc.h"
 #include "radio.h"
 #include "scheduler.h"
-#include <string.h>
 
 static uint32_t saveTime;
 

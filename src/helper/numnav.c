@@ -1,6 +1,5 @@
 #include "numnav.h"
 #include <stddef.h>
-#include <string.h>
 
 bool gIsNumNavInput = false;
 char gNumNavInput[16] = {'\0'};

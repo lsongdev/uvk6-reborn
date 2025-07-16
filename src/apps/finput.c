@@ -4,8 +4,6 @@
 #include "../scheduler.h"
 #include "../ui/graphics.h"
 #include "apps.h"
-#include <math.h>
-#include <string.h>
 
 // Константы для преобразования частот
 #define HZ 1       // 1 * 10Hz

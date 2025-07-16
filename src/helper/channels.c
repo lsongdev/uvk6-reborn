@@ -6,7 +6,6 @@
 #include "../radio.h"
 #include "../system.h"
 #include <stddef.h>
-#include <string.h>
 
 uint16_t gScanlistSize = 0;
 uint16_t gScanlist[SCANLIST_MAX] = {0};

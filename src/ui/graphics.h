@@ -7,7 +7,6 @@
 #include "gfxfont.h"
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 
 typedef enum {
   POS_L,
