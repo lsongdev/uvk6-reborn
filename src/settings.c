@@ -397,7 +397,7 @@ const char *SETTINGS_GetValueString(Setting s) {
     sprintf(buf, "%u.%04u (%u)", vol / 10000, vol % 10000, v);
   } break;
   case SETTING_UPCONVERTER:
-    sprintf(buf, "%u.%05u", v / MHZ, v % MHZ);
+    mhzToS(buf, v);
     break;
 
   case SETTING_SQLOPENTIME:

@@ -132,14 +132,13 @@ static void getValS(const MenuItem *item, char *buf, uint8_t _) {
     strncpy(buf, YES_NO[gChEd.allowTx], 31);
     break;
   case MEM_F_RX:
-    sprintf(buf, "%u.%05u", gChEd.rxF / MHZ, gChEd.rxF % MHZ);
+    mhzToS(buf, gChEd.rxF);
     break;
   case MEM_F_TX:
-    sprintf(buf, "%u.%05u", gChEd.txF / MHZ, gChEd.txF % MHZ);
+    mhzToS(buf, gChEd.txF);
     break;
   case MEM_LAST_F:
-    sprintf(buf, "%u.%05u", gChEd.misc.lastUsedFreq / MHZ,
-            gChEd.misc.lastUsedFreq % MHZ);
+    mhzToS(buf, gChEd.misc.lastUsedFreq);
     break;
   case MEM_RX_CODE_TYPE:
     strncpy(buf, TX_CODE_TYPES[gChEd.code.rx.type], 31);
@@ -154,7 +153,7 @@ static void getValS(const MenuItem *item, char *buf, uint8_t _) {
     PrintRTXCode(buf, gChEd.code.tx.type, gChEd.code.tx.value);
     break;
   case MEM_TX_OFFSET:
-    sprintf(buf, "%u.%05u", gChEd.txF / MHZ, gChEd.txF % MHZ);
+    mhzToS(buf, gChEd.txF);
     break;
   case MEM_TX_OFFSET_DIR:
     snprintf(buf, 15, TX_OFFSET_NAMES[gChEd.offsetDir]);

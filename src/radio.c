@@ -1273,7 +1273,7 @@ const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
              StepFrequencyTable[ctx->step] % KHZ);
     break;
   case PARAM_FREQUENCY:
-    snprintf(buf, 15, "%u.%05u", ctx->frequency / MHZ, ctx->frequency % MHZ);
+    mhzToS(buf, ctx->frequency);
     break;
   case PARAM_RADIO:
     snprintf(buf, 15, "%s", RADIO_NAMES[ctx->radio_type]);

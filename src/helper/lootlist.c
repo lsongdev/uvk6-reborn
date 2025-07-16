@@ -239,7 +239,7 @@ CH LOOT_ToCh(const Loot *loot) {
       .gainIndex = p.gainIndex,
   };
 
-  snprintf(ch.name, 9, "%u.%05u", ch.rxF / MHZ, ch.rxF % MHZ);
+  mhzToS(ch.name, ch.rxF);
 
   if (loot->ct != 255) {
     ch.code.tx.type = CODE_TYPE_CONTINUOUS_TONE;
