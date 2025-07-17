@@ -8,8 +8,10 @@
 #include "../ui/menu.h"
 #include "../ui/statusline.h"
 #include "apps.h"
+#include "chcfg.h"
 #include "textinput.h"
 #include "vfo1.h"
+#include <string.h>
 
 typedef enum {
   MODE_INFO,
@@ -99,15 +101,16 @@ static void getChItem(uint16_t i, uint16_t index, bool isCurrent) {
 static void setMenuIndex(uint16_t i) { channelIndex = i - 1; }
 
 static void save() {
-  /* gChEd.scanlists = 0;
+  gChEd.scanlists = 0;
   CHANNELS_Save(getChannelNumber(channelIndex), &gChEd);
-  RADIO_LoadCurrentVFO(); */
+  // RADIO_LoadCurrentVFO();
+  LogC(LOG_C_YELLOW, "Chlist Save");
   APPS_exit();
   APPS_exit();
 }
 
 static void saveNamed() {
-  // strncpy(gChEd.name, gTextinputText, 9);
+  strncpy(gChEd.name, gTextinputText, 9);
   save();
 }
 
@@ -220,7 +223,7 @@ bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
     case KEY_STAR:
       viewMode = IncDecU(viewMode, 0, ARRAY_SIZE(VIEW_MODE_NAMES), true);
       return true;
-    /* case KEY_MENU:
+    case KEY_MENU:
       if (gChSaveMode) {
         CHANNELS_LoadScanlist(gChListFilter, gSettings.currentScanlist);
 
@@ -236,11 +239,11 @@ bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
         }
         return true;
       }
-      Log("BAND Selected by user");
-      RADIO_TuneToMR(chNum);
-      Log("Tuned to band, exit app");
+      LogC(LOG_C_YELLOW, "BAND Selected by user");
+      // RADIO_TuneToMR(chNum);
+      // Log("Tuned to band, exit app");
       APPS_exit();
-      return true; */
+      return true;
     /* case KEY_PTT:
       RADIO_TuneToMR(chNum);
       APPS_run(APP_VFO1);

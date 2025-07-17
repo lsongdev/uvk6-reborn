@@ -42,7 +42,6 @@ typedef enum {
   MEM_READONLY,
   MEM_RX_CODE,
   MEM_RX_CODE_TYPE,
-  MEM_SAVE,
   MEM_SCRAMBLER,
   MEM_SQ,
   MEM_SQ_TYPE,
@@ -56,7 +55,7 @@ typedef enum {
 } MemProp;
 
 static void save(const MenuItem *item) {
-  if (gChNum) {
+  if (gChNum >= 0) {
     CHANNELS_Save(gChNum, &gChEd);
     APPS_exit();
   } else {
@@ -144,7 +143,6 @@ static uint32_t getValue(MemProp p) {
     return gChEd.misc.lastUsedFreq;
   case MEM_BOUNDS:
   case MEM_NAME:
-  case MEM_SAVE:
     return 0;
   }
   return 0;
