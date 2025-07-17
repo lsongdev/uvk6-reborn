@@ -100,7 +100,7 @@ static Menu chListMenu = {.render_item = renderItem};
 
 static void action(const MenuItem *item) {}
 
-static void save() {
+/* static void save() {
   gChEd.scanlists = 0;
   CHANNELS_Save(getChannelNumber(channelIndex), &gChEd);
   // RADIO_LoadCurrentVFO();
@@ -112,7 +112,7 @@ static void save() {
 static void saveNamed() {
   strncpy(gChEd.name, gTextinputText, 9);
   save();
-}
+} */
 
 void CHLIST_init() {
   CHANNELS_LoadScanlist(gChListFilter, gSettings.currentScanlist);
@@ -132,7 +132,7 @@ void CHLIST_init() {
 void CHLIST_deinit() { gChSaveMode = false; }
 
 bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
-  uint16_t chNum = getChannelNumber(channelIndex);
+  // uint16_t chNum = getChannelNumber(channelIndex);
   bool longHeld = state == KEY_LONG_PRESSED;
   bool simpleKeypress = state == KEY_RELEASED;
   /* if (!gIsNumNavInput && longHeld && key == KEY_STAR) {
@@ -155,22 +155,22 @@ bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
         SETTINGS_DelayedSave();
         CHLIST_init();
       } else {
-        CHANNELS_Load(chNum, &ch);
+        /* CHANNELS_Load(chNum, &ch);
         ch.scanlists = CHANNELS_ScanlistByKey(ch.scanlists, key, longHeld);
-        CHANNELS_Save(chNum, &ch);
+        CHANNELS_Save(chNum, &ch); */
       }
       return true;
     }
   }
 
   if (viewMode == MODE_DELETE && simpleKeypress && key == KEY_1) {
-    CHANNELS_Delete(chNum);
+    // CHANNELS_Delete(chNum);
     return true;
   }
   if (viewMode == MODE_TX && simpleKeypress && key == KEY_1) {
-    CHANNELS_Load(chNum, &ch);
+    /* CHANNELS_Load(chNum, &ch);
     ch.allowTx = !ch.allowTx;
-    CHANNELS_Save(chNum, &ch);
+    CHANNELS_Save(chNum, &ch); */
     return true;
   }
 
@@ -228,10 +228,10 @@ bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
           snprintf(gTextinputText, 9, "%lu.%05lu", gChEd.rxF / MHZ,
                    gChEd.rxF % MHZ);
           gTextInputSize = 9;
-          gTextInputCallback = saveNamed;
+          // gTextInputCallback = saveNamed;
           APPS_run(APP_TEXTINPUT);
         } else {
-          save();
+          // save();
         }
         return true;
       }

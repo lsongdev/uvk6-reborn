@@ -23,7 +23,7 @@ typedef struct MenuItem {
   void (*set_value)(const MenuItem *item, int64_t); */
 
   void (*action)(const MenuItem *item);
-  const void *user_data; // Данные для action
+  // const void *user_data; // Данные для action
 } MenuItem;
 
 typedef struct Menu {
