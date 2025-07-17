@@ -179,8 +179,8 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       APPS_key(key, state);
       return true;
     case KEY_F:
-      RADIO_LoadVFOFromStorage(&radio_state, radio_state.active_vfo_index,
-                               &gChEd);
+      RADIO_SaveVFOToStorage(&radio_state,
+                             RADIO_GetCurrentVFONumber(&radio_state), &gChEd);
       APPS_run(APP_CH_CFG);
       return true;
     case KEY_STAR:

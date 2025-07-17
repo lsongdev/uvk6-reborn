@@ -22,7 +22,7 @@ void UI_TxBar(uint8_t y) {
   const uint8_t BAR_BASE = y + 7;
   FillRect(0, y, LCD_WIDTH, 8, C_CLEAR);
   // PrintMediumEx(LCD_WIDTH - 1, BAR_BASE, 2, true, "%u", gCurrentTxPower);
-  const unsigned int level = MIN(BK4819_GetVoiceAmplitude() * 8, 65535u);
+  const unsigned int level = MIN(BK4819_GetVoiceAmplitude() * 8u, 65535u);
   uint8_t audioW =
       ConvertDomain(MIN(SQRT16(level), 124u), 0, 124, 0, BAR_WIDTH);
   FillRect(BAR_LEFT_MARGIN, y + 2, audioW, 4, C_FILL);

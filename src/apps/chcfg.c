@@ -9,6 +9,7 @@
 #include "../radio.h"
 #include "../ui/menu.h"
 #include "apps.h"
+#include "chlist.h"
 #include "finput.h"
 #include "textinput.h"
 #include <string.h>
@@ -54,6 +55,17 @@ typedef enum {
   MEM_COUNT,
 } MemProp;
 
+static void save(const MenuItem *item) {
+  if (gChNum) {
+    CHANNELS_Save(gChNum, &gChEd);
+    APPS_exit();
+  } else {
+    gChSaveMode = true;
+    gChListFilter = TYPE_FILTER_CH_SAVE;
+    APPS_run(APP_CH_LIST);
+  }
+}
+
 static void PrintRTXCode(char *Output, uint8_t codeType, uint8_t code) {
   if (codeType == CODE_TYPE_CONTINUOUS_TONE) {
     sprintf(Output, "CT:%u.%uHz", CTCSS_Options[code] / 10,
@@ -67,14 +79,86 @@ static void PrintRTXCode(char *Output, uint8_t codeType, uint8_t code) {
   }
 }
 
-static void getValS(const MenuItem *item, char *buf, uint8_t _) {
-  uint32_t fs = gChEd.rxF;
-  uint32_t fe = gChEd.txF;
-  switch (item->setting) {
+static uint32_t getValue(MemProp p) {
+  switch (p) {
+  case MEM_COUNT:
+    return MEM_COUNT;
+  case MEM_BW:
+    return gChEd.bw;
+  case MEM_RX_CODE_TYPE:
+    return gChEd.code.rx.type;
+  case MEM_RX_CODE:
+    return gChEd.code.rx.value;
+  case MEM_TX_CODE_TYPE:
+    return gChEd.code.tx.type;
+  case MEM_TX_CODE:
+    return gChEd.code.tx.value;
+  case MEM_F_TXP:
+    return gChEd.power;
+  case MEM_TX_OFFSET_DIR:
+    return gChEd.offsetDir;
+  case MEM_MODULATION:
+    return gChEd.modulation;
+  case MEM_STEP:
+    return gChEd.step;
+  case MEM_SQ_TYPE:
+    return gChEd.squelch.type;
+  case MEM_SQ:
+    return gChEd.squelch.value;
+  case MEM_PPM:
+    return gChEd.ppm + 15;
+  case MEM_GAIN:
+    return gChEd.gainIndex;
+  case MEM_SCRAMBLER:
+    return gChEd.scrambler;
+  case MEM_TX:
+    return gChEd.allowTx;
+  case MEM_READONLY:
+    return gChEd.meta.readonly;
+  case MEM_TYPE:
+    return gChEd.meta.type;
+  case MEM_BANK:
+    return gChEd.misc.bank;
+  case MEM_P_CAL_L:
+    return gChEd.misc.powCalib.s;
+  case MEM_P_CAL_M:
+    return gChEd.misc.powCalib.m;
+  case MEM_P_CAL_H:
+    return gChEd.misc.powCalib.e;
+  case MEM_RADIO:
+    return gChEd.radio;
+  case MEM_START:
+  case MEM_F_RX:
+    return gChEd.rxF;
+  case MEM_END:
+  case MEM_F_TX:
+    return gChEd.txF;
+  case MEM_TX_OFFSET:
+    if (gChEd.offsetDir == OFFSET_NONE) {
+      return 0;
+    } else if (gChEd.offsetDir == OFFSET_MINUS) {
+      return -gChEd.txF;
+    }
+    return gChEd.txF;
+  case MEM_LAST_F:
+    return gChEd.misc.lastUsedFreq;
   case MEM_BOUNDS:
+  case MEM_NAME:
+  case MEM_SAVE:
+    return 0;
+  }
+  return 0;
+}
+
+static void getValS(const MenuItem *item, char *buf, uint8_t _) {
+  const uint32_t v = getValue(item->setting);
+  switch (item->setting) {
+  case MEM_BOUNDS: {
+    const uint32_t fs = gChEd.rxF;
+    const uint32_t fe = gChEd.txF;
     sprintf(buf, "%lu.%05lu - %lu.%05lu", fs / MHZ, fs % MHZ, fe / MHZ,
             fe % MHZ);
-    break;
+  } break;
   /* case MEM_START:
     sprintf(buf, "%lu.%03lu", fs / MHZ, fs / 100 % 1000);
     break;
@@ -93,6 +177,8 @@ static void getValS(const MenuItem *item, char *buf, uint8_t _) {
                    ? BW_NAMES_SI47XX_SSB
                    : BW_NAMES_SI47XX)[gChEd.bw],
               31);
+    } else {
+      strncpy(buf, "WFM", 31);
     }
     break;
   case MEM_SQ_TYPE:
@@ -102,22 +188,12 @@ static void getValS(const MenuItem *item, char *buf, uint8_t _) {
     sprintf(buf, "%+d", gChEd.ppm);
     break;
   case MEM_SQ:
-    sprintf(buf, "%u", gChEd.squelch.value);
-    break;
   case MEM_SCRAMBLER:
-    sprintf(buf, "%u", gChEd.scrambler);
-    break;
   case MEM_BANK:
-    sprintf(buf, "%u", gChEd.misc.bank);
-    break;
   case MEM_P_CAL_L:
-    sprintf(buf, "%u", gChEd.misc.powCalib.s);
-    break;
   case MEM_P_CAL_M:
-    sprintf(buf, "%u", gChEd.misc.powCalib.m);
-    break;
   case MEM_P_CAL_H:
-    sprintf(buf, "%u", gChEd.misc.powCalib.e);
+    sprintf(buf, "%u", v);
     break;
   case MEM_GAIN:
     sprintf(buf, "%ddB", -gainTable[gChEd.gainIndex].gainDb + 33);
@@ -133,13 +209,10 @@ static void getValS(const MenuItem *item, char *buf, uint8_t _) {
     strncpy(buf, YES_NO[gChEd.allowTx], 31);
     break;
   case MEM_F_RX:
-    mhzToS(buf, gChEd.rxF);
-    break;
   case MEM_F_TX:
-    mhzToS(buf, gChEd.txF);
-    break;
   case MEM_LAST_F:
-    mhzToS(buf, gChEd.misc.lastUsedFreq);
+  case MEM_TX_OFFSET:
+    mhzToS(buf, v);
     break;
   case MEM_RX_CODE_TYPE:
     strncpy(buf, TX_CODE_TYPES[gChEd.code.rx.type], 31);
@@ -152,9 +225,6 @@ static void getValS(const MenuItem *item, char *buf, uint8_t _) {
     break;
   case MEM_TX_CODE:
     PrintRTXCode(buf, gChEd.code.tx.type, gChEd.code.tx.value);
-    break;
-  case MEM_TX_OFFSET:
-    mhzToS(buf, gChEd.txF);
     break;
   case MEM_TX_OFFSET_DIR:
     snprintf(buf, 15, TX_OFFSET_NAMES[gChEd.offsetDir]);
@@ -170,8 +240,6 @@ static void getValS(const MenuItem *item, char *buf, uint8_t _) {
     break;
   case MEM_RADIO:
     snprintf(buf, 15, RADIO_NAMES[gChEd.radio]);
-    break;
-  default:
     break;
   }
 }
@@ -254,57 +322,6 @@ static void setValue(MemProp p, uint32_t v) {
   }
 }
 
-static uint32_t getValue(MemProp p) {
-  switch (p) {
-  case MEM_BW:
-    return gChEd.bw;
-  case MEM_RX_CODE_TYPE:
-    return gChEd.code.rx.type;
-  case MEM_RX_CODE:
-    return gChEd.code.rx.value;
-  case MEM_TX_CODE_TYPE:
-    return gChEd.code.tx.type;
-  case MEM_TX_CODE:
-    return gChEd.code.tx.value;
-  case MEM_F_TXP:
-    return gChEd.power;
-  case MEM_TX_OFFSET_DIR:
-    return gChEd.offsetDir;
-  case MEM_MODULATION:
-    return gChEd.modulation;
-  case MEM_STEP:
-    return gChEd.step;
-  case MEM_SQ_TYPE:
-    return gChEd.squelch.type;
-  case MEM_SQ:
-    return gChEd.squelch.value;
-  case MEM_PPM:
-    return gChEd.ppm + 15;
-  case MEM_GAIN:
-    return gChEd.gainIndex;
-  case MEM_SCRAMBLER:
-    return gChEd.scrambler;
-  case MEM_TX:
-    return gChEd.allowTx;
-  case MEM_READONLY:
-    return gChEd.meta.readonly;
-  case MEM_TYPE:
-    return gChEd.meta.type;
-  case MEM_BANK:
-    return gChEd.misc.bank;
-  case MEM_P_CAL_L:
-    return gChEd.misc.powCalib.s;
-  case MEM_P_CAL_M:
-    return gChEd.misc.powCalib.m;
-  case MEM_P_CAL_H:
-    return gChEd.misc.powCalib.e;
-  case MEM_RADIO:
-    return gChEd.radio;
-  default:
-    return 0;
-  }
-}
-
 static void updVal(const MenuItem *item, bool inc);
 
 static MenuItem pCalMenuItems[] = {
@@ -347,7 +364,7 @@ static MenuItem menuChVfo[] = {
     {"Radio", .submenu = &radioMenu},
 
     {"Readonly", MEM_READONLY, getValS, updVal},
-    {"Save CH", MEM_SAVE, getValS, updVal},
+    {"Save CH", .action = save},
 };
 
 static void applyBounds(uint32_t fs, uint32_t fe) {
@@ -375,7 +392,7 @@ static MenuItem menuBand[] = {
 
     {"Bank", MEM_BANK, getValS, updVal},
     {"Readonly", MEM_READONLY, getValS, updVal},
-    {"Save BAND", MEM_SAVE, getValS, updVal},
+    {"Save BAND", .action = save},
 };
 
 static Menu *menu;
@@ -498,8 +515,10 @@ void CHCFG_init(void) {
   // updateTxCodeListSize();
 
   if (gChEd.meta.type == TYPE_BAND) {
+    gChEd.meta.type = TYPE_BAND;
     menu = &bandMenu;
   } else {
+    gChEd.meta.type = TYPE_CH;
     menu = &chMenu;
   }
 

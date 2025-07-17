@@ -415,7 +415,7 @@ bool UART_IsCommandAvailable(void) {
     } else {
       CommandLength = (DmaLength + sizeof(UART_DMA_Buffer)) - gUART_WriteIndex;
     }
-    if (CommandLength < 8) {
+    if (CommandLength < 8u) {
       return 0;
     }
     if (UART_DMA_Buffer[DMA_INDEX(gUART_WriteIndex, 1)] == 0xCD) {
