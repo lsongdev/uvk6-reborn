@@ -12,6 +12,7 @@
 #include "gpio.h"
 #include "uart.h"
 #include <stdbool.h>
+#include <string.h>
 
 static const char Version[] = "s0v4";
 

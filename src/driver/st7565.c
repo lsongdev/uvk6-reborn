@@ -9,6 +9,7 @@
 #include "systick.h"
 #include "uart.h"
 #include <stdint.h>
+#include <string.h>
 
 static void waitToSend() {
   while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {

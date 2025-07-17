@@ -10,6 +10,7 @@
 #include "../scheduler.h"
 #include "components.h"
 #include "graphics.h"
+#include <string.h>
 
 static uint8_t previousBatteryLevel = 255;
 static bool showBattery = true;

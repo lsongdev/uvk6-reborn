@@ -11,6 +11,7 @@
 #include "apps.h"
 #include "finput.h"
 #include "textinput.h"
+#include <string.h>
 
 static const char *YES_NO[] = {"No", "Yes"};
 

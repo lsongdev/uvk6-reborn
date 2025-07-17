@@ -1,5 +1,6 @@
 #include "misc.h"
 #include "driver/uart.h"
+#include "external/printf/printf.h"
 
 char IsPrintable(char ch) { return (ch < 32 || 126 < ch) ? ' ' : ch; }
 

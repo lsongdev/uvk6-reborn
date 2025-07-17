@@ -2,6 +2,7 @@
 #include "../driver/st7565.h"
 #include "../ui/graphics.h"
 #include "apps.h"
+#include <string.h>
 
 char *gTextinputText = "";
 uint8_t gTextInputSize = 15;

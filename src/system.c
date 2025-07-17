@@ -15,6 +15,7 @@
 #include "settings.h"
 #include "ui/graphics.h"
 #include "ui/statusline.h"
+#include <string.h>
 
 #define queueLen 20
 #define itemSize sizeof(SystemMessages)

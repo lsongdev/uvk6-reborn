@@ -7,6 +7,7 @@
 #include "fonts/muMatrix8ptRegular.h"
 #include "fonts/symbols.h"
 #include <stdlib.h>
+#include <string.h>
 
 static Cursor cursor = {0, 0};
 

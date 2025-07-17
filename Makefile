@@ -1,101 +1,146 @@
-SRC_DIR := src
-OBJ_DIR := obj
-BIN_DIR := bin
+# =============================================================================
+# Directory Structure
+# =============================================================================
+SRC_DIR       := src
+OBJ_DIR       := obj
+BIN_DIR       := bin
 
-TARGET = $(BIN_DIR)/firmware
+# =============================================================================
+# Project Configuration
+# =============================================================================
+PROJECT_NAME  := firmware
+TARGET        := $(BIN_DIR)/$(PROJECT_NAME)
+GIT_HASH      := $(shell git rev-parse --short HEAD)
+BUILD_TIME    := $(shell date -u +'"%Y-%m-%d %H:%M UTC"')
+BUILD_TAG     := $(shell date -u +'"%Y%m%d_%H%M"')
 
-SRC = $(wildcard $(SRC_DIR)/driver/*.c)
-SRC += $(wildcard $(SRC_DIR)/helper/*.c)
-SRC += $(wildcard $(SRC_DIR)/ui/*.c)
-SRC += $(wildcard $(SRC_DIR)/apps/*.c)
-SRC += $(wildcard $(SRC_DIR)/*.c)
+# =============================================================================
+# Source Files
+# =============================================================================
+SRC := $(wildcard $(SRC_DIR)/*.c) \
+       $(wildcard $(SRC_DIR)/driver/*.c) \
+       $(wildcard $(SRC_DIR)/helper/*.c) \
+       $(wildcard $(SRC_DIR)/ui/*.c) \
+       $(wildcard $(SRC_DIR)/apps/*.c)
 
-OBJS = $(OBJ_DIR)/start.o
-OBJS += $(OBJ_DIR)/init.o
-OBJS += $(OBJ_DIR)/external/printf/printf.o
+OBJS := $(OBJ_DIR)/start.o \
+        $(OBJ_DIR)/init.o \
+        $(OBJ_DIR)/external/printf/printf.o \
+        $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
-OBJS += $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
-
+# =============================================================================
+# BSP Configuration
+# =============================================================================
 BSP_DEFINITIONS := $(wildcard hardware/*/*.def)
-BSP_HEADERS := $(patsubst hardware/%,inc/%,$(BSP_DEFINITIONS))
-BSP_HEADERS := $(patsubst %.def,%.h,$(BSP_HEADERS))
+BSP_HEADERS     := $(patsubst hardware/%,inc/%,$(BSP_DEFINITIONS:.def=.h))
 
-AS = arm-none-eabi-gcc
-CC = arm-none-eabi-gcc
-LD = arm-none-eabi-gcc
-OBJCOPY = arm-none-eabi-objcopy
+# =============================================================================
+# Toolchain
+# =============================================================================
+AS       := arm-none-eabi-gcc
+CC       := arm-none-eabi-gcc
+LD       := arm-none-eabi-gcc
+OBJCOPY  := arm-none-eabi-objcopy
+SIZE     := arm-none-eabi-size
 
-GIT_HASH := $(shell git rev-parse --short HEAD)
-TS := $(shell date -u +'"%Y-%m-%d %H:%M UTC"')
-TS_FILE := $(shell date -u +'"%Y%m%d_%H%M"')
+# =============================================================================
+# Compiler Flags
+# =============================================================================
+# Common flags for AS and CC
+COMMON_FLAGS := -mcpu=cortex-m0 -mthumb -mabi=aapcs
+OPTIMIZATION := -Os -flto=auto -ffunction-sections -fdata-sections
 
-ASFLAGS = -c -mcpu=cortex-m0
-CFLAGS = -Os -Wall -Wno-error -mcpu=cortex-m0 -fno-builtin -fno-builtin-printf -fshort-enums -fno-delete-null-pointer-checks -Wno-error=incompatible-pointer-types -nostdlib -MMD -flto=auto -Wextra
-CFLAGS += -DPRINTF_INCLUDE_CONFIG_H
-CFLAGS += -DGIT_HASH=\"$(GIT_HASH)\"
-CFLAGS += -DTIME_STAMP=\"$(TS)\"
-CFLAGS += -DCMSIS_device_header=\"ARMCM0.h\"
+# Assembler flags
+ASFLAGS  := $(COMMON_FLAGS) -c
 
+# Compiler flags
+CFLAGS   := $(COMMON_FLAGS) $(OPTIMIZATION) \
+            -std=c2x \
+            -Wall -Wextra \
+			-Wno-missing-field-initializers \
+            -Wno-error=incompatible-pointer-types \
+            -Wno-unused-function -Wno-unused-variable \
+            -fno-builtin -fshort-enums \
+            -fno-delete-null-pointer-checks \
+            -fsingle-precision-constant \
+            -finline-functions-called-once \
+            -MMD -MP
 
-CCFLAGS += -Wall -Werror -mcpu=cortex-m0 -fno-builtin -fshort-enums -fno-delete-null-pointer-checks -MMD -g
-CCFLAGS += -ftree-vectorize -funroll-loops
-CCFLAGS += -Wextra -Wno-unused-function -Wno-unused-variable -Wno-unknown-pragmas 
-#-Wunused-parameter -Wconversion
-CCFLAGS += -fno-math-errno -pipe -ffunction-sections -fdata-sections -ffast-math
-CCFLAGS += -fsingle-precision-constant -finline-functions-called-once
-CCFLAGS += -Os -g3 -fno-exceptions -fno-non-call-exceptions -fno-delete-null-pointer-checks
-CCFLAGS += -DARMCM0
+# Debug flags
+DEBUG_FLAGS := -g3 -DDEBUG
 
+# Defines
+DEFINES  := -DPRINTF_INCLUDE_CONFIG_H \
+            -DGIT_HASH=\"$(GIT_HASH)\" \
+            -DTIME_STAMP=\"$(BUILD_TIME)\" \
+            -DCMSIS_device_header=\"ARMCM0.h\" \
+            -DARMCM0
 
-LDFLAGS = -mcpu=cortex-m0 -nostartfiles -Wl,-T,firmware.ld
-# Use newlib-nano instead of newlib
-LDFLAGS += --specs=nano.specs -lc -lnosys -mthumb -mabi=aapcs -lm -fno-rtti -fno-exceptions
-LDFLAGS += -Wl,--build-id=none
-LDFLAGS += -z noseparate-code -z noexecstack -mcpu=cortex-m0 -nostartfiles -Wl,-L,linker -Wl,--gc-sections
-LDFLAGS += -Wl,--print-memory-usage
-LDFLAGS += -Wl,-Map=./obj/output.map
+# Include paths
+INC_DIRS := -I./src/config \
+            -I./src/external/CMSIS_5/CMSIS/Core/Include/ \
+            -I./src/external/CMSIS_5/Device/ARM/ARMCM0/Include \
+            -I./src/external/mcufont/decoder/ \
+            -I./src/external/mcufont/fonts/
 
-INC =
-INC += -I ./src/config
-INC += -I ./src/external/CMSIS_5/CMSIS/Core/Include/
-INC += -I ./src/external/CMSIS_5/Device/ARM/ARMCM0/Include
-INC += -I ./src/external/mcufont/decoder/
-INC += -I ./src/external/mcufont/fonts/
+# =============================================================================
+# Linker Flags
+# =============================================================================
+LDFLAGS  := $(COMMON_FLAGS) $(OPTIMIZATION) \
+            -nostartfiles \
+            -Tfirmware.ld \
+            --specs=nano.specs \
+            -lc -lnosys -lm \
+            -Wl,--gc-sections \
+            -Wl,--build-id=none \
+            -Wl,--print-memory-usage \
+            -Wl,-Map=$(OBJ_DIR)/output.map
 
-DEPS = $(OBJS:.o=.d)
+# =============================================================================
+# Build Rules
+# =============================================================================
+.PHONY: all debug release clean
 
-.PHONY: all clean
+all: $(TARGET).bin
 
-all: $(TARGET)
-	$(OBJCOPY) -O binary $< $<.bin
-	-python3 fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
-
-debug: CCFLAGS += -DDEBUG
-debug: clean all
+debug: CFLAGS += $(DEBUG_FLAGS)
+debug: all
 
 release: clean all
-	cp $(BIN_DIR)/firmware.packed.bin $(BIN_DIR)/s0va-by-fagci-$(TS_FILE).bin
+	cp $(TARGET).packed.bin $(BIN_DIR)/s0va-by-fagci-$(BUILD_TAG).bin
 
-version.o: .FORCE
+$(TARGET).bin: $(TARGET)
+	$(OBJCOPY) -O binary $< $@
+	-python3 fw-pack.py $@ $(GIT_HASH) $(TARGET).packed.bin
 
 $(TARGET): $(OBJS) | $(BIN_DIR)
 	$(LD) $(LDFLAGS) $^ -o $@
-
-inc/dp32g030/%.h: hardware/dp32g030/%.def
+	$(SIZE) $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(BSP_HEADERS) $(OBJ_DIR)
-	mkdir -p $(@D)
-	$(CC) $(CFLAGS) $(INC) -c $< -o $@
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) $(DEFINES) $(INC_DIRS) -c $< -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.S | $(OBJ_DIR)
+	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) $< -o $@
 
+inc/%/%.h: hardware/%/%.def
+	@mkdir -p $(@D)
+	# Add your header generation command here
+
 $(BIN_DIR) $(OBJ_DIR):
-	mkdir -p $@
+	@mkdir -p $@
 
-.FORCE:
+# =============================================================================
+# Clean
+# =============================================================================
+clean:
+	rm -rf $(TARGET) $(TARGET).* $(OBJ_DIR) $(BIN_DIR)/*.bin
 
+# =============================================================================
+# Dependencies
+# =============================================================================
+DEPS := $(OBJS:.o=.d)
 -include $(DEPS)
 
-clean:
-	rm -f $(TARGET).bin $(TARGET).packed.bin $(TARGET) $(OBJ_DIR)/*.o $(OBJ_DIR)/*.d $(OBJ_DIR)/**/*.o $(OBJ_DIR)/**/**/*.o $(OBJ_DIR)/**/*.d

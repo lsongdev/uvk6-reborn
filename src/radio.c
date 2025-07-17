@@ -18,6 +18,7 @@
 #include "scheduler.h"
 #include "settings.h"
 #include <stdint.h>
+#include <string.h>
 
 #define RADIO_SAVE_DELAY_MS 1000
 
