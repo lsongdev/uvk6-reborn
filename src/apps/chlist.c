@@ -1,11 +1,10 @@
 #include "chlist.h"
 #include "../driver/uart.h"
 #include "../helper/bands.h"
-#include "../helper/numnav.h"
+#include "../helper/menu.h"
 #include "../radio.h"
 #include "../ui/components.h"
 #include "../ui/graphics.h"
-#include "../ui/menu.h"
 #include "../ui/statusline.h"
 #include "apps.h"
 #include "chcfg.h"
@@ -22,6 +21,8 @@ typedef enum {
   // MODE_TYPE,
   // MODE_SELECT,
 } CHLIST_ViewMode;
+
+static Menu chListMenu = {};
 
 static char *VIEW_MODE_NAMES[] = {
     "INFO",   //
@@ -49,7 +50,6 @@ static char *CH_TYPE_FILTER_NAMES[] = {
 bool gChSaveMode = false;
 CHTypeFilter gChListFilter = TYPE_FILTER_CH;
 
-static uint16_t channelIndex = 0;
 static uint8_t viewMode = MODE_INFO;
 static CH ch;
 static char tempName[9] = {0};
@@ -98,7 +98,7 @@ static void getChItem(uint16_t i, uint16_t index, bool isCurrent) {
   }
 }
 
-static void setMenuIndex(uint16_t i) { channelIndex = i - 1; }
+static void action(const MenuItem *item) {}
 
 static void save() {
   gChEd.scanlists = 0;
@@ -116,7 +116,9 @@ static void saveNamed() {
 
 void CHLIST_init() {
   CHANNELS_LoadScanlist(gChListFilter, gSettings.currentScanlist);
-  if (gChListFilter == TYPE_FILTER_BAND ||
+  MENU_Init(&chListMenu);
+  // TODO: set menu index
+  /* if (gChListFilter == TYPE_FILTER_BAND ||
       gChListFilter == TYPE_FILTER_BAND_SAVE) {
     channelIndex = BANDS_GetScanlistIndex();
   }
@@ -124,7 +126,7 @@ void CHLIST_init() {
     channelIndex = 0;
   } else if (channelIndex > gScanlistSize) {
     channelIndex = gScanlistSize - 1;
-  }
+  } */
 }
 
 void CHLIST_deinit() { gChSaveMode = false; }
@@ -133,7 +135,7 @@ bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
   uint16_t chNum = getChannelNumber(channelIndex);
   bool longHeld = state == KEY_LONG_PRESSED;
   bool simpleKeypress = state == KEY_RELEASED;
-  if (!gIsNumNavInput && longHeld && key == KEY_STAR) {
+  /* if (!gIsNumNavInput && longHeld && key == KEY_STAR) {
     NUMNAV_Init(channelIndex, 0, gScanlistSize - 1);
     gNumNavCallback = setMenuIndex;
     return true;
@@ -143,7 +145,7 @@ bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
       channelIndex = NUMNAV_Input(key) - 1;
       return true;
     }
-  }
+  } */
 
   if (viewMode == MODE_SCANLIST || viewMode == MODE_SCANLIST_SELECT) {
     if ((longHeld || simpleKeypress) && (key > KEY_0 && key < KEY_9)) {
@@ -185,16 +187,10 @@ bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
     }
   }
 
-  if (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT) {
-    switch (key) {
-    case KEY_UP:
-    case KEY_DOWN:
-      channelIndex = IncDecU(channelIndex, 0, gScanlistSize, key != KEY_UP);
-      return true;
-    default:
-      break;
-    }
+  if (MENU_HandleInput(key, state)) {
+    return true;
   }
+
   if (state == KEY_RELEASED) {
     switch (key) {
     case KEY_0:
@@ -254,10 +250,10 @@ bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
       APPS_run(APP_CH_CFG);
       return true; */
     case KEY_EXIT:
-      if (gIsNumNavInput) {
+      /* if (gIsNumNavInput) {
         NUMNAV_Deinit();
         return true;
-      }
+      } */
       APPS_exit();
       return true;
     default:
@@ -268,9 +264,7 @@ bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
 }
 
 void CHLIST_render() {
-  UI_ShowMenuEx(getChItem, gScanlistSize, channelIndex, MENU_LINES_TO_SHOW + 1);
-  if (!gIsNumNavInput) {
-    STATUSLINE_SetText("%s %s", CH_TYPE_FILTER_NAMES[gChListFilter],
-                       VIEW_MODE_NAMES[viewMode]);
-  }
+  MENU_Render();
+  STATUSLINE_SetText("%s %s", CH_TYPE_FILTER_NAMES[gChListFilter],
+                     VIEW_MODE_NAMES[viewMode]);
 }
