@@ -22,8 +22,6 @@ typedef enum {
   // MODE_SELECT,
 } CHLIST_ViewMode;
 
-static Menu chListMenu = {};
-
 static char *VIEW_MODE_NAMES[] = {
     "INFO",   //
     "TX",     //
@@ -65,12 +63,12 @@ static inline uint16_t getChannelNumber(uint16_t menuIndex) {
   return gScanlist[menuIndex];
 }
 
-static void getChItem(uint16_t i, uint16_t index, bool isCurrent) {
+static void renderItem(uint16_t index, bool isCurrent) {
   index = getChannelNumber(index);
   CHANNELS_Load(index, &ch);
-  const uint8_t y = MENU_Y + i * MENU_ITEM_H;
+  uint8_t y = 8 + (index % 5) * 7;
   if (isCurrent) {
-    FillRect(0, y, LCD_WIDTH - 3, MENU_ITEM_H, C_FILL);
+    FillRect(0, y, LCD_WIDTH - 3, 7, C_FILL);
   }
   if (ch.meta.type) {
     PrintSymbolsEx(2, y + 8, POS_L, C_INVERT, "%c", typeIcons[ch.meta.type]);
@@ -97,6 +95,8 @@ static void getChItem(uint16_t i, uint16_t index, bool isCurrent) {
     break;
   }
 }
+
+static Menu chListMenu = {.render_item = renderItem};
 
 static void action(const MenuItem *item) {}
 
