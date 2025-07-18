@@ -5,9 +5,6 @@
 #include <stdbool.h>
 
 #define MENU_STACK_DEPTH 3
-static const uint8_t MENU_Y = 8;
-static const uint8_t MENU_ITEM_H = 11;
-static const uint8_t MENU_LINES_TO_SHOW = 5;
 
 static Menu *menu_stack[MENU_STACK_DEPTH];
 static uint8_t menu_stack_top = 0;
@@ -57,7 +54,7 @@ void MENU_Render(void) {
     const bool isActive = idx == current_index;
 
     if (active_menu->render_item) {
-      active_menu->render_item(idx, isActive);
+      active_menu->render_item(idx, i, isActive);
     } else {
       const MenuItem *item = &active_menu->items[idx];
       uint8_t by = MENU_Y + i * MENU_ITEM_H + 8;

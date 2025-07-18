@@ -63,13 +63,10 @@ static inline uint16_t getChannelNumber(uint16_t menuIndex) {
   return gScanlist[menuIndex];
 }
 
-static void renderItem(uint16_t index, bool isCurrent) {
+static void renderItem(uint16_t index, uint8_t i, bool isCurrent) {
   index = getChannelNumber(index);
   CHANNELS_Load(index, &ch);
-  uint8_t y = 8 + (index % 5) * 7;
-  if (isCurrent) {
-    FillRect(0, y, LCD_WIDTH - 3, 7, C_FILL);
-  }
+  uint8_t y = MENU_Y + i * MENU_ITEM_H;
   if (ch.meta.type) {
     PrintSymbolsEx(2, y + 8, POS_L, C_INVERT, "%c", typeIcons[ch.meta.type]);
     PrintMediumEx(13, y + 8, POS_L, C_INVERT, "%s", ch.name);
@@ -96,7 +93,7 @@ static void renderItem(uint16_t index, bool isCurrent) {
   }
 }
 
-static Menu chListMenu = {.render_item = renderItem};
+static Menu chListMenu = {.render_item = renderItem, .itemHeight = MENU_ITEM_H};
 
 static void action(const MenuItem *item) {}
 
@@ -116,6 +113,7 @@ static void saveNamed() {
 
 void CHLIST_init() {
   CHANNELS_LoadScanlist(gChListFilter, gSettings.currentScanlist);
+  chListMenu.num_items = gScanlistSize;
   MENU_Init(&chListMenu);
   // TODO: set menu index
   /* if (gChListFilter == TYPE_FILTER_BAND ||

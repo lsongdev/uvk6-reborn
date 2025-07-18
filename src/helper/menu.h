@@ -6,9 +6,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define MENU_Y 8
+#define MENU_ITEM_H 11
+#define MENU_LINES_TO_SHOW 5
+
 typedef void (*MenuAction)(void);
 typedef void (*MenuOnEnter)(void);
-typedef void (*MenuRenderItem)(uint16_t index, bool is_selected);
+typedef void (*MenuRenderItem)(uint16_t index, uint8_t visIndex,
+                               bool is_selected);
 
 typedef struct MenuItem MenuItem;
 
