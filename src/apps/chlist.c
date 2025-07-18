@@ -95,7 +95,27 @@ static void renderItem(uint16_t index, uint8_t i, bool isCurrent) {
 
 static Menu chListMenu = {.render_item = renderItem, .itemHeight = MENU_ITEM_H};
 
-static void action(const MenuItem *item) {}
+static void action(const MenuItem *item) {
+  if (gChSaveMode) {
+    CHANNELS_LoadScanlist(gChListFilter, gSettings.currentScanlist);
+
+    if (gChEd.name[0] == '\0') {
+      gTextinputText = tempName;
+      snprintf(gTextinputText, 9, "%lu.%05lu", gChEd.rxF / MHZ,
+               gChEd.rxF % MHZ);
+      gTextInputSize = 9;
+      // gTextInputCallback = saveNamed;
+      APPS_run(APP_TEXTINPUT);
+    } else {
+      // save();
+    }
+    return;
+  }
+  LogC(LOG_C_YELLOW, "BAND Selected by user");
+  // RADIO_TuneToMR(chNum);
+  // Log("Tuned to band, exit app");
+  APPS_exit();
+}
 
 /* static void save() {
   gChEd.scanlists = 0;
@@ -218,25 +238,6 @@ bool CHLIST_key(KEY_Code_t key, Key_State_t state) {
       viewMode = IncDecU(viewMode, 0, ARRAY_SIZE(VIEW_MODE_NAMES), true);
       return true;
     case KEY_MENU:
-      if (gChSaveMode) {
-        CHANNELS_LoadScanlist(gChListFilter, gSettings.currentScanlist);
-
-        if (gChEd.name[0] == '\0') {
-          gTextinputText = tempName;
-          snprintf(gTextinputText, 9, "%lu.%05lu", gChEd.rxF / MHZ,
-                   gChEd.rxF % MHZ);
-          gTextInputSize = 9;
-          // gTextInputCallback = saveNamed;
-          APPS_run(APP_TEXTINPUT);
-        } else {
-          // save();
-        }
-        return true;
-      }
-      LogC(LOG_C_YELLOW, "BAND Selected by user");
-      // RADIO_TuneToMR(chNum);
-      // Log("Tuned to band, exit app");
-      APPS_exit();
       return true;
     /* case KEY_PTT:
       RADIO_TuneToMR(chNum);

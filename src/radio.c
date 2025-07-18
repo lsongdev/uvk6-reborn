@@ -1249,6 +1249,19 @@ static const char *RADIO_GetModulationName(VFOContext *ctx) {
   return "WFM";
 }
 
+static void printRTXCode(char *Output, uint8_t codeType, uint8_t code) {
+  if (codeType == CODE_TYPE_CONTINUOUS_TONE) {
+    sprintf(Output, "CT:%u.%u", CTCSS_Options[code] / 10,
+            CTCSS_Options[code] % 10);
+  } else if (codeType == CODE_TYPE_DIGITAL) {
+    sprintf(Output, "DCS:D%03oN", DCS_Options[code]);
+  } else if (codeType == CODE_TYPE_REVERSE_DIGITAL) {
+    sprintf(Output, "DCS:D%03oI", DCS_Options[code]);
+  } else {
+    sprintf(Output, "No code");
+  }
+}
+
 const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
   static char buf[16] = "unk";
   uint32_t v = RADIO_GetParam(ctx, param);
@@ -1289,6 +1302,15 @@ const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
     }
     snprintf(buf, 15, "Auto");
     break;
+
+  case PARAM_RX_CODE:
+    printRTXCode(buf, ctx->code.type, ctx->code.value);
+    break;
+
+  case PARAM_TX_CODE:
+    printRTXCode(buf, ctx->tx_state.code.type, ctx->tx_state.code.value);
+    break;
+
   case PARAM_POWER:
     return TX_POWER_NAMES[ctx->power];
   case PARAM_AFC:

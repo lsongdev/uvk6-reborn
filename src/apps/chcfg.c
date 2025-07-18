@@ -7,7 +7,6 @@
 #include "../helper/menu.h"
 #include "../misc.h"
 #include "../radio.h"
-#include "../ui/menu.h"
 #include "apps.h"
 #include "chlist.h"
 #include "finput.h"

@@ -12,7 +12,6 @@
 #include "../scheduler.h"
 #include "../ui/components.h"
 #include "../ui/graphics.h"
-#include "../ui/menu.h"
 #include "../ui/spectrum.h"
 #include "../ui/statusline.h"
 #include "apps.h"
@@ -284,12 +283,12 @@ void VFO1_render(void) {
                step % KHZ);
 
   if (ctx->code.type) {
-    PrintRTXCode(String, ctx->code.type, ctx->code.value);
-    PrintSmallEx(0, BASE - 6, POS_L, C_FILL, "R%s", String);
+    PrintSmallEx(0, BASE - 6, POS_L, C_FILL, "R%s",
+                 RADIO_GetParamValueString(ctx, PARAM_RX_CODE));
   }
   if (ctx->tx_state.code.type) {
-    PrintRTXCode(String, ctx->tx_state.code.type, ctx->tx_state.code.value);
-    PrintSmallEx(0, BASE, POS_L, C_FILL, "T%s", String);
+    PrintSmallEx(0, BASE, POS_L, C_FILL, "T%s",
+                 RADIO_GetParamValueString(ctx, PARAM_RX_CODE));
   }
 
   if (gSettings.iAmPro) {
@@ -349,10 +348,10 @@ void VFO1_render(void) {
   if (gLastActiveLoot) {
     const uint32_t ago = (Now() - gLastActiveLoot->lastTimeOpen) / 1000;
     if (gLastActiveLoot->ct != 255) {
-      PrintRTXCode(String, CODE_TYPE_CONTINUOUS_TONE, gLastActiveLoot->ct);
+      // PrintRTXCode(String, CODE_TYPE_CONTINUOUS_TONE, gLastActiveLoot->ct);
       PrintSmallEx(0, LCD_HEIGHT - 1, POS_L, C_FILL, "%s", String);
     } else if (gLastActiveLoot->cd != 255) {
-      PrintRTXCode(String, CODE_TYPE_DIGITAL, gLastActiveLoot->cd);
+      // PrintRTXCode(String, CODE_TYPE_DIGITAL, gLastActiveLoot->cd);
       PrintSmallEx(0, LCD_HEIGHT - 1, POS_L, C_FILL, "%s", String);
     }
     UI_DrawLoot(gLastActiveLoot, LCD_XCENTER, LCD_HEIGHT - 1, POS_C);

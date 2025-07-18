@@ -6,7 +6,6 @@
 #include "../helper/menu.h"
 #include "../misc.h"
 #include "../settings.h"
-#include "../ui/menu.h"
 #include "apps.h"
 #include "finput.h"
 

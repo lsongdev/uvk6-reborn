@@ -39,6 +39,9 @@ typedef enum {
   PARAM_TX_STATE,
   PARAM_RADIO,
 
+  PARAM_RX_CODE,
+  PARAM_TX_CODE,
+
   PARAM_AFC,
   PARAM_DEV,
   PARAM_MIC,
@@ -98,6 +101,8 @@ typedef struct {
 
   bool save_to_eeprom; // Флаг необходимости сохранения в EEPROM
   uint32_t last_save_time; // Время последнего сохранения
+
+  Measurement msm; // TODO: implement
 } VFOContext;
 
 // Channel/VFO mode
