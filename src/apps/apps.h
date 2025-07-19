@@ -2,6 +2,7 @@
 #define APPS_H
 
 #include "../driver/keyboard.h"
+#include "../radio.h"
 
 #define RUN_APPS_COUNT 3
 
@@ -32,13 +33,14 @@ typedef struct App {
   void (*render)(void);
   bool (*key)(KEY_Code_t Key, Key_State_t state);
   void (*deinit)(void);
+  bool needsRadioState;
 } App;
 
 extern const App apps[APPS_COUNT];
 extern const AppType_t appsAvailableToRun[RUN_APPS_COUNT];
 
-extern AppType_t gPreviousApp;
 extern AppType_t gCurrentApp;
+extern RadioState gRadioState;
 
 AppType_t APPS_Peek();
 bool APPS_key(KEY_Code_t Key, Key_State_t state);

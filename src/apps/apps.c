@@ -1,5 +1,6 @@
 #include "apps.h"
 #include "../driver/st7565.h"
+#include "../driver/uart.h"
 #include "../ui/graphics.h"
 #include "../ui/statusline.h"
 #include "about.h"
@@ -20,6 +21,9 @@
 #define APPS_STACK_SIZE 8
 
 AppType_t gCurrentApp = APP_NONE;
+RadioState gRadioState;
+
+static AppType_t loadedVfoApp = APP_NONE;
 
 static AppType_t appsStack[APPS_STACK_SIZE] = {APP_NONE};
 static int8_t stackIndex = -1;
@@ -88,7 +92,8 @@ const App apps[APPS_COUNT] = {
     [APP_FC] =
     {"FC", FC_init, FC_update, FC_render, FC_key, FC_deinit},
   */
-    [APP_VFO1] = {"1 VFO", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL},
+    [APP_VFO1] = {"1 VFO", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL,
+                  true, true},
     [APP_ABOUT] = {"ABOUT", NULL, NULL, ABOUT_Render, ABOUT_key, NULL},
 };
 
@@ -139,6 +144,15 @@ void APPS_run(AppType_t app) {
     APPS_deinit();
   } */
   pushApp(app);
+
+  if (loadedVfoApp != gCurrentApp && apps[gCurrentApp].needsRadioState) {
+    LogC(LOG_C_MAGENTA, "[APP] Load radio state for %s",
+         apps[gCurrentApp].name);
+    RADIO_InitState(&gRadioState, 16);
+    RADIO_LoadVFOs(&gRadioState);
+    loadedVfoApp = gCurrentApp;
+  }
+
   APPS_init(app);
 }
 

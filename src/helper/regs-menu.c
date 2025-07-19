@@ -1,13 +1,14 @@
 #include "regs-menu.h"
+#include "../apps/apps.h"
+#include "../helper/menu.h"
 #include "../radio.h"
-#include "../ui/graphics.h"
 #include "channels.h"
-#include "measurements.h"
+#include <string.h>
 
 static const uint8_t MENU_Y = 6;
 static const uint8_t MENU_ITEM_H = 7;
+const uint8_t MENU_LINES_TO_SHOW = 7;
 
-static uint8_t currentIndex;
 static bool inMenu;
 
 static uint8_t PARAM_ITEMS[3][PARAM_COUNT] = {
@@ -47,38 +48,62 @@ static uint8_t PARAM_SIZE[] = {
     [RADIO_BK1080] = 2,
 };
 
+static void getValS(const MenuItem *item, char *buf, uint8_t buf_size) {
+  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
+  snprintf(buf, buf_size, "%s", RADIO_GetParamValueString(ctx, item->setting));
+}
+
+static void updateVal(const MenuItem *item, bool up) {
+  RADIO_IncDecParam(, item->setting, up);
+}
+
 static void updateValueAlt(bool inc) {}
 
-const uint8_t MENU_LINES_TO_SHOW = 7;
+static const MenuItem regsMenuItems[3][PARAM_COUNT] = {
+    [RADIO_BK4819] =
+        {
+            {PARAM_NAMES[PARAM_RADIO], PARAM_RADIO, getValS, updateVal},
+            {PARAM_NAMES[PARAM_GAIN], PARAM_GAIN, getValS, updateVal},
+            {PARAM_NAMES[PARAM_BANDWIDTH], PARAM_BANDWIDTH, getValS, updateVal},
+            {PARAM_NAMES[PARAM_SQUELCH_VALUE], PARAM_SQUELCH_VALUE, getValS,
+             updateVal},
+            {PARAM_NAMES[PARAM_MODULATION], PARAM_MODULATION, getValS,
+             updateVal},
+            {PARAM_NAMES[PARAM_STEP], PARAM_STEP, getValS, updateVal},
+            {PARAM_NAMES[PARAM_AFC], PARAM_AFC, getValS, updateVal},
+            {PARAM_NAMES[PARAM_DEV], PARAM_DEV, getValS, updateVal},
+            {PARAM_NAMES[PARAM_MIC], PARAM_MIC, getValS, updateVal},
+            {PARAM_NAMES[PARAM_XTAL], PARAM_XTAL, getValS, updateVal},
+            {PARAM_NAMES[PARAM_POWER], PARAM_POWER, getValS, updateVal},
+        },
+    [RADIO_SI4732] =
+        {
+            {PARAM_NAMES[PARAM_RADIO], PARAM_RADIO, getValS, updateVal},
+            {PARAM_NAMES[PARAM_GAIN], PARAM_GAIN, getValS, updateVal},
+            {PARAM_NAMES[PARAM_BANDWIDTH], PARAM_BANDWIDTH, getValS, updateVal},
+            {PARAM_NAMES[PARAM_SQUELCH_VALUE], PARAM_SQUELCH_VALUE, getValS,
+             updateVal},
+            {PARAM_NAMES[PARAM_MODULATION], PARAM_MODULATION, getValS,
+             updateVal},
+            {PARAM_NAMES[PARAM_STEP], PARAM_STEP, getValS, updateVal},
+        },
+    [RADIO_BK1080] =
+        {
+            {PARAM_NAMES[PARAM_RADIO], PARAM_RADIO, getValS, updateVal},
+            {PARAM_NAMES[PARAM_STEP], PARAM_STEP, getValS, updateVal},
+        },
+};
+
+static const Menu regsMenu = {
+    .title = "",
+    .items = regsMenuItems,
+    .num_items = ARRAY_SIZE(regsMenuItems),
+    .itemHeight = MENU_ITEM_H,
+};
 
 void REGSMENU_Draw(VFOContext *ctx) {
   if (inMenu) {
-
-    const uint8_t size = PARAM_SIZE[ctx->radio_type];
-    const uint16_t maxItems =
-        size < MENU_LINES_TO_SHOW ? size : MENU_LINES_TO_SHOW;
-    const uint16_t offset = Clamp(currentIndex - 2, 0, size - maxItems);
-
-    FillRect(0, MENU_Y, LCD_XCENTER, maxItems * MENU_ITEM_H + 2, C_CLEAR);
-    DrawRect(0, MENU_Y, LCD_XCENTER, maxItems * MENU_ITEM_H + 2, C_FILL);
-
-    for (uint8_t i = 0; i < maxItems; ++i) {
-      const uint16_t itemIndex = i + offset;
-      const bool isCurrent = itemIndex == currentIndex;
-      const Color color = isCurrent ? C_INVERT : C_FILL;
-      const uint8_t ry = MENU_Y + 1 + i * MENU_ITEM_H;
-      const uint8_t y = ry + 5;
-
-      if (isCurrent) {
-        FillRect(0, ry, LCD_XCENTER, MENU_ITEM_H, C_FILL);
-      }
-
-      PrintSmallEx(5, y, POS_L, color, "%s",
-                   PARAM_NAMES[PARAM_ITEMS[ctx->radio_type][itemIndex]]);
-      PrintSmallEx(LCD_XCENTER - 5, y, POS_R, color, "%s",
-                   RADIO_GetParamValueString(
-                       ctx, PARAM_ITEMS[ctx->radio_type][itemIndex]));
-    }
+    MENU_Render();
   }
 }
 
@@ -87,14 +112,6 @@ bool REGSMENU_Key(KEY_Code_t key, Key_State_t state, VFOContext *ctx) {
   case KEY_0:
     inMenu = !inMenu;
     return true;
-  case KEY_UP:
-  case KEY_DOWN:
-    if (inMenu) {
-      currentIndex = IncDecU(currentIndex, 0, PARAM_SIZE[ctx->radio_type],
-                             key == KEY_DOWN);
-      return true;
-    }
-    break;
   case KEY_2:
   case KEY_8:
     if (inMenu) {

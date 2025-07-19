@@ -1361,3 +1361,4 @@ const ExtendedVFOContext *RADIO_GetCurrentVFOConst(const RadioState *state) {
   uint8_t current = RADIO_GetCurrentVFONumber(state);
   return (current != 0xFF) ? &state->vfos[current] : NULL;
 }
+
