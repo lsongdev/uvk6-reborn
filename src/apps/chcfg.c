@@ -53,15 +53,19 @@ typedef enum {
   MEM_COUNT,
 } MemProp;
 
-static void save(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
-  if (gChNum >= 0) {
-    CHANNELS_Save(gChNum, &gChEd);
-    APPS_exit();
-  } else {
-    gChSaveMode = true;
-    gChListFilter = TYPE_FILTER_CH_SAVE;
-    APPS_run(APP_CH_LIST);
+static bool save(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
+  if (state == KEY_RELEASED && key == KEY_MENU) {
+    if (gChNum >= 0) {
+      CHANNELS_Save(gChNum, &gChEd);
+      APPS_exit();
+    } else {
+      gChSaveMode = true;
+      gChListFilter = TYPE_FILTER_CH_SAVE;
+      APPS_run(APP_CH_LIST);
+    }
+    return true;
   }
+  return false;
 }
 
 static void PrintRTXCode(char *Output, uint8_t codeType, uint8_t code) {
@@ -369,10 +373,14 @@ static void applyBounds(uint32_t fs, uint32_t fe) {
   gChEd.txF = fe;
 }
 
-static void setBounds(const MenuItem *item) {
-  FINPUT_setup(0, 1340 * MHZ, UNIT_MHZ, true);
-  gFInputCallback = applyBounds;
-  APPS_run(APP_FINPUT);
+static bool setBounds(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
+  if (state == KEY_RELEASED && key == KEY_MENU) {
+    FINPUT_setup(0, 1340 * MHZ, UNIT_MHZ, true);
+    gFInputCallback = applyBounds;
+    APPS_run(APP_FINPUT);
+    return true;
+  }
+  return false;
 }
 
 static MenuItem menuBand[] = {

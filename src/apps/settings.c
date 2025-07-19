@@ -26,13 +26,17 @@ static void doCalibrate(uint32_t v, uint32_t _) {
   SETTINGS_SetValue(SETTING_BATTERYCALIBRATION, BATTERY_GetCal(v * 100));
 }
 
-static void calibrate(const MenuItem *item) {
-  gFInputValue1 =
-      BATTERY_GetPreciseVoltage(SETTINGS_GetValue(SETTING_BATTERYCALIBRATION)) /
-      100;
-  gFInputCallback = doCalibrate;
-  FINPUT_setup(500, 860, UNIT_VOLTS, false);
-  APPS_run(APP_FINPUT);
+static bool calibrate(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
+  if (state == KEY_RELEASED && key == KEY_MENU) {
+    gFInputValue1 = BATTERY_GetPreciseVoltage(
+                        SETTINGS_GetValue(SETTING_BATTERYCALIBRATION)) /
+                    100;
+    gFInputCallback = doCalibrate;
+    FINPUT_setup(500, 860, UNIT_VOLTS, false);
+    APPS_run(APP_FINPUT);
+    return true;
+  }
+  return false;
 }
 
 static const MenuItem sqlMenuItems[] = {

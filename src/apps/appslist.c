@@ -1,14 +1,19 @@
 #include "appslist.h"
 #include "../helper/menu.h"
 #include "apps.h"
+#include <sys/types.h>
 
 static MenuItem appsItems[RUN_APPS_COUNT];
 
 static Menu appsMenu = {"Apps", appsItems, RUN_APPS_COUNT};
 
-static void run(const MenuItem *item) {
-  APPS_exit();
-  APPS_runManual(item->setting);
+static bool run(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
+  if (state == KEY_RELEASED && key == KEY_MENU) {
+    APPS_exit();
+    APPS_runManual(item->setting);
+    return true;
+  }
+  return false;
 }
 
 void APPSLIST_init(void) {

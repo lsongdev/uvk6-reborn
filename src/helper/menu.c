@@ -85,6 +85,7 @@ bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
   if (!active_menu) {
     return false;
   }
+  const MenuItem *item = &active_menu->items[current_index];
 
   if (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT) {
     switch (key) {
@@ -95,13 +96,12 @@ bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
       return true;
       break;
     case KEY_STAR:
-    case KEY_F: {
-      const MenuItem *item = &active_menu->items[current_index];
+    case KEY_F:
       if (item->change_value) {
         item->change_value(item, key == KEY_STAR);
         return true;
       }
-    }
+
       return true;
     default:
       break;
@@ -110,11 +110,7 @@ bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
 
   if (state == KEY_RELEASED) {
     switch (key) {
-    case KEY_MENU: {
-      const MenuItem *item = &active_menu->items[current_index];
-      if (item->action) {
-        item->action(item, key, state);
-      }
+    case KEY_MENU:
       if (item->submenu) {
         if (menu_stack_top < MENU_STACK_DEPTH) {
           menu_stack[menu_stack_top++] = active_menu;
@@ -126,12 +122,14 @@ bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
         }
       }
       return true;
-    }
     case KEY_EXIT:
       return MENU_Back();
     default:
       break;
     }
+  }
+  if (item->action) {
+    return item->action(item, key, state);
   }
   return false;
 }

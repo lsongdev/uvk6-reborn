@@ -27,7 +27,7 @@ typedef struct MenuItem {
   /* int64_t (*get_value)(const MenuItem *item);
   void (*set_value)(const MenuItem *item, int64_t); */
 
-  void (*action)(const MenuItem *item, KEY_Code_t, Key_State_t);
+  bool (*action)(const MenuItem *item, KEY_Code_t, Key_State_t);
   // const void *user_data; // Данные для action
 } MenuItem;
 
