@@ -25,7 +25,7 @@ extern const char *RADIO_NAMES[3];
 extern const uint16_t StepFrequencyTable[15];
 
 // Параметры
-typedef enum {
+typedef const enum {
   PARAM_FREQUENCY,
   PARAM_STEP,
   PARAM_POWER,

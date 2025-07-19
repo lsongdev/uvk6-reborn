@@ -38,6 +38,10 @@ typedef struct Menu {
   MenuRenderItem render_item;
   MenuOnEnter on_enter;
   uint8_t itemHeight;
+  uint8_t x;
+  uint8_t y;
+  uint8_t width;
+  uint8_t height;
 } Menu;
 
 void MENU_Init(Menu *main_menu);

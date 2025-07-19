@@ -12,22 +12,22 @@ static uint8_t menu_stack_top = 0;
 static Menu *active_menu = NULL;
 static uint16_t current_index = 0;
 
-static void UI_DrawScrollBar(const uint16_t size, const uint16_t i,
-                             const uint8_t nLines) {
-  const uint8_t y = ConvertDomain(i, 0, size - 1, MENU_Y, LCD_HEIGHT - 3);
-
-  DrawVLine(LCD_WIDTH - 2, MENU_Y, LCD_HEIGHT - MENU_Y, C_FILL);
-
-  FillRect(LCD_WIDTH - 3, y, 3, 3, C_FILL);
-}
-
-static void UI_ShowMenuItem(uint8_t line, const MenuItem *item,
-                            bool isCurrent) {}
-
 void MENU_Init(Menu *main_menu) {
   active_menu = main_menu;
   current_index = 0;
   menu_stack_top = 0;
+
+  STATUSLINE_SetText(active_menu->title);
+
+  if (!active_menu->width)
+    active_menu->width = LCD_WIDTH;
+
+  if (!active_menu->height)
+    active_menu->height = LCD_HEIGHT - active_menu->y;
+
+  if (!active_menu->itemHeight)
+    active_menu->itemHeight = MENU_ITEM_H;
+
   if (main_menu->on_enter)
     main_menu->on_enter();
 }
@@ -36,15 +36,13 @@ void MENU_Render(void) {
   if (!active_menu)
     return;
 
-  STATUSLINE_SetText(active_menu->title);
-  const uint8_t menuItemH =
-      active_menu->itemHeight ? active_menu->itemHeight : MENU_ITEM_H;
-  const uint8_t linesToShow = (LCD_HEIGHT - MENU_Y) / menuItemH;
+  uint8_t itemsShow = active_menu->height / active_menu->itemHeight;
 
   const uint16_t offset = (current_index >= 2) ? current_index - 2 : 0;
-  const uint16_t visible = (active_menu->num_items < linesToShow)
-                               ? active_menu->num_items
-                               : linesToShow;
+  const uint16_t visible = MIN(active_menu->num_items, itemsShow);
+
+  const uint8_t ex = active_menu->x + active_menu->width;
+  const uint8_t ey = active_menu->y + active_menu->height;
 
   for (uint16_t i = 0; i < visible; ++i) {
     uint16_t idx = i + offset;
@@ -52,26 +50,35 @@ void MENU_Render(void) {
       break;
 
     const bool isActive = idx == current_index;
+    const uint8_t y = active_menu->y + i * active_menu->itemHeight;
 
     if (active_menu->render_item) {
       active_menu->render_item(idx, i, isActive);
     } else {
       const MenuItem *item = &active_menu->items[idx];
-      uint8_t by = MENU_Y + i * MENU_ITEM_H + 8;
+      const uint8_t by = y + 8;
+
       PrintMedium(3, by, "%s %c", item->name, item->submenu ? '>' : ' ');
+
       if (item->get_value_text) {
         char value_buf[32];
         item->get_value_text(item, value_buf, sizeof(value_buf));
-        PrintSmallEx(LCD_WIDTH - 7, by, POS_R, C_FILL, "%s", value_buf);
+        PrintSmallEx(ex - 7, by, POS_R, C_FILL, "%s", value_buf);
       }
     }
 
     if (isActive) {
-      FillRect(0, MENU_Y + i * menuItemH, LCD_WIDTH - 4, menuItemH, C_INVERT);
+      FillRect(active_menu->x, y, ex - 4, active_menu->itemHeight, C_INVERT);
     }
   }
 
-  UI_DrawScrollBar(active_menu->num_items, current_index, linesToShow);
+  // scrollbar
+  const uint8_t y = ConvertDomain(current_index, 0, active_menu->num_items - 1,
+                                  active_menu->y, ey - 3);
+
+  DrawVLine(ex - 2, active_menu->y, active_menu->height, C_FILL);
+
+  FillRect(ex - 3, y, 3, 3, C_FILL);
 }
 
 bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
