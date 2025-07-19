@@ -593,7 +593,7 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   }
 }
 
-uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param) {
+uint32_t RADIO_GetParam(const VFOContext *ctx, ParamType param) {
   switch (param) {
   case PARAM_FREQUENCY:
     return ctx->frequency;
@@ -802,7 +802,7 @@ void RADIO_ToggleTX(VFOContext *ctx, bool on) {
   }
 }
 
-bool RADIO_IsSSB(VFOContext *ctx) {
+bool RADIO_IsSSB(const VFOContext *ctx) {
   return ctx->modulation == MOD_LSB || ctx->modulation == MOD_USB;
 }
 
@@ -1239,7 +1239,7 @@ void RADIO_UpdateAudioRouting(RadioState *state) {
   }
 }
 
-static const char *RADIO_GetModulationName(VFOContext *ctx) {
+static const char *RADIO_GetModulationName(const VFOContext *ctx) {
   if (ctx->radio_type == RADIO_BK4819) {
     return MOD_NAMES_BK4819[ctx->modulation];
   }
@@ -1262,7 +1262,7 @@ static void printRTXCode(char *Output, uint8_t codeType, uint8_t code) {
   }
 }
 
-const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param) {
+const char *RADIO_GetParamValueString(const VFOContext *ctx, ParamType param) {
   static char buf[16] = "unk";
   uint32_t v = RADIO_GetParam(ctx, param);
   switch (param) {

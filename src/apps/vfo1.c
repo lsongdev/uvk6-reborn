@@ -6,7 +6,6 @@
 #include "../helper/measurements.h"
 #include "../helper/numnav.h"
 #include "../helper/regs-menu.h"
-#include "../helper/vfo.h"
 #include "../inc/dp32g030/gpio.h"
 #include "../radio.h"
 #include "../scheduler.h"
@@ -57,14 +56,14 @@ void VFO1_update(void) {
 }
 
 bool VFO1_key(KEY_Code_t key, Key_State_t state) {
-  uint8_t vfoN = RADIO_GetCurrentVFONumber(&gRadioState);
   if (!gIsNumNavInput && state == KEY_RELEASED &&
-      REGSMENU_Key(key, state, &gRadioState.vfos[vfoN].context)) {
+      REGSMENU_Key(key, state)) {
     return true;
   }
 
+  uint8_t vfoN = RADIO_GetCurrentVFONumber(&gRadioState);
   const ExtendedVFOContext *ctxEx = &gRadioState.vfos[vfoN];
-  const VFOContext *ctx = &ctxEx->context;
+  VFOContext *ctx = &ctxEx->context;
 
   if (state == KEY_RELEASED && ctxEx->mode == MODE_CHANNEL) {
     if (!gIsNumNavInput && key <= KEY_9) {
@@ -359,5 +358,5 @@ void VFO1_render(void) {
     }
   }
 
-  REGSMENU_Draw(ctx);
+  REGSMENU_Draw();
 }

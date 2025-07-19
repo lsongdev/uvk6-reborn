@@ -159,7 +159,7 @@ void RADIO_ApplySettings(VFOContext *ctx);
 // Проверка поддержки параметра в текущем диапазоне
 bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value);
 
-uint32_t RADIO_GetParam(VFOContext *ctx, ParamType param);
+uint32_t RADIO_GetParam(const VFOContext *ctx, ParamType param);
 bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
                        bool save_to_eeprom);
 bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc,
@@ -170,8 +170,8 @@ void RADIO_EnableAudioRouting(RadioState *state, bool enable);
 void RADIO_UpdateAudioRouting(RadioState *state);
 
 void RADIO_ToggleTX(VFOContext *ctx, bool on);
-bool RADIO_IsSSB(VFOContext *ctx);
-const char *RADIO_GetParamValueString(VFOContext *ctx, ParamType param);
+bool RADIO_IsSSB(const VFOContext *ctx);
+const char *RADIO_GetParamValueString(const VFOContext *ctx, ParamType param);
 
 uint8_t RADIO_GetCurrentVFONumber(const RadioState *state);
 ExtendedVFOContext *RADIO_GetCurrentVFO(RadioState *state);

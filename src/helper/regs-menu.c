@@ -1,9 +1,9 @@
 #include "regs-menu.h"
 #include "../apps/apps.h"
+#include "../external/printf/printf.h"
 #include "../helper/menu.h"
 #include "../radio.h"
 #include "channels.h"
-#include "../external/printf/printf.h"
 
 static bool inMenu;
 
@@ -16,6 +16,7 @@ static Menu regsMenu = {
     .y = 5,
     .width = 64,
 };
+
 static void initMenu();
 
 static void getValS(const MenuItem *item, char *buf, uint8_t buf_size) {
@@ -32,41 +33,44 @@ static void updateVal(const MenuItem *item, bool up) {
 }
 
 static void updateValueAlt(bool inc) {}
-static const uint8_t radioParamCount[3] = {
-    [RADIO_BK4819] = 11,
-    [RADIO_SI4732] = 6,
-    [RADIO_BK1080] = 2,
+
+static const ParamType paramsBK4819[] = {
+    PARAM_RADIO,         //
+    PARAM_GAIN,          //
+    PARAM_BANDWIDTH,     //
+    PARAM_SQUELCH_VALUE, //
+    PARAM_MODULATION,    //
+    PARAM_STEP,          //
+    PARAM_AFC,           //
+    PARAM_DEV,           //
+    PARAM_MIC,           //
+    PARAM_XTAL,          //
+    PARAM_POWER,         //
+};
+static const ParamType paramsSI[] = {
+    PARAM_RADIO,         //
+    PARAM_GAIN,          //
+    PARAM_BANDWIDTH,     //
+    PARAM_SQUELCH_VALUE, //
+    PARAM_MODULATION,    //
+    PARAM_STEP,          //
 };
 
-static const ParamType radioParams[3][PARAM_COUNT] = {
-    [RADIO_BK4819] =
-        {
-            PARAM_RADIO,
-            PARAM_GAIN,
-            PARAM_BANDWIDTH,
-            PARAM_SQUELCH_VALUE,
-            PARAM_MODULATION,
-            PARAM_STEP,
-            PARAM_AFC,
-            PARAM_DEV,
-            PARAM_MIC,
-            PARAM_XTAL,
-            PARAM_POWER,
-        },
-    [RADIO_SI4732] =
-        {
-            PARAM_RADIO,
-            PARAM_GAIN,
-            PARAM_BANDWIDTH,
-            PARAM_SQUELCH_VALUE,
-            PARAM_MODULATION,
-            PARAM_STEP,
-        },
-    [RADIO_BK1080] =
-        {
-            PARAM_RADIO,
-            PARAM_STEP,
-        },
+static const ParamType paramsBK1080[] = {
+    PARAM_RADIO, //
+    PARAM_STEP,  //
+};
+
+static const ParamType *radioParams[] = {
+    [RADIO_BK4819] = paramsBK4819,
+    [RADIO_SI4732] = paramsSI,
+    [RADIO_BK1080] = paramsBK1080,
+};
+
+static const uint8_t radioParamCount[] = {
+    [RADIO_BK4819] = ARRAY_SIZE(paramsBK4819),
+    [RADIO_SI4732] = ARRAY_SIZE(paramsSI),
+    [RADIO_BK1080] = ARRAY_SIZE(paramsBK1080),
 };
 
 static void initMenu() {
@@ -79,15 +83,16 @@ static void initMenu() {
     menuItems[i].change_value = updateVal;
     menuItems[i].get_value_text = getValS;
   }
+  MENU_Init(&regsMenu);
 }
 
-void REGSMENU_Draw(VFOContext *ctx) {
+void REGSMENU_Draw() {
   if (inMenu) {
     MENU_Render();
   }
 }
 
-bool REGSMENU_Key(KEY_Code_t key, Key_State_t state, VFOContext *ctx) {
+bool REGSMENU_Key(KEY_Code_t key, Key_State_t state) {
   if (inMenu && MENU_HandleInput(key, state)) {
     return true;
   }
