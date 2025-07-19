@@ -53,7 +53,7 @@ typedef enum {
   MEM_COUNT,
 } MemProp;
 
-static void save(const MenuItem *item) {
+static void save(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   if (gChNum >= 0) {
     CHANNELS_Save(gChNum, &gChEd);
     APPS_exit();

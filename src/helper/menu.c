@@ -106,7 +106,7 @@ bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
     case KEY_MENU: {
       const MenuItem *item = &active_menu->items[current_index];
       if (item->action) {
-        item->action(item);
+        item->action(item, key, state);
       }
       if (item->submenu) {
         if (menu_stack_top < MENU_STACK_DEPTH) {
