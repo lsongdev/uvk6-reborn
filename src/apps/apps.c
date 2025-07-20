@@ -85,7 +85,7 @@ const App apps[APPS_COUNT] = {
     [APP_CH_LIST] = {"Channels", CHLIST_init, NULL, CHLIST_render, CHLIST_key,
                      CHLIST_deinit},
     [APP_SCANER] = {"Spectrum", SCANER_init, SCANER_update, SCANER_render,
-                    SCANER_key, SCANER_deinit},
+                    SCANER_key, SCANER_deinit, true},
     /*
     [APP_LOOT_LIST] = {"Loot", LOOTLIST_init,
     LOOTLIST_update, LOOTLIST_render, LOOTLIST_key, NULL}, [APP_CH_SCAN] = {"CH
@@ -95,7 +95,7 @@ const App apps[APPS_COUNT] = {
     BANDSCAN_update, BANDSCAN_render, BANDSCAN_key, BANDSCAN_deinit},
     [APP_FC] =
   */
-    [APP_FC] = {"FC", FC_init, FC_update, FC_render, FC_key, FC_deinit},
+    [APP_FC] = {"FC", FC_init, FC_update, FC_render, FC_key, FC_deinit, true},
     [APP_VFO1] = {"1 VFO", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL,
                   true, true},
     [APP_ABOUT] = {"ABOUT", NULL, NULL, ABOUT_Render, ABOUT_key, NULL},

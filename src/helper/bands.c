@@ -17,16 +17,20 @@ Band defaultBand = {
     .meta.readonly = true,
     .meta.type = TYPE_BAND_DETACHED,
     .name = "Unknown",
+
+    .radio = RADIO_BK4819,
     .step = STEP_25_0kHz,
     .bw = BK4819_FILTER_BW_12k,
+
+    .rxF = BK4819_F_MIN,
+    .txF = BK4819_F_MAX,
+
     .squelch =
         {
             .type = SQUELCH_RSSI_NOISE_GLITCH,
             .value = 4,
         },
-    .gainIndex = 21,
-    .rxF = 0,
-    .txF = 130000000,
+    .gainIndex = AUTO_GAIN_INDEX,
     .allowTx = false,
 };
 

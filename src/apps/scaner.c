@@ -43,13 +43,18 @@ void SCANER_init(void) {
   SPECTRUM_H = 44;
 
   gMonitorMode = false;
+  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+  VFOContext *ctx = &vfo->context;
 
   if (gCurrentBand.meta.type != TYPE_BAND_DETACHED) {
-    ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
-    VFOContext *ctx = &vfo->context;
+    LogC(LOG_C_BRIGHT_YELLOW, "[i] [SCAN] Init withOUT detached band");
     BANDS_SelectByFrequency(RADIO_GetParam(ctx, PARAM_FREQUENCY), false);
     gCurrentBand.meta.type = TYPE_BAND_DETACHED;
+  } else {
+    LogC(LOG_C_BRIGHT_YELLOW, "[i] [SCAN] Init with detached band");
   }
+
+  gCurrentBand.step = RADIO_GetParam(ctx, PARAM_STEP);
 
   BANDS_RangeClear(); // TODO: push only if gCurrentBand was changed from
                       // outside
@@ -62,13 +67,13 @@ void SCANER_init(void) {
 void SCANER_update(void) { SCAN_Check(isAnalyserMode); }
 
 bool SCANER_key(KEY_Code_t key, Key_State_t state) {
-  if (REGSMENU_Key(key, state)) {
+  if (state == KEY_RELEASED && REGSMENU_Key(key, state)) {
     return true;
   }
   ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
   VFOContext *ctx = &vfo->context;
 
-  uint32_t step = RADIO_GetParam(ctx, PARAM_STEP);
+  uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
 
   if (state == KEY_LONG_PRESSED) {
     Band _b;
@@ -116,7 +121,7 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
     case KEY_3:
     case KEY_9:
       RADIO_IncDecParam(ctx, PARAM_STEP, key == KEY_3, false);
-      gCurrentBand.step = RADIO_GetParam(ctx, PARAM_STEP);
+      gCurrentBand.step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
       SCAN_setBand(gCurrentBand);
       return true;
     case KEY_STAR:
@@ -166,7 +171,8 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
 
     case KEY_2:
       BANDS_RangePush(
-          CUR_GetRange(BANDS_RangePeek(), RADIO_GetParam(ctx, PARAM_STEP)));
+          CUR_GetRange(BANDS_RangePeek(),
+                       StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)]));
       SCAN_setBand(*BANDS_RangePeek());
       CUR_Reset();
       return true;
@@ -203,7 +209,7 @@ void SCANER_render(void) {
   ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
   VFOContext *ctx = &vfo->context;
 
-  const uint32_t step = RADIO_GetParam(ctx, PARAM_STEP);
+  const uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
 
   STATUSLINE_RenderRadioSettings();
 

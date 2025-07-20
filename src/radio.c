@@ -625,8 +625,8 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   case PARAM_COUNT:
     return;
   }
-  /* LogC(LOG_C_WHITE, "[SET] %-12s -> %s%s", PARAM_NAMES[param],
-       RADIO_GetParamValueString(ctx, param), save_to_eeprom ? " [W]" : ""); */
+  LogC(LOG_C_WHITE, "[SET] %-12s -> %s%s", PARAM_NAMES[param],
+       RADIO_GetParamValueString(ctx, param), save_to_eeprom ? " [W]" : "");
 
   // TODO: make dirty only when changed.
   // but, potential BUG: param not applied when 0
@@ -646,6 +646,8 @@ uint32_t RADIO_GetParam(const VFOContext *ctx, ParamType param) {
     return RADIO_GetRSSI(ctx);
   case PARAM_FREQUENCY:
     return ctx->frequency;
+  case PARAM_PRECISE_F_CHANGE:
+    return ctx->preciseFChange;
   case PARAM_MODULATION:
     return ctx->modulation;
   case PARAM_BANDWIDTH:
@@ -783,8 +785,8 @@ void RADIO_ApplySettings(VFOContext *ctx) {
       }
       break;
     }
-    /* LogC(LOG_C_BRIGHT_WHITE, "[SET] %-12s -> %s", PARAM_NAMES[p],
-         RADIO_GetParamValueString(ctx, p)); */
+    LogC(LOG_C_BRIGHT_WHITE, "[SET] %-12s -> %s", PARAM_NAMES[p],
+         RADIO_GetParamValueString(ctx, p));
   }
 
   if (ctx->radio_type == RADIO_BK4819) {

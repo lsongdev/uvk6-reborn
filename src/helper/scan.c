@@ -34,7 +34,7 @@ static uint16_t measure(uint32_t f, bool precise) {
 static void onNewBand() {
   VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
   RADIO_SetParam(ctx, PARAM_FREQUENCY, gCurrentBand.rxF, false);
-  RADIO_SetParam(ctx, PARAM_STEP, StepFrequencyTable[gCurrentBand.step], false);
+  RADIO_SetParam(ctx, PARAM_STEP, gCurrentBand.step, false);
   SP_Init(&gCurrentBand);
 }
 
@@ -62,7 +62,7 @@ void SCAN_setEndF(uint32_t f) {
 
 static void next() {
   VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
-  uint32_t step = RADIO_GetParam(ctx, PARAM_STEP);
+  uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
   RADIO_AdjustParam(ctx, PARAM_FREQUENCY, step, false);
 
   if (RADIO_GetParam(ctx, PARAM_FREQUENCY) > gCurrentBand.txF) {
