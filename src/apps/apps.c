@@ -15,7 +15,7 @@
 #include "finput.h"
 // #include "lootlist.h"
 #include "reset.h"
-// #include "scaner.h"
+#include "scaner.h"
 #include "settings.h"
 #include "textinput.h"
 #include "vfo1.h"
@@ -60,8 +60,8 @@ const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {
     APP_VFO1,    //
     APP_CH_LIST, //
     APP_FC,      //
+    APP_SCANER,  //
     /*
-    APP_SCANER,    //
     APP_CH_SCAN,   //
     APP_BAND_SCAN, //
     APP_LOOT_LIST, // */
@@ -84,8 +84,10 @@ const App apps[APPS_COUNT] = {
                     CHCFG_deinit},
     [APP_CH_LIST] = {"Channels", CHLIST_init, NULL, CHLIST_render, CHLIST_key,
                      CHLIST_deinit},
-    /* [APP_SPECTRUM] = {"Spectrum", SCANER_init, SCANER_update, SCANER_render,
-    SCANER_key, SCANER_deinit}, [APP_LOOT_LIST] = {"Loot", LOOTLIST_init,
+    [APP_SCANER] = {"Spectrum", SCANER_init, SCANER_update, SCANER_render,
+                    SCANER_key, SCANER_deinit},
+    /*
+    [APP_LOOT_LIST] = {"Loot", LOOTLIST_init,
     LOOTLIST_update, LOOTLIST_render, LOOTLIST_key, NULL}, [APP_CH_SCAN] = {"CH
     Scan", CHSCAN_init, CHSCAN_update, CHSCAN_render, CHSCAN_key,
     CHSCAN_deinit},

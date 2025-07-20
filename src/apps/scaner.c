@@ -1,4 +1,4 @@
-/* #include "scaner.h"
+#include "scaner.h"
 #include "../driver/st7565.h"
 #include "../driver/uart.h"
 #include "../helper/bands.h"
@@ -27,32 +27,27 @@ static bool isAnalyserMode = false;
 static uint8_t scanAFC;
 static uint32_t scanDelay;
 
-static void setStartF(uint32_t f) {
-  radio.fixedBoundsMode = false;
+static void setRange(uint32_t fs, uint32_t fe) {
+  // radio.fixedBoundsMode = false;
   BANDS_RangeClear();
-  SCAN_setStartF(f);
-  BANDS_RangePush(gCurrentBand);
-}
-
-static void setEndF(uint32_t f) {
-  radio.fixedBoundsMode = false;
-  BANDS_RangeClear();
-  SCAN_setEndF(f);
+  SCAN_setStartF(fs);
+  SCAN_setEndF(fe);
   BANDS_RangePush(gCurrentBand);
 }
 
 void SCANER_init(void) {
   gMonitorMode = false;
-  RADIO_ToggleRX(false);
+  // RADIO_ToggleRX(false); // In nre radio done by default
 
   SPECTRUM_Y = 8;
   SPECTRUM_H = 44;
 
   gMonitorMode = false;
-  RADIO_LoadCurrentVFO();
 
   if (gCurrentBand.meta.type != TYPE_BAND_DETACHED) {
-    BANDS_SelectByFrequency(radio.rxF, radio.fixedBoundsMode);
+    ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+    VFOContext *ctx = &vfo->context;
+    BANDS_SelectByFrequency(RADIO_GetParam(ctx, PARAM_FREQUENCY), false);
     gCurrentBand.meta.type = TYPE_BAND_DETACHED;
   }
 
@@ -70,6 +65,10 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
   if (state == KEY_RELEASED && REGSMENU_Key(key, state)) {
     return true;
   }
+  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+  VFOContext *ctx = &vfo->context;
+
+  uint32_t step = RADIO_GetParam(ctx, PARAM_STEP);
 
   if (state == KEY_LONG_PRESSED) {
     Band _b;
@@ -77,8 +76,8 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
     case KEY_6:
       if (gLastActiveLoot) {
         _b = gCurrentBand;
-        _b.rxF = gLastActiveLoot->f - StepFrequencyTable[radio.step] * 64;
-        _b.txF = _b.rxF + StepFrequencyTable[radio.step] * 128;
+        _b.rxF = gLastActiveLoot->f - step * 64;
+        _b.txF = _b.rxF + step * 128;
         BANDS_RangePush(_b);
         SCAN_setBand(*BANDS_RangePeek());
         CUR_Reset();
@@ -116,12 +115,12 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
       return true;
     case KEY_3:
     case KEY_9:
-      radio.step = gCurrentBand.step = IncDecU(gCurrentBand.step, STEP_0_02kHz,
-                                               STEP_500_0kHz + 1, key == KEY_3);
+      RADIO_IncDecParam(ctx, PARAM_STEP, key == KEY_3, false);
+      gCurrentBand.step = RADIO_GetParam(ctx, PARAM_STEP);
       SCAN_setBand(gCurrentBand);
       return true;
     case KEY_STAR:
-      APPS_run(APP_LOOT_LIST);
+      // APPS_run(APP_LOOT_LIST);
       return true;
     case KEY_UP:
     case KEY_DOWN:
@@ -149,7 +148,8 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
       minMaxRssi = SP_GetMinMax();
       return true;
     case KEY_5:
-      gFInputCallback = selStart ? setStartF : setEndF;
+      gFInputCallback = setRange;
+      FINPUT_setup(0, 1360 * MHZ, UNIT_MHZ, true);
       APPS_run(APP_FINPUT);
       return true;
     case KEY_SIDE1:
@@ -161,12 +161,12 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
       SCAN_Next(true);
       return true;
     case KEY_STAR:
-      APPS_run(APP_LOOT_LIST);
+      // APPS_run(APP_LOOT_LIST);
       return true;
 
     case KEY_2:
       BANDS_RangePush(
-          CUR_GetRange(BANDS_RangePeek(), StepFrequencyTable[radio.step]));
+          CUR_GetRange(BANDS_RangePeek(), RADIO_GetParam(ctx, PARAM_STEP)));
       SCAN_setBand(*BANDS_RangePeek());
       CUR_Reset();
       return true;
@@ -178,7 +178,7 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
 
     case KEY_PTT:
       if (gLastActiveLoot && !gSettings.keylock) {
-        RADIO_TuneToSave(gLastActiveLoot->f);
+        RADIO_SetParam(ctx, PARAM_FREQUENCY, gLastActiveLoot->f, true);
         APPS_run(APP_VFO1);
         return true;
       }
@@ -200,7 +200,10 @@ static void renderAnalyzerUI() {
 }
 
 void SCANER_render(void) {
-  const uint32_t step = StepFrequencyTable[radio.step];
+  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+  VFOContext *ctx = &vfo->context;
+
+  const uint32_t step = RADIO_GetParam(ctx, PARAM_STEP);
 
   STATUSLINE_RenderRadioSettings();
 
@@ -230,7 +233,7 @@ void SCANER_render(void) {
   if (isAnalyserMode) {
     renderAnalyzerUI();
   } else {
-    SP_RenderArrow(&gCurrentBand, radio.rxF);
+    SP_RenderArrow(&gCurrentBand, RADIO_GetParam(ctx, PARAM_FREQUENCY));
   }
 
   // bottom
@@ -238,7 +241,8 @@ void SCANER_render(void) {
   bool showCurRange = Now() < cursorRangeTimeout;
   FSmall(1, LCD_HEIGHT - 2, POS_L, showCurRange ? r.rxF : gCurrentBand.rxF);
   FSmall(LCD_XCENTER, LCD_HEIGHT - 2, POS_C,
-         showCurRange ? CUR_GetCenterF(&gCurrentBand, step) : radio.rxF);
+         showCurRange ? CUR_GetCenterF(&gCurrentBand, step)
+                      : RADIO_GetParam(ctx, PARAM_FREQUENCY));
   FSmall(LCD_WIDTH - 1, LCD_HEIGHT - 2, POS_R,
          showCurRange ? r.txF : gCurrentBand.txF);
 
@@ -246,11 +250,11 @@ void SCANER_render(void) {
 
   CUR_Render();
 
-  if (gIsListening) {
+  if (vfo->is_open) {
     UI_RSSIBar(16);
   }
 
   REGSMENU_Draw();
 }
 
-void SCANER_deinit(void) {} */
+void SCANER_deinit(void) {}

@@ -1,4 +1,5 @@
-/* #include "scan.h"
+#include "scan.h"
+#include "../apps/apps.h"
 #include "../driver/st7565.h"
 #include "../driver/system.h"
 #include "../driver/systick.h"
@@ -23,15 +24,16 @@ static uint32_t scanCycles = 0;
 static uint32_t lastCpsTime = 0;
 
 static uint16_t measure(uint32_t f, bool precise) {
-  RADIO_TuneToPure(f, precise);
+  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
+  RADIO_SetParam(ctx, PARAM_FREQUENCY, f, false);
   SYSTICK_DelayUs(delay);
-  return RADIO_GetRSSI();
+  return RADIO_GetParam(ctx, PARAM_RSSI);
 }
 
 static void onNewBand() {
-  radio.rxF = gCurrentBand.rxF;
-  radio.step = gCurrentBand.step;
-  RADIO_Setup();
+  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
+  RADIO_SetParam(ctx, PARAM_FREQUENCY, gCurrentBand.rxF, false);
+  RADIO_SetParam(ctx, PARAM_STEP, StepFrequencyTable[gCurrentBand.step], false);
   SP_Init(&gCurrentBand);
 }
 
@@ -58,29 +60,31 @@ void SCAN_setEndF(uint32_t f) {
 }
 
 static void next() {
-  RADIO_ToggleRX(false);
-  radio.rxF += StepFrequencyTable[radio.step];
+  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
+  uint32_t step = RADIO_GetParam(ctx, PARAM_STEP);
+  RADIO_AdjustParam(ctx, PARAM_FREQUENCY, step, false);
 
-  if (radio.rxF > gCurrentBand.txF) {
+  if (RADIO_GetParam(ctx, PARAM_FREQUENCY) > gCurrentBand.txF) {
     if (isMultiband) {
       BANDS_SelectBandRelativeByScanlist(true);
       onNewBand();
     }
-    radio.rxF = gCurrentBand.rxF;
+    RADIO_SetParam(ctx, PARAM_FREQUENCY, gCurrentBand.rxF, false);
     gRedrawScreen = true;
   }
 
-  LOOT_Replace(&gLoot, radio.rxF);
+  LOOT_Replace(&gLoot, RADIO_GetParam(ctx, PARAM_FREQUENCY));
   SetTimeout(&scan_listen_timeout, 0);
   SetTimeout(&stay_at_timeout, 0);
   scanCycles++;
 }
 
 static void nextWithTimeout() {
-  if (lastListenState != gIsListening) {
-    lastListenState = gIsListening;
+  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+  if (lastListenState != vfo->is_open) {
+    lastListenState = vfo->is_open;
 
-    if (gIsListening) {
+    if (vfo->is_open) {
       SetTimeout(&scan_listen_timeout,
                  SCAN_TIMEOUTS[gSettings.sqOpenedTimeout]);
       SetTimeout(&stay_at_timeout, UINT32_MAX);
@@ -89,7 +93,7 @@ static void nextWithTimeout() {
     }
   }
 
-  if (CheckTimeout(&scan_listen_timeout) && gIsListening) {
+  if (CheckTimeout(&scan_listen_timeout) && vfo->is_open) {
     next();
     return;
   }
@@ -115,9 +119,11 @@ void SCAN_Init(bool multiband) {
 static uint32_t lastRender;
 
 void SCAN_Check(bool isAnalyserMode) {
+  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+  VFOContext *ctx = &vfo->context;
   if (isAnalyserMode) {
-    gLoot.f = radio.rxF;
-    gLoot.rssi = measure(radio.rxF, !isAnalyserMode);
+    gLoot.f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
+    gLoot.rssi = measure(gLoot.f, !isAnalyserMode);
     SP_AddPoint(&gLoot);
     if (Now() - lastRender > 500) {
       gRedrawScreen = true;
@@ -129,11 +135,11 @@ void SCAN_Check(bool isAnalyserMode) {
 
   if (gLoot.open) {
     // gLoot.open = RADIO_IsSquelchOpen();
-    RADIO_CheckAndListen();
+    RADIO_UpdateSquelch(&gRadioState);
     gRedrawScreen = true;
   } else {
-    gLoot.f = radio.rxF;
-    gLoot.rssi = measure(radio.rxF, !isAnalyserMode);
+    gLoot.f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
+    gLoot.rssi = measure(gLoot.f, !isAnalyserMode);
 
     if (!sqLevel && gLoot.rssi) {
       sqLevel = gLoot.rssi - 1;
@@ -152,16 +158,17 @@ void SCAN_Check(bool isAnalyserMode) {
     SP_AddPoint(&gLoot);
   }
 
-  if (gSettings.skipGarbageFrequencies && (radio.rxF % 1300000 == 0)) {
+  if (gSettings.skipGarbageFrequencies &&
+      (RADIO_GetParam(ctx, PARAM_FREQUENCY) % 1300000 == 0)) {
     gLoot.open = false;
   }
 
   // really good level?
-  if (gLoot.open && !gIsListening) {
+  if (gLoot.open && !vfo->is_open) {
     thinking = true;
     wasThinkingEarlier = true;
     SYS_DelayMs(SQL_DELAY);
-    gLoot.open = RADIO_IsSquelchOpen();
+    gLoot.open = vfo->is_open;
     thinking = false;
     gRedrawScreen = true;
     if (!gLoot.open) {
@@ -172,10 +179,10 @@ void SCAN_Check(bool isAnalyserMode) {
   LOOT_Update(&gLoot);
 
   // reset sql to noise floor when sql closed to check next freq better
-  if (gIsListening && !gLoot.open) {
+  if (vfo->is_open && !gLoot.open) {
     sqLevel = SP_GetNoiseFloor();
   }
-  RADIO_ToggleRX(gLoot.open);
+  RADIO_SwitchAudioToVFO(&gRadioState, gRadioState.active_vfo_index);
 
   if (gLoot.open) {
     gRedrawScreen = true;
@@ -195,4 +202,4 @@ void SCAN_Check(bool isAnalyserMode) {
   }
 
   nextWithTimeout();
-} */
+}

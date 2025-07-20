@@ -49,6 +49,11 @@ typedef const enum {
   PARAM_MIC,
   PARAM_XTAL,
 
+  PARAM_RSSI,
+  PARAM_NOISE,
+  PARAM_GLITCH,
+  PARAM_SNR,
+
   PARAM_COUNT
 } ParamType;
 
@@ -179,6 +184,7 @@ uint8_t RADIO_GetCurrentVFONumber(const RadioState *state);
 ExtendedVFOContext *RADIO_GetCurrentVFO(RadioState *state);
 const ExtendedVFOContext *RADIO_GetCurrentVFOConst(const RadioState *state);
 
+void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index);
 void RADIO_UpdateSquelch(RadioState *state);
 
 #endif // RADIO_H

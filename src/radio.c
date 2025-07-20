@@ -361,8 +361,8 @@ static void toggleBK1080SI4732(bool on) {
   }
 }
 
-// Внутренняя функция переключения аудио на конкретный VFO
-static void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
+// функция переключения аудио на конкретный VFO
+void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
   if (vfo_index >= state->num_vfos)
     return;
 
@@ -420,7 +420,7 @@ static bool setParamBK4819(VFOContext *ctx, ParamType p) {
     BK4819_SetModulation(ctx->modulation);
     return true;
   case PARAM_FREQUENCY:
-    BK4819_TuneTo(ctx->frequency, true); // TODO: check if SetFreq needed
+    BK4819_TuneTo(ctx->frequency, false); // TODO: check if SetFreq needed
     return true;
   case PARAM_AFC:
     BK4819_SetAFC(ctx->afc);
@@ -467,6 +467,40 @@ static bool setParamBK1080(VFOContext *ctx, ParamType p) {
     return true;
   }
   return false;
+}
+
+uint16_t RADIO_GetRSSI(VFOContext *ctx) {
+  switch (ctx->radio_type) {
+  case RADIO_BK4819:
+    return BK4819_GetRSSI();
+  case RADIO_BK1080:
+    return gShowAllRSSI ? BK1080_GetRSSI() : 0;
+  case RADIO_SI4732:
+    if (gShowAllRSSI) {
+      RSQ_GET();
+      return rsqStatus.resp.RSSI;
+    }
+    return 0;
+  default:
+    return 0;
+  }
+}
+
+uint8_t RADIO_GetSNR(VFOContext *ctx) {
+  switch (ctx->radio_type) {
+  case RADIO_BK4819:
+    return ConvertDomain(BK4819_GetSNR(), 24, 170, 0, 30);
+  case RADIO_BK1080:
+    return gShowAllRSSI ? BK1080_GetSNR() : 0;
+  case RADIO_SI4732:
+    if (gShowAllRSSI) {
+      RSQ_GET();
+      return rsqStatus.resp.SNR;
+    }
+    return 0;
+  default:
+    return 0;
+  }
 }
 
 // Инициализация VFO
@@ -597,6 +631,8 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
 
 uint32_t RADIO_GetParam(const VFOContext *ctx, ParamType param) {
   switch (param) {
+  case PARAM_RSSI:
+    return RADIO_GetRSSI(ctx);
   case PARAM_FREQUENCY:
     return ctx->frequency;
   case PARAM_MODULATION:
@@ -1054,23 +1090,6 @@ void RADIO_ToggleMultiwatch(RadioState *state, bool enable) {
 // Check if a VFO is a broadcast receiver
 static bool isBroadcastReceiver(const VFOContext *ctx) {
   return (ctx->radio_type == RADIO_SI4732 || ctx->radio_type == RADIO_BK1080);
-}
-
-uint8_t RADIO_GetSNR(VFOContext *ctx) {
-  switch (ctx->radio_type) {
-  case RADIO_BK4819:
-    return ConvertDomain(BK4819_GetSNR(), 24, 170, 0, 30);
-  case RADIO_BK1080:
-    return gShowAllRSSI ? BK1080_GetSNR() : 0;
-  case RADIO_SI4732:
-    if (gShowAllRSSI) {
-      RSQ_GET();
-      return rsqStatus.resp.SNR;
-    }
-    return 0;
-  default:
-    return 0;
-  }
 }
 
 bool RADIO_CheckSquelch(VFOContext *ctx) {
