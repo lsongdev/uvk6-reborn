@@ -1,4 +1,5 @@
 #include "menu.h"
+#include "../driver/uart.h"
 #include "../ui/graphics.h"
 #include "../ui/statusline.h"
 #include "measurements.h"
@@ -31,11 +32,7 @@ static void renderItem(uint16_t index, uint8_t i, bool isCurrent) {
   }
 }
 
-void MENU_Init(Menu *main_menu) {
-  active_menu = main_menu;
-  current_index = 0;
-  menu_stack_top = 0;
-
+static void init() {
   if (strlen(active_menu->title)) {
     STATUSLINE_SetText(active_menu->title);
   }
@@ -52,14 +49,22 @@ void MENU_Init(Menu *main_menu) {
   if (!active_menu->itemHeight)
     active_menu->itemHeight = MENU_ITEM_H;
 
-  if (main_menu->on_enter)
-    main_menu->on_enter();
+  if (active_menu->on_enter)
+    active_menu->on_enter();
 
   if (!active_menu->render_item) {
     active_menu->render_item = renderItem;
   }
 
   renderFn = active_menu->itemHeight >= MENU_ITEM_H ? PrintMedium : PrintSmall;
+}
+
+void MENU_Init(Menu *main_menu) {
+  active_menu = main_menu;
+  current_index = 0;
+  menu_stack_top = 0;
+
+  init();
 }
 
 void MENU_Render(void) {
@@ -136,9 +141,7 @@ bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
           menu_stack[menu_stack_top++] = active_menu;
           active_menu = item->submenu;
           current_index = 0;
-          if (active_menu->on_enter) {
-            active_menu->on_enter();
-          }
+          init();
         }
         return true;
       }
@@ -159,8 +162,7 @@ bool MENU_Back() {
   if (menu_stack_top > 0) {
     active_menu = menu_stack[--menu_stack_top];
     current_index = 0;
-    if (active_menu->on_enter)
-      active_menu->on_enter();
+    init();
 
     return true;
   }

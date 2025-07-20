@@ -411,6 +411,8 @@ void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
 
 static bool setParamBK4819(VFOContext *ctx, ParamType p) {
   switch (p) {
+  case PARAM_PRECISE_F_CHANGE:
+    return true;
   case PARAM_GAIN:
     BK4819_SetAGC(ctx->modulation != MOD_AM, ctx->gain);
     return true;
@@ -574,6 +576,7 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   switch (param) {
   case PARAM_PRECISE_F_CHANGE:
     ctx->preciseFChange = value;
+    break;
   case PARAM_FREQUENCY:
     ctx->frequency = value;
     break;
@@ -622,8 +625,8 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   case PARAM_COUNT:
     return;
   }
-  LogC(LOG_C_WHITE, "[SET] %-12s -> %s%s", PARAM_NAMES[param],
-       RADIO_GetParamValueString(ctx, param), save_to_eeprom ? " [W]" : "");
+  /* LogC(LOG_C_WHITE, "[SET] %-12s -> %s%s", PARAM_NAMES[param],
+       RADIO_GetParamValueString(ctx, param), save_to_eeprom ? " [W]" : ""); */
 
   // TODO: make dirty only when changed.
   // but, potential BUG: param not applied when 0
@@ -780,8 +783,8 @@ void RADIO_ApplySettings(VFOContext *ctx) {
       }
       break;
     }
-    LogC(LOG_C_BRIGHT_WHITE, "[SET] %-12s -> %s", PARAM_NAMES[p],
-         RADIO_GetParamValueString(ctx, p));
+    /* LogC(LOG_C_BRIGHT_WHITE, "[SET] %-12s -> %s", PARAM_NAMES[p],
+         RADIO_GetParamValueString(ctx, p)); */
   }
 
   if (ctx->radio_type == RADIO_BK4819) {
@@ -956,6 +959,8 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
   RADIO_SetParam(ctx, PARAM_MIC, gSettings.mic, false);
   RADIO_SetParam(ctx, PARAM_DEV, gSettings.deviation * 10, false);
 
+  RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, true, false);
+
   vfo->context.code = storage->code.rx;
   vfo->context.tx_state.code = storage->code.tx;
 
@@ -1037,6 +1042,8 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
   RADIO_SetParam(ctx, PARAM_SQUELCH_TYPE, channel.squelch.type, false);
   RADIO_SetParam(ctx, PARAM_SQUELCH_VALUE, channel.squelch.value, false);
   RADIO_SetParam(ctx, PARAM_STEP, channel.step, false);
+
+  RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, true, false);
 
   ctx->code = channel.code.rx;
   ctx->tx_state.code = channel.code.tx;
