@@ -33,7 +33,8 @@ static uint16_t measure(uint32_t f, bool precise) {
 
 static void onNewBand() {
   VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
-  RADIO_SetParam(ctx, PARAM_FREQUENCY, gCurrentBand.rxF, false);
+  gLoot.f = gCurrentBand.rxF;
+  // RADIO_SetParam(ctx, PARAM_FREQUENCY, gCurrentBand.rxF, false);
   RADIO_SetParam(ctx, PARAM_STEP, gCurrentBand.step, false);
   SP_Init(&gCurrentBand);
 }
@@ -63,18 +64,19 @@ void SCAN_setEndF(uint32_t f) {
 static void next() {
   VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
   uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
-  RADIO_AdjustParam(ctx, PARAM_FREQUENCY, step, false);
+  gLoot.f += step;
+  // RADIO_AdjustParam(ctx, PARAM_FREQUENCY, step, false);
 
-  if (RADIO_GetParam(ctx, PARAM_FREQUENCY) > gCurrentBand.txF) {
+  if (gLoot.f > gCurrentBand.txF) {
     if (isMultiband) {
       BANDS_SelectBandRelativeByScanlist(true);
       onNewBand();
     }
-    RADIO_SetParam(ctx, PARAM_FREQUENCY, gCurrentBand.rxF, false);
+    gLoot.f = gCurrentBand.rxF;
     gRedrawScreen = true;
   }
 
-  LOOT_Replace(&gLoot, RADIO_GetParam(ctx, PARAM_FREQUENCY));
+  LOOT_Replace(&gLoot, gLoot.f);
   SetTimeout(&scan_listen_timeout, 0);
   SetTimeout(&stay_at_timeout, 0);
   scanCycles++;
@@ -120,10 +122,13 @@ void SCAN_Init(bool multiband) {
 static uint32_t lastRender;
 
 void SCAN_Check(bool isAnalyserMode) {
+  RADIO_UpdateMultiwatch(&gRadioState);
+  RADIO_CheckAndSaveVFO(&gRadioState);
+
   ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
   VFOContext *ctx = &vfo->context;
   if (isAnalyserMode) {
-    gLoot.f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
+    // gLoot.f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
     gLoot.rssi = measure(gLoot.f, !isAnalyserMode);
     SP_AddPoint(&gLoot);
     if (Now() - lastRender > 500) {
@@ -139,7 +144,7 @@ void SCAN_Check(bool isAnalyserMode) {
     RADIO_UpdateSquelch(&gRadioState);
     gRedrawScreen = true;
   } else {
-    gLoot.f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
+    // gLoot.f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
     gLoot.rssi = measure(gLoot.f, !isAnalyserMode);
 
     if (!sqLevel && gLoot.rssi) {

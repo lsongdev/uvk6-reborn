@@ -22,6 +22,8 @@
 
 #define RADIO_SAVE_DELAY_MS 1000
 
+// #define DEBUG_PARAMS 1
+
 bool gShowAllRSSI = false;
 bool gMonitorMode = false;
 
@@ -625,8 +627,11 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   case PARAM_COUNT:
     return;
   }
+
+#ifdef DEBUG_PARAMS
   LogC(LOG_C_WHITE, "[SET] %-12s -> %s%s", PARAM_NAMES[param],
        RADIO_GetParamValueString(ctx, param), save_to_eeprom ? " [W]" : "");
+#endif /* ifdef DEBUG_PARAMS */
 
   // TODO: make dirty only when changed.
   // but, potential BUG: param not applied when 0
@@ -785,8 +790,11 @@ void RADIO_ApplySettings(VFOContext *ctx) {
       }
       break;
     }
+
+#ifdef DEBUG_PARAMS
     LogC(LOG_C_BRIGHT_WHITE, "[SET] %-12s -> %s", PARAM_NAMES[p],
          RADIO_GetParamValueString(ctx, p));
+#endif /* ifdef DEBUG_PARAMS */
   }
 
   if (ctx->radio_type == RADIO_BK4819) {
@@ -1357,6 +1365,7 @@ const char *RADIO_GetParamValueString(const VFOContext *ctx, ParamType param) {
   case PARAM_MIC:
   case PARAM_XTAL:
   case PARAM_SQUELCH_VALUE:
+  case PARAM_PRECISE_F_CHANGE:
     snprintf(buf, 15, "%u", v);
     break;
   case PARAM_SQUELCH_TYPE:

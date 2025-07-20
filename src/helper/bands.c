@@ -22,7 +22,7 @@ Band defaultBand = {
     .step = STEP_25_0kHz,
     .bw = BK4819_FILTER_BW_12k,
 
-    .rxF = BK4819_F_MIN,
+    .rxF = 16 * MHZ,
     .txF = BK4819_F_MAX,
 
     .squelch =

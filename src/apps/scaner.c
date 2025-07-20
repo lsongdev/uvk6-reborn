@@ -52,6 +52,9 @@ void SCANER_init(void) {
     gCurrentBand.meta.type = TYPE_BAND_DETACHED;
   } else {
     LogC(LOG_C_BRIGHT_YELLOW, "[i] [SCAN] Init with detached band");
+    if (!gCurrentBand.rxF && !gCurrentBand.txF) {
+      gCurrentBand = defaultBand;
+    }
   }
 
   gCurrentBand.step = RADIO_GetParam(ctx, PARAM_STEP);
@@ -60,6 +63,9 @@ void SCANER_init(void) {
                       // outside
 
   BANDS_RangePush(gCurrentBand);
+
+  LogC(LOG_C_BRIGHT_YELLOW, "[SCANER] Bounds: %u .. %u", gCurrentBand.rxF,
+       gCurrentBand.txF);
 
   SCAN_Init(false);
 }
