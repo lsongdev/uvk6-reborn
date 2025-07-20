@@ -93,31 +93,9 @@ static void renderItem(uint16_t index, uint8_t i, bool isCurrent) {
   }
 }
 
-static Menu chListMenu = {.render_item = renderItem, .itemHeight = MENU_ITEM_H};
+static uint16_t channelIndex;
 
-static void action(const MenuItem *item) {
-  if (gChSaveMode) {
-    CHANNELS_LoadScanlist(gChListFilter, gSettings.currentScanlist);
-
-    if (gChEd.name[0] == '\0') {
-      gTextinputText = tempName;
-      snprintf(gTextinputText, 9, "%lu.%05lu", gChEd.rxF / MHZ,
-               gChEd.rxF % MHZ);
-      gTextInputSize = 9;
-      // gTextInputCallback = saveNamed;
-      APPS_run(APP_TEXTINPUT);
-    } else {
-      // save();
-    }
-    return;
-  }
-  LogC(LOG_C_YELLOW, "BAND Selected by user");
-  // RADIO_TuneToMR(chNum);
-  // Log("Tuned to band, exit app");
-  APPS_exit();
-}
-
-/* static void save() {
+static void save() {
   gChEd.scanlists = 0;
   CHANNELS_Save(getChannelNumber(channelIndex), &gChEd);
   // RADIO_LoadCurrentVFO();
@@ -129,7 +107,36 @@ static void action(const MenuItem *item) {
 static void saveNamed() {
   strncpy(gChEd.name, gTextinputText, 9);
   save();
-} */
+}
+
+static Menu chListMenu = {.render_item = renderItem, .itemHeight = MENU_ITEM_H};
+
+static bool action(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
+  if (state == KEY_RELEASED && key == KEY_MENU) {
+    if (gChSaveMode) {
+      CHANNELS_LoadScanlist(gChListFilter, gSettings.currentScanlist);
+
+      if (gChEd.name[0] == '\0') {
+        gTextinputText = tempName;
+        snprintf(gTextinputText, 9, "%lu.%05lu", gChEd.rxF / MHZ,
+                 gChEd.rxF % MHZ);
+        gTextInputSize = 9;
+        // channelIndex = item->setting;
+        gTextInputCallback = saveNamed;
+        APPS_run(APP_TEXTINPUT);
+      } else {
+        // save();
+      }
+      return true;
+    }
+    LogC(LOG_C_YELLOW, "BAND Selected by user");
+    // RADIO_TuneToMR(chNum);
+    // Log("Tuned to band, exit app");
+    APPS_exit();
+    return true;
+  }
+  return false;
+}
 
 void CHLIST_init() {
   CHANNELS_LoadScanlist(gChListFilter, gSettings.currentScanlist);
