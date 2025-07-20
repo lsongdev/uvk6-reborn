@@ -764,6 +764,10 @@ void RADIO_ApplySettings(VFOContext *ctx) {
     ctx->dirty[PARAM_RADIO] = false;
   }
 
+  const bool needSetupToneDetection = ctx->dirty[PARAM_RX_CODE] ||
+                                      ctx->dirty[PARAM_TX_CODE] ||
+                                      ctx->dirty[PARAM_TX_STATE];
+
   for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
     if (!ctx->dirty[p]) {
       continue;
@@ -797,7 +801,7 @@ void RADIO_ApplySettings(VFOContext *ctx) {
 #endif /* ifdef DEBUG_PARAMS */
   }
 
-  if (ctx->radio_type == RADIO_BK4819) {
+  if (needSetupToneDetection && ctx->radio_type == RADIO_BK4819) {
     setupToneDetection(ctx); // TODO: check if needed each time
   }
 }

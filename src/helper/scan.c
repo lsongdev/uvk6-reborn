@@ -27,6 +27,7 @@ static uint16_t measure(uint32_t f, bool precise) {
   VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
   RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, precise, false);
   RADIO_SetParam(ctx, PARAM_FREQUENCY, f, false);
+  RADIO_ApplySettings(ctx);
   SYSTICK_DelayUs(delay);
   return RADIO_GetParam(ctx, PARAM_RSSI);
 }
@@ -36,6 +37,7 @@ static void onNewBand() {
   gLoot.f = gCurrentBand.rxF;
   // RADIO_SetParam(ctx, PARAM_FREQUENCY, gCurrentBand.rxF, false);
   RADIO_SetParam(ctx, PARAM_STEP, gCurrentBand.step, false);
+  RADIO_ApplySettings(ctx);
   SP_Init(&gCurrentBand);
 }
 
@@ -129,7 +131,7 @@ void SCAN_Check(bool isAnalyserMode) {
   VFOContext *ctx = &vfo->context;
   if (isAnalyserMode) {
     // gLoot.f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
-    gLoot.rssi = measure(gLoot.f, !isAnalyserMode);
+    gLoot.rssi = measure(gLoot.f, false);
     SP_AddPoint(&gLoot);
     if (Now() - lastRender > 500) {
       gRedrawScreen = true;
@@ -142,6 +144,7 @@ void SCAN_Check(bool isAnalyserMode) {
   if (gLoot.open) {
     // gLoot.open = RADIO_IsSquelchOpen();
     RADIO_UpdateSquelch(&gRadioState);
+    gLoot.open = vfo->is_open;
     gRedrawScreen = true;
   } else {
     // gLoot.f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
@@ -174,6 +177,7 @@ void SCAN_Check(bool isAnalyserMode) {
     thinking = true;
     wasThinkingEarlier = true;
     SYS_DelayMs(SQL_DELAY);
+    RADIO_UpdateSquelch(&gRadioState);
     gLoot.open = vfo->is_open;
     thinking = false;
     gRedrawScreen = true;
@@ -188,7 +192,6 @@ void SCAN_Check(bool isAnalyserMode) {
   if (vfo->is_open && !gLoot.open) {
     sqLevel = SP_GetNoiseFloor();
   }
-  RADIO_SwitchAudioToVFO(&gRadioState, gRadioState.active_vfo_index);
 
   if (gLoot.open) {
     gRedrawScreen = true;
