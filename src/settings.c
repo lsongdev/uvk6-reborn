@@ -357,12 +357,12 @@ const char *SETTINGS_GetValueString(Setting s) {
   case SETTING_TONELOCAL:
   case SETTING_SKIPGARBAGEFREQUENCIES:
   case SETTING_DTMFDECODE:
+  case SETTING_PTT_LOCK:
     return YES_NO[v];
 
   case SETTING_BEEP:
   case SETTING_REPEATERSTE:
   case SETTING_KEYLOCK:
-  case SETTING_PTT_LOCK:
   case SETTING_STE:
     return ON_OFF[v];
   case SETTING_MULTIWATCH:

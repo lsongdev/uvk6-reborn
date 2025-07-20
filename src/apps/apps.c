@@ -105,7 +105,6 @@ bool APPS_key(KEY_Code_t Key, Key_State_t state) {
 }
 
 void APPS_init(AppType_t app) {
-  gCurrentApp = app;
 
   STATUSLINE_SetText("%s", apps[gCurrentApp].name);
   gRedrawScreen = true;
@@ -144,6 +143,7 @@ void APPS_run(AppType_t app) {
     APPS_deinit();
   } */
   pushApp(app);
+  gCurrentApp = app;
 
   if (loadedVfoApp != gCurrentApp && apps[gCurrentApp].needsRadioState) {
     LogC(LOG_C_MAGENTA, "[APP] Load radio state for %s",

@@ -13,7 +13,6 @@ static Menu regsMenu = {
     .title = "",
     .items = menuItems,
     .itemHeight = 7,
-    .y = 5,
     .width = 64,
 };
 

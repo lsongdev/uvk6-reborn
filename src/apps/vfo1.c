@@ -29,11 +29,7 @@ static void tuneTo(uint32_t f, uint32_t _) {
   RADIO_SetParam(RADIO_GetCurrentVFO(&gRadioState), PARAM_FREQUENCY, f, true);
 }
 
-void VFO1_init(void) {
-  RADIO_InitState(&gRadioState, 16);
-  RADIO_LoadVFOs(&gRadioState);
-  gLastActiveLoot = NULL;
-}
+void VFO1_init(void) { gLastActiveLoot = NULL; }
 
 static uint32_t lastRender;
 static uint32_t lastSqCheck;
@@ -56,8 +52,7 @@ void VFO1_update(void) {
 }
 
 bool VFO1_key(KEY_Code_t key, Key_State_t state) {
-  if (!gIsNumNavInput && state == KEY_RELEASED &&
-      REGSMENU_Key(key, state)) {
+  if (!gIsNumNavInput && state == KEY_RELEASED && REGSMENU_Key(key, state)) {
     return true;
   }
 

@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define MENU_Y 8
+#define MENU_Y 7
 #define MENU_ITEM_H 11
 #define MENU_LINES_TO_SHOW 5
 
