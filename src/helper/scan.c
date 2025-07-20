@@ -25,6 +25,7 @@ static uint32_t lastCpsTime = 0;
 
 static uint16_t measure(uint32_t f, bool precise) {
   VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
+  RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, precise, false);
   RADIO_SetParam(ctx, PARAM_FREQUENCY, f, false);
   SYSTICK_DelayUs(delay);
   return RADIO_GetParam(ctx, PARAM_RSSI);

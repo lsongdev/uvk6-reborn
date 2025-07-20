@@ -34,20 +34,25 @@ const char *RADIO_NAMES[3] = {
 };
 
 const char *PARAM_NAMES[] = {
-    [PARAM_FREQUENCY] = "f",          //
-    [PARAM_STEP] = "Step",            //
-    [PARAM_POWER] = "Power",          //
-    [PARAM_TX_OFFSET] = "TX offset",  //
-    [PARAM_MODULATION] = "Mod",       //
-    [PARAM_SQUELCH_VALUE] = "SQ",     //
-    [PARAM_SQUELCH_TYPE] = "SQ type", //
-    [PARAM_VOLUME] = "Volume",        //
-    [PARAM_GAIN] = "Gain",            //
-    [PARAM_BANDWIDTH] = "BW",         //
-    [PARAM_TX_STATE] = "TX state",    //
-    [PARAM_RADIO] = "Radio",          //
-    [PARAM_RX_CODE] = "RX code",      //
-    [PARAM_TX_CODE] = "TX code",      //
+    [PARAM_FREQUENCY] = "f",                //
+    [PARAM_STEP] = "Step",                  //
+    [PARAM_POWER] = "Power",                //
+    [PARAM_TX_OFFSET] = "TX offset",        //
+    [PARAM_MODULATION] = "Mod",             //
+    [PARAM_SQUELCH_VALUE] = "SQ",           //
+    [PARAM_SQUELCH_TYPE] = "SQ type",       //
+    [PARAM_VOLUME] = "Volume",              //
+    [PARAM_GAIN] = "Gain",                  //
+    [PARAM_BANDWIDTH] = "BW",               //
+    [PARAM_TX_STATE] = "TX state",          //
+    [PARAM_RADIO] = "Radio",                //
+    [PARAM_RX_CODE] = "RX code",            //
+    [PARAM_TX_CODE] = "TX code",            //
+    [PARAM_RSSI] = "RSSI",                  //
+    [PARAM_GLITCH] = "Glitch",              //
+    [PARAM_NOISE] = "Noise",                //
+    [PARAM_SNR] = "SNR",                    //
+    [PARAM_PRECISE_F_CHANGE] = "Precise f", //
 
     [PARAM_AFC] = "AFC",   //
     [PARAM_DEV] = "DEV",   //
@@ -420,7 +425,8 @@ static bool setParamBK4819(VFOContext *ctx, ParamType p) {
     BK4819_SetModulation(ctx->modulation);
     return true;
   case PARAM_FREQUENCY:
-    BK4819_TuneTo(ctx->frequency, false); // TODO: check if SetFreq needed
+    BK4819_TuneTo(ctx->frequency,
+                  ctx->preciseFChange); // TODO: check if SetFreq needed
     return true;
   case PARAM_AFC:
     BK4819_SetAFC(ctx->afc);
@@ -469,7 +475,7 @@ static bool setParamBK1080(VFOContext *ctx, ParamType p) {
   return false;
 }
 
-uint16_t RADIO_GetRSSI(VFOContext *ctx) {
+static uint16_t RADIO_GetRSSI(const VFOContext *ctx) {
   switch (ctx->radio_type) {
   case RADIO_BK4819:
     return BK4819_GetRSSI();
@@ -486,7 +492,7 @@ uint16_t RADIO_GetRSSI(VFOContext *ctx) {
   }
 }
 
-uint8_t RADIO_GetSNR(VFOContext *ctx) {
+static uint8_t RADIO_GetSNR(VFOContext *ctx) {
   switch (ctx->radio_type) {
   case RADIO_BK4819:
     return ConvertDomain(BK4819_GetSNR(), 24, 170, 0, 30);
@@ -566,6 +572,8 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   uint32_t old_value = RADIO_GetParam(ctx, param);
 
   switch (param) {
+  case PARAM_PRECISE_F_CHANGE:
+    ctx->preciseFChange = value;
   case PARAM_FREQUENCY:
     ctx->frequency = value;
     break;

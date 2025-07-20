@@ -37,7 +37,7 @@ static void setRange(uint32_t fs, uint32_t fe) {
 
 void SCANER_init(void) {
   gMonitorMode = false;
-  // RADIO_ToggleRX(false); // In nre radio done by default
+  // RADIO_ToggleRX(false); // In new radio done by default
 
   SPECTRUM_Y = 8;
   SPECTRUM_H = 44;
@@ -62,7 +62,7 @@ void SCANER_init(void) {
 void SCANER_update(void) { SCAN_Check(isAnalyserMode); }
 
 bool SCANER_key(KEY_Code_t key, Key_State_t state) {
-  if (state == KEY_RELEASED && REGSMENU_Key(key, state)) {
+  if (REGSMENU_Key(key, state)) {
     return true;
   }
   ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);

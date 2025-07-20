@@ -54,6 +54,8 @@ typedef const enum {
   PARAM_GLITCH,
   PARAM_SNR,
 
+  PARAM_PRECISE_F_CHANGE,
+
   PARAM_COUNT
 } ParamType;
 
@@ -77,11 +79,15 @@ typedef struct {
 
 // Контекст VFO
 typedef struct {
+  Measurement msm; // TODO: implement
+
+  uint32_t last_save_time; // Время последнего сохранения
+  uint32_t frequency;      // Текущая частота
+  uint16_t bandwidth;      // Полоса пропускания
+  uint16_t dev;
   Radio radio_type;
-  uint32_t frequency;           // Текущая частота
   ModulationType modulation;    // Текущая модуляция
   uint8_t volume;               // Громкость
-  uint16_t bandwidth;           // Полоса пропускания
   const FreqBand *current_band; // Активный диапазон
   bool dirty[PARAM_COUNT];      // Флаги изменений
   Code code;
@@ -91,25 +97,23 @@ typedef struct {
   uint8_t gain;
 
   uint8_t afc;
-  uint16_t dev;
   uint8_t mic;
   XtalMode xtal;
 
+  bool preciseFChange;
+
   struct {
-    bool is_active; // true, если идёт передача
-    TXStatus last_error;
     uint32_t frequency; // Частота передачи (может отличаться от RX)
+    uint8_t power_level; // Уровень мощности
+    TXStatus last_error;
     ModulationType modulation; // Модуляция TX
-    uint8_t power_level;       // Уровень мощности
-    bool dirty; // Флаг изменения параметров TX
     Code code;
+    bool dirty;     // Флаг изменения параметров TX
+    bool is_active; // true, если идёт передача
     bool pa_enabled;
   } tx_state;
 
   bool save_to_eeprom; // Флаг необходимости сохранения в EEPROM
-  uint32_t last_save_time; // Время последнего сохранения
-
-  Measurement msm; // TODO: implement
 } VFOContext;
 
 // Channel/VFO mode
