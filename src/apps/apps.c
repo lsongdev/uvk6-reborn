@@ -7,9 +7,11 @@
 #include "appslist.h"
 #include "chcfg.h"
 #include "chlist.h"
-/* #include "bandscan.h"
+/*
+#include "bandscan.h"
 #include "chscan.h"
-#include "fc.h" */
+*/
+#include "fc.h"
 #include "finput.h"
 // #include "lootlist.h"
 #include "reset.h"
@@ -57,11 +59,11 @@ AppType_t APPS_Peek(void) {
 const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {
     APP_VFO1,    //
     APP_CH_LIST, //
+    APP_FC,      //
     /*
     APP_SCANER,    //
     APP_CH_SCAN,   //
     APP_BAND_SCAN, //
-    APP_FC,        //
     APP_LOOT_LIST, // */
     APP_ABOUT, //
 };
@@ -90,8 +92,8 @@ const App apps[APPS_COUNT] = {
     [APP_BAND_SCAN] = {"Band Scan", BANDSCAN_init,
     BANDSCAN_update, BANDSCAN_render, BANDSCAN_key, BANDSCAN_deinit},
     [APP_FC] =
-    {"FC", FC_init, FC_update, FC_render, FC_key, FC_deinit},
   */
+    [APP_FC] = {"FC", FC_init, FC_update, FC_render, FC_key, FC_deinit},
     [APP_VFO1] = {"1 VFO", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL,
                   true, true},
     [APP_ABOUT] = {"ABOUT", NULL, NULL, ABOUT_Render, ABOUT_key, NULL},

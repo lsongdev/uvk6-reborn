@@ -7,6 +7,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define SQL_DELAY 50
+
 #define MAX_VFOS 16
 extern Measurement gLoot;
 

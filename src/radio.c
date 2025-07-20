@@ -46,6 +46,8 @@ const char *PARAM_NAMES[] = {
     [PARAM_BANDWIDTH] = "BW",         //
     [PARAM_TX_STATE] = "TX state",    //
     [PARAM_RADIO] = "Radio",          //
+    [PARAM_RX_CODE] = "RX code",      //
+    [PARAM_TX_CODE] = "TX code",      //
 
     [PARAM_AFC] = "AFC",   //
     [PARAM_DEV] = "DEV",   //
@@ -817,6 +819,7 @@ void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
     state->vfos[i].mode = MODE_VFO;
     state->vfos[i].channel_index = 0;
     state->vfos[i].is_active = (i == 0); // First VFO is active by default
+    state->vfos[i].is_open = false;
   }
 
   // Initialize multiwatch
@@ -1361,4 +1364,3 @@ const ExtendedVFOContext *RADIO_GetCurrentVFOConst(const RadioState *state) {
   uint8_t current = RADIO_GetCurrentVFONumber(state);
   return (current != 0xFF) ? &state->vfos[current] : NULL;
 }
-

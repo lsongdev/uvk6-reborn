@@ -4,14 +4,14 @@
 #include "../driver/keyboard.h"
 #include "../radio.h"
 
-#define RUN_APPS_COUNT 3
+#define RUN_APPS_COUNT 4
 
 typedef enum {
   APP_NONE,
   // APP_SCANER,
   // APP_CH_SCAN,
   // APP_BAND_SCAN,
-  // APP_FC,
+  APP_FC,
   APP_CH_LIST,
   APP_FINPUT,
   APP_APPS_LIST,

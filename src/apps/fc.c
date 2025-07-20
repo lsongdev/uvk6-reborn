@@ -1,4 +1,4 @@
-/* #include "fc.h"
+#include "fc.h"
 #include "../dcs.h"
 #include "../driver/system.h"
 #include "../driver/uart.h"
@@ -49,7 +49,6 @@ static void disableScan() {
 
 void FC_init() {
   Log("FC init");
-  RADIO_LoadCurrentVFO();
   bound = SETTINGS_GetFilterBound();
   BK4819_SelectFilterEx(filter);
   enableScan();
@@ -76,9 +75,15 @@ void FC_update(void) {
     return;
   }
 
+  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+  VFOContext *ctx = &vfo->context;
+
+  RADIO_UpdateMultiwatch(&gRadioState);
+  RADIO_CheckAndSaveVFO(&gRadioState);
+
   if (isScanning) {
     if (BK4819_GetFrequencyScanResult(&currentFrequency)) {
-      Log("FC got %u", currentFrequency);
+      // Log("FC got %u", currentFrequency);
       bool freqIsOk = true;
 
       gRedrawScreen = true;
@@ -103,14 +108,14 @@ void FC_update(void) {
       } else {
         frequencyHits = 1;
       }
-      Log("FC hits %u", frequencyHits);
+      // Log("FC hits %u", frequencyHits);
 
       lastDetectedFrequency = currentFrequency;
 
       if (frequencyHits >= REQUIRED_FREQUENCY_HITS) {
-        Log("FC hit! Tuning");
+        // Log("FC hit! Tuning");
         disableScan();
-        RADIO_TuneTo(currentFrequency);
+        RADIO_SetParam(ctx, PARAM_FREQUENCY, currentFrequency, false);
         frequencyHits = 0;
       } else {
         disableScan();
@@ -119,17 +124,18 @@ void FC_update(void) {
     }
 
     if (filterSwitchCounter >= FILTER_SWITCH_INTERVAL) {
-      Log("FC switch filter");
+      // Log("FC switch filter");
       switchFilter();
     }
     SetTimeout(&fcTimeuot, 200 << gSettings.fcTime);
   } else {
-    if (!gIsListening) {
+    if (!vfo->is_open) {
       SYS_DelayMs(SQL_DELAY);
     }
-    Log("FC checklisten");
-    RADIO_CheckAndListen();
-    if (gIsListening) {
+    // Log("FC checklisten");
+    RADIO_UpdateSquelch(&gRadioState);
+
+    if (vfo->is_open) {
       gRedrawScreen = true;
     } else {
       enableScan();
@@ -147,6 +153,8 @@ bool FC_key(KEY_Code_t key, Key_State_t state) {
       break;
     }
   }
+  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+  VFOContext *ctx = &vfo->context;
 
   if (state == KEY_RELEASED) {
     switch (key) {
@@ -158,12 +166,10 @@ bool FC_key(KEY_Code_t key, Key_State_t state) {
       break;
     case KEY_3:
     case KEY_9:
-      radio.squelch.value = IncDecU(radio.squelch.value, 0, 11, key == KEY_3);
-      RADIO_SaveCurrentVFODelayed();
-      RADIO_Setup();
+      RADIO_IncDecParam(ctx, PARAM_SQUELCH_VALUE, key == KEY_3, true);
       break;
     case KEY_STAR:
-      APPS_run(APP_LOOT_LIST);
+      // APPS_run(APP_LOOT_LIST);
       return true;
     case KEY_SIDE1:
       LOOT_BlacklistLast();
@@ -180,7 +186,7 @@ bool FC_key(KEY_Code_t key, Key_State_t state) {
     case KEY_PTT:
       if (gLastActiveLoot) {
         FC_deinit();
-        RADIO_TuneToSave(gLastActiveLoot->f);
+        RADIO_SetParam(ctx, PARAM_FREQUENCY, gLastActiveLoot->f, true);
         APPS_run(APP_VFO1);
       }
       return true;
@@ -192,9 +198,12 @@ bool FC_key(KEY_Code_t key, Key_State_t state) {
 }
 
 void FC_render() {
+  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+  VFOContext *ctx = &vfo->context;
   PrintMediumEx(0, 16, POS_L, C_FILL, "%s %ums HZ %u SQ %u %s",
                 FILTER_NAMES[filter], 200 << gSettings.fcTime, hz,
-                radio.squelch.value, bandAutoSwitch ? "[A]" : "");
+                RADIO_GetParam(ctx, PARAM_SQUELCH_VALUE),
+                bandAutoSwitch ? "[A]" : "");
   UI_BigFrequency(40, currentFrequency);
 
   if (gLastActiveLoot) {
@@ -209,4 +218,4 @@ void FC_render() {
                    DCS_Options[gLastActiveLoot->cd]);
     }
   }
-} */
+}

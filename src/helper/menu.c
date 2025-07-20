@@ -140,8 +140,9 @@ bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
             active_menu->on_enter();
           }
         }
+        return true;
       }
-      return true;
+      break;
     case KEY_EXIT:
       return MENU_Back();
     default:
