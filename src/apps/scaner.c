@@ -160,7 +160,7 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
       return true;
     case KEY_5:
       gFInputCallback = setRange;
-      FINPUT_setup(0, 1360 * MHZ, UNIT_MHZ, true);
+      FINPUT_setup(0, BK4819_F_MAX, UNIT_MHZ, true);
       APPS_run(APP_FINPUT);
       return true;
     case KEY_SIDE1:

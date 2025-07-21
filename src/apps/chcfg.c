@@ -375,7 +375,7 @@ static void applyBounds(uint32_t fs, uint32_t fe) {
 
 static bool setBounds(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   if (state == KEY_RELEASED && key == KEY_MENU) {
-    FINPUT_setup(0, 1340 * MHZ, UNIT_MHZ, true);
+    FINPUT_setup(0, BK4819_F_MAX, UNIT_MHZ, true);
     gFInputCallback = applyBounds;
     APPS_run(APP_FINPUT);
     return true;

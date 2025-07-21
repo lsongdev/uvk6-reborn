@@ -22,7 +22,7 @@
 
 #define RADIO_SAVE_DELAY_MS 1000
 
-// #define DEBUG_PARAMS 1
+#define DEBUG_PARAMS 1
 
 bool gShowAllRSSI = false;
 bool gMonitorMode = false;
@@ -425,6 +425,9 @@ static bool setParamBK4819(VFOContext *ctx, ParamType p) {
     BK4819_Squelch(ctx->squelch.value, gSettings.sqlOpenTime,
                    gSettings.sqlCloseTime);
     return true;
+  case PARAM_SQUELCH_TYPE:
+    BK4819_SquelchType(ctx->squelch.type);
+    return true;
   case PARAM_MODULATION:
     BK4819_SetModulation(ctx->modulation);
     return true;
@@ -579,6 +582,16 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   case PARAM_PRECISE_F_CHANGE:
     ctx->preciseFChange = value;
     break;
+  case PARAM_STEP:
+    ctx->step = (Step)value;
+    break;
+  case PARAM_TX_OFFSET:
+    ctx->tx_state.frequency = value;
+    break;
+  case PARAM_POWER:
+    ctx->power = value;
+    break;
+
   case PARAM_FREQUENCY:
     ctx->frequency = value;
     break;
@@ -590,9 +603,6 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     break;
   case PARAM_VOLUME:
     ctx->volume = (uint8_t)value;
-    break;
-  case PARAM_STEP:
-    ctx->step = (Step)value;
     break;
   case PARAM_GAIN:
     ctx->gain = value;
@@ -620,9 +630,6 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
     for (uint8_t i = 0; i < PARAM_COUNT; ++i) {
       ctx->dirty[i] = true;
     }
-    break;
-  case PARAM_POWER:
-    ctx->power = value;
     break;
   case PARAM_COUNT:
     return;
@@ -756,6 +763,14 @@ bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc,
   return RADIO_AdjustParam(ctx, param, inc ? v : -v, save_to_eeprom);
 }
 
+typedef bool (*spf_ptr)(VFOContext *, ParamType);
+
+static spf_ptr setParamForRadio[] = {
+    [RADIO_BK4819] = &setParamBK4819,
+    [RADIO_BK1080] = &setParamBK1080,
+    [RADIO_SI4732] = &setParamSI4732,
+};
+
 // Применение настроек
 void RADIO_ApplySettings(VFOContext *ctx) {
   if (ctx->dirty[PARAM_RADIO]) {
@@ -774,31 +789,27 @@ void RADIO_ApplySettings(VFOContext *ctx) {
       continue;
     }
 
-    switch (ctx->radio_type) {
-    case RADIO_BK4819:
-      if (!setParamBK4819(ctx, p)) {
+    switch (p) {
+    case PARAM_STEP:
+    case PARAM_POWER:
+    case PARAM_TX_OFFSET:
+    case PARAM_TX_STATE:
+    case PARAM_TX_CODE:
+    case PARAM_RX_CODE:
+    case PARAM_RSSI:
+    case PARAM_NOISE:
+    case PARAM_GLITCH:
+    case PARAM_SNR:
+      ctx->dirty[p] = false;
+      continue;
+    }
+
+    if (!setParamForRadio[ctx->radio_type](ctx, p)) {
 #ifdef DEBUG_PARAMS
-        LogC(LOG_C_YELLOW, "[W] Param %s not set for BK4819", PARAM_NAMES[p]);
+      LogC(LOG_C_YELLOW, "[W] Param %s not set for %s", PARAM_NAMES[p],
+           RADIO_NAMES[ctx->radio_type]);
 #endif
-        continue;
-      }
-      break;
-    case RADIO_SI4732:
-      if (!setParamSI4732(ctx, p)) {
-#ifdef DEBUG_PARAMS
-        LogC(LOG_C_YELLOW, "[W] Param %s not set for SI4732", PARAM_NAMES[p]);
-#endif
-        continue;
-      }
-      break;
-    case RADIO_BK1080:
-      if (!setParamBK1080(ctx, p)) {
-#ifdef DEBUG_PARAMS
-        LogC(LOG_C_YELLOW, "[W] Param %s not set for BK1080", PARAM_NAMES[p]);
-#endif
-        continue;
-      }
-      break;
+      continue;
     }
     ctx->dirty[p] = false;
 

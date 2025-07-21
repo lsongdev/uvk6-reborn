@@ -13,16 +13,16 @@
 // =============================
 typedef struct {
   uint32_t scanDelayUs; // Задержка измерения (микросек)
-  uint16_t squelchLevel; // Текущий уровень шумоподавления
-  bool thinking;         // Думоем
-  bool wasThinkingEarlier; // Флаг для корректировки squelch
-  bool lastListenState;    // Последнее состояние squelch
-  bool isMultiband;        // Мультидиапазонный режим
   uint32_t stayAtTimeout; // Таймаут удержания на частоте
   uint32_t scanListenTimeout; // Таймаут прослушивания
   uint32_t scanCycles; // Количество циклов сканирования
   uint32_t lastCpsTime;    // Последнее время замера CPS
   uint32_t lastRenderTime; // Последнее время отрисовки
+  uint16_t squelchLevel; // Текущий уровень шумоподавления
+  bool thinking;         // Думоем
+  bool wasThinkingEarlier; // Флаг для корректировки squelch
+  bool lastListenState;    // Последнее состояние squelch
+  bool isMultiband;        // Мультидиапазонный режим
 } ScanState;
 
 static ScanState scan = {
@@ -68,6 +68,7 @@ static void ApplyBandSettings() {
 }
 
 static void NextFrequency() {
+  // TODO: priority cooldown scan
   VFOContext *ctx = GetVFOContext();
   uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
   gLoot.f += step;
@@ -177,7 +178,8 @@ static void UpdateSquelchAndRssi(bool isAnalyserMode) {
   SP_AddPoint(&gLoot);
 
   if (gSettings.skipGarbageFrequencies &&
-      (RADIO_GetParam(&vfo->context, PARAM_FREQUENCY) % 1300000 == 0)) {
+      (RADIO_GetParam(&vfo->context, PARAM_FREQUENCY) % GARBAGE_FREQUENCY_MOD ==
+       0)) {
     gLoot.open = false;
   }
 }

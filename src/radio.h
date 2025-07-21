@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #define SQL_DELAY 50
+#define GARBAGE_FREQUENCY_MOD (13 * MHZ)
 
 #define MAX_VFOS 16
 extern Measurement gLoot;

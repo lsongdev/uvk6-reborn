@@ -1,4 +1,4 @@
-/* #include "lootlist.h"
+#include "lootlist.h"
 #include "../dcs.h"
 #include "../driver/st7565.h"
 #include "../driver/system.h"
@@ -7,14 +7,15 @@
 #include "../helper/channels.h"
 #include "../helper/lootlist.h"
 #include "../helper/measurements.h"
+#include "../helper/menu.h"
 #include "../radio.h"
 #include "../scheduler.h"
 #include "../ui/components.h"
 #include "../ui/graphics.h"
-#include "../ui/menu.h"
 #include "../ui/statusline.h"
 #include "apps.h"
 #include "chlist.h"
+#include <stdbool.h>
 #include <stdint.h>
 
 static uint8_t menuIndex = 0;
@@ -47,13 +48,10 @@ static bool shortList = true;
 static bool sortRev = false;
 
 static void tuneToLoot(const Loot *loot, bool save) {
-  if (save) {
-    RADIO_TuneToSave(loot->f);
-  } else {
-    RADIO_TuneTo(loot->f);
-  }
+  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
   BANDS_SetRadioParamsFromCurrentBand();
-  RADIO_Setup();
+  RADIO_SetParam(ctx, PARAM_FREQUENCY, loot->f, save);
+  RADIO_ApplySettings(ctx);
 }
 
 static void displayFreqBlWl(uint8_t y, const Loot *loot) {
@@ -118,7 +116,7 @@ static void sort(Sort type) {
 }
 
 void LOOTLIST_update() {
-  RADIO_CheckAndListen();
+  RADIO_Sq();
   gRedrawScreen = true;
   SYS_DelayMs(SQL_DELAY);
 }
@@ -281,4 +279,4 @@ bool LOOTLIST_key(KEY_Code_t key, Key_State_t state) {
   }
 
   return false;
-} */
+}

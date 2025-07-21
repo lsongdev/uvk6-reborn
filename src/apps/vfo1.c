@@ -165,7 +165,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
     case KEY_8:
     case KEY_9:
       gFInputCallback = tuneTo;
-      FINPUT_setup(0, 1340 * MHZ, UNIT_MHZ, false);
+      FINPUT_setup(0, BK4819_F_MAX, UNIT_MHZ, false);
       APPS_run(APP_FINPUT);
       APPS_key(key, state);
       return true;
