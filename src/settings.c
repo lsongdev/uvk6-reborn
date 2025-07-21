@@ -20,8 +20,6 @@ static const char *YES_NO[] = {"No", "Yes"};
 static const char *ON_OFF[] = {"Off", "On"};
 
 uint8_t BL_TIME_VALUES[7] = {0, 5, 10, 20, 60, 120, 255};
-const char *BL_TIME_NAMES[7] = {"Off",  "5s",   "10s", "20s",
-                                "1min", "2min", "On"};
 
 const char *BL_SQL_MODE_NAMES[3] = {"Off", "On", "Open"};
 const char *CH_DISPLAY_MODE_NAMES[3] = {"Name+F", "F", "Name"};
@@ -49,7 +47,7 @@ uint32_t SCAN_TIMEOUTS[15] = {
 
 char *SCAN_TIMEOUT_NAMES[15] = {
     "0",  "100ms", "200ms", "300ms", "400ms", "500ms", "1s",   "3s",
-    "5s", "10s",   "30s",   "1min",  "2min",  "5min",  "None",
+    "5s", "10s",   "30s",   "1m",    "2m",    "5m",    "None",
 };
 
 static const uint8_t PATCH3_PREAMBLE[] = {0x15, 0x00, 0x03, 0x74,
@@ -390,7 +388,13 @@ const char *SETTINGS_GetValueString(Setting s) {
   case SETTING_FCTIME:
     return FC_TIME_NAMES[v];
   case SETTING_BACKLIGHT:
-    return BL_TIME_NAMES[v];
+    if (BL_TIME_VALUES[v] == 0) {
+      return ON_OFF[0];
+    } else if (BL_TIME_VALUES[v] == 255) {
+      return ON_OFF[1];
+    }
+    sprintf(buf, "%us", BL_TIME_VALUES[v]);
+    break;
 
   case SETTING_BATTERYCALIBRATION: {
     uint32_t vol = BATTERY_GetPreciseVoltage(v);

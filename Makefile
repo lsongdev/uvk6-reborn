@@ -64,10 +64,10 @@ CFLAGS   := $(COMMON_FLAGS) $(OPTIMIZATION) \
             -fno-delete-null-pointer-checks \
             -fsingle-precision-constant \
             -finline-functions-called-once \
-            -MMD -MP
+            -MMD -MP -g0
 
 # Debug flags
-DEBUG_FLAGS := -g3 -DDEBUG
+DEBUG_FLAGS := -DDEBUG
 
 # Defines
 DEFINES  := -DPRINTF_INCLUDE_CONFIG_H \
