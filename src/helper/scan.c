@@ -71,6 +71,8 @@ static void NextFrequency() {
   VFOContext *ctx = GetVFOContext();
   uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
   gLoot.f += step;
+  RADIO_GetCurrentVFO(&gRadioState)->is_open = false;
+  RADIO_SwitchAudioToVFO(&gRadioState, gRadioState.active_vfo_index);
 
   if (gLoot.f > gCurrentBand.txF) {
     if (scan.isMultiband) {
