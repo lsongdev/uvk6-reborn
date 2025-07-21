@@ -22,7 +22,7 @@
 
 #define RADIO_SAVE_DELAY_MS 1000
 
-#define DEBUG_PARAMS 1
+// #define DEBUG_PARAMS 1
 
 bool gShowAllRSSI = false;
 bool gMonitorMode = false;
@@ -764,36 +764,43 @@ void RADIO_ApplySettings(VFOContext *ctx) {
     ctx->dirty[PARAM_RADIO] = false;
   }
 
-  const bool needSetupToneDetection = ctx->dirty[PARAM_RX_CODE] ||
-                                      ctx->dirty[PARAM_TX_CODE] ||
-                                      ctx->dirty[PARAM_TX_STATE];
+  const bool needSetupToneDetection =
+      (ctx->dirty[PARAM_RX_CODE] || ctx->dirty[PARAM_TX_CODE] ||
+       ctx->dirty[PARAM_TX_STATE]) &&
+      ctx->radio_type == RADIO_BK4819;
 
   for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
     if (!ctx->dirty[p]) {
       continue;
     }
-    ctx->dirty[p] = false;
 
     switch (ctx->radio_type) {
     case RADIO_BK4819:
       if (!setParamBK4819(ctx, p)) {
+#ifdef DEBUG_PARAMS
         LogC(LOG_C_YELLOW, "[W] Param %s not set for BK4819", PARAM_NAMES[p]);
+#endif
         continue;
       }
       break;
     case RADIO_SI4732:
       if (!setParamSI4732(ctx, p)) {
+#ifdef DEBUG_PARAMS
         LogC(LOG_C_YELLOW, "[W] Param %s not set for SI4732", PARAM_NAMES[p]);
+#endif
         continue;
       }
       break;
     case RADIO_BK1080:
       if (!setParamBK1080(ctx, p)) {
+#ifdef DEBUG_PARAMS
         LogC(LOG_C_YELLOW, "[W] Param %s not set for BK1080", PARAM_NAMES[p]);
+#endif
         continue;
       }
       break;
     }
+    ctx->dirty[p] = false;
 
 #ifdef DEBUG_PARAMS
     LogC(LOG_C_BRIGHT_WHITE, "[SET] %-12s -> %s", PARAM_NAMES[p],
@@ -801,8 +808,8 @@ void RADIO_ApplySettings(VFOContext *ctx) {
 #endif /* ifdef DEBUG_PARAMS */
   }
 
-  if (needSetupToneDetection && ctx->radio_type == RADIO_BK4819) {
-    setupToneDetection(ctx); // TODO: check if needed each time
+  if (needSetupToneDetection) {
+    setupToneDetection(ctx);
   }
 }
 

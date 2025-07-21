@@ -5,6 +5,13 @@
 #include "lootlist.h"
 #include <stdint.h>
 
+typedef enum {
+    SCAN_STATE_IDLE,
+    SCAN_STATE_SCANNING,
+    SCAN_STATE_LISTENING,
+    SCAN_STATE_PAUSED
+} ScanStateType;
+
 extern uint32_t delay;
 extern uint16_t sqLevel;
 

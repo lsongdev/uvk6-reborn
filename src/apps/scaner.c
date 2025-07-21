@@ -25,7 +25,7 @@ static uint32_t cursorRangeTimeout = 0;
 static bool isAnalyserMode = false;
 
 static uint8_t scanAFC;
-static uint32_t scanDelay;
+// static uint32_t scanDelay;
 
 static void setRange(uint32_t fs, uint32_t fe) {
   // radio.fixedBoundsMode = false;
@@ -122,7 +122,7 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
     switch (key) {
     case KEY_1:
     case KEY_7:
-      delay = AdjustU(delay, 0, 10000, key == KEY_1 ? 100 : -100);
+      // delay = AdjustU(delay, 0, 10000, key == KEY_1 ? 100 : -100);
       return true;
     case KEY_3:
     case KEY_9:
@@ -147,13 +147,13 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
     switch (key) {
     case KEY_4:
       if (isAnalyserMode) {
-        delay = scanDelay;
+        // delay = scanDelay;
         BK4819_SetAFC(scanAFC);
       } else {
-        scanDelay = delay;
+        // scanDelay = delay;
         scanAFC = BK4819_GetAFC();
         BK4819_SetAFC(0);
-        delay = 0;
+        // delay = 0;
       }
       isAnalyserMode = !isAnalyserMode;
       minMaxRssi = SP_GetMinMax();
@@ -233,7 +233,7 @@ void SCANER_render(void) {
     UI_DrawLoot(gLastActiveLoot, LCD_XCENTER, 14, POS_C);
   }
 
-  PrintSmallEx(0, 12, POS_L, C_FILL, "%uus", delay);
+  // PrintSmallEx(0, 12, POS_L, C_FILL, "%uus", delay);
 
   PrintSmallEx(LCD_WIDTH, 12, POS_R, C_FILL, "%u.%02uk", step / 100,
                step % 100);

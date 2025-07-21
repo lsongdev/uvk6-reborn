@@ -8,189 +8,214 @@
 #include "../ui/spectrum.h"
 #include "bands.h"
 
-uint32_t delay = 1200;
-uint16_t sqLevel = 0;
+// =============================
+// Состояние сканирования
+// =============================
+typedef struct {
+  uint32_t scanDelayUs; // Задержка измерения (микросек)
+  uint16_t squelchLevel; // Текущий уровень шумоподавления
+  bool thinking;         // Думоем
+  bool wasThinkingEarlier; // Флаг для корректировки squelch
+  bool lastListenState;    // Последнее состояние squelch
+  bool isMultiband;        // Мультидиапазонный режим
+  uint32_t stayAtTimeout; // Таймаут удержания на частоте
+  uint32_t scanListenTimeout; // Таймаут прослушивания
+  uint32_t scanCycles; // Количество циклов сканирования
+  uint32_t lastCpsTime;    // Последнее время замера CPS
+  uint32_t lastRenderTime; // Последнее время отрисовки
+} ScanState;
 
-static bool thinking = false;
-static bool wasThinkingEarlier = false;
+static ScanState scan = {
+    .scanDelayUs = 1200,
+    .squelchLevel = 0,
+    .thinking = false,
+    .wasThinkingEarlier = false,
+    .lastListenState = false,
+    .isMultiband = false,
+    .stayAtTimeout = 0,
+    .scanListenTimeout = 0,
+    .scanCycles = 0,
+    .lastCpsTime = 0,
+    .lastRenderTime = 0,
+};
 
-static uint32_t stay_at_timeout;
-static uint32_t scan_listen_timeout;
+// =============================
+// Вспомогательные функции
+// =============================
+static inline VFOContext *GetVFOContext() {
+  return &RADIO_GetCurrentVFO(&gRadioState)->context;
+}
 
-static bool lastListenState = false;
-static bool isMultiband = false;
+static inline ExtendedVFOContext *GetVFO() {
+  return RADIO_GetCurrentVFO(&gRadioState);
+}
 
-static uint32_t scanCycles = 0;
-static uint32_t lastCpsTime = 0;
-
-static uint16_t measure(uint32_t f, bool precise) {
-  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
+static uint16_t MeasureSignal(uint32_t frequency, bool precise) {
+  VFOContext *ctx = GetVFOContext();
   RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, precise, false);
-  RADIO_SetParam(ctx, PARAM_FREQUENCY, f, false);
+  RADIO_SetParam(ctx, PARAM_FREQUENCY, frequency, false);
   RADIO_ApplySettings(ctx);
-  SYSTICK_DelayUs(delay);
+  SYSTICK_DelayUs(scan.scanDelayUs);
   return RADIO_GetParam(ctx, PARAM_RSSI);
 }
 
-static void onNewBand() {
-  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
+static void ApplyBandSettings() {
+  VFOContext *ctx = GetVFOContext();
   gLoot.f = gCurrentBand.rxF;
-  // RADIO_SetParam(ctx, PARAM_FREQUENCY, gCurrentBand.rxF, false);
   RADIO_SetParam(ctx, PARAM_STEP, gCurrentBand.step, false);
   RADIO_ApplySettings(ctx);
   SP_Init(&gCurrentBand);
 }
 
-uint32_t SCAN_GetCps() {
-  uint32_t cps = scanCycles * 1000 / (Now() - lastCpsTime);
-  lastCpsTime = Now();
-  scanCycles = 0;
-  return cps;
-}
-
-void SCAN_setBand(Band b) {
-  gCurrentBand = b;
-  onNewBand();
-}
-
-void SCAN_setStartF(uint32_t f) {
-  gCurrentBand.rxF = f;
-  onNewBand();
-}
-
-void SCAN_setEndF(uint32_t f) {
-  gCurrentBand.txF = f;
-  onNewBand();
-}
-
-static void next() {
-  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
+static void NextFrequency() {
+  VFOContext *ctx = GetVFOContext();
   uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
   gLoot.f += step;
-  // RADIO_AdjustParam(ctx, PARAM_FREQUENCY, step, false);
 
   if (gLoot.f > gCurrentBand.txF) {
-    if (isMultiband) {
+    if (scan.isMultiband) {
       BANDS_SelectBandRelativeByScanlist(true);
-      onNewBand();
+      ApplyBandSettings();
     }
     gLoot.f = gCurrentBand.rxF;
     gRedrawScreen = true;
   }
 
   LOOT_Replace(&gLoot, gLoot.f);
-  SetTimeout(&scan_listen_timeout, 0);
-  SetTimeout(&stay_at_timeout, 0);
-  scanCycles++;
+  SetTimeout(&scan.scanListenTimeout, 0);
+  SetTimeout(&scan.stayAtTimeout, 0);
+  scan.scanCycles++;
 }
 
-static void nextWithTimeout() {
-  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
-  if (lastListenState != vfo->is_open) {
-    lastListenState = vfo->is_open;
+static void NextWithTimeout() {
+  ExtendedVFOContext *vfo = GetVFO();
+  if (scan.lastListenState != vfo->is_open) {
+    scan.lastListenState = vfo->is_open;
 
     if (vfo->is_open) {
-      SetTimeout(&scan_listen_timeout,
+      SetTimeout(&scan.scanListenTimeout,
                  SCAN_TIMEOUTS[gSettings.sqOpenedTimeout]);
-      SetTimeout(&stay_at_timeout, UINT32_MAX);
+      SetTimeout(&scan.stayAtTimeout, UINT32_MAX);
     } else {
-      SetTimeout(&stay_at_timeout, SCAN_TIMEOUTS[gSettings.sqClosedTimeout]);
+      SetTimeout(&scan.stayAtTimeout, SCAN_TIMEOUTS[gSettings.sqClosedTimeout]);
     }
   }
 
-  if (CheckTimeout(&scan_listen_timeout) && vfo->is_open) {
-    next();
-    return;
-  }
-
-  if (CheckTimeout(&stay_at_timeout)) {
-    next();
-    return;
+  if ((CheckTimeout(&scan.scanListenTimeout) && vfo->is_open) ||
+      CheckTimeout(&scan.stayAtTimeout)) {
+    NextFrequency();
   }
 }
 
-void SCAN_Next(bool up) { next(); }
+// =============================
+// API функций
+// =============================
+uint32_t SCAN_GetCps() {
+  uint32_t cps = scan.scanCycles * 1000 / (Now() - scan.lastCpsTime);
+  scan.lastCpsTime = Now();
+  scan.scanCycles = 0;
+  return cps;
+}
+
+void SCAN_setBand(Band b) {
+  gCurrentBand = b;
+  ApplyBandSettings();
+}
+
+void SCAN_setStartF(uint32_t f) {
+  gCurrentBand.rxF = f;
+  ApplyBandSettings();
+}
+
+void SCAN_setEndF(uint32_t f) {
+  gCurrentBand.txF = f;
+  ApplyBandSettings();
+}
+
+void SCAN_Next(bool up) { NextFrequency(); }
 
 void SCAN_Init(bool multiband) {
-  isMultiband = multiband;
+  scan.isMultiband = multiband;
   gLoot.snr = 0;
-
-  lastCpsTime = Now();
-  scanCycles = 0;
-
-  onNewBand();
+  scan.lastCpsTime = Now();
+  scan.scanCycles = 0;
+  ApplyBandSettings();
 }
 
-static uint32_t lastRender;
+// =============================
+// Обработка сканирования
+// =============================
+static void HandleAnalyserMode() {
+  gLoot.rssi = MeasureSignal(gLoot.f, false);
+  SP_AddPoint(&gLoot);
+  if (Now() - scan.lastRenderTime > 500) {
+    gRedrawScreen = true;
+    scan.lastRenderTime = Now();
+  }
+  NextFrequency();
+}
+
+static void UpdateSquelchAndRssi(bool isAnalyserMode) {
+  ExtendedVFOContext *vfo = GetVFO();
+  gLoot.rssi = MeasureSignal(gLoot.f, !isAnalyserMode);
+
+  if (!scan.squelchLevel && gLoot.rssi) {
+    scan.squelchLevel = gLoot.rssi - 1;
+  }
+
+  if (scan.squelchLevel > gLoot.rssi) {
+    uint16_t perc = (scan.squelchLevel - gLoot.rssi) * 100 /
+                    ((scan.squelchLevel + gLoot.rssi) / 2);
+    if (perc >= 25) {
+      scan.squelchLevel = gLoot.rssi - 1;
+    }
+  }
+
+  gLoot.open = gLoot.rssi >= scan.squelchLevel;
+  SP_AddPoint(&gLoot);
+
+  if (gSettings.skipGarbageFrequencies &&
+      (RADIO_GetParam(&vfo->context, PARAM_FREQUENCY) % 1300000 == 0)) {
+    gLoot.open = false;
+  }
+}
 
 void SCAN_Check(bool isAnalyserMode) {
   RADIO_UpdateMultiwatch(&gRadioState);
   RADIO_CheckAndSaveVFO(&gRadioState);
 
-  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
-  VFOContext *ctx = &vfo->context;
+  ExtendedVFOContext *vfo = GetVFO();
+
   if (isAnalyserMode) {
-    // gLoot.f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
-    gLoot.rssi = measure(gLoot.f, false);
-    SP_AddPoint(&gLoot);
-    if (Now() - lastRender > 500) {
-      gRedrawScreen = true;
-      lastRender = Now();
-    }
-    next();
+    HandleAnalyserMode();
     return;
   }
 
   if (gLoot.open) {
-    // gLoot.open = RADIO_IsSquelchOpen();
     RADIO_UpdateSquelch(&gRadioState);
     gLoot.open = vfo->is_open;
     gRedrawScreen = true;
   } else {
-    // gLoot.f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
-    gLoot.rssi = measure(gLoot.f, !isAnalyserMode);
-
-    if (!sqLevel && gLoot.rssi) {
-      sqLevel = gLoot.rssi - 1;
-    }
-
-    if (sqLevel > gLoot.rssi) {
-      uint16_t perc =
-          (sqLevel - gLoot.rssi) * 100 / ((sqLevel + gLoot.rssi) / 2);
-      if (perc >= 25) {
-        sqLevel = gLoot.rssi - 1;
-      }
-    }
-
-    gLoot.open = gLoot.rssi >= sqLevel;
-
-    SP_AddPoint(&gLoot);
+    UpdateSquelchAndRssi(isAnalyserMode);
   }
 
-  if (gSettings.skipGarbageFrequencies &&
-      (RADIO_GetParam(ctx, PARAM_FREQUENCY) % 1300000 == 0)) {
-    gLoot.open = false;
-  }
-
-  // really good level?
   if (gLoot.open && !vfo->is_open) {
-    thinking = true;
-    wasThinkingEarlier = true;
+    scan.thinking = true;
+    scan.wasThinkingEarlier = true;
     SYS_DelayMs(SQL_DELAY);
     RADIO_UpdateSquelch(&gRadioState);
     gLoot.open = vfo->is_open;
-    thinking = false;
+    scan.thinking = false;
     gRedrawScreen = true;
     if (!gLoot.open) {
-      sqLevel++;
+      scan.squelchLevel++;
     }
   }
 
   LOOT_Update(&gLoot);
 
-  // reset sql to noise floor when sql closed to check next freq better
   if (vfo->is_open && !gLoot.open) {
-    sqLevel = SP_GetNoiseFloor();
+    scan.squelchLevel = SP_GetNoiseFloor();
   }
 
   if (gLoot.open) {
@@ -198,17 +223,16 @@ void SCAN_Check(bool isAnalyserMode) {
   }
 
   static uint8_t stepsPassed;
-
   if (!gLoot.open) {
     if (stepsPassed++ > 64) {
       stepsPassed = 0;
       gRedrawScreen = true;
-      if (!wasThinkingEarlier) {
-        sqLevel--;
+      if (!scan.wasThinkingEarlier) {
+        scan.squelchLevel--;
       }
-      wasThinkingEarlier = false;
+      scan.wasThinkingEarlier = false;
     }
   }
 
-  nextWithTimeout();
+  NextWithTimeout();
 }
