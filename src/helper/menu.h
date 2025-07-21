@@ -24,11 +24,7 @@ typedef struct MenuItem {
   void (*change_value)(const MenuItem *item, bool up);
   struct Menu *submenu; // если не NULL — переход в подменю
 
-  /* int64_t (*get_value)(const MenuItem *item);
-  void (*set_value)(const MenuItem *item, int64_t); */
-
   bool (*action)(const MenuItem *item, KEY_Code_t, Key_State_t);
-  // const void *user_data; // Данные для action
 } MenuItem;
 
 typedef struct Menu {

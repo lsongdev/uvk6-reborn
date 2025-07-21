@@ -78,7 +78,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
 
   // pressed or hold continue
   if (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT) {
-    bool isSsb = RADIO_IsSSB(ctx);
+    const bool isSsb = RADIO_IsSSB(ctx);
     switch (key) {
     case KEY_UP:
     case KEY_DOWN:
@@ -202,7 +202,7 @@ static void renderTxRxState(uint8_t y, bool isTx) {
   VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
   if (isTx && ctx->tx_state.is_active) {
     PrintMediumBoldEx(LCD_XCENTER, y, POS_C, C_FILL, "%s",
-                      TX_STATE_NAMES[ctx->tx_state.last_error]);
+                      RADIO_GetParamValueString(ctx, PARAM_TX_STATE));
   }
 }
 
