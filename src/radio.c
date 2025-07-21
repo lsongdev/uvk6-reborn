@@ -413,8 +413,6 @@ void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
 
 static bool setParamBK4819(VFOContext *ctx, ParamType p) {
   switch (p) {
-  case PARAM_PRECISE_F_CHANGE:
-    return true;
   case PARAM_GAIN:
     BK4819_SetAGC(ctx->modulation != MOD_AM, ctx->gain);
     return true;
@@ -446,6 +444,10 @@ static bool setParamBK4819(VFOContext *ctx, ParamType p) {
     return true;
   case PARAM_DEV:
     BK4819_SetRegValue(RS_DEV, ctx->dev);
+    return true;
+  case PARAM_VOLUME:
+    BK4819_SetRegValue(RS_AF_DAC_GAIN,
+                       ConvertDomain(ctx->volume, 0, 100, 0, 15));
     return true;
   }
   return false;
@@ -800,6 +802,7 @@ void RADIO_ApplySettings(VFOContext *ctx) {
     case PARAM_NOISE:
     case PARAM_GLITCH:
     case PARAM_SNR:
+    case PARAM_PRECISE_F_CHANGE:
       ctx->dirty[p] = false;
       continue;
     }
@@ -993,6 +996,7 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
   RADIO_SetParam(ctx, PARAM_XTAL, XTAL_2_26M, false);
 
   RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, true, false);
+  RADIO_SetParam(ctx, PARAM_VOLUME, 100, false);
 
   vfo->context.code = storage->code.rx;
   vfo->context.tx_state.code = storage->code.tx;
@@ -1079,6 +1083,7 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
   RADIO_SetParam(ctx, PARAM_XTAL, XTAL_2_26M, false);
 
   RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, true, false);
+  RADIO_SetParam(ctx, PARAM_VOLUME, 100, false);
 
   ctx->code = channel.code.rx;
   ctx->tx_state.code = channel.code.tx;
@@ -1392,6 +1397,9 @@ const char *RADIO_GetParamValueString(const VFOContext *ctx, ParamType param) {
   case PARAM_SQUELCH_VALUE:
   case PARAM_PRECISE_F_CHANGE:
     snprintf(buf, 15, "%u", v);
+    break;
+  case PARAM_VOLUME:
+    snprintf(buf, 15, "%u%", v);
     break;
   case PARAM_SQUELCH_TYPE:
     snprintf(buf, 15, "%s", SQ_TYPE_NAMES[ctx->squelch.type]);
