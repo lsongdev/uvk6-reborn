@@ -160,6 +160,14 @@ static void HandleAnalyserMode() {
 
 static void UpdateSquelchAndRssi(bool isAnalyserMode) {
   ExtendedVFOContext *vfo = GetVFO();
+  if (gSettings.skipGarbageFrequencies &&
+      (RADIO_GetParam(&vfo->context, PARAM_FREQUENCY) % GARBAGE_FREQUENCY_MOD ==
+       0)) {
+    gLoot.open = false;
+    gLoot.rssi = 0;
+    SP_AddPoint(&gLoot);
+    return;
+  }
   gLoot.rssi = MeasureSignal(gLoot.f, !isAnalyserMode);
 
   if (!scan.squelchLevel && gLoot.rssi) {
@@ -176,12 +184,6 @@ static void UpdateSquelchAndRssi(bool isAnalyserMode) {
 
   gLoot.open = gLoot.rssi >= scan.squelchLevel;
   SP_AddPoint(&gLoot);
-
-  if (gSettings.skipGarbageFrequencies &&
-      (RADIO_GetParam(&vfo->context, PARAM_FREQUENCY) % GARBAGE_FREQUENCY_MOD ==
-       0)) {
-    gLoot.open = false;
-  }
 }
 
 void SCAN_Check(bool isAnalyserMode) {
