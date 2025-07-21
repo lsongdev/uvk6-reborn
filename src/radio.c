@@ -979,6 +979,7 @@ void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
 
   RADIO_SetParam(ctx, PARAM_MIC, gSettings.mic, false);
   RADIO_SetParam(ctx, PARAM_DEV, gSettings.deviation * 10, false);
+  RADIO_SetParam(ctx, PARAM_XTAL, XTAL_2_26M, false);
 
   RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, true, false);
 
@@ -1063,6 +1064,8 @@ void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
   RADIO_SetParam(ctx, PARAM_SQUELCH_TYPE, channel.squelch.type, false);
   RADIO_SetParam(ctx, PARAM_SQUELCH_VALUE, channel.squelch.value, false);
   RADIO_SetParam(ctx, PARAM_STEP, channel.step, false);
+
+  RADIO_SetParam(ctx, PARAM_XTAL, XTAL_2_26M, false);
 
   RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, true, false);
 
