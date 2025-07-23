@@ -128,9 +128,7 @@ void STATUSLINE_render(void) {
     UI_Scanlists(LCD_XCENTER - 13, 0, gSettings.currentScanlist);
   } */
 
-  PrintSymbolsEx(LCD_WIDTH - 1 -
-                     (gSettings.batteryStyle == BAT_VOLTAGE ? 38 : 18),
-                 BASE_Y, POS_R, C_FILL, "%s", icons);
+  PrintSymbolsEx(LCD_WIDTH - 1 - 22, BASE_Y, POS_R, C_FILL, "%s", icons);
 
   PrintSmall(0, BASE_Y,
              statuslineTicker[0] == '\0' ? statuslineText : statuslineTicker);
