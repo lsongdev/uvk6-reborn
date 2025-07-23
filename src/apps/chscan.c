@@ -22,8 +22,6 @@ static void loadCurrentCh() {
 }
 
 static void nextWithTimeout() {
-  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
-  VFOContext *ctx = &vfo->context;
   if (lastListenState != vfo->is_open) {
     lastListenState = vfo->is_open;
     if (vfo->is_open) {
@@ -103,7 +101,6 @@ bool CHSCAN_key(KEY_Code_t key, Key_State_t state) {
 
 void CHSCAN_render(void) {
   if (gScanlistSize) {
-    ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
     if (vfo->is_open) {
       PrintMediumBoldEx(LCD_XCENTER, 18, POS_C, C_FILL, "%s", activeCh.name);
     } else {

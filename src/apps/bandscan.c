@@ -35,7 +35,6 @@ bool BANDSCAN_key(KEY_Code_t key, Key_State_t state) {
   }
   bool longHeld = state == KEY_LONG_PRESSED;
   bool simpleKeypress = state == KEY_RELEASED;
-  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
   if ((longHeld || simpleKeypress) && (key > KEY_0 && key < KEY_9)) {
     gSettings.currentScanlist = CHANNELS_ScanlistByKey(
         gSettings.currentScanlist, key, longHeld && !simpleKeypress);

@@ -26,7 +26,7 @@ static void setChannel(uint16_t v) {
 }
 
 static void tuneTo(uint32_t f, uint32_t _) {
-  RADIO_SetParam(RADIO_GetCurrentVFO(&gRadioState), PARAM_FREQUENCY, f, true);
+  RADIO_SetParam(vfo, PARAM_FREQUENCY, f, true);
 }
 
 void VFO1_init(void) { gLastActiveLoot = NULL; }
@@ -57,12 +57,10 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
   }
 
   uint8_t vfoN = RADIO_GetCurrentVFONumber(&gRadioState);
-  const ExtendedVFOContext *ctxEx = &gRadioState.vfos[vfoN];
-  VFOContext *ctx = &ctxEx->context;
 
-  if (state == KEY_RELEASED && ctxEx->mode == MODE_CHANNEL) {
+  if (state == KEY_RELEASED && vfo->mode == MODE_CHANNEL) {
     if (!gIsNumNavInput && key <= KEY_9) {
-      NUMNAV_Init(ctxEx->channel_index, 0, CHANNELS_GetCountMax() - 1);
+      NUMNAV_Init(vfo->channel_index, 0, CHANNELS_GetCountMax() - 1);
       gNumNavCallback = setChannel;
     }
     if (gIsNumNavInput) {
@@ -82,7 +80,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
     switch (key) {
     case KEY_UP:
     case KEY_DOWN:
-      if (ctxEx->mode == MODE_CHANNEL) {
+      if (vfo->mode == MODE_CHANNEL) {
         CHANNELS_Next(key == KEY_UP);
       } else {
         RADIO_IncDecParam(ctx, PARAM_FREQUENCY, key == KEY_UP, true);
@@ -199,7 +197,6 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
 }
 
 static void renderTxRxState(uint8_t y, bool isTx) {
-  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
   if (isTx && ctx->tx_state.is_active) {
     PrintMediumBoldEx(LCD_XCENTER, y, POS_C, C_FILL, "%s",
                       RADIO_GetParamValueString(ctx, PARAM_TX_STATE));
@@ -230,8 +227,6 @@ void VFO1_render(void) {
   const uint8_t BASE = 40;
 
   uint8_t vfoN = RADIO_GetCurrentVFONumber(&gRadioState);
-  const ExtendedVFOContext *ctxEx = &gRadioState.vfos[vfoN];
-  const VFOContext *ctx = &ctxEx->context;
 
   if (gIsNumNavInput) {
     STATUSLINE_SetText("Select: %s", gNumNavInput);
@@ -248,7 +243,7 @@ void VFO1_render(void) {
       ctx->tx_state.is_active ? ctx->tx_state.frequency : ctx->frequency;
   const char *mod = RADIO_GetParamValueString(ctx, PARAM_MODULATION);
 
-  if (ctxEx->mode == MODE_CHANNEL) {
+  if (vfo->mode == MODE_CHANNEL) {
     PrintMediumEx(LCD_XCENTER, BASE - 16, POS_C, C_FILL, "VFO %u", vfoN + 1);
   } else {
     if (gCurrentBand.meta.type == TYPE_BAND_DETACHED) {
@@ -265,7 +260,7 @@ void VFO1_render(void) {
   renderTxRxState(BASE, ctx->tx_state.is_active);
   UI_BigFrequency(BASE, f);
   PrintMediumEx(LCD_WIDTH - 1, BASE - 12, POS_R, C_FILL, mod);
-  renderChannelName(21, ctxEx->channel_index);
+  renderChannelName(21, vfo->channel_index);
   const uint32_t step = StepFrequencyTable[ctx->step];
   /* if (potentialTxState == TX_ON) {
     PrintSmallEx(LCD_XCENTER, BASE + 6, POS_C, C_FILL, "%s",
@@ -326,7 +321,7 @@ void VFO1_render(void) {
       UI_RSSIBar(BASE + 1);
     }
   } else {
-    if (ctxEx->is_active || gSettings.iAmPro) {
+    if (vfo->is_active || gSettings.iAmPro) {
       UI_RSSIBar(BASE + 1);
     }
     if (ctx->tx_state.is_active) {

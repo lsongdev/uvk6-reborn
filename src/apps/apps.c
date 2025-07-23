@@ -21,7 +21,10 @@
 #define APPS_STACK_SIZE 8
 
 AppType_t gCurrentApp = APP_NONE;
+
 RadioState gRadioState;
+ExtendedVFOContext *vfo;
+VFOContext *ctx;
 
 static AppType_t loadedVfoApp = APP_NONE;
 
@@ -148,6 +151,8 @@ void APPS_run(AppType_t app) {
          apps[gCurrentApp].name);
     RADIO_InitState(&gRadioState, 16);
     RADIO_LoadVFOs(&gRadioState);
+    vfo = RADIO_GetCurrentVFO(&gRadioState);
+    ctx = &vfo->context;
     loadedVfoApp = gCurrentApp;
   }
 

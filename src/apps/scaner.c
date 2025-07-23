@@ -43,8 +43,6 @@ void SCANER_init(void) {
   SPECTRUM_H = 44;
 
   gMonitorMode = false;
-  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
-  VFOContext *ctx = &vfo->context;
 
   if (gCurrentBand.meta.type != TYPE_BAND_DETACHED) {
     LogC(LOG_C_BRIGHT_YELLOW, "[i] [SCAN] Init withOUT detached band");
@@ -76,8 +74,6 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
   if (state == KEY_RELEASED && REGSMENU_Key(key, state)) {
     return true;
   }
-  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
-  VFOContext *ctx = &vfo->context;
 
   uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
 
@@ -209,9 +205,6 @@ static void renderAnalyzerUI() {
 }
 
 void SCANER_render(void) {
-  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
-  VFOContext *ctx = &vfo->context;
-
   const uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
 
   STATUSLINE_RenderRadioSettings();

@@ -42,16 +42,8 @@ static ScanState scan = {
 // =============================
 // Вспомогательные функции
 // =============================
-static inline VFOContext *GetVFOContext() {
-  return &RADIO_GetCurrentVFO(&gRadioState)->context;
-}
-
-static inline ExtendedVFOContext *GetVFO() {
-  return RADIO_GetCurrentVFO(&gRadioState);
-}
 
 static uint16_t MeasureSignal(uint32_t frequency, bool precise) {
-  VFOContext *ctx = GetVFOContext();
   RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, precise, false);
   RADIO_SetParam(ctx, PARAM_FREQUENCY, frequency, false);
   RADIO_ApplySettings(ctx);
@@ -60,7 +52,6 @@ static uint16_t MeasureSignal(uint32_t frequency, bool precise) {
 }
 
 static void ApplyBandSettings() {
-  VFOContext *ctx = GetVFOContext();
   gLoot.f = gCurrentBand.rxF;
   RADIO_SetParam(ctx, PARAM_STEP, gCurrentBand.step, false);
   RADIO_ApplySettings(ctx);
@@ -69,10 +60,9 @@ static void ApplyBandSettings() {
 
 static void NextFrequency() {
   // TODO: priority cooldown scan
-  VFOContext *ctx = GetVFOContext();
   uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
   gLoot.f += step;
-  RADIO_GetCurrentVFO(&gRadioState)->is_open = false;
+  vfo->is_open = false;
   RADIO_SwitchAudioToVFO(&gRadioState, gRadioState.active_vfo_index);
 
   if (gLoot.f > gCurrentBand.txF) {
@@ -91,7 +81,6 @@ static void NextFrequency() {
 }
 
 static void NextWithTimeout() {
-  ExtendedVFOContext *vfo = GetVFO();
   if (scan.lastListenState != vfo->is_open) {
     scan.lastListenState = vfo->is_open;
 
@@ -159,7 +148,6 @@ static void HandleAnalyserMode() {
 }
 
 static void UpdateSquelchAndRssi(bool isAnalyserMode) {
-  ExtendedVFOContext *vfo = GetVFO();
   if (gSettings.skipGarbageFrequencies &&
       (RADIO_GetParam(&vfo->context, PARAM_FREQUENCY) % GARBAGE_FREQUENCY_MOD ==
        0)) {
@@ -189,8 +177,6 @@ static void UpdateSquelchAndRssi(bool isAnalyserMode) {
 void SCAN_Check(bool isAnalyserMode) {
   RADIO_UpdateMultiwatch(&gRadioState);
   RADIO_CheckAndSaveVFO(&gRadioState);
-
-  ExtendedVFOContext *vfo = GetVFO();
 
   if (isAnalyserMode) {
     HandleAnalyserMode();

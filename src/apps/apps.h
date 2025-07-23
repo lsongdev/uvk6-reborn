@@ -40,7 +40,10 @@ extern const App apps[APPS_COUNT];
 extern const AppType_t appsAvailableToRun[RUN_APPS_COUNT];
 
 extern AppType_t gCurrentApp;
+
 extern RadioState gRadioState;
+extern ExtendedVFOContext *vfo;
+extern VFOContext *ctx;
 
 AppType_t APPS_Peek();
 bool APPS_key(KEY_Code_t Key, Key_State_t state);
