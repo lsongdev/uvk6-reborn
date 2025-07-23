@@ -130,9 +130,6 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
       gCurrentBand.step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
       SCAN_setBand(gCurrentBand);
       return true;
-    case KEY_STAR:
-      // APPS_run(APP_LOOT_LIST);
-      return true;
     case KEY_UP:
     case KEY_DOWN:
       CUR_Move(key == KEY_UP);
@@ -172,7 +169,7 @@ bool SCANER_key(KEY_Code_t key, Key_State_t state) {
       SCAN_Next(true);
       return true;
     case KEY_STAR:
-      // APPS_run(APP_LOOT_LIST);
+      APPS_run(APP_LOOT_LIST);
       return true;
 
     case KEY_2:

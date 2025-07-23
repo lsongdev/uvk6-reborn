@@ -13,7 +13,7 @@
 */
 #include "fc.h"
 #include "finput.h"
-// #include "lootlist.h"
+#include "lootlist.h"
 #include "reset.h"
 #include "scaner.h"
 #include "settings.h"
@@ -57,14 +57,15 @@ AppType_t APPS_Peek(void) {
 }
 
 const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {
-    APP_VFO1,    //
-    APP_CH_LIST, //
-    APP_FC,      //
-    APP_SCANER,  //
+    APP_VFO1,      //
+    APP_CH_LIST,   //
+    APP_FC,        //
+    APP_SCANER,    //
+    APP_LOOT_LIST, //
     /*
     APP_CH_SCAN,   //
     APP_BAND_SCAN, //
-    APP_LOOT_LIST, // */
+    // */
     APP_ABOUT, //
 };
 
@@ -86,9 +87,10 @@ const App apps[APPS_COUNT] = {
                      CHLIST_deinit},
     [APP_SCANER] = {"Spectrum", SCANER_init, SCANER_update, SCANER_render,
                     SCANER_key, SCANER_deinit, true},
+    [APP_LOOT_LIST] = {"Loot", LOOTLIST_init, LOOTLIST_update, LOOTLIST_render,
+                       LOOTLIST_key, NULL},
     /*
-    [APP_LOOT_LIST] = {"Loot", LOOTLIST_init,
-    LOOTLIST_update, LOOTLIST_render, LOOTLIST_key, NULL}, [APP_CH_SCAN] = {"CH
+    [APP_CH_SCAN] = {"CH
     Scan", CHSCAN_init, CHSCAN_update, CHSCAN_render, CHSCAN_key,
     CHSCAN_deinit},
     [APP_BAND_SCAN] = {"Band Scan", BANDSCAN_init,

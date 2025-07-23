@@ -62,9 +62,6 @@ static void getLootItem(uint16_t i, uint16_t index, bool isCurrent) {
   const Loot *item = LOOT_Item(index);
   const uint8_t y = MENU_Y + i * MENU_ITEM_H_LARGER;
 
-  if (isCurrent) {
-    FillRect(0, y, LCD_WIDTH - 3, MENU_ITEM_H_LARGER, C_FILL);
-  }
   displayFreqBlWl(y, item);
 
   PrintSmallEx(LCD_WIDTH - 6, y + 7, POS_R, C_INVERT, "%us",
@@ -87,9 +84,6 @@ static void getLootItemShort(uint16_t i, uint16_t index, bool isCurrent) {
   const uint8_t y = MENU_Y + i * MENU_ITEM_H;
   const uint32_t ago = (Now() - loot->lastTimeOpen) / 1000;
 
-  if (isCurrent) {
-    FillRect(0, y, LCD_WIDTH - 3, MENU_ITEM_H, C_FILL);
-  }
   displayFreqBlWl(y, loot);
 
   switch (sortType) {
@@ -104,6 +98,10 @@ static void getLootItemShort(uint16_t i, uint16_t index, bool isCurrent) {
   }
 }
 
+static void renderItem(uint16_t index, uint8_t i, bool isCurrent) {
+  (shortList ? getLootItemShort : getLootItem)(i, index, isCurrent);
+}
+
 static void sort(Sort type) {
   if (sortType == type) {
     sortRev = !sortRev;
@@ -115,18 +113,31 @@ static void sort(Sort type) {
   STATUSLINE_SetText("By %s %s", sortNames[sortType], sortRev ? "v" : "^");
 }
 
+static uint32_t lastSqCheck;
 void LOOTLIST_update() {
-  RADIO_Sq();
+  RADIO_UpdateMultiwatch(&gRadioState);
+  RADIO_CheckAndSaveVFO(&gRadioState);
+
+  if (Now() - lastSqCheck >= 55) {
+    RADIO_UpdateSquelch(&gRadioState);
+    lastSqCheck = Now();
+  }
   gRedrawScreen = true;
   SYS_DelayMs(SQL_DELAY);
 }
 
-void LOOTLIST_render(void) {
-  UI_ShowMenuEx(shortList ? getLootItemShort : getLootItem, LOOT_Size(),
-                menuIndex, shortList ? 5 : 3);
+static Menu lootMenu = {"Loot", .render_item = renderItem};
+
+static void initMenu() {
+  lootMenu.num_items = LOOT_Size();
+  lootMenu.itemHeight = shortList ? MENU_ITEM_H : MENU_ITEM_H_LARGER;
+  MENU_Init(&lootMenu);
 }
 
+void LOOTLIST_render(void) { MENU_Render(); }
+
 void LOOTLIST_init(void) {
+  initMenu();
   sortType = SORT_F;
   sort(SORT_LOT);
   if (LOOT_Size()) {
@@ -181,11 +192,14 @@ bool LOOTLIST_key(KEY_Code_t key, Key_State_t state) {
   loot = LOOT_Item(menuIndex);
   const uint8_t MENU_SIZE = LOOT_Size();
 
+  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
+
   if (state == KEY_LONG_PRESSED) {
     switch (key) {
     case KEY_0:
       LOOT_Clear();
-      RADIO_TuneToPure(0, true);
+      RADIO_SetParam(ctx, PARAM_FREQUENCY, 0, false);
+      RADIO_ApplySettings(ctx);
       return true;
     case KEY_SIDE1:
       gMonitorMode = !gMonitorMode;
@@ -249,6 +263,7 @@ bool LOOTLIST_key(KEY_Code_t key, Key_State_t state) {
       return true;
     case KEY_7:
       shortList = !shortList;
+      initMenu();
       return true;
     case KEY_9:
       return true;
@@ -266,7 +281,8 @@ bool LOOTLIST_key(KEY_Code_t key, Key_State_t state) {
       if (loot) {
         tuneToLoot(loot, false);
       } else {
-        RADIO_TuneToPure(0, true);
+        RADIO_SetParam(ctx, PARAM_FREQUENCY, 0, false);
+        RADIO_ApplySettings(ctx);
       }
       return true;
     case KEY_MENU:
