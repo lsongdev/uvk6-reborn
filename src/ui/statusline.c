@@ -135,13 +135,24 @@ void STATUSLINE_render(void) {
 }
 
 void STATUSLINE_RenderRadioSettings() {
-  STATUSLINE_SetText(                                      //
-      "%s %s AFC%s %s %s %s",                              //
-      RADIO_GetParamValueString(ctx, PARAM_GAIN),          //
-      RADIO_GetParamValueString(ctx, PARAM_BANDWIDTH),     //
-      RADIO_GetParamValueString(ctx, PARAM_AFC),           //
-      RADIO_GetParamValueString(ctx, PARAM_SQUELCH_TYPE),  //
-      RADIO_GetParamValueString(ctx, PARAM_SQUELCH_VALUE), //
-      RADIO_GetParamValueString(ctx, PARAM_MODULATION)     //
-  );
+  char gain[8];
+  char bandwidth[8];
+  char afc[8];
+  char squelch_type[8];
+  char squelch_value[8];
+  char modulation[8];
+
+  strncpy(gain, RADIO_GetParamValueString(ctx, PARAM_GAIN), sizeof(gain));
+  strncpy(bandwidth, RADIO_GetParamValueString(ctx, PARAM_BANDWIDTH),
+          sizeof(bandwidth));
+  strncpy(afc, RADIO_GetParamValueString(ctx, PARAM_AFC), sizeof(afc));
+  strncpy(squelch_type, RADIO_GetParamValueString(ctx, PARAM_SQUELCH_TYPE),
+          sizeof(squelch_type));
+  strncpy(squelch_value, RADIO_GetParamValueString(ctx, PARAM_SQUELCH_VALUE),
+          sizeof(squelch_value));
+  strncpy(modulation, RADIO_GetParamValueString(ctx, PARAM_MODULATION),
+          sizeof(modulation));
+
+  STATUSLINE_SetText("%s %s AFC%s %s %s %s", gain, bandwidth, afc, squelch_type,
+                     squelch_value, modulation);
 }
