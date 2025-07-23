@@ -1169,6 +1169,7 @@ bool RADIO_CheckSquelch(VFOContext *ctx) {
 }
 
 static void RADIO_UpdateMeasurement() {
+  vfo->msm.f = ctx->frequency;
   vfo->msm.rssi = RADIO_GetRSSI(ctx);
   vfo->msm.snr = RADIO_GetSNR(ctx);
   vfo->msm.noise = BK4819_GetNoise();
