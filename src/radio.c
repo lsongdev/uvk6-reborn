@@ -22,7 +22,7 @@
 
 #define RADIO_SAVE_DELAY_MS 1000
 
-// #define DEBUG_PARAMS 1
+#define DEBUG_PARAMS 1
 
 bool gShowAllRSSI = false;
 bool gMonitorMode = false;
@@ -503,7 +503,7 @@ static uint16_t RADIO_GetRSSI(const VFOContext *ctx) {
   }
 }
 
-static uint8_t RADIO_GetSNR(VFOContext *ctx) {
+static uint8_t RADIO_GetSNR(const VFOContext *ctx) {
   switch (ctx->radio_type) {
   case RADIO_BK4819:
     return ConvertDomain(BK4819_GetSNR(), 24, 170, 0, 30);
@@ -518,6 +518,14 @@ static uint8_t RADIO_GetSNR(VFOContext *ctx) {
   default:
     return 0;
   }
+}
+
+static uint8_t RADIO_GetNoise(const VFOContext *ctx) {
+  return ctx->radio_type == RADIO_BK4819 ? BK4819_GetNoise() : 0;
+}
+
+static uint8_t RADIO_GetGlitch(const VFOContext *ctx) {
+  return ctx->radio_type == RADIO_BK4819 ? BK4819_GetGlitch() : 0;
 }
 
 static void updateContext() {
@@ -554,6 +562,7 @@ void RADIO_Init(VFOContext *ctx, Radio radio_type) {
 // Проверка параметра для текущего диапазона
 bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value) {
   const FreqBand *band = ctx->current_band;
+
   if (!band)
     return false;
 
@@ -588,6 +597,20 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   uint32_t old_value = RADIO_GetParam(ctx, param);
 
   switch (param) {
+  case PARAM_TX_STATE:
+  case PARAM_RSSI:
+  case PARAM_NOISE:
+  case PARAM_GLITCH:
+  case PARAM_SNR:
+    return;
+
+  case PARAM_RX_CODE:
+    ctx->code.value = value;
+    break;
+  case PARAM_TX_CODE:
+    ctx->tx_state.code.value = value;
+    break;
+
   case PARAM_PRECISE_F_CHANGE:
     ctx->preciseFChange = value;
     break;
@@ -663,8 +686,23 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
 
 uint32_t RADIO_GetParam(const VFOContext *ctx, ParamType param) {
   switch (param) {
+  case PARAM_RX_CODE:
+    return ctx->code.value;
+    break;
+  case PARAM_TX_CODE:
+    return ctx->tx_state.code.value;
+    break;
+  case PARAM_TX_OFFSET:
+    return ctx->tx_state.frequency;
+    break;
   case PARAM_RSSI:
-    return RADIO_GetRSSI(ctx);
+    return vfo->msm.rssi;
+  case PARAM_NOISE:
+    return vfo->msm.noise;
+  case PARAM_GLITCH:
+    return vfo->msm.glitch;
+  case PARAM_SNR:
+    return vfo->msm.snr;
   case PARAM_FREQUENCY:
     return ctx->frequency;
   case PARAM_PRECISE_F_CHANGE:
@@ -1366,6 +1404,15 @@ const char *RADIO_GetParamValueString(const VFOContext *ctx, ParamType param) {
   static char buf[16] = "unk";
   uint32_t v = RADIO_GetParam(ctx, param);
   switch (param) {
+  case PARAM_RSSI:
+    snprintf(buf, 15, "%+ddB", Rssi2DBm(v));
+    break;
+  case PARAM_NOISE:
+  case PARAM_GLITCH:
+  case PARAM_SNR:
+    snprintf(buf, 15, "%u", v);
+    break;
+
   case PARAM_MODULATION:
     return RADIO_GetModulationName(ctx);
   case PARAM_TX_STATE:
