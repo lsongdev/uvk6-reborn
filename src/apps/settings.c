@@ -20,9 +20,6 @@ static void updateValS(const MenuItem *item, bool up) {
 }
 
 static void doCalibrate(uint32_t v, uint32_t _) {
-  Log("v=%u, c=%u, nv=%u, nc=%u",
-      BATTERY_GetPreciseVoltage(gSettings.batteryCalibration),
-      gSettings.batteryCalibration, v, BATTERY_GetCal(v * 100));
   SETTINGS_SetValue(SETTING_BATTERYCALIBRATION, BATTERY_GetCal(v * 100));
 }
 
@@ -89,12 +86,12 @@ static const MenuItem batMenuItems[] = {
 static Menu batteryMenu = {"Battery", batMenuItems, ARRAY_SIZE(batMenuItems)};
 
 static const MenuItem menuItems[] = {
-    {"Radio", .submenu = &radioMenu},
     {"Scan", .submenu = &scanMenu},
+    {"Radio", .submenu = &radioMenu},
     {"Display", .submenu = &displayMenu},
     {"Battery", .submenu = &batteryMenu},
-    {"Main app", SETTING_MAINAPP, getValS, updateValS},
     {"Beep", SETTING_BEEP, getValS, updateValS},
+    {"Main app", SETTING_MAINAPP, getValS, updateValS},
     {"Lock PTT", SETTING_PTT_LOCK, getValS, updateValS},
     /*
     {"Upconv", M_UPCONVERTER, 0},

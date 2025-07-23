@@ -230,10 +230,9 @@ void VFO1_render(void) {
 
   if (gIsNumNavInput) {
     STATUSLINE_SetText("Select: %s", gNumNavInput);
-    /* } else if (gSettings.iAmPro &&
-               (!gSettings.mWatch || gIsListening)) { // NOTE mwatch is
-    temporary STATUSLINE_RenderRadioSettings(); } else {
-      STATUSLINE_SetText(radio.name); */
+  } else if (gSettings.iAmPro &&
+             (!gSettings.mWatch || vfo->is_open)) { // NOTE mwatch is temporary
+    STATUSLINE_RenderRadioSettings();
   } else {
     STATUSLINE_SetText("Radio: %s",
                        RADIO_GetParamValueString(ctx, PARAM_RADIO));

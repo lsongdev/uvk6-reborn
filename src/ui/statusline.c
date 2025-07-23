@@ -82,17 +82,19 @@ void STATUSLINE_render(void) {
   DrawHLine(0, 6, LCD_WIDTH, C_FILL);
 
   if (showBattery) {
-    if (gSettings.batteryStyle) {
+    switch (gSettings.batteryStyle) {
+    case BAT_CLEAN:
+      UI_Battery(previousBatteryLevel);
+      break;
+    case BAT_PERCENT:
       PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_INVERT, "%u%%",
                    gBatteryPercent);
-    } else {
-      UI_Battery(previousBatteryLevel);
+      break;
+    case BAT_VOLTAGE:
+      PrintSmallEx(LCD_WIDTH - 1 - 16, BASE_Y, POS_R, C_FILL, "%u.%02uV",
+                   gBatteryVoltage / 100, gBatteryVoltage % 100);
+      break;
     }
-  }
-
-  if (gSettings.batteryStyle == BAT_VOLTAGE) {
-    PrintSmallEx(LCD_WIDTH - 1 - 16, BASE_Y, POS_R, C_FILL, "%u.%02uV",
-                 gBatteryVoltage / 100, gBatteryVoltage % 100);
   }
 
   char icons[8] = {'\0'};
@@ -102,18 +104,6 @@ void STATUSLINE_render(void) {
     icons[idx++] = SYM_EEPROM_W;
   }
 
-  /* if (SVC_Running(SVC_BEACON)) {
-    icons[idx++] = SYM_BEACON;
-  } */
-
-  /* if (SVC_Running(SVC_FC)) {
-    icons[idx++] = SYM_FC;
-  }
-
-  if (SVC_Running(SVC_SCAN)) {
-    icons[idx++] = SYM_SCAN;
-  } */
-
   if (LOOT_Size() == LOOT_SIZE_MAX) {
     icons[idx++] = SYM_LOOT_FULL;
   }
@@ -122,9 +112,9 @@ void STATUSLINE_render(void) {
     icons[idx++] = SYM_MONITOR;
   }
 
-  /* if (RADIO_GetRadio() == RADIO_BK1080 || isSi4732On) {
+  if (ctx->radio_type == RADIO_BK1080 || isSi4732On) {
     icons[idx++] = SYM_BROADCAST;
-  } */
+  }
 
   if (gSettings.upconverter) {
     icons[idx++] = SYM_CONVERTER;
@@ -147,15 +137,13 @@ void STATUSLINE_render(void) {
 }
 
 void STATUSLINE_RenderRadioSettings() {
-  /* const int8_t vGain = -gainTable[radio.gainIndex].gainDb + 33;
-
-  STATUSLINE_SetText(                              //
-      "%+d %s AFC%u %s %u %s",                     //
-      vGain,                                       //
-      RADIO_GetBWName(),                           //
-      BK4819_GetAFC(),                             //
-      sqTypeNames[radio.squelch.type],             //
-      radio.squelch.value,                         //
-      modulationTypeOptions[RADIO_GetModulation()] //
-  ); */
+  STATUSLINE_SetText(                                      //
+      "%s %s AFC%s %s %s %s",                              //
+      RADIO_GetParamValueString(ctx, PARAM_GAIN),          //
+      RADIO_GetParamValueString(ctx, PARAM_BANDWIDTH),     //
+      RADIO_GetParamValueString(ctx, PARAM_AFC),           //
+      RADIO_GetParamValueString(ctx, PARAM_SQUELCH_TYPE),  //
+      RADIO_GetParamValueString(ctx, PARAM_SQUELCH_VALUE), //
+      RADIO_GetParamValueString(ctx, PARAM_MODULATION)     //
+  );
 }
