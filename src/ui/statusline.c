@@ -91,7 +91,7 @@ void STATUSLINE_render(void) {
                    gBatteryPercent);
       break;
     case BAT_VOLTAGE:
-      PrintSmallEx(LCD_WIDTH - 1 - 16, BASE_Y, POS_R, C_FILL, "%u.%02uV",
+      PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_FILL, "%u.%02uV",
                    gBatteryVoltage / 100, gBatteryVoltage % 100);
       break;
     }

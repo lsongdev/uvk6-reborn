@@ -913,6 +913,8 @@ void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
 
   // Initialize multiwatch
   state->active_vfo_index = gSettings.activeVFO;
+  updateContext();
+
   state->last_scan_time = 0;
   state->multiwatch_enabled = false;
 }
@@ -964,16 +966,15 @@ bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
   RADIO_SwitchAudioToVFO(state, vfo_index);
 
   // Activate new VFO
-  state->active_vfo_index = vfo_index;
   state->vfos[vfo_index].is_active = true;
+  state->active_vfo_index = vfo_index;
+  updateContext();
 
   // Apply settings for the new VFO
   RADIO_ApplySettings(&state->vfos[vfo_index].context);
 
   gSettings.activeVFO = vfo_index;
   SETTINGS_DelayedSave();
-
-  updateContext();
 
   return true;
 }
@@ -1167,27 +1168,21 @@ bool RADIO_CheckSquelch(VFOContext *ctx) {
   return gShowAllRSSI ? RADIO_GetSNR(ctx) > ctx->squelch.value : true;
 }
 
-void RADIO_UpdateMeasurement() {
-  Measurement m = {
-      .rssi = RADIO_GetRSSI(),
-      .snr = RADIO_GetSNR(),
-      .noise = BK4819_GetNoise(),
-      .glitch = BK4819_GetGlitch(),
-  };
-  m.open = RADIO_IsSquelchOpen();
+static void RADIO_UpdateMeasurement() {
+  vfo->msm.rssi = RADIO_GetRSSI(ctx);
+  vfo->msm.snr = RADIO_GetSNR(ctx);
+  vfo->msm.noise = BK4819_GetNoise();
+  vfo->msm.glitch = BK4819_GetGlitch();
+  vfo->msm.open = RADIO_CheckSquelch(ctx);
   if (!gMonitorMode) {
-    LOOT_Update(&m);
+    LOOT_Update(&vfo->msm);
   }
-  RADIO_ToggleRX(m.open);
-  SP_ShiftGraph(-1);
-  SP_AddGraphPoint(&m);
 }
 
 void RADIO_UpdateSquelch(RadioState *state) {
-  ExtendedVFOContext *active_vfo = &state->vfos[state->active_vfo_index];
-  bool is_open = RADIO_CheckSquelch(&active_vfo->context);
-  if (is_open != active_vfo->is_open) {
-    active_vfo->is_open = is_open;
+  RADIO_UpdateMeasurement();
+  if (vfo->msm.open != vfo->is_open) {
+    vfo->is_open = vfo->msm.open;
     RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
   }
 }
