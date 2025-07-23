@@ -22,7 +22,7 @@
 
 #define RADIO_SAVE_DELAY_MS 1000
 
-// #define DEBUG_PARAMS 1
+#define DEBUG_PARAMS 1
 
 bool gShowAllRSSI = false;
 bool gMonitorMode = false;
@@ -1261,7 +1261,98 @@ void RADIO_UpdateSquelch(RadioState *state) {
   }
 }
 // Update multiwatch state (should be called periodically)
+
 void RADIO_UpdateMultiwatch(RadioState *state) {
+  if (!state->multiwatch_enabled || gSettings.mWatch == 0) {
+    state->scan_state = RADIO_SCAN_STATE_IDLE;
+    return;
+  }
+
+  static uint8_t current_scan_vfo = 0;
+  static uint32_t last_scan_time = 0;
+  uint32_t current_time = Now();
+
+  switch (state->scan_state) {
+  case RADIO_SCAN_STATE_IDLE:
+    Log("IDLE");
+    // Начинаем новый цикл сканирования
+    current_scan_vfo = 0;
+    state->scan_state = RADIO_SCAN_STATE_SWITCHING;
+    break;
+
+  case RADIO_SCAN_STATE_SWITCHING:
+    // Ищем следующий VFO для сканирования (пропускаем активный и вещательные)
+    do {
+      current_scan_vfo = (current_scan_vfo + 1) % state->num_vfos;
+    } while (current_scan_vfo == state->active_vfo_index ||
+             isBroadcastReceiver(&state->vfos[current_scan_vfo].context));
+
+    // Временно переключаемся
+    RADIO_SwitchVFOTemp(state, current_scan_vfo);
+    Log("SW %u", state->vfos[current_scan_vfo].context.frequency);
+    state->scan_state = RADIO_SCAN_STATE_WARMUP;
+    last_scan_time = current_time;
+    break;
+
+  case RADIO_SCAN_STATE_WARMUP:
+    Log("WU");
+    // Ждем стабилизации сигнала
+    if (current_time - last_scan_time >= SQL_DELAY) {
+      state->scan_state = RADIO_SCAN_STATE_MEASURING;
+    }
+    break;
+
+  case RADIO_SCAN_STATE_MEASURING:
+    Log("ME");
+    // Выполняем замер
+    RADIO_UpdateMeasurement(&state->vfos[current_scan_vfo]);
+    state->scan_state = RADIO_SCAN_STATE_DECISION;
+    break;
+
+  case RADIO_SCAN_STATE_DECISION: {
+    Log("DEC");
+    // Только для режима с автопереключением
+    ExtendedVFOContext *scanned = &state->vfos[current_scan_vfo];
+    ExtendedVFOContext *active = &state->vfos[state->active_vfo_index];
+    if (gSettings.mWatch == 2) {
+
+      // Условия переключения:
+      bool should_switch =
+          scanned->msm.open &&
+          (scanned->msm.rssi > active->msm.rssi + 3 || // Гистерезис 3dB
+           !active->msm.open) &&
+          scanned->msm.rssi > 0;
+
+      if (should_switch) {
+        RADIO_SwitchVFO(state, current_scan_vfo);
+      }
+    } else {
+      if (scanned->msm.open != scanned->is_open) {
+        scanned->is_open = scanned->msm.open;
+        RADIO_SwitchAudioToVFO(state, current_scan_vfo);
+      }
+      if (scanned->msm.open) {
+        Log("OPEN!!!");
+        state->scan_state = RADIO_SCAN_STATE_WARMUP;
+        last_scan_time = current_time;
+        return;
+      }
+    }
+
+    // Переходим к следующему VFO или завершаем цикл
+    if (current_scan_vfo >= state->num_vfos - 1) {
+      // Возвращаемся к активному VFO
+      RADIO_SwitchVFOTemp(state, state->active_vfo_index);
+      state->scan_state = RADIO_SCAN_STATE_IDLE;
+    } else {
+      state->scan_state = RADIO_SCAN_STATE_SWITCHING;
+    }
+    break;
+  }
+  }
+}
+
+/* void RADIO_UpdateMultiwatch(RadioState *state) {
   if (!state->multiwatch_enabled)
     return;
 
@@ -1319,7 +1410,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
       }
     }
   }
-}
+} */
 
 void RADIO_LoadVFOs(RadioState *state) {
   Log("RADIO_LoadVFOs()");
