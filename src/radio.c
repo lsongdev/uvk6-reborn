@@ -327,7 +327,7 @@ static void rxTurnOff(Radio r) {
   }
 }
 
-static void rxTurnOn(VFOContext *ctx) {
+static void rxTurnOn(const VFOContext *ctx) {
   switch (ctx->radio_type) {
   case RADIO_BK4819:
     BK4819_RX_TurnOn();
@@ -486,7 +486,7 @@ static bool setParamBK1080(VFOContext *ctx, ParamType p) {
   return false;
 }
 
-static uint16_t RADIO_GetRSSI(const VFOContext *ctx) {
+uint16_t RADIO_GetRSSI(const VFOContext *ctx) {
   switch (ctx->radio_type) {
   case RADIO_BK4819:
     return BK4819_GetRSSI();
@@ -503,7 +503,7 @@ static uint16_t RADIO_GetRSSI(const VFOContext *ctx) {
   }
 }
 
-static uint8_t RADIO_GetSNR(const VFOContext *ctx) {
+uint8_t RADIO_GetSNR(const VFOContext *ctx) {
   switch (ctx->radio_type) {
   case RADIO_BK4819:
     return ConvertDomain(BK4819_GetSNR(), 24, 170, 0, 30);
@@ -520,11 +520,11 @@ static uint8_t RADIO_GetSNR(const VFOContext *ctx) {
   }
 }
 
-static uint8_t RADIO_GetNoise(const VFOContext *ctx) {
+uint8_t RADIO_GetNoise(const VFOContext *ctx) {
   return ctx->radio_type == RADIO_BK4819 ? BK4819_GetNoise() : 0;
 }
 
-static uint8_t RADIO_GetGlitch(const VFOContext *ctx) {
+uint8_t RADIO_GetGlitch(const VFOContext *ctx) {
   return ctx->radio_type == RADIO_BK4819 ? BK4819_GetGlitch() : 0;
 }
 

@@ -191,6 +191,11 @@ const ExtendedVFOContext *RADIO_GetCurrentVFOConst(const RadioState *state);
 void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index);
 void RADIO_UpdateSquelch(RadioState *state);
 
+uint16_t RADIO_GetRSSI(const VFOContext *ctx);
+uint8_t RADIO_GetSNR(const VFOContext *ctx);
+uint8_t RADIO_GetNoise(const VFOContext *ctx);
+uint8_t RADIO_GetGlitch(const VFOContext *ctx);
+
 extern RadioState gRadioState;
 extern ExtendedVFOContext *vfo;
 extern VFOContext *ctx;

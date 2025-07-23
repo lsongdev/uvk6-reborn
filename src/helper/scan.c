@@ -47,8 +47,8 @@ static uint16_t MeasureSignal(uint32_t frequency, bool precise) {
   RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, precise, false);
   RADIO_SetParam(ctx, PARAM_FREQUENCY, frequency, false);
   RADIO_ApplySettings(ctx);
-  SYSTICK_DelayUs(scan.scanDelayUs);
-  return RADIO_GetParam(ctx, PARAM_RSSI);
+  SYSTICK_DelayUs(precise ? scan.scanDelayUs : 0);
+  return RADIO_GetRSSI(ctx);
 }
 
 static void ApplyBandSettings() {
@@ -62,8 +62,10 @@ static void NextFrequency() {
   // TODO: priority cooldown scan
   uint32_t step = StepFrequencyTable[RADIO_GetParam(ctx, PARAM_STEP)];
   vfo->msm.f += step;
-  vfo->is_open = false;
-  RADIO_SwitchAudioToVFO(&gRadioState, gRadioState.active_vfo_index);
+  if (vfo->is_open) {
+    vfo->is_open = false;
+    RADIO_SwitchAudioToVFO(&gRadioState, gRadioState.active_vfo_index);
+  }
 
   if (vfo->msm.f > gCurrentBand.txF) {
     if (scan.isMultiband) {
