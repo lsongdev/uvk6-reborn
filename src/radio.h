@@ -11,7 +11,6 @@
 #define GARBAGE_FREQUENCY_MOD (13 * MHZ)
 
 #define MAX_VFOS 16
-extern Measurement gLoot;
 
 extern bool gShowAllRSSI;
 extern bool gMonitorMode;
@@ -79,7 +78,6 @@ typedef struct {
 
 // Контекст VFO
 typedef struct {
-  Measurement msm; // TODO: implement
 
   uint32_t last_save_time; // Время последнего сохранения
   uint32_t frequency;      // Текущая частота
@@ -122,6 +120,7 @@ typedef enum { MODE_VFO, MODE_CHANNEL } VFOMode;
 
 // Extended VFO context
 typedef struct {
+  Measurement msm;             // TODO: implement
   VFOContext context;          // Existing VFO context
   uint32_t last_activity_time; // for multiwatch
   uint16_t channel_index;      // Channel index if in channel mode
@@ -191,5 +190,9 @@ const ExtendedVFOContext *RADIO_GetCurrentVFOConst(const RadioState *state);
 
 void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index);
 void RADIO_UpdateSquelch(RadioState *state);
+
+extern RadioState gRadioState;
+extern ExtendedVFOContext *vfo;
+extern VFOContext *ctx;
 
 #endif // RADIO_H

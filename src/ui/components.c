@@ -1,4 +1,5 @@
 #include "components.h"
+#include "../apps/apps.h"
 #include "../driver/st7565.h"
 #include "../helper/channels.h"
 #include "../helper/measurements.h"
@@ -29,7 +30,7 @@ void UI_TxBar(uint8_t y) {
 }
 
 void UI_RSSIBar(uint8_t y) {
-  uint16_t rssi = gLoot.rssi;
+  uint16_t rssi = vfo->msm.rssi;
   if (rssi == 0) {
     return;
   }
@@ -44,7 +45,7 @@ void UI_RSSIBar(uint8_t y) {
   const uint16_t SNR_MAX = 30;
 
   uint8_t rssiW = ConvertDomain(rssi, RSSI_MIN, RSSI_MAX, 0, BAR_WIDTH);
-  uint8_t snrW = ConvertDomain(gLoot.snr, SNR_MIN, SNR_MAX, 0, BAR_WIDTH);
+  uint8_t snrW = ConvertDomain(vfo->msm.snr, SNR_MIN, SNR_MAX, 0, BAR_WIDTH);
 
   FillRect(BAR_LEFT_MARGIN, y + 2, rssiW, 4, C_FILL);
   FillRect(BAR_LEFT_MARGIN, y + 7, snrW, 1, C_FILL);
@@ -157,16 +158,16 @@ void UI_DisplayScanlists(uint32_t y) {
 }
 
 void UI_RenderScanScreen() {
-  /* if (gScanlistSize) {
-    PrintMediumEx(LCD_XCENTER, 26, POS_C, C_FILL, "%u.%05u", radio.rxF / MHZ,
-                  radio.rxF % MHZ);
+  if (gScanlistSize) {
+    const uint32_t f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
+    PrintMediumEx(LCD_XCENTER, 26, POS_C, C_FILL, "%u.%05u", f / MHZ, f % MHZ);
   } else {
     PrintMediumBoldEx(LCD_XCENTER, 18, POS_C, C_FILL, "Scanlist empty");
   }
 
-  if (gIsListening) {
+  if (vfo->is_open) {
     UI_RSSIBar(28);
-  } */
+  }
 
   if (gLastActiveLoot) {
     UI_DrawLoot(gLastActiveLoot, LCD_XCENTER, 50, POS_C);

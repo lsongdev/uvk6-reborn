@@ -27,7 +27,9 @@
 bool gShowAllRSSI = false;
 bool gMonitorMode = false;
 
-Measurement gLoot;
+RadioState gRadioState;
+ExtendedVFOContext *vfo;
+VFOContext *ctx;
 
 const char *RADIO_NAMES[3] = {
     [RADIO_BK4819] = "BK4819",
@@ -518,6 +520,11 @@ static uint8_t RADIO_GetSNR(VFOContext *ctx) {
   }
 }
 
+static void updateContext() {
+  vfo = RADIO_GetCurrentVFO(&gRadioState);
+  ctx = &vfo->context;
+}
+
 // Инициализация VFO
 void RADIO_Init(VFOContext *ctx, Radio radio_type) {
   memset(ctx, 0, sizeof(VFOContext));
@@ -966,6 +973,8 @@ bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
   gSettings.activeVFO = vfo_index;
   SETTINGS_DelayedSave();
 
+  updateContext();
+
   return true;
 }
 
@@ -1158,6 +1167,22 @@ bool RADIO_CheckSquelch(VFOContext *ctx) {
   return gShowAllRSSI ? RADIO_GetSNR(ctx) > ctx->squelch.value : true;
 }
 
+void RADIO_UpdateMeasurement() {
+  Measurement m = {
+      .rssi = RADIO_GetRSSI(),
+      .snr = RADIO_GetSNR(),
+      .noise = BK4819_GetNoise(),
+      .glitch = BK4819_GetGlitch(),
+  };
+  m.open = RADIO_IsSquelchOpen();
+  if (!gMonitorMode) {
+    LOOT_Update(&m);
+  }
+  RADIO_ToggleRX(m.open);
+  SP_ShiftGraph(-1);
+  SP_AddGraphPoint(&m);
+}
+
 void RADIO_UpdateSquelch(RadioState *state) {
   ExtendedVFOContext *active_vfo = &state->vfos[state->active_vfo_index];
   bool is_open = RADIO_CheckSquelch(&active_vfo->context);
@@ -1265,6 +1290,8 @@ void RADIO_LoadVFOs(RadioState *state) {
   }
 
   RADIO_ApplySettings(ctx);
+
+  updateContext();
 }
 
 // Включаем/выключаем маршрутизацию аудио
