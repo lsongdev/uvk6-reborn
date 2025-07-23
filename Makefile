@@ -107,7 +107,7 @@ debug: CFLAGS += $(DEBUG_FLAGS)
 debug: all
 
 release: clean all
-	cp $(TARGET).packed.bin $(BIN_DIR)/s0va-by-fagci-$(BUILD_TAG).bin
+	cp $(TARGET).packed.bin $(BIN_DIR)/Hawk5-alfa-by-fagci-$(BUILD_TAG).bin
 
 $(TARGET).bin: $(TARGET)
 	$(OBJCOPY) -O binary $< $@

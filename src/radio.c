@@ -22,7 +22,7 @@
 
 #define RADIO_SAVE_DELAY_MS 1000
 
-#define DEBUG_PARAMS 1
+// #define DEBUG_PARAMS 1
 
 bool gShowAllRSSI = false;
 bool gMonitorMode = false;
@@ -983,7 +983,7 @@ static bool RADIO_SwitchVFOTemp(RadioState *state, uint8_t vfo_index) {
     return false;
   }
 
-  Log("RADIO_SwitchVFOTemp");
+  // Log("RADIO_SwitchVFOTemp");
 
   // Deactivate current VFO
   // state->vfos[state->active_vfo_index].is_active = false;
@@ -1274,7 +1274,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
 
   switch (state->scan_state) {
   case RADIO_SCAN_STATE_IDLE:
-    Log("IDLE");
+    // Log("IDLE");
     // Начинаем новый цикл сканирования
     current_scan_vfo = 0;
     state->scan_state = RADIO_SCAN_STATE_SWITCHING;
@@ -1289,13 +1289,13 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
 
     // Временно переключаемся
     RADIO_SwitchVFOTemp(state, current_scan_vfo);
-    Log("SW %u", state->vfos[current_scan_vfo].context.frequency);
+    // Log("SW %u", state->vfos[current_scan_vfo].context.frequency);
     state->scan_state = RADIO_SCAN_STATE_WARMUP;
     last_scan_time = current_time;
     break;
 
   case RADIO_SCAN_STATE_WARMUP:
-    Log("WU");
+    // Log("WU");
     // Ждем стабилизации сигнала
     if (current_time - last_scan_time >= SQL_DELAY) {
       state->scan_state = RADIO_SCAN_STATE_MEASURING;
@@ -1303,14 +1303,14 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
     break;
 
   case RADIO_SCAN_STATE_MEASURING:
-    Log("ME");
+    // Log("ME");
     // Выполняем замер
     RADIO_UpdateMeasurement(&state->vfos[current_scan_vfo]);
     state->scan_state = RADIO_SCAN_STATE_DECISION;
     break;
 
   case RADIO_SCAN_STATE_DECISION: {
-    Log("DEC");
+    // Log("DEC");
     // Только для режима с автопереключением
     ExtendedVFOContext *scanned = &state->vfos[current_scan_vfo];
     ExtendedVFOContext *active = &state->vfos[state->active_vfo_index];
@@ -1332,7 +1332,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
         RADIO_SwitchAudioToVFO(state, current_scan_vfo);
       }
       if (scanned->msm.open) {
-        Log("OPEN!!!");
+        // Log("OPEN!!!");
         state->scan_state = RADIO_SCAN_STATE_WARMUP;
         last_scan_time = current_time;
         return;
