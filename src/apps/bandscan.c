@@ -1,4 +1,4 @@
-/* #include "chscan.h"
+#include "chscan.h"
 
 #include "../driver/uart.h"
 #include "../helper/bands.h"
@@ -35,6 +35,7 @@ bool BANDSCAN_key(KEY_Code_t key, Key_State_t state) {
   }
   bool longHeld = state == KEY_LONG_PRESSED;
   bool simpleKeypress = state == KEY_RELEASED;
+  VFOContext *ctx = &RADIO_GetCurrentVFO(&gRadioState)->context;
   if ((longHeld || simpleKeypress) && (key > KEY_0 && key < KEY_9)) {
     gSettings.currentScanlist = CHANNELS_ScanlistByKey(
         gSettings.currentScanlist, key, longHeld && !simpleKeypress);
@@ -63,7 +64,8 @@ bool BANDSCAN_key(KEY_Code_t key, Key_State_t state) {
       return true;
     case KEY_PTT:
       if (gLastActiveLoot && !gSettings.keylock) {
-        RADIO_TuneToSave(gLastActiveLoot->f);
+        RADIO_SetParam(ctx, gLastActiveLoot->f, PARAM_FREQUENCY, true);
+        RADIO_ApplySettings(ctx);
         APPS_run(APP_VFO1);
         return true;
       }
@@ -82,4 +84,4 @@ void BANDSCAN_render(void) {
 
   UI_RenderScanScreen();
   REGSMENU_Draw();
-} */
+}

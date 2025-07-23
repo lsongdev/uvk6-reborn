@@ -5,12 +5,10 @@
 #include "../ui/statusline.h"
 #include "about.h"
 #include "appslist.h"
+#include "bandscan.h"
 #include "chcfg.h"
 #include "chlist.h"
-/*
-#include "bandscan.h"
 #include "chscan.h"
-*/
 #include "fc.h"
 #include "finput.h"
 #include "lootlist.h"
@@ -62,11 +60,9 @@ const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {
     APP_FC,        //
     APP_SCANER,    //
     APP_LOOT_LIST, //
-    /*
     APP_CH_SCAN,   //
     APP_BAND_SCAN, //
-    // */
-    APP_ABOUT, //
+    APP_ABOUT,     //
 };
 
 const App apps[APPS_COUNT] = {
@@ -89,14 +85,10 @@ const App apps[APPS_COUNT] = {
                     SCANER_key, SCANER_deinit, true},
     [APP_LOOT_LIST] = {"Loot", LOOTLIST_init, LOOTLIST_update, LOOTLIST_render,
                        LOOTLIST_key, NULL},
-    /*
-    [APP_CH_SCAN] = {"CH
-    Scan", CHSCAN_init, CHSCAN_update, CHSCAN_render, CHSCAN_key,
-    CHSCAN_deinit},
-    [APP_BAND_SCAN] = {"Band Scan", BANDSCAN_init,
-    BANDSCAN_update, BANDSCAN_render, BANDSCAN_key, BANDSCAN_deinit},
-    [APP_FC] =
-  */
+    [APP_CH_SCAN] = {"CH Scan", CHSCAN_init, CHSCAN_update, CHSCAN_render,
+                     CHSCAN_key, CHSCAN_deinit},
+    [APP_BAND_SCAN] = {"Band Scan", BANDSCAN_init, BANDSCAN_update,
+                       BANDSCAN_render, BANDSCAN_key, BANDSCAN_deinit},
     [APP_FC] = {"FC", FC_init, FC_update, FC_render, FC_key, FC_deinit, true},
     [APP_VFO1] = {"1 VFO", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL,
                   true, true},

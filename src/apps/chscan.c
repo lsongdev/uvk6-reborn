@@ -1,4 +1,4 @@
-/* #include "chscan.h"
+#include "chscan.h"
 
 #include "../driver/system.h"
 #include "../driver/uart.h"
@@ -16,14 +16,21 @@ static bool lastListenState;
 static uint32_t timeout = 0;
 static bool isWaiting;
 
+static void loadCurrentCh() {
+  RADIO_LoadChannelToVFO(&gRadioState, RADIO_GetCurrentVFONumber(&gRadioState),
+                         CHANNELS_GetCurrentScanlistCH());
+}
+
 static void nextWithTimeout() {
-  if (lastListenState != gIsListening) {
-    lastListenState = gIsListening;
-    if (gIsListening) {
-      CHANNELS_Load(radio.channel, &activeCh);
+  ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+  VFOContext *ctx = &vfo->context;
+  if (lastListenState != vfo->is_open) {
+    lastListenState = vfo->is_open;
+    if (vfo->is_open) {
+      loadCurrentCh();
       isWaiting = true;
     }
-    SetTimeout(&timeout, gIsListening
+    SetTimeout(&timeout, vfo->is_open
                              ? SCAN_TIMEOUTS[gSettings.sqOpenedTimeout]
                              : SCAN_TIMEOUTS[gSettings.sqClosedTimeout]);
   }
@@ -38,15 +45,23 @@ static void nextWithTimeout() {
 
 void CHSCAN_init(void) {
   CHANNELS_LoadScanlist(TYPE_FILTER_CH, gSettings.currentScanlist);
-  CHANNELS_LoadCurrentScanlistCH();
+  loadCurrentCh();
 }
 
 void CHSCAN_deinit(void) {}
 
+static uint32_t lastSqCheck;
+
 void CHSCAN_update(void) {
+  RADIO_UpdateMultiwatch(&gRadioState);
+  RADIO_CheckAndSaveVFO(&gRadioState);
+
   nextWithTimeout();
   SYS_DelayMs(SQL_DELAY);
-  RADIO_CheckAndListen();
+  if (Now() - lastSqCheck >= 55) {
+    RADIO_UpdateSquelch(&gRadioState);
+    lastSqCheck = Now();
+  }
   gRedrawScreen = true;
 }
 
@@ -57,7 +72,7 @@ bool CHSCAN_key(KEY_Code_t key, Key_State_t state) {
     gSettings.currentScanlist = CHANNELS_ScanlistByKey(
         gSettings.currentScanlist, key, longHeld && !simpleKeypress);
     CHANNELS_LoadScanlist(TYPE_FILTER_CH, gSettings.currentScanlist);
-    CHANNELS_LoadCurrentScanlistCH();
+    loadCurrentCh();
     SETTINGS_DelayedSave();
     isWaiting = false;
     return true;
@@ -88,7 +103,8 @@ bool CHSCAN_key(KEY_Code_t key, Key_State_t state) {
 
 void CHSCAN_render(void) {
   if (gScanlistSize) {
-    if (gIsListening) {
+    ExtendedVFOContext *vfo = RADIO_GetCurrentVFO(&gRadioState);
+    if (vfo->is_open) {
       PrintMediumBoldEx(LCD_XCENTER, 18, POS_C, C_FILL, "%s", activeCh.name);
     } else {
       PrintMediumEx(LCD_XCENTER, 18, POS_C, C_FILL,
@@ -97,4 +113,4 @@ void CHSCAN_render(void) {
   }
 
   UI_RenderScanScreen();
-} */
+}
