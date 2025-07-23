@@ -147,6 +147,7 @@ void APPS_run(AppType_t app) {
          apps[gCurrentApp].name);
     RADIO_InitState(&gRadioState, 16);
     RADIO_LoadVFOs(&gRadioState);
+    RADIO_ToggleMultiwatch(&gRadioState, gSettings.mWatch);
     loadedVfoApp = gCurrentApp;
   }
 

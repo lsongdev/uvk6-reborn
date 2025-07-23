@@ -978,6 +978,40 @@ void RADIO_CheckAndSaveVFO(RadioState *state) {
   }
 }
 
+static bool RADIO_SwitchVFOTemp(RadioState *state, uint8_t vfo_index) {
+  if (vfo_index >= state->num_vfos) {
+    return false;
+  }
+
+  Log("RADIO_SwitchVFOTemp");
+
+  // Deactivate current VFO
+  // state->vfos[state->active_vfo_index].is_active = false;
+
+  VFOContext *oldCtx = &state->vfos[state->active_vfo_index].context;
+  VFOContext *newCtx = &state->vfos[vfo_index].context;
+
+  for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
+    newCtx->dirty[p] = RADIO_GetParam(oldCtx, p) != RADIO_GetParam(newCtx, p);
+  }
+
+  // mute previous vfo (fast fix)
+  /* state->vfos[state->active_vfo_index].is_open = false;
+  RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
+  RADIO_SwitchAudioToVFO(state, vfo_index); */
+
+  // Activate new VFO
+  // state->vfos[vfo_index].is_active = true;
+  state->active_vfo_index = vfo_index;
+  gRedrawScreen = true;
+  // updateContext();
+
+  // Apply settings for the new VFO
+  RADIO_ApplySettings(&state->vfos[vfo_index].context);
+
+  return true;
+}
+
 // Switch to a different VFO
 bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
   if (vfo_index >= state->num_vfos) {
@@ -1206,7 +1240,8 @@ bool RADIO_CheckSquelch(VFOContext *ctx) {
   return gShowAllRSSI ? RADIO_GetSNR(ctx) > ctx->squelch.value : true;
 }
 
-static void RADIO_UpdateMeasurement() {
+static void RADIO_UpdateMeasurement(ExtendedVFOContext *vfo) {
+  VFOContext *ctx = &vfo->context;
   vfo->msm.f = ctx->frequency;
   vfo->msm.rssi = RADIO_GetRSSI(ctx);
   vfo->msm.snr = RADIO_GetSNR(ctx);
@@ -1219,13 +1254,12 @@ static void RADIO_UpdateMeasurement() {
 }
 
 void RADIO_UpdateSquelch(RadioState *state) {
-  RADIO_UpdateMeasurement();
+  RADIO_UpdateMeasurement(&state->vfos[state->active_vfo_index]);
   if (vfo->msm.open != vfo->is_open) {
     vfo->is_open = vfo->msm.open;
     RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
   }
 }
-
 // Update multiwatch state (should be called periodically)
 void RADIO_UpdateMultiwatch(RadioState *state) {
   if (!state->multiwatch_enabled)
@@ -1274,6 +1308,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
     bool still_active = RADIO_CheckSquelch(&active_vfo->context);
 
     if (!still_active) {
+      Log("!still active, next");
       // Return to the first broadcast receiver we find
       for (uint8_t i = 0; i < state->num_vfos; i++) {
         ExtendedVFOContext *vfo = &state->vfos[i];

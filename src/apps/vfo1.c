@@ -1,6 +1,7 @@
 #include "vfo1.h"
 #include "../dcs.h"
 #include "../driver/gpio.h"
+#include "../driver/uart.h"
 #include "../helper/bands.h"
 #include "../helper/channels.h"
 #include "../helper/measurements.h"
@@ -40,7 +41,7 @@ void VFO1_update(void) {
   RADIO_UpdateMultiwatch(&gRadioState);
   RADIO_CheckAndSaveVFO(&gRadioState);
 
-  if (Now() - lastSqCheck >= 55) {
+  if (Now() - lastSqCheck >= SQL_DELAY) {
     RADIO_UpdateSquelch(&gRadioState);
     lastSqCheck = Now();
   }
