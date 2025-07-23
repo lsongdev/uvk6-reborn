@@ -1352,66 +1352,6 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
   }
 }
 
-/* void RADIO_UpdateMultiwatch(RadioState *state) {
-  if (!state->multiwatch_enabled)
-    return;
-
-  uint32_t current_time = Now();
-  if (current_time - state->last_scan_time < 100) {
-    return;
-  }
-
-  state->last_scan_time = current_time;
-
-  // Обновляем маршрутизацию аудио
-  RADIO_UpdateAudioRouting(state);
-
-  // Get current active VFO
-  uint8_t current_vfo = state->active_vfo_index;
-  const ExtendedVFOContext *active_vfo = &state->vfos[current_vfo];
-
-  // If current VFO is a broadcast receiver, we can switch away from it
-  if (isBroadcastReceiver(&active_vfo->context)) {
-    // Check other VFOs for activity
-    for (uint8_t i = 0; i < state->num_vfos; i++) {
-      if (i == current_vfo)
-        continue;
-
-      ExtendedVFOContext *vfo = &state->vfos[i];
-
-      // Skip broadcast receivers in multiwatch
-      if (isBroadcastReceiver(&vfo->context))
-        continue;
-
-      // Check for activity (implementation depends on your hardware)
-      bool has_activity = RADIO_CheckSquelch(&vfo->context);
-
-      if (has_activity) {
-        // Switch to this VFO
-        RADIO_SwitchVFO(state, i);
-        return;
-      }
-    }
-  }
-
-  // If we're on a non-broadcast VFO, check if we should return to broadcast
-  if (!isBroadcastReceiver(&active_vfo->context)) {
-    bool still_active = RADIO_CheckSquelch(&active_vfo->context);
-
-    if (!still_active) {
-      Log("!still active, next");
-      // Return to the first broadcast receiver we find
-      for (uint8_t i = 0; i < state->num_vfos; i++) {
-        ExtendedVFOContext *vfo = &state->vfos[i];
-        if (isBroadcastReceiver(&vfo->context)) {
-          RADIO_SwitchVFO(state, i);
-          return;
-        }
-      }
-    }
-  }
-} */
-
 void RADIO_LoadVFOs(RadioState *state) {
   Log("RADIO_LoadVFOs()");
 
