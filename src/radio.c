@@ -22,7 +22,7 @@
 
 #define RADIO_SAVE_DELAY_MS 1000
 
-// #define DEBUG_PARAMS 1
+#define DEBUG_PARAMS 1
 
 bool gShowAllRSSI = false;
 bool gMonitorMode = false;
@@ -959,22 +959,20 @@ void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
 
 // Функция проверки необходимости сохранения и собственно сохранения
 void RADIO_CheckAndSaveVFO(RadioState *state) {
-  uint8_t vfo_index = RADIO_GetCurrentVFONumber(state);
-  if (vfo_index >= state->num_vfos)
-    return;
+  for (uint8_t i = 0; i < state->num_vfos; ++i) {
+    VFOContext *ctx = &state->vfos[i].context;
+    uint16_t num = state->vfos[i].vfo_ch_index;
 
-  VFOContext *ctx = &state->vfos[vfo_index].context;
-  uint16_t num = state->vfos[vfo_index].vfo_ch_index;
+    if (ctx->save_to_eeprom &&
+        (Now() - ctx->last_save_time >= RADIO_SAVE_DELAY_MS)) {
+      LogC(LOG_C_BRIGHT_YELLOW, "TRYING TO SAVE PARAM");
+      VFO ch;
 
-  if (ctx->save_to_eeprom &&
-      (Now() - ctx->last_save_time >= RADIO_SAVE_DELAY_MS)) {
-    LogC(LOG_C_BRIGHT_YELLOW, "TRYING TO SAVE PARAM");
-    VFO ch;
+      RADIO_SaveVFOToStorage(state, i, &ch);
+      CHANNELS_Save(num, &ch);
 
-    RADIO_SaveVFOToStorage(state, vfo_index, &ch);
-    CHANNELS_Save(num, &ch);
-
-    ctx->save_to_eeprom = false;
+      ctx->save_to_eeprom = false;
+    }
   }
 }
 
@@ -1281,6 +1279,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
     break;
 
   case RADIO_SCAN_STATE_SWITCHING:
+    RADIO_CheckAndSaveVFO(&gRadioState);
     // Ищем следующий VFO для сканирования (пропускаем активный и вещательные)
     do {
       current_scan_vfo = (current_scan_vfo + 1) % state->num_vfos;
