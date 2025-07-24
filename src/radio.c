@@ -982,7 +982,7 @@ static bool RADIO_SwitchVFOTemp(RadioState *state, uint8_t vfo_index) {
     return false;
   }
 
-  Log("RADIO_SwitchVFOTemp %u", vfo_index);
+  // Log("RADIO_SwitchVFOTemp %u", vfo_index);
 
   // Deactivate current VFO
   // state->vfos[state->active_vfo_index].is_active = false;
@@ -1240,6 +1240,7 @@ bool RADIO_CheckSquelch(VFOContext *ctx) {
 }
 
 static void RADIO_UpdateMeasurement(ExtendedVFOContext *vfo) {
+  // Log("Update MSM");
   VFOContext *ctx = &vfo->context;
   vfo->msm.f = ctx->frequency;
   vfo->msm.rssi = RADIO_GetRSSI(ctx);
@@ -1297,7 +1298,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
   case RADIO_SCAN_STATE_WARMUP:
     // Log("WU");
     // Ждем стабилизации сигнала
-    if (current_time - last_scan_time >= SQL_DELAY) {
+    if (last_scan_time && current_time - last_scan_time >= SQL_DELAY) {
       state->scan_state = RADIO_SCAN_STATE_MEASURING;
     }
     break;
@@ -1306,6 +1307,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
     // Log("ME");
     // Выполняем замер
     RADIO_UpdateMeasurement(&state->vfos[current_scan_vfo]);
+    // Log("MSM: %u", state->vfos[current_scan_vfo].msm.open);
     state->scan_state = RADIO_SCAN_STATE_DECISION;
     break;
 
@@ -1334,15 +1336,14 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
       if (scanned->msm.open) {
         // Log("OPEN!!!");
         state->scan_state = RADIO_SCAN_STATE_WARMUP;
-        last_scan_time = current_time;
+        last_scan_time = Now();
         return;
       }
     }
 
     // Переходим к следующему VFO или завершаем цикл
     if (current_scan_vfo >= state->num_vfos - 1) {
-      // Возвращаемся к активному VFO
-      // RADIO_SwitchVFOTemp(state, state->primary_vfo_index);
+      last_scan_time = 0; // NOTE: IMPORTANT
       state->scan_state = RADIO_SCAN_STATE_IDLE;
     } else {
       state->scan_state = RADIO_SCAN_STATE_SWITCHING;
