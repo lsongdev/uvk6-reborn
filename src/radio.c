@@ -1279,7 +1279,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
     break;
 
   case RADIO_SCAN_STATE_SWITCHING:
-    RADIO_CheckAndSaveVFO(&gRadioState);
+    // RADIO_CheckAndSaveVFO(&gRadioState);
     // Ищем следующий VFO для сканирования (пропускаем активный и вещательные)
     do {
       current_scan_vfo = (current_scan_vfo + 1) % state->num_vfos;
