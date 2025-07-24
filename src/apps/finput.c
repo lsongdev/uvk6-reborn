@@ -77,8 +77,6 @@ static uint32_t convertFromDisplayValue() {
   }
 
   switch (currentConfig.unit) {
-  /* case UNIT_VOLTS:
-    return integerPart * 100 + fractionalPart; */
   default:
     return integerPart;
   }
@@ -100,6 +98,13 @@ static void reset() {
 static void fillFromCurrentValue() {
   uint32_t value =
       (inputStage == INPUT_FIRST_VALUE) ? gFInputValue1 : gFInputValue2;
+  
+  // Skip filling if value is 0 to prevent displaying initial "0"
+  if (value == 0) {
+    resetInputBuffer();
+    return;
+  }
+
   uint32_t integerPart = 0;
   uint32_t fractionalPart = 0;
   fractionalDigits = 0;
@@ -244,17 +249,33 @@ bool FINPUT_key(KEY_Code_t key, Key_State_t state) {
         if (dotEntered && fractionalDigits >= MAX_FRACTION_DIGITS) {
           break;
         }
-        inputBuffer[cursorPos++] = '0' + (key - KEY_0);
-        inputBuffer[cursorPos] = '\0';
-        if (dotEntered)
-          fractionalDigits++;
-
-        if (inputStage == INPUT_FIRST_VALUE) {
-          gFInputValue1 = convertFromDisplayValue();
-        } else {
-          gFInputValue2 = convertFromDisplayValue();
+        
+        // Check if adding new digit would exceed max value
+        uint32_t currentValue = convertFromDisplayValue();
+        uint32_t newDigit = key - KEY_0;
+        uint32_t newValue = currentValue * 10 + newDigit * currentConfig.multiplier;
+        
+        if (!dotEntered && currentConfig.allow_dot && newValue > currentConfig.max && cursorPos > 0) {
+          // Insert decimal point if value would exceed max
+          inputBuffer[cursorPos++] = '.';
+          inputBuffer[cursorPos] = '\0';
+          dotEntered = true;
+          gRedrawScreen = true;
         }
-        gRedrawScreen = true;
+        
+        if (cursorPos < MAX_INPUT_LENGTH - 1) {
+          inputBuffer[cursorPos++] = '0' + (key - KEY_0);
+          inputBuffer[cursorPos] = '\0';
+          if (dotEntered)
+            fractionalDigits++;
+
+          if (inputStage == INPUT_FIRST_VALUE) {
+            gFInputValue1 = convertFromDisplayValue();
+          } else {
+            gFInputValue2 = convertFromDisplayValue();
+          }
+          gRedrawScreen = true;
+        }
       }
       return true;
 
@@ -356,7 +377,10 @@ void FINPUT_render(void) {
   const uint8_t BASE_Y = 32;
   char displayStr[MAX_INPUT_LENGTH + 3] = "";
 
-  strncpy(displayStr, inputBuffer, MAX_INPUT_LENGTH);
+  // Only copy buffer to display if it's not empty
+  if (inputBuffer[0] != '\0') {
+    strncpy(displayStr, inputBuffer, MAX_INPUT_LENGTH);
+  }
 
   const char *unitSuffix = "";
   switch (currentConfig.unit) {
