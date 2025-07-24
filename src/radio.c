@@ -941,16 +941,17 @@ void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
   memset(state, 0, sizeof(RadioState));
   state->num_vfos = (num_vfos > MAX_VFOS) ? MAX_VFOS : num_vfos;
 
+  state->primary_vfo_index = state->active_vfo_index = gSettings.activeVFO;
+
   for (uint8_t i = 0; i < state->num_vfos; i++) {
     RADIO_Init(&state->vfos[i].context, RADIO_BK4819); // Default to BK4819
     state->vfos[i].mode = MODE_VFO;
     state->vfos[i].channel_index = 0;
-    state->vfos[i].is_active = (i == 0); // First VFO is active by default
+    state->vfos[i].is_active =
+        (i == state->primary_vfo_index); // First VFO is active by default
     state->vfos[i].is_open = false;
   }
 
-  // Initialize multiwatch
-  state->active_vfo_index = gSettings.activeVFO;
   updateContext();
 
   state->last_scan_time = 0;
@@ -1037,7 +1038,7 @@ bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
 
   // Activate new VFO
   state->vfos[vfo_index].is_active = true;
-  state->active_vfo_index = vfo_index;
+  state->primary_vfo_index = state->active_vfo_index = vfo_index;
   updateContext();
 
   // Apply settings for the new VFO
@@ -1341,7 +1342,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
     // Переходим к следующему VFO или завершаем цикл
     if (current_scan_vfo >= state->num_vfos - 1) {
       // Возвращаемся к активному VFO
-      RADIO_SwitchVFOTemp(state, state->active_vfo_index);
+      RADIO_SwitchVFOTemp(state, state->primary_vfo_index);
       state->scan_state = RADIO_SCAN_STATE_IDLE;
     } else {
       state->scan_state = RADIO_SCAN_STATE_SWITCHING;
@@ -1555,7 +1556,7 @@ uint8_t RADIO_GetCurrentVFONumber(const RadioState *state) {
     }
   }
   return 0xFF; // Ошибка - активный VFO не найден */
-  return state->active_vfo_index;
+  return state->primary_vfo_index;
 }
 
 /**

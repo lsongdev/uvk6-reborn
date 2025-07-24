@@ -69,7 +69,7 @@ typedef enum {
 } TXStatus;
 
 typedef enum {
-  RADIO_SCAN_STATE_IDLE, // Сканирование не активно
+  RADIO_SCAN_STATE_IDLE,      // Сканирование не активно
   RADIO_SCAN_STATE_SWITCHING, // Сканирование не активно
   RADIO_SCAN_STATE_WARMUP, // Ожидание стабилизации после переключения
   RADIO_SCAN_STATE_MEASURING, // Выполнение замера
@@ -144,6 +144,7 @@ typedef struct {
   uint32_t last_scan_time;           // Last scan time
   uint8_t num_vfos;                  // Number of configured VFOs
   uint8_t active_vfo_index;          // Currently active VFO
+  uint8_t primary_vfo_index;         //
   uint8_t last_active_vfo; // Последний активный VFO с активностью
   bool audio_routing_enabled; // Флаг управления аудио маршрутизацией
   bool multiwatch_enabled;   // Whether multiwatch is enabled
