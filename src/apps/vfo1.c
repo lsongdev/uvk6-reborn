@@ -41,7 +41,7 @@ void VFO1_update(void) {
   RADIO_UpdateMultiwatch(&gRadioState);
   RADIO_CheckAndSaveVFO(&gRadioState);
 
-  if (Now() - lastSqCheck >= SQL_DELAY) {
+  if (!gSettings.mWatch && Now() - lastSqCheck >= SQL_DELAY) {
     RADIO_UpdateSquelch(&gRadioState);
     lastSqCheck = Now();
   }

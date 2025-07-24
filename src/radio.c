@@ -22,7 +22,7 @@
 
 #define RADIO_SAVE_DELAY_MS 1000
 
-#define DEBUG_PARAMS 1
+// #define DEBUG_PARAMS 1
 
 bool gShowAllRSSI = false;
 bool gMonitorMode = false;
@@ -982,7 +982,7 @@ static bool RADIO_SwitchVFOTemp(RadioState *state, uint8_t vfo_index) {
     return false;
   }
 
-  // Log("RADIO_SwitchVFOTemp");
+  Log("RADIO_SwitchVFOTemp %u", vfo_index);
 
   // Deactivate current VFO
   // state->vfos[state->active_vfo_index].is_active = false;
@@ -1000,7 +1000,7 @@ static bool RADIO_SwitchVFOTemp(RadioState *state, uint8_t vfo_index) {
   RADIO_SwitchAudioToVFO(state, vfo_index); */
 
   // Activate new VFO
-  // state->vfos[vfo_index].is_active = true;
+  state->vfos[vfo_index].is_active = true;
   state->active_vfo_index = vfo_index;
   gRedrawScreen = true;
   // updateContext();
@@ -1267,7 +1267,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
     return;
   }
 
-  static uint8_t current_scan_vfo = 0;
+  static int8_t current_scan_vfo = 0;
   static uint32_t last_scan_time = 0;
   uint32_t current_time = Now();
 
@@ -1275,7 +1275,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
   case RADIO_SCAN_STATE_IDLE:
     // Log("IDLE");
     // Начинаем новый цикл сканирования
-    current_scan_vfo = 0;
+    current_scan_vfo = -1;
     state->scan_state = RADIO_SCAN_STATE_SWITCHING;
     break;
 
@@ -1342,7 +1342,7 @@ void RADIO_UpdateMultiwatch(RadioState *state) {
     // Переходим к следующему VFO или завершаем цикл
     if (current_scan_vfo >= state->num_vfos - 1) {
       // Возвращаемся к активному VFO
-      RADIO_SwitchVFOTemp(state, state->primary_vfo_index);
+      // RADIO_SwitchVFOTemp(state, state->primary_vfo_index);
       state->scan_state = RADIO_SCAN_STATE_IDLE;
     } else {
       state->scan_state = RADIO_SCAN_STATE_SWITCHING;
