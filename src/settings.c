@@ -110,13 +110,22 @@ const uint16_t PAGE_SIZES[7] = {
 
 // A format marker prevents interpreting foreign (e.g. LOSEHU) EEPROM as ours.
 #define SETTINGS_SIGNATURE 0x15
+static const uint8_t SETTINGS_MAGIC[4] = {'U', 'V', 'R', '1'};
 
 void SETTINGS_Save(void) {
   gSettings.checkbyte = SETTINGS_SIGNATURE;
   EEPROM_WriteBuffer(SETTINGS_OFFSET, (uint8_t *)&gSettings, SETTINGS_SIZE);
+  // Commit the format marker last when initializing new EEPROM data.
+  EEPROM_WriteBuffer(SETTINGS_MAGIC_OFFSET, (uint8_t *)SETTINGS_MAGIC,
+                     sizeof(SETTINGS_MAGIC));
 }
 
 bool SETTINGS_Load(void) {
+  uint8_t magic[sizeof(SETTINGS_MAGIC)];
+  if (EEPROM_ReadBuffer(SETTINGS_MAGIC_OFFSET, magic, sizeof(magic)) != 0 ||
+      memcmp(magic, SETTINGS_MAGIC, sizeof(magic)) != 0)
+    return false;
+
   Settings saved;
   if (EEPROM_ReadBuffer(SETTINGS_OFFSET, &saved, sizeof(saved)) != 0)
     return false;
