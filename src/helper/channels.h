@@ -164,13 +164,11 @@ void CHANNELS_Load(int16_t num, CH *p);
 void CHANNELS_Save(int16_t num, CH *p);
 bool CHANNELS_LoadBuf();
 int16_t CHANNELS_GetCurrentScanlistCH();
-void CHANNELS_Next(bool next);
 void CHANNELS_Delete(int16_t i);
 bool CHANNELS_Existing(int16_t i);
 uint16_t CHANNELS_Scanlists(int16_t i);
 void CHANNELS_LoadScanlist(CHTypeFilter type, uint16_t n);
 void CHANNELS_LoadBlacklistToLoot();
-void CHANNELS_LoadCurrentScanlistCH();
 
 void CHANNELS_SetScanlistIndexFromRadio();
 

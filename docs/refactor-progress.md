@@ -32,6 +32,12 @@
 - 发射入口固定返回 `TX_DISABLED`，旧 EEPROM 的 `allowTx` 位无法开启功放；今后必须独立实现并验证 TX 安全规则才可恢复。
 - 不更改实际 EEPROM 读写布局，不进行未经验证的 EEPROM 迁移或硬件刷写。
 
+## 构建源文件收敛
+
+- Makefile 只编译 Radio、输入、设置、显式重置四类可达应用；旧扫描器、频谱和频道管理界面保留源码但不参与新固件编译。
+- 删除旧频道列表的 `CHANNELS_LoadCurrentScanlistCH/CHANNELS_Next` 调频入口，防止未使用代码引用已经移除的多 VFO API。
+- 活跃的 EEPROM 频道读取、写入和旧格式适配仍保留。
+
 ## 当前操作
 
 | 操作 | 行为 |

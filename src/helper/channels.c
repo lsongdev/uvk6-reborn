@@ -82,21 +82,6 @@ int16_t CHANNELS_GetCurrentScanlistCH() {
   return -1;
 }
 
-void CHANNELS_LoadCurrentScanlistCH() {
-  RADIO_LoadChannelToVFO(gRadioState, RADIO_GetCurrentVFONumber(gRadioState),
-                         CHANNELS_GetCurrentScanlistCH());
-  RADIO_ApplySettings(ctx);
-  ctx->save_to_eeprom = true;
-  ctx->last_save_time = Now();
-}
-
-void CHANNELS_Next(bool next) {
-  if (gScanlistSize) {
-    chScanlistIndex = IncDecU(chScanlistIndex, 0, gScanlistSize, next);
-    CHANNELS_LoadCurrentScanlistCH();
-  }
-}
-
 void CHANNELS_SetScanlistIndexFromRadio() {
   if (vfo->mode == MODE_CHANNEL && gScanlistSize) {
     for (uint16_t i = 0; i < gScanlistSize; ++i) {
