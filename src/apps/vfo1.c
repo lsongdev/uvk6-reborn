@@ -169,6 +169,8 @@ static bool handleRelease(KEY_Code_t key, Key_State_t state) {
   case KEY_7:
   case KEY_8:
   case KEY_9:
+    gFInputValue1 = 0;
+    gFInputValue2 = 0;
     gFInputCallback = tuneTo;
     FINPUT_setup(0, BK4819_F_MAX, UNIT_MHZ, false);
     APPS_run(APP_FINPUT);
@@ -261,7 +263,7 @@ void VFO1_render(void) {
 
   STATUSLINE_SetText("RADIO");
 
-  PrintMediumEx(2, 18, POS_L, C_FILL, "%.10s", gCurrentBand.name);
+  PrintMediumEx(2, 18, POS_L, C_FILL, "%.10s", BANDS_GetDisplayName(frequency));
   if (ctx->tx_state.is_active)
     PrintMediumEx(LCD_WIDTH - 1, 18, POS_R, C_FILL, "TX");
   else if (ctx->tx_state.last_error)

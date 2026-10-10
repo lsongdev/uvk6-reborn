@@ -91,6 +91,8 @@ static int16_t bandIndexByFreq(uint32_t f, bool preciseStep) {
 }
 
 void BANDS_Load(void) {
+  allBandsSize = 0;
+  allBandIndex = -1;
   for (int16_t chNum = 0; chNum < CHANNELS_GetCountMax() - 2; ++chNum) {
     if (CHANNELS_GetMeta(chNum).type != TYPE_BAND) {
       continue;
@@ -171,6 +173,27 @@ Band BANDS_ByFrequency(uint32_t f) {
     return b;
   }
   return defaultBand;
+}
+
+// EEPROM band records are optional. A display fallback must not change
+// tuning bounds, squelch, or any other saved radio settings.
+const char *BANDS_GetDisplayName(uint32_t frequency) {
+  if (gCurrentBand.meta.type == TYPE_BAND &&
+      BANDS_InRange(frequency, gCurrentBand))
+    return gCurrentBand.name;
+  if (frequency >= 64 * MHZ && frequency <= 108 * MHZ)
+    return "FM Radio";
+  if (frequency >= 118 * MHZ && frequency < 137 * MHZ)
+    return "Airband";
+  if (frequency >= 144 * MHZ && frequency <= 148 * MHZ)
+    return "2m";
+  if (frequency >= 430 * MHZ && frequency <= 440 * MHZ)
+    return "70cm";
+  if (frequency < 30 * MHZ)
+    return "HF";
+  if (frequency < 300 * MHZ)
+    return "VHF";
+  return "UHF";
 }
 
 uint8_t BANDS_GetScanlistIndex() { return scanlistBandIndex; }
