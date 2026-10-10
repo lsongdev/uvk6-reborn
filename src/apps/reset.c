@@ -122,8 +122,10 @@ void RESET_Render(void) {
 }
 
 bool RESET_key(KEY_Code_t k, Key_State_t state) {
+  // Stay in recovery mode until settings are explicitly initialized.
+  // In particular, MENU must not open normal apps with foreign EEPROM data.
   if (state != KEY_RELEASED || resetState.type != RESET_UNKNOWN)
-    return false;
+    return true;
 
   if (k == KEY_EXIT) {
     resetState.confirm = false;
