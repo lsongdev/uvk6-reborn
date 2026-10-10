@@ -27,11 +27,13 @@ bool isSi4732On = false;
 static uint16_t fDiv() { return si4732mode == SI47XX_FM ? 1000 : 100; }
 
 bool SI47XX_ReadBuffer(uint8_t *buf, uint8_t size) {
+  if (!buf || !size)
+    return false;
   uint8_t retries = 5;
   while (retries--) {
     I2C_Start();
     if (I2C_Write(SI47XX_I2C_ADDR + 1) == 0) {
-      if (I2C_ReadBuffer(buf, size) == 0) {
+      if (I2C_ReadBuffer(buf, size) == size) {
         I2C_Stop();
         return true;
       }
@@ -61,16 +63,21 @@ bool SI47XX_IsSSB() {
   return si4732mode == SI47XX_USB || si4732mode == SI47XX_LSB;
 }
 
-void waitToSend() {
-  uint8_t tmp = 0;
+static bool waitToSend(void) {
+  uint32_t started = GetUptimeMs();
   do {
-    TIMER_DelayUs(1);
-    SI47XX_ReadBuffer((uint8_t *)&tmp, 1);
-  } while (!(tmp & STATUS_CTS));
+    uint8_t status = 0;
+    if (SI47XX_ReadBuffer(&status, 1) && (status & STATUS_CTS))
+      return true;
+    TIMER_DelayUs(100);
+  } while (GetUptimeMs() - started < 100);
+  return false; // The receiver must never stall the system indefinitely.
 }
 
 #include "../ui/graphics.h" // X_X
-void SI47XX_downloadPatch() {
+static bool SI47XX_downloadPatch(void) {
+  if (!SETTINGS_IsPatchPresent())
+    return false;
   // Log("DL patch");
   FillRect(0, LCD_YCENTER - 4, LCD_WIDTH, 9, C_FILL);
   PrintMediumBoldEx(LCD_XCENTER, LCD_YCENTER + 3, POS_C, C_INVERT, "WAIT...");
@@ -83,14 +90,15 @@ void SI47XX_downloadPatch() {
   for (uint16_t offset = 0; offset < PATCH_SIZE; offset += BUF_SIZE) {
     const uint32_t rest = PATCH_SIZE - offset;
     const uint32_t eepromN = rest > BUF_SIZE ? BUF_SIZE : rest;
-    EEPROM_ReadBuffer(PATCH_START + offset, buf, eepromN);
+    if (EEPROM_ReadBuffer(PATCH_START + offset, buf, eepromN) != 0)
+      return false;
 
     for (uint16_t i = 0; i < eepromN; i += 8) {
-      waitToSend();
-      SI47XX_WriteBuffer(buf + i, 8);
+      if (!waitToSend() || !SI47XX_WriteBuffer(buf + i, 8))
+        return false;
     }
   }
-  // Log("DL patch OK");
+  return true;
 }
 
 void SI47XX_SetProperty(uint16_t prop, uint16_t value) {
@@ -231,9 +239,13 @@ void SI47XX_PatchPowerUp() {
   SI47XX_WriteBuffer(cmd, 3);
   SYS_DelayMs(60);
 
+  if (!SI47XX_downloadPatch()) {
+    Log("[SI] SSB patch missing or failed");
+    RST_LOW;
+    isSi4732On = false;
+    return;
+  }
   isSi4732On = true;
-
-  SI47XX_downloadPatch();
 
   SI47XX_SsbSetup(2, 1, 0, 1, 0, 1);
   setAvcAmMaxGain(42);
@@ -347,8 +359,8 @@ void SI47XX_SetFreq(uint16_t freq) {
   }
 
   waitToSend();
-  SI47XX_WriteBuffer(cmd, size);
-  siCurrentFreq = freq;
+  if (SI47XX_WriteBuffer(cmd, size))
+    siCurrentFreq = freq;
 }
 
 void SI47XX_SetAMFrontendAGC(uint8_t minGainIdx, uint8_t attnBackup) {

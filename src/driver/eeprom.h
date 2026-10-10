@@ -7,6 +7,9 @@
 
 extern bool gEepromWrite;
 
+// Writes remain disabled until a valid config or explicit initialization.
+void EEPROM_SetWritesEnabled(bool enabled);
+
 int EEPROM_ReadBuffer(uint32_t Address, void *pBuffer, uint16_t Size);
 void EEPROM_WriteBuffer(uint32_t Address, uint8_t *pBuffer, uint16_t Size);
 void EEPROM_ClearPage(uint16_t page);

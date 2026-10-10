@@ -32,7 +32,10 @@ static uint32_t GetChannelOffset(int16_t num) {
 }
 
 uint16_t CHANNELS_GetCountMax(void) {
-  uint16_t n = (getChannelsEnd() - CHANNELS_OFFSET) / CH_SIZE;
+  uint32_t end = getChannelsEnd();
+  if (end <= CHANNELS_OFFSET)
+    return 0;
+  uint32_t n = (end - CHANNELS_OFFSET) / CH_SIZE;
   return n < SCANLIST_MAX ? n : SCANLIST_MAX;
 }
 

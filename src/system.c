@@ -16,12 +16,9 @@
 #include "ui/graphics.h"
 #include "ui/spectrum.h"
 #include "ui/statusline.h"
-#include <string.h>
 
 #define queueLen 20
 #define itemSize sizeof(SystemMessages)
-
-static uint8_t DEAD_BUF[] = {0xDE, 0xAD};
 
 static char notificationMessage[16] = "";
 static uint32_t notificationTimeoutAt;
@@ -65,23 +62,6 @@ static void appRender() {
 static void systemUpdate() {
   BATTERY_UpdateBatteryInfo();
   BACKLIGHT_Update();
-}
-
-static bool resetNeeded() {
-  uint8_t buf[2];
-  EEPROM_ReadBuffer(0, buf, 2);
-
-  return memcmp(buf, DEAD_BUF, 2) == 0;
-}
-
-static void loadSettingsOrReset() {
-  SETTINGS_Load();
-  if (gSettings.batteryCalibration > 2154 ||
-      gSettings.batteryCalibration < 1900) {
-    gSettings.batteryCalibration = 0;
-    EEPROM_WriteBuffer(0, DEAD_BUF, 2);
-    NVIC_SystemReset();
-  }
 }
 
 static bool checkKeylock(Key_State_t state, KEY_Code_t key) {
@@ -148,13 +128,15 @@ void SYS_Main() {
   BATTERY_UpdateBatteryInfo();
 
   SystemMessages n = KEYBOARD_GetKey();
-  if (resetNeeded() || n.key == KEY_EXIT) {
+  if (n.key == KEY_EXIT || !SETTINGS_Load()) {
+    // Unknown EEPROM contents are not our config: never write a marker or
+    // restart automatically. Only explicit initialization may unlock writes.
     initDisplay();
     gSettings.batteryCalibration = 2000;
     gSettings.backlight = 5;
     APPS_run(APP_RESET);
   } else {
-    loadSettingsOrReset();
+    EEPROM_SetWritesEnabled(true);
     BATTERY_UpdateBatteryInfo();
 
     initDisplay();
