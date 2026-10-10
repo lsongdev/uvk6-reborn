@@ -32,13 +32,14 @@ const char *MW_NAMES[4] = {
     [MW_SWITCH] = "Switch",
     [MW_EXTRA] = "Extra",
 };
-const char *EEPROM_TYPE_NAMES[6] = {
+const char *EEPROM_TYPE_NAMES[7] = {
     [EEPROM_BL24C64] = "64 #",   //
     [EEPROM_BL24C128] = "128",   //
     [EEPROM_BL24C256] = "256",   //
     [EEPROM_BL24C512] = "512",   //
     [EEPROM_BL24C1024] = "1024", //
     [EEPROM_M24M02] = "M02",     //
+    [EEPROM_4MBIT] = "4Mbit",  //
 };
 uint32_t SCAN_TIMEOUTS[15] = {
     0,         100,       200,           300,           400,
@@ -87,30 +88,51 @@ Settings gSettings = {
     .deviation = 130, // 1300
 };
 
-const uint32_t EEPROM_SIZES[6] = {
+const uint32_t EEPROM_SIZES[7] = {
     [EEPROM_BL24C64] = 8192,     //
     [EEPROM_BL24C128] = 16384,   //
     [EEPROM_BL24C256] = 32768,   //
     [EEPROM_BL24C512] = 65536,   //
     [EEPROM_BL24C1024] = 131072, //
     [EEPROM_M24M02] = 262144,    //
+    [EEPROM_4MBIT] = 524288,   //
 };
 
-const uint16_t PAGE_SIZES[6] = {
+const uint16_t PAGE_SIZES[7] = {
     [EEPROM_BL24C64] = 32,    //
     [EEPROM_BL24C128] = 64,   //
     [EEPROM_BL24C256] = 64,   //
     [EEPROM_BL24C512] = 128,  //
     [EEPROM_BL24C1024] = 128, //
     [EEPROM_M24M02] = 256,    //
+    [EEPROM_4MBIT] = 128,   // conservative chunk size; verify actual chip
 };
 
+// A format marker prevents interpreting foreign (e.g. LOSEHU) EEPROM as ours.
+#define SETTINGS_SIGNATURE 0x15
+
 void SETTINGS_Save(void) {
-  EEPROM_WriteBuffer(SETTINGS_OFFSET, &gSettings, SETTINGS_SIZE);
+  gSettings.checkbyte = SETTINGS_SIGNATURE;
+  EEPROM_WriteBuffer(SETTINGS_OFFSET, (uint8_t *)&gSettings, SETTINGS_SIZE);
 }
 
-void SETTINGS_Load(void) {
-  EEPROM_ReadBuffer(SETTINGS_OFFSET, &gSettings, SETTINGS_SIZE);
+bool SETTINGS_Load(void) {
+  Settings saved;
+  if (EEPROM_ReadBuffer(SETTINGS_OFFSET, &saved, sizeof(saved)) != 0)
+    return false;
+
+  if (saved.checkbyte != SETTINGS_SIGNATURE ||
+      saved.eepromType >= EEPROM_UNKNOWN ||
+      saved.eepromType != EEPROM_DetectType() ||
+      saved.batteryCalibration < 1900 || saved.batteryCalibration > 2154 ||
+      saved.mainApp <= APP_NONE || saved.mainApp >= APPS_COUNT ||
+      saved.backlight >= ARRAY_SIZE(BL_TIME_VALUES) ||
+      saved.sqOpenedTimeout >= ARRAY_SIZE(SCAN_TIMEOUTS) ||
+      saved.sqClosedTimeout >= ARRAY_SIZE(SCAN_TIMEOUTS))
+    return false;
+
+  gSettings = saved;
+  return true;
 }
 
 void SETTINGS_DelayedSave(void) { SETTINGS_Save(); }
@@ -120,18 +142,24 @@ uint32_t SETTINGS_GetFilterBound(void) {
 }
 
 uint32_t SETTINGS_GetEEPROMSize(void) {
-  return EEPROM_SIZES[gSettings.eepromType];
+  return gSettings.eepromType < EEPROM_UNKNOWN
+             ? EEPROM_SIZES[gSettings.eepromType]
+             : 0;
 }
 
-uint16_t SETTINGS_GetPageSize(void) { return PAGE_SIZES[gSettings.eepromType]; }
+uint16_t SETTINGS_GetPageSize(void) {
+  return gSettings.eepromType < EEPROM_UNKNOWN
+             ? PAGE_SIZES[gSettings.eepromType]
+             : 0;
+}
 
 bool SETTINGS_IsPatchPresent() {
   if (SETTINGS_GetEEPROMSize() < 32768) {
     return false;
   }
   uint8_t buf[8];
-  EEPROM_ReadBuffer(SETTINGS_GetEEPROMSize() - PATCH_SIZE, buf, 8);
-  return memcmp(buf, PATCH3_PREAMBLE, 8) == 0;
+  return EEPROM_ReadBuffer(SETTINGS_GetEEPROMSize() - PATCH_SIZE, buf, 8) == 0 &&
+         memcmp(buf, PATCH3_PREAMBLE, 8) == 0;
 }
 
 bool dirty[SETTING_COUNT];
