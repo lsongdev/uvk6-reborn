@@ -184,7 +184,8 @@ typedef struct {
 } __attribute__((packed)) Settings;
 // getsize(Settings)
 
-#define SETTINGS_OFFSET (0)
+#define SETTINGS_MAGIC_OFFSET (0)
+#define SETTINGS_OFFSET (4)
 #define SETTINGS_SIZE sizeof(Settings)
 
 #define CH_SIZE sizeof(CH)
