@@ -2,6 +2,7 @@
 #define RADIO_H
 
 #include "driver/bk4819.h"
+#include "radio-model.h"
 #include "helper/channels.h"
 #include "helper/lootlist.h"
 #include <stdbool.h>
@@ -10,7 +11,7 @@
 #define SQL_DELAY 50
 #define GARBAGE_FREQUENCY_MOD (13 * MHZ)
 
-#define MAX_VFOS 4
+#define MAX_VFOS 1
 
 extern const char *PARAM_NAMES[];
 extern const char *TX_STATE_NAMES[7];
@@ -137,6 +138,7 @@ typedef struct {
   Squelch squelch;
   bool preciseFChange;
   bool fixed_bounds;
+  bool tx_allowed;
 
   bool save_to_eeprom; // Флаг необходимости сохранения в EEPROM
 } VFOContext;
@@ -182,6 +184,10 @@ bool RADIO_SaveCurrentVFO(RadioState *state);
 void RADIO_ToggleMultiwatch(RadioState *state, bool enable);
 void RADIO_UpdateMultiwatch(RadioState *state);
 bool RADIO_ToggleVFOMode(RadioState *state, uint8_t vfo_index);
+
+ReceiverCapabilities RADIO_GetReceiverCapabilities(void);
+bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan);
+RadioParameters RADIO_ReadParameters(const VFOContext *context);
 
 // Инициализация
 void RADIO_Init(VFOContext *ctx, Radio radio_type);

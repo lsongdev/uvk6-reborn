@@ -54,46 +54,17 @@ AppType_t APPS_Peek(void) {
   return APP_NONE;
 }
 
-const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {
-    APP_VFO1,      //
-    APP_CH_LIST,   //
-    APP_FC,        //
-    APP_SCANER,    //
-    APP_CH_SCAN,   //
-    APP_BAND_SCAN, //
-    APP_ABOUT,     //
-};
+const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {APP_VFO1};
 
+// Only the minimal radio, input, settings and explicit reset remain reachable.
 const App apps[APPS_COUNT] = {
     [APP_NONE] = {"None", NULL, NULL, NULL, NULL, NULL},
     [APP_FINPUT] = {"Freq input", FINPUT_init, FINPUT_update, FINPUT_render,
                     FINPUT_key, FINPUT_deinit},
-    [APP_TEXTINPUT] = {"Text input", TEXTINPUT_init, NULL, TEXTINPUT_render,
-                       TEXTINPUT_key, TEXTINPUT_deinit},
     [APP_SETTINGS] = {"Settings", SETTINGS_init, NULL, SETTINGS_render,
                       SETTINGS_key, SETTINGS_deinit},
-    [APP_APPS_LIST] = {"Run app", APPSLIST_init, NULL, APPSLIST_render,
-                       APPSLIST_key, NULL},
-    [APP_RESET] = {"Reset", RESET_Init, RESET_Update, RESET_Render, RESET_key,
-                   NULL},
-    [APP_CH_CFG] = {"CH cfg", CHCFG_init, NULL, CHCFG_render, CHCFG_key,
-                    CHCFG_deinit},
-    [APP_CH_LIST] = {"Channels", CHLIST_init, NULL, CHLIST_render, CHLIST_key,
-                     CHLIST_deinit},
-    [APP_SCANER] = {"Spectrum", SCANER_init, SCANER_update, SCANER_render,
-                    SCANER_key, SCANER_deinit, true},
-    [APP_LOOT_LIST] = {"Loot", LOOTLIST_init, LOOTLIST_update, LOOTLIST_render,
-                       LOOTLIST_key, NULL},
-    [APP_CH_SCAN] = {"CH Scan", CHSCAN_init, CHSCAN_update, CHSCAN_render,
-                     CHSCAN_key, CHSCAN_deinit, true},
-    [APP_BAND_SCAN] = {"Band Scan", BANDSCAN_init, BANDSCAN_update,
-                       BANDSCAN_render, BANDSCAN_key, BANDSCAN_deinit, true},
-    [APP_FC] = {"FC", FC_init, FC_update, FC_render, FC_key, FC_deinit, true},
-    [APP_VFO1] = {"1 VFO", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL,
-                  true},
-    /* [APP_GENERATOR] = {"Generator", GENERATOR_init, GENERATOR_update,
-                       GENERATOR_render, GENERATOR_key, NULL, true, true}, */
-    [APP_ABOUT] = {"ABOUT", NULL, NULL, ABOUT_Render, NULL, NULL},
+    [APP_RESET] = {"Reset", RESET_Init, RESET_Update, RESET_Render, RESET_key, NULL},
+    [APP_VFO1] = {"Radio", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL, true},
 };
 
 bool APPS_key(KEY_Code_t Key, Key_State_t state) {
@@ -137,7 +108,7 @@ void APPS_deinit(void) {
 
 RadioState radioState;
 void APPS_run(AppType_t app) {
-  if (app <= APP_NONE || app >= APPS_COUNT)
+  if (app <= APP_NONE || app >= APPS_COUNT || !apps[app].name)
     return;
   if (stackIndex >= 0 && appsStack[stackIndex] == app) {
     return;
@@ -150,9 +121,9 @@ void APPS_run(AppType_t app) {
     LogC(LOG_C_MAGENTA, "[APP] Load radio state for %s",
          apps[gCurrentApp].name);
     gRadioState = &radioState;
-    RADIO_InitState(gRadioState, 16);
+    RADIO_InitState(gRadioState, 1);
     RADIO_LoadVFOs(gRadioState);
-    RADIO_ToggleMultiwatch(gRadioState, gSettings.mWatch);
+    gRadioState->multiwatch_enabled = false;
     loadedVfoApp = gCurrentApp;
   }
 

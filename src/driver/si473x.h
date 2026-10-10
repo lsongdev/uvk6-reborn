@@ -567,6 +567,7 @@ typedef union {
   uint8_t raw[2];
 } SI47XX_BW_Config; // AM_CHANNEL_FILTER
 
+bool SI47XX_Detect(void);
 void SI47XX_PowerUp();
 void SI47XX_PatchPowerUp();
 void SI47XX_PowerDown();
@@ -588,6 +589,8 @@ void SI47XX_SetSeekFmRssiThreshold(uint16_t value);
 void SI47XX_SetSeekAmRssiThreshold(uint16_t value);
 void SI47XX_SetBFO(int16_t bfo);
 void SI47XX_SetSsbCapacitor(uint16_t v);
+bool SI47XX_BandwidthFromHz(uint32_t hz, bool ssb, uint16_t *index);
+uint32_t SI47XX_BandwidthToHz(uint16_t index, bool ssb);
 void SI47XX_TuneTo(uint32_t f);
 void SI47XX_SetVolume(uint8_t volume);
 void SI47xx_GetStatus(uint8_t intack, uint8_t cancel);

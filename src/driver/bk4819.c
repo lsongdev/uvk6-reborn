@@ -1275,3 +1275,18 @@ void BK4819_Init(void) {
                                  (gSettings.deviation * 10) | (1 << 12));
   isInitialized = true;
 }
+
+// Public frequency units are translated into the chip's filter selector here.
+static const uint16_t bandwidthHz[] = {6000,7000,9000,10000,12000,14000,17000,20000,23000,26000};
+bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index) {
+  for (uint8_t i = 0; i < ARRAY_SIZE(bandwidthHz); ++i) {
+    if (bandwidthHz[i] == hz) {
+      *index = i;
+      return true;
+    }
+  }
+  return false;
+}
+uint32_t BK4819_BandwidthToHz(uint16_t index) {
+  return index < ARRAY_SIZE(bandwidthHz) ? bandwidthHz[index] : 0;
+}

@@ -201,7 +201,6 @@ void SI47XX_PowerUp() {
 
   isSi4732On = true;
 
-  AUDIO_ToggleSpeaker(true);
   SI47XX_SetVolume(63);
 
   if (si4732mode == SI47XX_FM) {
@@ -250,7 +249,6 @@ void SI47XX_PatchPowerUp() {
   SI47XX_SsbSetup(2, 1, 0, 1, 0, 1);
   setAvcAmMaxGain(42);
 
-  AUDIO_ToggleSpeaker(true);
   SI47XX_SetVolume(63);
 
   SI47XX_SetFreq(siCurrentFreq);
@@ -299,7 +297,6 @@ uint32_t SI47XX_getFrequency(bool *valid) {
 
 void SI47XX_PowerDown() {
   // printf("SI PD\n");
-  AUDIO_ToggleSpeaker(false);
   uint8_t cmd[1] = {CMD_POWER_DOWN};
 
   waitToSend();
@@ -312,19 +309,24 @@ void SI47XX_PowerDown() {
 
 void SI47XX_SwitchMode(SI47XX_MODE mode) {
   Log("[SI] mode %u -> %u", si4732mode, mode);
-  if (si4732mode != mode) {
-    bool wasSSB = SI47XX_IsSSB();
-    si4732mode = mode;
-    if (mode == SI47XX_USB || mode == SI47XX_LSB) {
-      if (!wasSSB) {
-        SI47XX_PowerDown();
-        SI47XX_PatchPowerUp();
-      }
-    } else {
+  if (si4732mode == mode && isSi4732On)
+    return;
+  bool wasSSB = isSi4732On && SI47XX_IsSSB();
+  bool needsSSB = mode == SI47XX_USB || mode == SI47XX_LSB;
+  si4732mode = mode;
+  if (!wasSSB || !needsSSB) {
+    if (isSi4732On)
       SI47XX_PowerDown();
+    if (needsSSB)
+      SI47XX_PatchPowerUp();
+    else
       SI47XX_PowerUp();
-    }
   }
+  // Patch startup uses USB internally. Restore the requested sideband so
+  // an LSB label can never hide actual USB demodulation.
+  si4732mode = mode;
+  if (wasSSB && needsSSB)
+    siCurrentFreq = 0; // Sideband is encoded in the tune command, even at the same carrier.
 }
 
 void SI47XX_SetFreq(uint16_t freq) {
@@ -420,19 +422,19 @@ void SI47XX_SetBFO(int16_t bfo) { SI47XX_SetProperty(PROP_SSB_BFO, bfo); }
 
 void SI47XX_TuneTo(uint32_t f) {
   if (SI47XX_IsSSB()) {
-    int32_t bfo = ((int32_t)(siCurrentFreq * fDiv()) - f) * 10;
-    if (bfo > -16000 && bfo < 16000) {
-      SI47XX_SetBFO(bfo);
-      f = siCurrentFreq * fDiv();
-    } else {
-      SI47XX_SetBFO(0);
-    }
+    uint32_t carrier = (uint32_t)siCurrentFreq * 100;
+    int32_t bfo = ((int32_t)carrier - (int32_t)f) * 10;
+    if (!siCurrentFreq || bfo <= -16000 || bfo >= 16000)
+      carrier = (f / 100) * 100;
+    SI47XX_SetFreq(carrier / 100);
+    // Apply the residual even on the first coarse tune, not only on later
+    // fine adjustments. The public model and actual SSB frequency agree.
+    SI47XX_SetBFO(((int32_t)carrier - (int32_t)f) * 10);
+    return;
   }
-  f /= fDiv();
-  if (si4732mode == SI47XX_FM) {
-    f -= f % 5;
-  }
-  SI47XX_SetFreq(f);
+  // FM_TUNE_FREQ accepts 10 kHz units. The controller has resolved the
+  // requested frequency; do not floor it again to 50 kHz.
+  SI47XX_SetFreq(f / fDiv());
 }
 
 void SI47xx_GetStatus(uint8_t intack, uint8_t cancel) {
@@ -459,4 +461,35 @@ void SI47xx_GetStatus(uint8_t intack, uint8_t cancel) {
   /* if (valid) {
     *valid = !(response[0] & STATUS_ERR);
   } */
+}
+
+static const uint16_t amBandwidthHz[] = {6000,4000,3000,2000,1000,1800,2500};
+static const uint16_t ssbBandwidthHz[] = {1200,2200,3000,4000,500,1000};
+bool SI47XX_BandwidthFromHz(uint32_t hz, bool ssb, uint16_t *index) {
+  const uint16_t *values = ssb ? ssbBandwidthHz : amBandwidthHz;
+  uint8_t count = ssb ? ARRAY_SIZE(ssbBandwidthHz) : ARRAY_SIZE(amBandwidthHz);
+  for (uint8_t i = 0; i < count; ++i) {
+    if (values[i] == hz) {
+      *index = i;
+      return true;
+    }
+  }
+  return false;
+}
+uint32_t SI47XX_BandwidthToHz(uint16_t index, bool ssb) {
+  const uint16_t *values = ssb ? ssbBandwidthHz : amBandwidthHz;
+  uint8_t count = ssb ? ARRAY_SIZE(ssbBandwidthHz) : ARRAY_SIZE(amBandwidthHz);
+  return index < count ? values[index] : 0;
+}
+
+bool SI47XX_Detect(void) {
+  // Release the shared receiver reset line before probing the SI address.
+  RST_HIGH;
+  SYS_DelayMs(10);
+  I2C_Start();
+  bool present = I2C_Write(SI47XX_I2C_ADDR) == 0;
+  I2C_Stop();
+  if (!present)
+    RST_LOW;
+  return present;
 }

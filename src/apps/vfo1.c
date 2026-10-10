@@ -1,292 +1,317 @@
 #include "vfo1.h"
-#include "../dcs.h"
-#include "../driver/gpio.h"
-#include "../driver/uart.h"
-#include "../external/printf/printf.h"
-#include "../helper/bands.h"
-#include "../helper/channels.h"
-#include "../helper/measurements.h"
-#include "../helper/numnav.h"
-#include "../helper/regs-menu.h"
-#include "../helper/scan.h"
-#include "../inc/dp32g030/gpio.h"
+#include "../driver/st7565.h"
+#include "../helper/menu.h"
 #include "../radio.h"
 #include "../scheduler.h"
 #include "../ui/components.h"
 #include "../ui/graphics.h"
-#include "../ui/spectrum.h"
 #include "../ui/statusline.h"
 #include "apps.h"
-#include "chcfg.h"
-#include "chlist.h"
 #include "finput.h"
-#include <stdint.h>
 
-static char String[16];
-static const Step liveStep = STEP_5_0kHz;
+static bool initialized;
+static bool receiving;
+static bool changed;
+static bool inMenu;
+static bool confirming;
+static uint8_t menuIndex;
+static uint8_t bandIndex;
+static uint32_t frequencyHz;
+static uint32_t lastFrequency[16];
+static RadioParameters parameters;
+static RxPlan pending;
+static const char *message;
+static uint32_t messageAt;
 
-static void updateBand(void) {
-  uint32_t f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
-  if (!BANDS_InRange(f, gCurrentBand) ||
-      gCurrentBand.meta.type == TYPE_BAND_DETACHED) {
-    BANDS_SelectByFrequency(f, ctx->fixed_bounds);
+static void notify(const char *text) {
+  message = text;
+  messageAt = Now();
+  gRedrawScreen = true;
+}
+
+static void apply(const RxPlan *plan) {
+  uint8_t nextBand = RADIO_MODEL_BandAt(plan->frequency_hz);
+  if (!RADIO_ApplyRxPlan(ctx, plan)) {
+    notify("Tune failed");
+    return;
+  }
+  frequencyHz = plan->frequency_hz;
+  bandIndex = nextBand;
+  parameters = plan->parameters;
+  receiving = true;
+  lastFrequency[bandIndex] = frequencyHz;
+  const RadioParameters *preset = &radioBands[bandIndex].preset;
+  changed = parameters.mode != preset->mode || parameters.step_hz != preset->step_hz ||
+            parameters.bandwidth_hz != preset->bandwidth_hz || parameters.squelch != preset->squelch;
+  message = NULL;
+}
+
+static void request(uint32_t target, RadioParameters values, bool confirmParameters) {
+  RxPlan plan;
+  RxResult result = RADIO_MODEL_Plan(target, values, RADIO_GetReceiverCapabilities(), &plan);
+  if (result == RX_OUT_OF_RANGE || result == RX_INVALID_PARAMETERS) {
+    notify("Invalid params");
+    return;
+  }
+  if (result != RX_OK) {
+    // A gap has no receiver. Stop the old audio and retain a navigable target,
+    // without storing the unsupported target as an applied EEPROM frequency.
+    frequencyHz = target;
+    parameters = values;
+    bandIndex = RADIO_MODEL_BandAt(target);
+    receiving = false;
+    vfo->is_open = false;
+    RADIO_SwitchAudioToVFO(gRadioState, 0);
+    notify(result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
+    return;
+  }
+  if (RADIO_MODEL_BandAt(plan.frequency_hz) != RADIO_MODEL_BandAt(target)) {
+    notify("Band boundary");
+    return;
+  }
+  if (plan.frequency_hz != target || confirmParameters) {
+    pending = plan;
+    confirming = true;
+    inMenu = false;
+    gRedrawScreen = true;
+  } else {
+    apply(&plan);
   }
 }
 
-static void setChannel(uint16_t v) {
-  RADIO_LoadChannelToVFO(gRadioState, RADIO_GetCurrentVFONumber(gRadioState),
-                         v);
-}
-
-static void tuneTo(uint32_t f, uint32_t _) {
-  (void)_;
-  RADIO_SetParam(ctx, PARAM_FREQUENCY, f, true);
-  RADIO_ApplySettings(ctx);
-  updateBand();
+static void tuneTo(uint32_t value, uint32_t unused) {
+  (void)unused;
+  uint32_t target = value*10u; // Legacy input/storage boundary is 10 Hz.
+  uint8_t band = RADIO_MODEL_BandAt(target);
+  if (band == UINT8_MAX) {
+    notify("Out of range");
+    return;
+  }
+  RadioParameters values = band == bandIndex ? parameters : radioBands[band].preset;
+  request(target, values, false);
 }
 
 void VFO1_init(void) {
-  gLastActiveLoot = NULL;
-  CHANNELS_LoadScanlist(TYPE_FILTER_CH, gSettings.currentScanlist);
-  if (vfo->mode == MODE_CHANNEL) {
-    setChannel(vfo->channel_index);
+  if (initialized)
+    return;
+  initialized = true;
+  frequencyHz = ctx->frequency*10u;
+  bandIndex = RADIO_MODEL_BandAt(frequencyHz);
+  parameters = RADIO_ReadParameters(ctx);
+  if (bandIndex == UINT8_MAX) {
+    frequencyHz = 145500000;
+    bandIndex = RADIO_MODEL_BandAt(frequencyHz);
+    parameters = radioBands[bandIndex].preset;
   }
-  updateBand();
-
-  SCAN_SetMode(SCAN_MODE_SINGLE);
-  // SCAN_Init(false);
+  request(frequencyHz, parameters, false);
 }
 
-void VFO1_update(void) {}
+bool VFO1_isReceiving(void) { return initialized && receiving; }
 
-static bool handleNumNav(KEY_Code_t key) {
-  if (gIsNumNavInput) {
-    NUMNAV_Input(key);
-    return true;
+void VFO1_update(void) {
+  if (message && Now()-messageAt >= 2500) {
+    message = NULL;
+    gRedrawScreen = true;
   }
-
-  if (key <= KEY_9) {
-    NUMNAV_Init(vfo->channel_index, 0, CHANNELS_GetCountMax() - 1);
-    gNumNavCallback = setChannel;
-    return false;
-  }
-
-  return false;
 }
 
-static bool handleFrequencyChange(KEY_Code_t key) {
-  if (key != KEY_UP && key != KEY_DOWN)
-    return false;
+static void nextBand(void) {
+  uint8_t band = RADIO_MODEL_NextBand(bandIndex);
+  const RadioBand *definition = &radioBands[band];
+  request(lastFrequency[band] ? lastFrequency[band] : definition->initial_hz,
+          definition->preset, false);
+}
 
-  if (vfo->mode == MODE_CHANNEL) {
-    CHANNELS_Next(key == KEY_UP);
+static void nextMode(void) {
+  ReceiverCapabilities capabilities = RADIO_GetReceiverCapabilities();
+  for (uint8_t offset = 1; offset < RX_MODE_COUNT; ++offset) {
+    RadioParameters candidate = parameters;
+    candidate.mode = (parameters.mode+offset)%RX_MODE_COUNT;
+    if (candidate.mode == RX_WFM)
+      candidate.bandwidth_hz = 0;
+    uint32_t minimumStep = candidate.mode == RX_WFM ? (capabilities.si ? 10000 : 100000)
+                         : candidate.mode == RX_AM && frequencyHz <= 30000000 && capabilities.si ? 1000 : 10;
+    if (candidate.step_hz < minimumStep)
+      candidate.step_hz = minimumStep;
+    RxPlan plan;
+    RxResult result = RADIO_MODEL_Plan(frequencyHz, candidate, capabilities, &plan);
+    if (result == RX_INVALID_PARAMETERS) {
+      candidate.bandwidth_hz = candidate.mode == RX_WFM ? 0
+          : candidate.mode == RX_LSB || candidate.mode == RX_USB ? 3000
+          : candidate.mode == RX_AM ? 6000 : 12000;
+      result = RADIO_MODEL_Plan(frequencyHz, candidate, capabilities, &plan);
+    }
+    if (result != RX_OK)
+      continue;
+    request(frequencyHz, candidate,
+            candidate.bandwidth_hz != parameters.bandwidth_hz || candidate.step_hz != parameters.step_hz);
+    return;
+  }
+  notify("No other mode");
+}
+
+static void changeValue(bool up) {
+  RadioParameters candidate = parameters;
+  if (menuIndex == 0) {
+    nextMode();
+    return;
+  }
+  if (menuIndex == 1) {
+    static const uint32_t steps[] = {20,50,500,1000,2500,5000,6250,8330,9000,10000,12500,25000,50000,100000,500000};
+    uint8_t index = 0;
+    for (uint8_t i = 0; i < sizeof(steps)/sizeof(steps[0]); ++i)
+      if (steps[i] == candidate.step_hz)
+        index = i;
+    for (uint8_t offset = 1; offset < sizeof(steps)/sizeof(steps[0]); ++offset) {
+      uint8_t i = up ? (index+offset)%15 : (index+15-offset)%15;
+      candidate.step_hz = steps[i];
+      RxPlan plan;
+      if (RADIO_MODEL_Plan(frequencyHz, candidate, RADIO_GetReceiverCapabilities(), &plan) == RX_OK)
+        break;
+    }
+  } else if (menuIndex == 2) {
+    if (parameters.mode == RX_WFM) {
+      notify("Fixed bandwidth");
+      return;
+    }
+    static const uint16_t widths[] = {500,1000,1200,1800,2000,2200,2500,3000,4000,6000,7000,9000,10000,12000,14000,17000,20000,23000,26000};
+    uint8_t index = 0;
+    for (uint8_t i = 0; i < sizeof(widths)/sizeof(widths[0]); ++i)
+      if (widths[i] == candidate.bandwidth_hz)
+        index = i;
+    for (uint8_t offset = 1; offset < sizeof(widths)/sizeof(widths[0]); ++offset) {
+      uint8_t i = up ? (index+offset)%19 : (index+19-offset)%19;
+      candidate.bandwidth_hz = widths[i];
+      RxPlan plan;
+      if (RADIO_MODEL_Plan(frequencyHz, candidate, RADIO_GetReceiverCapabilities(), &plan) == RX_OK)
+        break;
+    }
+  } else if (menuIndex == 3) {
+    candidate.squelch = up ? (candidate.squelch+1)%11 : (candidate.squelch+10)%11;
   } else {
-    RADIO_IncDecParam(ctx, PARAM_FREQUENCY, key == KEY_UP, true);
-  }
-  updateBand();
-  return true;
-}
-
-static bool handleSSBFineTune(KEY_Code_t key) {
-  if (ctx->radio_type != RADIO_SI4732 || !RADIO_IsSSB(ctx))
-    return false;
-  if (key != KEY_SIDE1 && key != KEY_SIDE2)
-    return false;
-
-  RADIO_AdjustParam(ctx, PARAM_FREQUENCY, key == KEY_SIDE1 ? 5 : -5, true);
-  // TODO: SAVE
-  return true;
-}
-
-static bool handleLongPress(KEY_Code_t key) {
-  uint8_t vfoN = RADIO_GetCurrentVFONumber(gRadioState);
-
-  switch (key) {
-  case KEY_1:
-    gChListFilter = TYPE_FILTER_BAND;
-    APPS_run(APP_CH_LIST);
-    return true;
-
-  case KEY_2:
-    if (gCurrentApp == APP_VFO1) {
-      gSettings.iAmPro = !gSettings.iAmPro;
-      SETTINGS_Save();
-      return true;
-    }
-    return false;
-
-  case KEY_3:
-    RADIO_SaveCurrentVFO(gRadioState);
-    RADIO_ToggleVFOMode(gRadioState, vfoN);
-    updateBand();
-    return true;
-
-  case KEY_4:
-    gShowAllRSSI = !gShowAllRSSI;
-    return true;
-
-  case KEY_5:
-    RADIO_ToggleMultiwatch(gRadioState, !gRadioState->multiwatch_enabled);
-    return true;
-
-  case KEY_6:
-    RADIO_IncDecParam(ctx, PARAM_POWER, true, true);
-    return true;
-
-  case KEY_7:
-    RADIO_IncDecParam(ctx, PARAM_STEP, true, true);
-    return true;
-
-  case KEY_8:
-    RADIO_IncDecParam(ctx, PARAM_TX_OFFSET, true, true);
-    return true;
-
-  case KEY_0:
-    RADIO_IncDecParam(ctx, PARAM_MODULATION, true, true);
-    return true;
-
-  case KEY_SIDE1:
-  case KEY_SIDE2:
-    SP_NextGraphUnit(key == KEY_SIDE1);
-    return true;
-
-  default:
-    return false;
-  }
-}
-
-static bool handleRelease(KEY_Code_t key, Key_State_t state) {
-  uint8_t vfoN = RADIO_GetCurrentVFONumber(gRadioState);
-
-  switch (key) {
-  case KEY_0:
-  case KEY_1:
-  case KEY_2:
-  case KEY_3:
-  case KEY_4:
-  case KEY_5:
-  case KEY_6:
-  case KEY_7:
-  case KEY_8:
-  case KEY_9:
-    gFInputValue1 = 0;
-    gFInputValue2 = 0;
-    gFInputCallback = tuneTo;
-    FINPUT_setup(0, BK4819_F_MAX, UNIT_MHZ, false);
-    APPS_run(APP_FINPUT);
-    APPS_key(key, state);
-    return true;
-
-  case KEY_F:
-    RADIO_SaveVFOToStorage(gRadioState, vfoN, &gChEd);
-    gChNum = -1;
-    APPS_run(APP_CH_CFG);
-    return true;
-
-  case KEY_STAR:
-    APPS_run(APP_LOOT_LIST);
-    return true;
-
-  case KEY_SIDE1:
     gMonitorMode = !gMonitorMode;
-    return true;
-
-  case KEY_SIDE2:
-    GPIO_FlipBit(&GPIOC->DATA, GPIOC_PIN_FLASHLIGHT);
-    return true;
-
-  case KEY_EXIT:
-    if (gMonitorMode) {
-      gMonitorMode = false;
-      return true;
-    }
-    if (!APPS_exit()) {
-      RADIO_SaveCurrentVFO(gRadioState);
-      RADIO_SwitchVFO(gRadioState,
-                      IncDecU(vfoN, 0, gRadioState->num_vfos, true));
-      updateBand();
-    }
-    return true;
-
-  default:
-    return false;
+    return;
   }
+  request(frequencyHz, candidate, false);
 }
 
 bool VFO1_key(KEY_Code_t key, Key_State_t state) {
-  // return false;
-  if (REGSMENU_Key(key, state)) {
+  if (key == KEY_PTT) {
+    if (state == KEY_RELEASED)
+      RADIO_ToggleTX(ctx, false);
+    else if (!inMenu && !confirming && receiving)
+      RADIO_ToggleTX(ctx, true);
     return true;
   }
-
-  // Обработка NUM NAV в режиме канала
-  if (state == KEY_RELEASED && vfo->mode == MODE_CHANNEL && !gIsNumNavInput) {
-    if (handleNumNav(key)) {
-      return true;
+  if (ctx->tx_state.is_active)
+    return true;
+  if (confirming) {
+    if (state == KEY_RELEASED) {
+      if (key == KEY_MENU) {
+        confirming = false;
+        apply(&pending);
+      } else if (key == KEY_EXIT) {
+        confirming = false;
+      }
     }
-  }
-
-  // PTT
-  if (key == KEY_PTT && !gIsNumNavInput) {
-    RADIO_ToggleTX(ctx, state != KEY_RELEASED);
     return true;
   }
-
-  // Обработка нажатий и удержаний
-  if (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT) {
-    if (handleFrequencyChange(key))
-      return true;
-    if (handleSSBFineTune(key))
-      return true;
+  if (inMenu) {
+    if (key == KEY_MENU && state == KEY_LONG_PRESSED) {
+      inMenu = false;
+      return false; // System opens global settings.
+    }
+    if (state == KEY_RELEASED) {
+      if (key == KEY_EXIT)
+        inMenu = false;
+      else if (key == KEY_UP || key == KEY_DOWN)
+        menuIndex = key == KEY_DOWN ? (menuIndex+1)%5 : (menuIndex+4)%5;
+      else if (key == KEY_STAR || key == KEY_F || key == KEY_MENU)
+        changeValue(key != KEY_F);
+    }
+    return true;
   }
-
-  // Длинные нажатия
-  if (state == KEY_LONG_PRESSED) {
-    return handleLongPress(key);
+  if ((key == KEY_UP || key == KEY_DOWN) &&
+      (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT)) {
+    uint32_t target = RADIO_MODEL_Step(frequencyHz, parameters.step_hz, key == KEY_UP);
+    uint8_t band = RADIO_MODEL_BandAt(target);
+    if (band != UINT8_MAX)
+      request(target, band == bandIndex ? parameters : radioBands[band].preset, false);
+    return true;
   }
-
-  // Отпускания
-  if (state == KEY_RELEASED) {
-    return handleRelease(key, state);
+  if (state != KEY_RELEASED)
+    return false;
+  if (key == KEY_SIDE1)
+    nextBand();
+  else if (key == KEY_SIDE2)
+    nextMode();
+  else if (key == KEY_MENU)
+    inMenu = true;
+  else if (key == KEY_EXIT)
+    gMonitorMode = false;
+  else if (key <= KEY_9) {
+    gFInputValue1 = gFInputValue2 = 0;
+    gFInputCallback = tuneTo;
+    FINPUT_setup(RADIO_MIN_HZ/10, RADIO_MAX_HZ/10, UNIT_MHZ, false);
+    APPS_run(APP_FINPUT);
+    APPS_key(key, state);
+  } else {
+    return false;
   }
-
-  return false;
+  return true;
 }
 
-// Single-frequency main screen, with a dedicated band row and S-meter.
-// Coordinates are pixel baselines on the 128x64 display.
 void VFO1_render(void) {
-  const uint8_t FREQ_BASE = 41;
-  uint32_t frequency = RADIO_GetParam(
-      ctx, ctx->tx_state.is_active ? PARAM_TX_FREQUENCY_FACT : PARAM_FREQUENCY);
-  const char *mode = RADIO_GetParamValueString(ctx, PARAM_MODULATION);
-
   STATUSLINE_SetText("RADIO");
-
-  PrintMediumEx(2, 18, POS_L, C_FILL, "%.10s", BANDS_GetDisplayName(frequency));
+  if (confirming) {
+    PrintMediumEx(2, 18, POS_L, C_FILL, "Apply %s?", rxModeNames[pending.parameters.mode]);
+    PrintMediumEx(2, 30, POS_L, C_FILL, "%u.%05u MHz", pending.frequency_hz/1000000,
+                  pending.frequency_hz%1000000/10);
+    PrintSmall(2, 40, "BW %u Hz STEP %u Hz", pending.parameters.bandwidth_hz, pending.parameters.step_hz);
+    PrintSmall(2, 57, "MENU: apply  EXIT: cancel");
+    return;
+  }
+  if (inMenu) {
+    static const char *const names[] = {"Mode", "Step", "BW", "SQ", "Monitor"};
+    for (uint8_t i = 0; i < 5; ++i) {
+      uint8_t y = 17+i*10;
+      PrintMediumEx(2, y, POS_L, C_FILL, "%s", names[i]);
+      if (i == 0)
+        PrintSmallEx(124, y, POS_R, C_FILL, "%s", rxModeNames[parameters.mode]);
+      else if (i == 1)
+        PrintSmallEx(124, y, POS_R, C_FILL, "%u Hz", parameters.step_hz);
+      else if (i == 2) {
+        if (parameters.mode == RX_WFM)
+          PrintSmallEx(124, y, POS_R, C_FILL, "Fixed");
+        else
+          PrintSmallEx(124, y, POS_R, C_FILL, "%u Hz", parameters.bandwidth_hz);
+      } else if (i == 3)
+        PrintSmallEx(124, y, POS_R, C_FILL, "%u", parameters.squelch);
+      else
+        PrintSmallEx(124, y, POS_R, C_FILL, "%s", gMonitorMode ? "On" : "Off");
+      if (i == menuIndex)
+        FillRect(0, y-7, 128, 10, C_INVERT);
+    }
+    return;
+  }
+  uint32_t frequency = ctx->tx_state.is_active ? RADIO_GetParam(ctx, PARAM_TX_FREQUENCY_FACT)*10u : frequencyHz;
+  PrintMediumEx(2, 18, POS_L, C_FILL, "%.10s%s", radioBands[bandIndex].name, changed ? "*" : "");
   if (ctx->tx_state.is_active)
-    PrintMediumEx(LCD_WIDTH - 1, 18, POS_R, C_FILL, "TX");
-  else if (ctx->tx_state.last_error)
-    PrintSmallEx(LCD_WIDTH - 1, 18, POS_R, C_FILL, "TX ERR");
-
-  // Left-aligned frequency; above 999 MHz use a slightly narrower font so
-  // the 5 decimal places still fit alongside the mode and unit.
-  if (frequency / MHZ < 1000)
-    PrintBiggestDigitsEx(2, FREQ_BASE, POS_L, C_FILL, "%u.%05u",
-                        frequency / MHZ, frequency % MHZ);
+    PrintSmallEx(127, 18, POS_R, C_FILL, "TX");
+  else if (!receiving)
+    PrintSmallEx(127, 18, POS_R, C_FILL, "RX --");
+  else if (ctx->tx_state.last_error != TX_UNKNOWN)
+    PrintSmallEx(127, 18, POS_R, C_FILL, "TX OFF");
+  if (frequency/1000000 < 1000)
+    PrintBiggestDigitsEx(2, 41, POS_L, C_FILL, "%u.%05u", frequency/1000000, frequency%1000000/10);
   else
-    PrintBigDigitsEx(2, FREQ_BASE, POS_L, C_FILL, "%u.%05u",
-                     frequency / MHZ, frequency % MHZ);
-
-  // Mode (7px) plus the MHz unit (5px) and a 2px gap: 14px total.
-  PrintMediumEx(LCD_WIDTH - 1, FREQ_BASE - 7, POS_R, C_FILL, "%s",
-                mode ? mode : "?");
-  PrintSmallEx(LCD_WIDTH - 1, FREQ_BASE, POS_R, C_FILL, "MHz");
-
-  if (ctx->tx_state.is_active)
+    PrintBigDigitsEx(2, 41, POS_L, C_FILL, "%u.%05u", frequency/1000000, frequency%1000000/10);
+  PrintMediumEx(127, 34, POS_R, C_FILL, "%s", rxModeNames[parameters.mode]);
+  PrintSmallEx(127, 41, POS_R, C_FILL, "MHz");
+  if (message)
+    PrintSmall(2, 60, "%s", message);
+  else if (ctx->tx_state.is_active)
     UI_TxBar(52);
-  else
+  else if (receiving)
     UI_SMeter(52);
-
-  REGSMENU_Draw();
 }

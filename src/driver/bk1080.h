@@ -21,6 +21,7 @@ typedef enum {
   BK1080_CHSP_50,
 } BK1080_ChannelSpacing;
 
+bool BK1080_Detect(void);
 void BK1080_Init(uint32_t Frequency, bool bEnable);
 uint16_t BK1080_ReadRegister(BK1080_Register_t Register);
 void BK1080_WriteRegister(BK1080_Register_t Register, uint16_t Value);

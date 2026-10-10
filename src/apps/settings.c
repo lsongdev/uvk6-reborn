@@ -12,7 +12,7 @@
 static uint8_t DEAD_BUF[] = {0xDE, 0xAD};
 
 static void getValS(const MenuItem *item, char *buf, uint8_t buf_size) {
-  sprintf(buf, "%s", SETTINGS_GetValueString(item->setting));
+  snprintf(buf, buf_size, "%s", SETTINGS_GetValueString(item->setting));
 }
 
 static void updateValS(const MenuItem *item, bool up) {
@@ -71,8 +71,6 @@ static const MenuItem displayMenuItems[] = {
     {"BL min", SETTING_BRIGHTNESS_L, getValS, updateValS},
     {"BL time", SETTING_BACKLIGHT, getValS, updateValS},
     {"BL SQL mode", SETTING_BACKLIGHTONSQUELCH, getValS, updateValS},
-    {"CH display", SETTING_CHDISPLAYMODE, getValS, updateValS},
-    {"Level in VFO", SETTING_SHOWLEVELINVFO, getValS, updateValS},
 };
 
 static Menu displayMenu = {.title = "Display",
@@ -87,7 +85,6 @@ static const MenuItem radioMenuItems[] = {
     {"STE", SETTING_STE, getValS, updateValS},
     {"Tone local", SETTING_TONELOCAL, getValS, updateValS},
     {"Roger", SETTING_ROGER, getValS, updateValS},
-    {"Multiwatch", SETTING_MULTIWATCH, getValS, updateValS},
     {"Mic", SETTING_MIC, getValS, updateValS},
     {"Freq corr", SETTING_FREQ_CORRECTION, getValS, updateValS},
 };
@@ -109,12 +106,11 @@ static Menu batteryMenu = {.title = "Battery",
 
 // Main menu
 static const MenuItem menuItems[] = {
-    {"Scan", .submenu = &scanMenu},
+    {"SQL", .submenu = &sqlMenu},
     {"Radio", .submenu = &radioMenu},
     {"Display", .submenu = &displayMenu},
     {"Battery", .submenu = &batteryMenu},
     {"Beep", SETTING_BEEP, getValS, updateValS},
-    {"Main app", SETTING_MAINAPP, getValS, updateValS},
     {"Lock PTT", SETTING_PTT_LOCK, getValS, updateValS},
 };
 

@@ -99,6 +99,8 @@ extern const Gain GAIN_TABLE[32];
 
 // extern const uint8_t SQ[2][6][11];
 
+bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index);
+uint32_t BK4819_BandwidthToHz(uint16_t index);
 void BK4819_Init(void);
 uint16_t BK4819_ReadRegister(BK4819_REGISTER_t Register);
 void BK4819_WriteRegister(BK4819_REGISTER_t Register, uint16_t Data);
