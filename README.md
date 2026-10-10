@@ -12,8 +12,8 @@ new persistence and validated transmit routing remain planned. See the
 
 - [重构进度与当前操作](docs/refactor-progress.md)
 - [用户手册](docs/user-manual.md)
-- [硬件事实](docs/hardware-facts.md)
-- [极简无线电设计](docs/minimal-radio-design.md)
+- [硬件事实](docs/hardware.md)
+- [极简无线电设计](docs/design.md)
 
 ## Build
 

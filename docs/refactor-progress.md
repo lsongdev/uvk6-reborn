@@ -1,6 +1,6 @@
 # 极简重构：第一批实现与当前操作
 
-更新日期：2026-10-10。分支：`codex/minimal-radio`。完整目标见[极简无线电设计](minimal-radio-design.md)。本文描述当前重构代码，尚未刷入实机；历史版操作见[原用户手册](user-manual.md)。
+更新日期：2026-10-10。分支：`codex/minimal-radio`。完整目标见[极简无线电设计](design.md)。本文描述当前重构代码，尚未刷入实机；历史版操作见[原用户手册](user-manual.md)。
 
 ## 已完成的第一批
 
