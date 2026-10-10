@@ -402,7 +402,33 @@ static void toggleBK1080SI4732(bool on) {
   }
 }
 
-// функция переключения аудио на конкретный VFO
+// Output routing is independent from receiver tuning and power-up.
+void RADIO_SetAudioOpen(bool open) {
+  if (!vfo || !ctx)
+    return;
+  if (ctx->radio_type == RADIO_BK4819)
+    toggleBK4819(open);
+  else
+    toggleBK1080SI4732(open);
+
+  BOARD_ToggleGreen(open);
+  if (open && gSettings.backlightOnSquelch != BL_SQL_OFF)
+    BACKLIGHT_On();
+  else if (!open && gSettings.backlightOnSquelch == BL_SQL_OPEN)
+    BACKLIGHT_Toggle(false);
+}
+
+void RADIO_StopReception(void) {
+  if (!vfo || !ctx)
+    return;
+  // Leave the RF chip configured for recovery, but never play stale audio.
+  // The next successful tune/squelch update will explicitly reopen it.
+  vfo->is_open = false;
+  vfo->msm.open = false;
+  RADIO_SetAudioOpen(false);
+}
+
+// Legacy receiver selection is used only when the active chip changes.
 void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
   if (vfo_index >= state->num_vfos)
     return;
@@ -430,27 +456,7 @@ void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index) {
 
   rxTurnOn(&vfo->context);
 
-  switch (vfo->context.radio_type) {
-  case RADIO_BK4819:
-    toggleBK4819(vfo->is_open);
-    break;
-  case RADIO_SI4732:
-  case RADIO_BK1080:
-    toggleBK1080SI4732(vfo->is_open);
-    break;
-  default:
-    break;
-  }
-  BOARD_ToggleGreen(vfo->is_open);
-  if (vfo->is_open) {
-    if (gSettings.backlightOnSquelch != BL_SQL_OFF) {
-      BACKLIGHT_On();
-    }
-  } else {
-    if (gSettings.backlightOnSquelch == BL_SQL_OPEN) {
-      BACKLIGHT_Toggle(false);
-    }
-  }
+  RADIO_SetAudioOpen(vfo->is_open);
 
   // Устанавливаем громкость для выбранного VFO
   // AUDIO_SetVolume(vfo->context.volume);
@@ -1748,11 +1754,9 @@ void RADIO_UpdateSquelch(RadioState *state) {
   } */
   RADIO_UpdateMeasurement(&state->vfos[state->active_vfo_index]);
   if (vfo->msm.open != vfo->is_open) {
-    gRedrawScreen = true; // TODO: mv
-    // RADIO_SetParam(ctx, PARAM_AFC_SPD, vfo->msm.open ? 57 : 63, false);
-    RADIO_ApplySettings(ctx);
     vfo->is_open = vfo->msm.open;
-    RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
+    RADIO_SetAudioOpen(vfo->is_open); // Squelch must not retune or repower RX.
+    gRedrawScreen = true;
   }
 }
 // Update multiwatch state (should be called periodically)
@@ -2148,6 +2152,10 @@ bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan) {
   Radio radio = plan->device == RX_DEVICE_BK ? RADIO_BK4819
               : plan->device == RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
   static const ModulationType modes[] = {MOD_FM, MOD_WFM, MOD_AM, MOD_LSB, MOD_USB};
+
+  // Mute during changes, even when keeping the same receiver. On failure
+  // the runtime can reapply its previous plan before reopening squelch.
+  RADIO_StopReception();
 
   // Preflight the SI receiver before committing user-visible state or EEPROM.
   // A missing patch, CTS timeout, or NACK must not be reported as a tune.

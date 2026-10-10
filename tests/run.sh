@@ -23,7 +23,7 @@ esac
   -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
   -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/vfo-regression.c src/radio-model.c "$dead_strip" -o "$test_binary"
+  tests/vfo-regression.c src/radio-model.c src/rx-runtime.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
@@ -36,5 +36,7 @@ esac
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/bk1080-regression.c "$dead_strip" -o "$test_binary"
+"${CC:-cc}" -std=c2x -Wall -Wextra -Werror tests/rx-runtime-regression.c \
+  src/rx-runtime.c -o "$test_binary"
 "$test_binary"
 echo 'SI sidebands/BFO, VFO keys, confirmation, unavailable receivers, frequency input, legacy storage, cached detection, receiver plans, precision, and band boundaries passed.'
