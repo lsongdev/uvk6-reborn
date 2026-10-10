@@ -68,14 +68,13 @@ void BK1080_Init(uint32_t f, bool bEnable) {
 }
 
 uint16_t BK1080_ReadRegister(BK1080_Register_t Register) {
-  uint8_t Value[2];
-
+  uint8_t Value[2] = {0xff, 0xff};
   I2C_Start();
-  I2C_Write(0x80);
-  I2C_Write((Register << 1) | I2C_READ);
-  I2C_ReadBuffer(Value, sizeof(Value));
+  bool valid = I2C_Write(0x80) == 0 &&
+               I2C_Write((Register << 1) | I2C_READ) == 0 &&
+               I2C_ReadBuffer(Value, sizeof(Value)) == sizeof(Value);
   I2C_Stop();
-  return MAKE_WORD(Value[0], Value[1]);
+  return valid ? MAKE_WORD(Value[0], Value[1]) : UINT16_MAX;
 }
 
 void BK1080_WriteRegister(BK1080_Register_t Register, uint16_t Value) {
@@ -103,4 +102,12 @@ uint8_t BK1080_GetSNR() { return BK1080_ReadRegister(BK1080_REG_07) & 0b1111; }
 
 uint16_t BK1080_GetRSSI() {
   return (BK1080_ReadRegister(BK1080_REG_10) & 0xFF) << 1;
+}
+
+bool BK1080_Detect(void) {
+  GPIO_ClearBit(&GPIOB->DATA, GPIOB_PIN_BK1080);
+  SYS_DelayMs(10);
+  bool present = BK1080_ReadRegister(1) == 0x1080;
+  GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_BK1080);
+  return present;
 }

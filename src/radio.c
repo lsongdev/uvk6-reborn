@@ -212,9 +212,9 @@ static const FreqBand si4732_bands[] = {
     {
         .min_freq = SI47XX_FM_F_MIN,
         .max_freq = SI47XX_FM_F_MAX,
-        .num_available_mods = 1,
+        .num_available_mods = 2,
         .num_available_bandwidths = 0,
-        .available_mods = {SI47XX_FM},
+        .available_mods = {MOD_FM, MOD_WFM},
         .available_bandwidths = {},
     },
 };
@@ -226,7 +226,7 @@ static const FreqBand bk1080_band = {
     .available_mods = {MOD_FM},
 };
 
-static bool RADIO_HasSi() { return BK1080_ReadRegister(1) != 0x1080; }
+static bool RADIO_HasSi() { return RADIO_GetReceiverCapabilities().si; }
 
 static uint32_t getRealTxFreq(const VFOContext *ctx) {
   switch (ctx->tx_state.offsetDirection) {
@@ -312,7 +312,8 @@ static TXStatus checkTX(VFOContext *ctx) {
     return TX_DISABLED_UPCONVERTER;
   }
 
-  if (ctx->radio_type != RADIO_BK4819) {
+  if (!ctx->tx_allowed || ctx->radio_type != RADIO_BK4819 ||
+      ctx->modulation != MOD_FM) {
     return TX_DISABLED;
   }
 
@@ -332,12 +333,6 @@ static TXStatus checkTX(VFOContext *ctx) {
 }
 
 static void toggleBK4819(bool on) {
-  static bool bk4819_listen;
-  if (bk4819_listen == on) {
-    return;
-  }
-  bk4819_listen = on;
-
   Log("[RADIO] BK4819 audio=%u", on);
   if (on) {
     BK4819_ToggleAFDAC(true);
@@ -387,15 +382,9 @@ static void rxTurnOn(const VFOContext *ctx) {
     break;
   case RADIO_SI4732:
     BK4819_Idle();
-    if (gSettings.si4732PowerOff || !isSi4732On) {
-      if (RADIO_IsSSB(ctx)) {
-        SI47XX_PatchPowerUp();
-      } else {
-        SI47XX_PowerUp();
-      }
-    } else {
-      SI47XX_SetVolume(ConvertDomain(ctx->volume, 0, 100, 0, 63));
-    }
+    SI47XX_SwitchMode(ctx->modulation == MOD_WFM ? SI47XX_FM
+                                               : (SI47XX_MODE)ctx->modulation);
+    SI47XX_SetVolume(ConvertDomain(ctx->volume, 0, 100, 0, 63));
     break;
   default:
     break;
@@ -403,11 +392,6 @@ static void rxTurnOn(const VFOContext *ctx) {
 }
 
 static void toggleBK1080SI4732(bool on) {
-  static bool bc_listen;
-  if (bc_listen == on) {
-    return;
-  }
-  bc_listen = on;
   Log("[RADIO] BK1080/SI audio=%u", on);
   if (on) {
     SYS_DelayMs(8);
@@ -564,14 +548,15 @@ static bool setParamSI4732(VFOContext *ctx, ParamType p) {
     SI47XX_TuneTo(ctx->frequency);
     return true;
   case PARAM_MODULATION:
-    SI47XX_SwitchMode((SI47XX_MODE)ctx->modulation);
+    SI47XX_SwitchMode(ctx->modulation == MOD_WFM ? SI47XX_FM
+                                               : (SI47XX_MODE)ctx->modulation);
     return true;
   case PARAM_GAIN:
     SI47XX_SetAutomaticGainControl(ctx->gain == 0,
                                    ctx->gain == 0 ? 0 : ctx->gain);
     return true;
   case PARAM_BANDWIDTH:
-    if (ctx->modulation == MOD_FM)
+    if (ctx->modulation == MOD_FM || ctx->modulation == MOD_WFM)
       return true; // AM/SSB bandwidth properties do not apply to FM.
     if (RADIO_IsSSB(ctx)) {
       SI47XX_SetSsbBandwidth(ctx->bandwidth);
@@ -626,13 +611,10 @@ uint16_t RADIO_GetRSSI(const VFOContext *ctx) {
   case RADIO_BK4819:
     return BK4819_GetRSSI();
   case RADIO_BK1080:
-    return gShowAllRSSI ? BK1080_GetRSSI() : 0;
+    return BK1080_GetRSSI();
   case RADIO_SI4732:
-    if (gShowAllRSSI) {
-      RSQ_GET();
-      return rsqStatus.resp.RSSI;
-    }
-    return 0;
+    RSQ_GET();
+    return rsqStatus.resp.RSSI;
   default:
     return 0;
   }
@@ -643,13 +625,9 @@ uint8_t RADIO_GetSNR(const VFOContext *ctx) {
   case RADIO_BK4819:
     return ConvertDomain(BK4819_GetSNR(), 24, 170, 0, 30);
   case RADIO_BK1080:
-    return gShowAllRSSI ? BK1080_GetSNR() : 0;
+    return BK1080_GetSNR();
   case RADIO_SI4732:
-    if (gShowAllRSSI) {
-      RSQ_GET();
-      return rsqStatus.resp.SNR;
-    }
-    return 0;
+    return rsqStatus.resp.SNR; // Same sample as the preceding RSSI read.
   default:
     return 0;
   }
@@ -846,7 +824,7 @@ void RADIO_Init(VFOContext *ctx, Radio radio_type) {
   switch (radio_type) {
   case RADIO_BK4819:
     ctx->current_band = &bk4819_bands[0];
-    ctx->frequency = 145500000; // 145.5 МГц (диапазон FM)
+    ctx->frequency = 14550000; // 145.5 МГц (диапазон FM)
     ctx->gain = AUTO_GAIN_INDEX;
     // ctx->afc_speed = BK4819_GetAFCSpeed();
 
@@ -859,7 +837,7 @@ void RADIO_Init(VFOContext *ctx, Radio radio_type) {
     break;
   case RADIO_SI4732:
     ctx->current_band = &si4732_bands[0];
-    ctx->frequency = 7100000; // 7.1 МГц (диапазон AM)
+    ctx->frequency = 710000; // 7.1 МГц (диапазон AM)
     break;
   default:
     break;
@@ -1421,7 +1399,7 @@ void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
   memset(state, 0, sizeof(RadioState));
   state->num_vfos = (num_vfos > MAX_VFOS) ? MAX_VFOS : num_vfos;
 
-  state->primary_vfo_index = state->active_vfo_index = gSettings.activeVFO;
+  state->primary_vfo_index = state->active_vfo_index = 0;
 
   for (uint8_t i = 0; i < state->num_vfos; i++) {
     // RADIO_Init(&state->vfos[i].context, RADIO_BK4819); // Default to BK4819
@@ -1446,7 +1424,7 @@ void RADIO_CheckAndSaveVFO(RadioState *state) {
     VFOContext *ctx = &state->vfos[i].context;
     uint16_t num = state->vfos[i].vfo_ch_index;
 
-    if (ctx->save_to_eeprom &&
+    if (num != UINT16_MAX && ctx->save_to_eeprom &&
         (Now() - ctx->last_save_time >= RADIO_SAVE_DELAY_MS)) {
       LogC(LOG_C_BRIGHT_YELLOW, "TRYING TO SAVE PARAM");
       VFO ch;
@@ -1615,7 +1593,13 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
   const ExtendedVFOContext *vfo = &state->vfos[vfo_index];
   const VFOContext *ctx = &vfo->context;
 
+  // This legacy adapter must initialize every byte before persisting it.
+  // Otherwise unassigned metadata/name/power bits come from stack contents.
+  *storage = (VFO){0};
   storage->meta.type = TYPE_VFO;
+  memcpy(storage->name, ctx->name, sizeof(storage->name)-1);
+  storage->power = ctx->power;
+  storage->allowTx = ctx->tx_allowed;
 
   storage->isChMode = vfo->mode;
   storage->channel = vfo->channel_index;
@@ -1638,7 +1622,7 @@ void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
 }
 
 bool RADIO_SaveCurrentVFO(RadioState *state) {
-  if (!state)
+  if (!state || state->vfos[state->active_vfo_index].vfo_ch_index == UINT16_MAX)
     return false;
 
   uint8_t current = state->active_vfo_index;
@@ -1740,7 +1724,7 @@ bool RADIO_CheckSquelch(VFOContext *ctx) {
     return BK4819_IsSquelchOpen();
   }
 
-  return gShowAllRSSI ? RADIO_GetSNR(ctx) > ctx->squelch.value : true;
+  return ctx->squelch.value == 0 || RADIO_GetSNR(ctx) > ctx->squelch.value;
 }
 
 static void RADIO_UpdateMeasurement(ExtendedVFOContext *vfo) {
@@ -1748,13 +1732,10 @@ static void RADIO_UpdateMeasurement(ExtendedVFOContext *vfo) {
   VFOContext *ctx = &vfo->context;
   vfo->msm.f = ctx->frequency;
   vfo->msm.rssi = RADIO_GetRSSI(ctx);
-  vfo->msm.noise = BK4819_GetNoise();
-  vfo->msm.glitch = BK4819_GetGlitch();
+  vfo->msm.noise = RADIO_GetNoise(ctx);
+  vfo->msm.glitch = RADIO_GetGlitch(ctx);
   vfo->msm.snr = RADIO_GetSNR(ctx);
   vfo->msm.open = RADIO_CheckSquelch(ctx);
-  if (!gMonitorMode && ctx->radio_type == RADIO_BK4819) {
-    LOOT_Update(&vfo->msm);
-  }
 }
 
 void RADIO_UpdateSquelch(RadioState *state) {
@@ -1775,6 +1756,10 @@ void RADIO_UpdateSquelch(RadioState *state) {
 // Update multiwatch state (should be called periodically)
 
 void RADIO_UpdateMultiwatch(RadioState *state) {
+  if (state->num_vfos < 2) {
+    state->scan_state = RADIO_SCAN_STATE_IDLE;
+    return;
+  }
   if (!state->multiwatch_enabled || gSettings.mWatch == 0) {
     state->scan_state = RADIO_SCAN_STATE_IDLE;
     return;
@@ -1875,6 +1860,9 @@ void RADIO_LoadVFOs(RadioState *state) {
   BK1080_Init(0, false);
 
   uint8_t vfoIdx = 0;
+  uint8_t selected = gSettings.activeVFO;
+  uint8_t found = 0;
+  uint16_t firstRecord = UINT16_MAX;
   for (uint16_t i = 0; i < CHANNELS_GetCountMax(); ++i) {
     CHMeta meta = CHANNELS_GetMeta(i);
 
@@ -1883,18 +1871,40 @@ void RADIO_LoadVFOs(RadioState *state) {
       continue;
     }
 
-    state->vfos[vfoIdx].vfo_ch_index = i;
+    if (firstRecord == UINT16_MAX)
+      firstRecord = i;
+    if (found++ < selected)
+      continue;
+    state->vfos[0].vfo_ch_index = i;
 
     MR ch;
     CHANNELS_Load(i, &ch);
-    if (ch.isChMode) {
-      RADIO_LoadChannelToVFO(state, vfoIdx, ch.channel);
-    } else {
-      RADIO_LoadVFOFromStorage(state, vfoIdx, &ch);
-    }
-    vfoIdx++;
+    RADIO_LoadVFOFromStorage(state, 0, &ch);
+    state->vfos[0].mode = MODE_VFO;
+    vfoIdx = 1;
+    break;
+  }
+  if (!vfoIdx && firstRecord != UINT16_MAX) {
+    MR stored;
+    CHANNELS_Load(firstRecord, &stored);
+    state->vfos[0].vfo_ch_index = firstRecord;
+    RADIO_LoadVFOFromStorage(state, 0, &stored);
+    state->vfos[0].mode = MODE_VFO;
+    vfoIdx = 1;
+  }
+  if (!vfoIdx) {
+    // No usable stored VFO: run a receive-only default without inventing a
+    // writable EEPROM slot or overwriting existing channel records.
+    VFO fallback = {.rxF = 14550000, .radio = RADIO_BK4819,
+                    .modulation = MOD_FM, .bw = BK4819_FILTER_BW_12k,
+                    .step = STEP_12_5kHz};
+    RADIO_LoadVFOFromStorage(state, 0, &fallback);
+    state->vfos[0].vfo_ch_index = UINT16_MAX;
+    vfoIdx = 1;
   }
   state->num_vfos = vfoIdx;
+  state->active_vfo_index = state->primary_vfo_index = 0;
+  state->multiwatch_enabled = false;
 
   VFOContext *ctx = &state->vfos[state->active_vfo_index].context;
   for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
@@ -1967,7 +1977,7 @@ const char *RADIO_GetParamValueString(const VFOContext *ctx, ParamType param) {
       return MOD_NAMES_BK4819[ctx->modulation];
     }
     if (ctx->radio_type == RADIO_SI4732) {
-      return MOD_NAMES_SI47XX[ctx->modulation];
+      return ctx->modulation == MOD_WFM ? "WFM" : MOD_NAMES_SI47XX[ctx->modulation];
     }
     return "WFM";
   case PARAM_TX_STATE:
@@ -2083,3 +2093,91 @@ const ExtendedVFOContext *RADIO_GetCurrentVFOConst(const RadioState *state) {
 }
 
 void RADIO_FastSquelchUpdate() { vfo->is_open = RADIO_CheckSquelch(ctx); }
+
+ReceiverCapabilities RADIO_GetReceiverCapabilities(void) {
+  static bool detected;
+  static ReceiverCapabilities capabilities;
+  if (!detected) {
+    capabilities.broadcast = BK1080_Detect();
+    // Probe each chip through its own driver. A failed BK read is not SI.
+    capabilities.si = !capabilities.broadcast && SI47XX_Detect();
+    capabilities.ssb_patch = capabilities.si && SETTINGS_IsPatchPresent();
+    detected = true;
+  }
+  return capabilities;
+}
+
+RadioParameters RADIO_ReadParameters(const VFOContext *context) {
+  RxMode mode = RX_FM;
+  if (context->modulation == MOD_WFM || context->radio_type == RADIO_BK1080 ||
+      (context->radio_type == RADIO_SI4732 && context->modulation == MOD_FM))
+    mode = RX_WFM;
+  else if (context->modulation == MOD_AM)
+    mode = RX_AM;
+  else if (context->modulation == MOD_LSB)
+    mode = RX_LSB;
+  else if (context->modulation == MOD_USB)
+    mode = RX_USB;
+  uint32_t bandwidth = mode == RX_WFM ? 0
+      : context->radio_type == RADIO_BK4819 ? BK4819_BandwidthToHz(context->bandwidth)
+      : SI47XX_BandwidthToHz(context->bandwidth, mode == RX_LSB || mode == RX_USB);
+  uint32_t step = context->step < ARRAY_SIZE(StepFrequencyTable)
+                      ? StepFrequencyTable[context->step]*10u : 0;
+  return (RadioParameters){mode, step, bandwidth, context->squelch.value, false};
+}
+
+bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan) {
+  if (!plan || !gRadioState || context != &gRadioState->vfos[0].context ||
+      context->tx_state.is_active || (unsigned)plan->parameters.mode >= RX_MODE_COUNT)
+    return false;
+  uint8_t step = UINT8_MAX;
+  for (uint8_t i = 0; i < ARRAY_SIZE(StepFrequencyTable); ++i)
+    if (StepFrequencyTable[i]*10u == plan->parameters.step_hz)
+      step = i;
+  if (step == UINT8_MAX)
+    return false; // Transitional EEPROM adapter cannot represent this step.
+  uint16_t bandwidth = 0;
+  bool isSsb = plan->parameters.mode == RX_LSB || plan->parameters.mode == RX_USB;
+  if (plan->parameters.mode != RX_WFM &&
+      !(plan->device == RX_DEVICE_BK
+          ? BK4819_BandwidthFromHz(plan->parameters.bandwidth_hz, &bandwidth)
+          : SI47XX_BandwidthFromHz(plan->parameters.bandwidth_hz, isSsb, &bandwidth)))
+    return false;
+  Radio radio = plan->device == RX_DEVICE_BK ? RADIO_BK4819
+              : plan->device == RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
+  static const ModulationType modes[] = {MOD_FM, MOD_WFM, MOD_AM, MOD_LSB, MOD_USB};
+  bool receiverChanged = context->radio_type != radio;
+  bool modeChanged = context->modulation != modes[plan->parameters.mode];
+  if (receiverChanged || modeChanged) {
+    // SI mode changes can power-cycle the DSP. Reapply its settings and
+    // reroute audio even if squelch was open before and remains open.
+    vfo->is_open = false;
+    AUDIO_ToggleSpeaker(false);
+  }
+  context->dirty[PARAM_RADIO] |= receiverChanged;
+  context->dirty[PARAM_MODULATION] |= context->modulation != modes[plan->parameters.mode];
+  context->dirty[PARAM_BANDWIDTH] |= context->bandwidth != bandwidth;
+  context->dirty[PARAM_SQUELCH_VALUE] |= context->squelch.value != plan->parameters.squelch;
+  context->dirty[PARAM_FREQUENCY] = true;
+  if (receiverChanged || modeChanged) {
+    context->gain = AUTO_GAIN_INDEX;
+    for (uint8_t i = 0; i < PARAM_COUNT; ++i)
+      context->dirty[i] = true;
+  }
+  context->radio_type = radio;
+  context->modulation = modes[plan->parameters.mode];
+  context->bandwidth = bandwidth;
+  context->frequency = plan->frequency_hz/10;
+  context->squelch.value = plan->parameters.squelch;
+  context->tx_allowed = RADIO_MODEL_CanTransmit(plan);
+  context->tx_state.offsetDirection = OFFSET_NONE;
+  context->volume = 100;
+  context->dirty[PARAM_VOLUME] = true;
+  context->step = step;
+  RADIO_UpdateCurrentBand(context);
+  RADIO_ApplySettings(context);
+  context->save_to_eeprom = true;
+  context->last_save_time = Now();
+  gRedrawScreen = true;
+  return true;
+}

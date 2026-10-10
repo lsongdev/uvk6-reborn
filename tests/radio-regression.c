@@ -4,6 +4,10 @@
 
 static bool hasSi = true;
 Settings gSettings;
+static unsigned probes;
+bool BK1080_Detect(void) { ++probes; return !hasSi; }
+bool SI47XX_Detect(void) { ++probes; return hasSi; }
+bool SETTINGS_IsPatchPresent(void) { return true; }
 const char *TX_OFFSET_NAMES[4] = {"None", "+", "-", "Freq"};
 const char *TX_POWER_NAMES[4] = {"Low", "Mid", "High", "Min"};
 uint16_t BK1080_ReadRegister(BK1080_Register_t reg) {
@@ -24,7 +28,9 @@ void bkAttToS(char *out, uint8_t gain) { (void)gain; out[0] = '\0'; }
 void testFrequencyInput(void);
 void testBandNames(void);
 
-int main(void) {
+int main(int argc, char **argv) {
+  (void)argv;
+  hasSi = argc == 1;
   VFOContext context = {.radio_type = RADIO_SI4732, .frequency = 9592500,
                         .modulation = MOD_FM};
   RADIO_UpdateCurrentBand(&context);
@@ -38,10 +44,11 @@ int main(void) {
 
   RADIO_SetParam(&context, PARAM_FREQUENCY, 9592500, true);
   assert(context.frequency == 9592500);
-  assert(context.radio_type == RADIO_SI4732);
-  assert(context.current_band == &si4732_bands[2]);
+  assert(context.radio_type == (hasSi ? RADIO_SI4732 : RADIO_BK1080));
+  assert(context.current_band == (hasSi ? &si4732_bands[2] : &bk1080_band));
   assert(context.modulation == MOD_FM && context.gain == 0);
 
+  if (hasSi) {
   RADIO_SetParam(&context, PARAM_FREQUENCY, 710000, true);
   assert(context.frequency == 710000);
   assert(context.radio_type == RADIO_SI4732);
@@ -51,7 +58,7 @@ int main(void) {
   assert(context.frequency == 14550000);
   assert(context.radio_type == RADIO_BK4819);
 
-  hasSi = false;
+  } else {
   context.modulation = MOD_FM;
   RADIO_SetParam(&context, PARAM_FREQUENCY, 9592500, false);
   assert(context.radio_type == RADIO_BK1080);
@@ -65,7 +72,8 @@ int main(void) {
   RADIO_SetParam(&context, PARAM_FREQUENCY, BK4819_F_MAX + 1, false);
   assert(context.frequency == 43850000);
 
-  hasSi = true;
+  }
+  if (hasSi) {
   VFO stored = {.radio = RADIO_SI4732, .rxF = 9592500,
                 .modulation = MOD_FM, .gainIndex = 0};
   setCommonParamsFromCh(&context, &stored);
@@ -75,6 +83,23 @@ int main(void) {
   stored.gainIndex = AUTO_GAIN_INDEX;
   setCommonParamsFromCh(&context, &stored);
   assert(context.radio_type == RADIO_SI4732 && context.gain == 0);
+  }
+  RadioState snapshot = {.num_vfos = 1};
+  snapshot.vfos[0].context = context;
+  snapshot.vfos[0].mode = MODE_VFO;
+  memcpy(snapshot.vfos[0].context.name, "VFO Test", 9);
+  snapshot.vfos[0].context.power = TX_POW_LOW;
+  VFO exported;
+  memset(&exported, 0xff, sizeof(exported));
+  RADIO_SaveVFOToStorage(&snapshot, 0, &exported);
+  assert(exported.meta.type == TYPE_VFO && !exported.meta.readonly);
+  assert(exported.name[9] == '\0' && strcmp(exported.name, "VFO Test") == 0);
+  assert(exported.power == TX_POW_LOW && !exported.allowTx);
+  assert(exported.rxF == context.frequency && exported.modulation == context.modulation);
+  unsigned initialProbes = probes;
+  RADIO_GetReceiverCapabilities();
+  RADIO_GetReceiverCapabilities();
+  assert(probes == initialProbes);
   testFrequencyInput();
   testBandNames();
   return 0;

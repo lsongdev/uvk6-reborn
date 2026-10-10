@@ -1,5 +1,6 @@
 #include "system.h"
 #include "apps/apps.h"
+#include "apps/vfo1.h"
 #include "driver/backlight.h"
 #include "driver/eeprom.h"
 #include "driver/keyboard.h"
@@ -67,7 +68,8 @@ static void systemUpdate() {
 static bool checkKeylock(Key_State_t state, KEY_Code_t key) {
   bool isKeyLocked = gSettings.keylock;
   bool isPttLocked = gSettings.pttLock;
-  bool isSpecialKey = key == KEY_PTT || key == KEY_SIDE1 || key == KEY_SIDE2;
+  // Side keys now change tuning, so the keyboard lock must cover them.
+  bool isSpecialKey = key == KEY_PTT;
   bool isLongPressF = state == KEY_LONG_PRESSED && key == KEY_F;
 
   if (isLongPressF) {
@@ -105,7 +107,7 @@ static void processKeyboard() {
         if (n.state == KEY_LONG_PRESSED) {
           APPS_run(APP_SETTINGS);
         } else if (n.state == KEY_RELEASED) {
-          APPS_run(APP_APPS_LIST);
+          APPS_run(APP_VFO1);
         }
       }
       if (n.key == KEY_EXIT) {
@@ -146,18 +148,20 @@ void SYS_Main() {
     ST7565_Blit();
 
     LogC(LOG_C_BRIGHT_WHITE, "LOAD BANDS");
-    BANDS_Load();
+    // Built-in frequency profiles no longer depend on EEPROM band records.
 
     LogC(LOG_C_BRIGHT_WHITE, "RUN DEFAULT APP");
-    APPS_run(gSettings.mainApp);
+    APPS_run(APP_VFO1);
   }
 
   for (;;) {
 
     SETTINGS_UpdateSave();
 
-    if (gCurrentApp != APP_RESET) {
-      SCAN_Check();
+    if (gRadioState && VFO1_isReceiving() && Now()-radioTimer >= SQL_DELAY) {
+      RADIO_CheckAndSaveVFO(gRadioState);
+      RADIO_UpdateSquelch(gRadioState);
+      radioTimer = Now();
     }
 
     APPS_update();
