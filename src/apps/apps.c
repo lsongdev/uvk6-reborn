@@ -108,7 +108,7 @@ void APPS_init(AppType_t app) {
   STATUSLINE_SetText("%s", apps[app].name);
   gRedrawScreen = true;
 
-  LogC(LOG_C_YELLOW, "[APP] Init %s", apps[gCurrentApp].name);
+  LogC(LOG_C_YELLOW, "[APP] Init %s", apps[app].name);
   if (apps[app].init) {
     apps[app].init();
   }
@@ -137,7 +137,9 @@ void APPS_deinit(void) {
 
 RadioState radioState;
 void APPS_run(AppType_t app) {
-  if (appsStack[stackIndex] == app) {
+  if (app <= APP_NONE || app >= APPS_COUNT)
+    return;
+  if (stackIndex >= 0 && appsStack[stackIndex] == app) {
     return;
   }
   APPS_deinit();
