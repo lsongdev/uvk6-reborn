@@ -76,11 +76,23 @@ int main(void) {
   SI47XX_TuneTo(720075);
   assert(siCurrentFreq == 7200 && lastBfo == -750);
 
+  // A NACK during fine tuning must propagate and not commit a new carrier.
+  ack = false;
+  unsigned beforeFail = tuneCommands;
+  uint16_t previousCarrier = siCurrentFreq;
+  assert(!SI47XX_TuneTo(730050));
+  assert(siCurrentFreq == previousCarrier && tuneCommands == beforeFail);
+  assert(!SI47XX_SetProperty(PROP_RX_VOLUME, 63));
+  ack = true;
+
   SI47XX_PowerDown();
   patchPresent = false;
   SI47XX_SwitchMode(SI47XX_LSB);
   assert(!isSi4732On && si4732mode == SI47XX_LSB);
   ack = false;
   assert(!SI47XX_Detect());
+  SI47XX_PowerDown();
+  assert(!SI47XX_SwitchMode(SI47XX_FM));
+  assert(!isSi4732On);
   return 0;
 }

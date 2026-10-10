@@ -101,15 +101,18 @@ static bool SI47XX_downloadPatch(void) {
   return true;
 }
 
-void SI47XX_SetProperty(uint16_t prop, uint16_t value) {
-  waitToSend();
+bool SI47XX_SetProperty(uint16_t prop, uint16_t value) {
+  if (!waitToSend())
+    return false;
   uint8_t tmp[6] = {
       CMD_SET_PROPERTY, 0,           //
       prop >> 8,        prop & 0xff, //
       value >> 8,       value & 0xff //
   };
-  SI47XX_WriteBuffer(tmp, 6);
+  if (!SI47XX_WriteBuffer(tmp, 6))
+    return false;
   SYS_DelayMs(8); // irrespective of CTS coming up earlier than that
+  return true;
 }
 
 /* uint16_t SI47XX_GetProperty(uint16_t prop, bool *valid) {
@@ -137,10 +140,10 @@ void RSQ_GET() {
   SI47XX_ReadBuffer(rsqStatus.raw, si4732mode == SI47XX_FM ? 8 : 6);
 }
 
-void SI47XX_SetVolume(uint8_t volume) {
+bool SI47XX_SetVolume(uint8_t volume) {
   if (volume > 63)
     volume = 63;
-  SI47XX_SetProperty(PROP_RX_VOLUME, volume);
+  return SI47XX_SetProperty(PROP_RX_VOLUME, volume);
 }
 
 void setAvcAmMaxGain(uint8_t gain) {
@@ -183,7 +186,7 @@ void SI47XX_SetAutomaticGainControl(uint8_t AGCDIS, uint8_t AGCIDX) {
   SI47XX_WriteBuffer(cmd2, 3);
 }
 
-void SI47XX_PowerUp() {
+bool SI47XX_PowerUp() {
   // printf("SI PU\n");
   RST_HIGH;
 
@@ -191,11 +194,12 @@ void SI47XX_PowerUp() {
   if (si4732mode == SI47XX_AM) {
     cmd[1] = FLG_XOSCEN | FUNC_AM;
   }
-  waitToSend();
-
+  // POWER_UP is sent just after reset; CTS is not meaningful yet.
+  SYS_DelayMs(10);
   if (!SI47XX_WriteBuffer(cmd, 3)) {
-    // printf("SI PU failed\n");
-    return;
+    RST_LOW;
+    isSi4732On = false;
+    return false;
   }
   SYS_DelayMs(500);
 
@@ -212,12 +216,15 @@ void SI47XX_PowerUp() {
     SI47XX_SetProperty(PROP_AM_AGC_RELEASE_RATE, 20);
     setAvcAmMaxGain(40);
   }
-  if (siCurrentFreq != 0) {
-    SI47XX_SetFreq(siCurrentFreq);
+  if (siCurrentFreq != 0 && !SI47XX_SetFreq(siCurrentFreq)) {
+    RST_LOW;
+    isSi4732On = false;
+    return false;
   }
+  return isSi4732On;
 }
 
-void SI47XX_SsbSetup(SI47XX_SsbFilterBW AUDIOBW, uint8_t SBCUTFLT,
+bool SI47XX_SsbSetup(SI47XX_SsbFilterBW AUDIOBW, uint8_t SBCUTFLT,
                      uint8_t AVC_DIVIDER, uint8_t AVCEN, uint8_t SMUTESEL,
                      uint8_t DSP_AFCDIS) {
   currentSsbMode.param.SBCUTFLT = SBCUTFLT;
@@ -226,27 +233,35 @@ void SI47XX_SsbSetup(SI47XX_SsbFilterBW AUDIOBW, uint8_t SBCUTFLT,
   currentSsbMode.param.SMUTESEL = SMUTESEL;
   currentSsbMode.param.DSP_AFCDIS = DSP_AFCDIS;
   currentSsbMode.param.AUDIOBW = AUDIOBW;
-  SI47XX_SetProperty(PROP_SSB_MODE,
-                     (currentSsbMode.raw[1] << 8) | currentSsbMode.raw[0]);
+  return SI47XX_SetProperty(PROP_SSB_MODE,
+                              (currentSsbMode.raw[1] << 8) | currentSsbMode.raw[0]);
 }
 
-void SI47XX_PatchPowerUp() {
+bool SI47XX_PatchPowerUp() {
   // printf("SI PPU\n");
   RST_HIGH;
   uint8_t cmd[3] = {CMD_POWER_UP, 0b00110001, OUT_ANALOG};
-  waitToSend();
-  SI47XX_WriteBuffer(cmd, 3);
+  SYS_DelayMs(10);
+  if (!SI47XX_WriteBuffer(cmd, 3)) {
+    RST_LOW;
+    isSi4732On = false;
+    return false;
+  }
   SYS_DelayMs(60);
 
   if (!SI47XX_downloadPatch()) {
     Log("[SI] SSB patch missing or failed");
     RST_LOW;
     isSi4732On = false;
-    return;
+    return false;
   }
   isSi4732On = true;
 
-  SI47XX_SsbSetup(2, 1, 0, 1, 0, 1);
+  if (!SI47XX_SsbSetup(2, 1, 0, 1, 0, 1)) {
+    RST_LOW;
+    isSi4732On = false;
+    return false;
+  }
   setAvcAmMaxGain(42);
 
   SI47XX_SetVolume(63);
@@ -255,12 +270,12 @@ void SI47XX_PatchPowerUp() {
   SI47XX_SetProperty(PROP_SSB_SOFT_MUTE_MAX_ATTENUATION, 0);
   SI47XX_SetProperty(PROP_AM_AUTOMATIC_VOLUME_CONTROL_MAX_GAIN, 0x7800);
 
-  si4732mode = SI47XX_USB; // FIXME: modulation must be set before power on to
-                           // prevent repowering
+  si4732mode = SI47XX_USB; // Patch boots in USB; caller restores requested mode.
+  return isSi4732On;
 }
 
-void SI47XX_SetSsbBandwidth(SI47XX_SsbFilterBW bw) {
-  SI47XX_SsbSetup(bw, 1, 0, 1, 0, 1);
+bool SI47XX_SetSsbBandwidth(SI47XX_SsbFilterBW bw) {
+  return SI47XX_SsbSetup(bw, 1, 0, 1, 0, 1);
 }
 
 void SI47XX_Seek(bool up, bool wrap) {
@@ -307,36 +322,36 @@ void SI47XX_PowerDown() {
   siCurrentFreq = 0;
 }
 
-void SI47XX_SwitchMode(SI47XX_MODE mode) {
+bool SI47XX_SwitchMode(SI47XX_MODE mode) {
   Log("[SI] mode %u -> %u", si4732mode, mode);
   if (si4732mode == mode && isSi4732On)
-    return;
+    return true;
   bool wasSSB = isSi4732On && SI47XX_IsSSB();
   bool needsSSB = mode == SI47XX_USB || mode == SI47XX_LSB;
   si4732mode = mode;
   if (!wasSSB || !needsSSB) {
     if (isSi4732On)
       SI47XX_PowerDown();
-    if (needsSSB)
-      SI47XX_PatchPowerUp();
-    else
-      SI47XX_PowerUp();
+    bool ready = needsSSB ? SI47XX_PatchPowerUp() : SI47XX_PowerUp();
+    if (!ready) {
+      si4732mode = mode;
+      return false;
+    }
   }
-  // Patch startup uses USB internally. Restore the requested sideband so
-  // an LSB label can never hide actual USB demodulation.
+  // Patch startup uses USB internally. Restore the requested sideband.
   si4732mode = mode;
   if (wasSSB && needsSSB)
-    siCurrentFreq = 0; // Sideband is encoded in the tune command, even at the same carrier.
+    siCurrentFreq = 0; // Sideband is encoded in the tune command.
+  return isSi4732On;
 }
 
-void SI47XX_SetFreq(uint16_t freq) {
+bool SI47XX_SetFreq(uint16_t freq) {
   if (freq == 0) {
     // printf("SI f=0 skip\n");
-    return; // Защита от установки нулевой частоты
+    return false; // Reject invalid carrier
   }
-  if (siCurrentFreq == freq) {
-    return;
-  }
+  if (siCurrentFreq == freq)
+    return isSi4732On;
   uint8_t hb = (freq >> 8) & 0xFF;
   uint8_t lb = freq & 0xFF;
 
@@ -360,9 +375,10 @@ void SI47XX_SetFreq(uint16_t freq) {
     cmd[5] = 1;
   }
 
-  waitToSend();
-  if (SI47XX_WriteBuffer(cmd, size))
-    siCurrentFreq = freq;
+  if (!isSi4732On || !waitToSend() || !SI47XX_WriteBuffer(cmd, size))
+    return false;
+  siCurrentFreq = freq;
+  return true;
 }
 
 void SI47XX_SetAMFrontendAGC(uint8_t minGainIdx, uint8_t attnBackup) {
@@ -370,11 +386,12 @@ void SI47XX_SetAMFrontendAGC(uint8_t minGainIdx, uint8_t attnBackup) {
                      minGainIdx << 8 | attnBackup);
 }
 
-void SI47XX_SetBandwidth(SI47XX_FilterBW AMCHFLT, bool AMPLFLT) {
+bool SI47XX_SetBandwidth(SI47XX_FilterBW AMCHFLT, bool AMPLFLT) {
   SI47XX_BW_Config cfg = {0};
   cfg.param.AMCHFLT = AMCHFLT;
   cfg.param.AMPLFLT = AMPLFLT;
-  SI47XX_SetProperty(PROP_AM_CHANNEL_FILTER, (cfg.raw[1] << 8) | cfg.raw[0]);
+  return SI47XX_SetProperty(PROP_AM_CHANNEL_FILTER,
+                              (cfg.raw[1] << 8) | cfg.raw[0]);
 }
 
 void SI47XX_ReadRDS(uint8_t buf[13]) {
@@ -418,23 +435,23 @@ void SI47XX_SetSeekAmRssiThreshold(uint16_t value) {
   SI47XX_SetProperty(PROP_AM_SEEK_TUNE_RSSI_THRESHOLD, value);
 }
 
-void SI47XX_SetBFO(int16_t bfo) { SI47XX_SetProperty(PROP_SSB_BFO, bfo); }
+bool SI47XX_SetBFO(int16_t bfo) {
+  return SI47XX_SetProperty(PROP_SSB_BFO, bfo);
+}
 
-void SI47XX_TuneTo(uint32_t f) {
+bool SI47XX_TuneTo(uint32_t f) {
   if (SI47XX_IsSSB()) {
     uint32_t carrier = (uint32_t)siCurrentFreq * 100;
     int32_t bfo = ((int32_t)carrier - (int32_t)f) * 10;
     if (!siCurrentFreq || bfo <= -16000 || bfo >= 16000)
       carrier = (f / 100) * 100;
-    SI47XX_SetFreq(carrier / 100);
-    // Apply the residual even on the first coarse tune, not only on later
-    // fine adjustments. The public model and actual SSB frequency agree.
-    SI47XX_SetBFO(((int32_t)carrier - (int32_t)f) * 10);
-    return;
+    if (!SI47XX_SetFreq(carrier / 100))
+      return false;
+    // Apply the BFO only after the coarse carrier was accepted.
+    return SI47XX_SetBFO(((int32_t)carrier - (int32_t)f) * 10);
   }
-  // FM_TUNE_FREQ accepts 10 kHz units. The controller has resolved the
-  // requested frequency; do not floor it again to 50 kHz.
-  SI47XX_SetFreq(f / fDiv());
+  // FM_TUNE_FREQ accepts 10 kHz units.
+  return SI47XX_SetFreq(f / fDiv());
 }
 
 void SI47xx_GetStatus(uint8_t intack, uint8_t cancel) {

@@ -2148,6 +2148,26 @@ bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan) {
   Radio radio = plan->device == RX_DEVICE_BK ? RADIO_BK4819
               : plan->device == RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
   static const ModulationType modes[] = {MOD_FM, MOD_WFM, MOD_AM, MOD_LSB, MOD_USB};
+
+  // Preflight the SI receiver before committing user-visible state or EEPROM.
+  // A missing patch, CTS timeout, or NACK must not be reported as a tune.
+  if (radio == RADIO_SI4732) {
+    SI47XX_MODE siMode = plan->parameters.mode == RX_WFM ? SI47XX_FM
+                      : (SI47XX_MODE)modes[plan->parameters.mode];
+    bool ready = SI47XX_SwitchMode(siMode);
+    if (ready)
+      ready = SI47XX_TuneTo(plan->frequency_hz / 10u);
+    if (ready && plan->parameters.mode != RX_WFM)
+      ready = isSsb ? SI47XX_SetSsbBandwidth(bandwidth)
+                    : SI47XX_SetBandwidth(bandwidth, true);
+    if (ready)
+      ready = SI47XX_SetVolume(63);
+    if (!ready) {
+      vfo->is_open = false;
+      AUDIO_ToggleSpeaker(false);
+      return false;
+    }
+  }
   bool receiverChanged = context->radio_type != radio;
   bool modeChanged = context->modulation != modes[plan->parameters.mode];
   if (receiverChanged || modeChanged) {
