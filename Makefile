@@ -17,11 +17,13 @@ BUILD_TAG     := $(shell date -u +'%Y%m%d_%H%M')
 # =============================================================================
 # Source Files
 # =============================================================================
+# Compile only reachable applications. Retired scan/spectrum code remains in
+# the tree for reference, but is not part of the single-receiver firmware.
 SRC := $(wildcard $(SRC_DIR)/*.c) \
        $(wildcard $(SRC_DIR)/driver/*.c) \
-       $(wildcard $(SRC_DIR)/helper/*.c) \
-       $(wildcard $(SRC_DIR)/ui/*.c) \
-       $(wildcard $(SRC_DIR)/apps/*.c)
+       $(filter-out $(SRC_DIR)/helper/scan.c,$(wildcard $(SRC_DIR)/helper/*.c)) \
+       $(filter-out $(SRC_DIR)/ui/spectrum.c,$(wildcard $(SRC_DIR)/ui/*.c)) \
+       $(addprefix $(SRC_DIR)/apps/,apps.c vfo1.c finput.c settings.c reset.c)
 
 OBJS := $(OBJ_DIR)/start.o \
         $(OBJ_DIR)/init.o \
