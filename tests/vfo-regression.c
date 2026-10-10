@@ -131,5 +131,6 @@ int main(void) {
   failApply = true;
   press(KEY_UP);
   assert(frequencyHz == 438500000 && parameters.mode == RX_FM && applied == 1);
+  assert(!receiving && !vfo->is_open && routed == 1);
   return 0;
 }

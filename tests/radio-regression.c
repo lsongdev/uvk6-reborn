@@ -79,10 +79,15 @@ int main(int argc, char **argv) {
   setCommonParamsFromCh(&context, &stored);
   assert(context.frequency == 9592500 && context.volume == 100);
   assert(context.dirty[PARAM_VOLUME]);
+  // A full-width EEPROM name without NUL must never overflow ctx->name.
+  memset(stored.name, 'X', sizeof(stored.name));
   stored.radio = RADIO_BK4819;
   stored.gainIndex = AUTO_GAIN_INDEX;
   setCommonParamsFromCh(&context, &stored);
   assert(context.radio_type == RADIO_SI4732 && context.gain == 0);
+  assert(context.name[sizeof(context.name) - 1] == '\0');
+  for (unsigned i = 0; i < sizeof(context.name) - 1; ++i)
+    assert(context.name[i] == 'X');
   }
   RadioState snapshot = {.num_vfos = 1};
   snapshot.vfos[0].context = context;

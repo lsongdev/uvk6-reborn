@@ -32,6 +32,10 @@ static void notify(const char *text) {
 static void apply(const RxPlan *plan) {
   uint8_t nextBand = RADIO_MODEL_BandAt(plan->frequency_hz);
   if (!RADIO_ApplyRxPlan(ctx, plan)) {
+    // A failed hardware change must not leave the UI claiming reception.
+    receiving = false;
+    vfo->is_open = false;
+    RADIO_SwitchAudioToVFO(gRadioState, 0);
     notify("Tune failed");
     return;
   }
