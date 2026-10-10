@@ -127,6 +127,10 @@ bool SETTINGS_Load(void) {
       saved.batteryCalibration < 1900 || saved.batteryCalibration > 2154 ||
       saved.mainApp <= APP_NONE || saved.mainApp >= APPS_COUNT ||
       saved.backlight >= ARRAY_SIZE(BL_TIME_VALUES) ||
+      saved.roger >= ARRAY_SIZE(rogerNames) ||
+      saved.chDisplayMode >= ARRAY_SIZE(CH_DISPLAY_MODE_NAMES) ||
+      saved.batteryType > BAT_3500 || saved.batteryStyle > BAT_VOLTAGE ||
+      saved.backlightOnSquelch > BL_SQL_OPEN ||
       saved.sqOpenedTimeout >= ARRAY_SIZE(SCAN_TIMEOUTS) ||
       saved.sqClosedTimeout >= ARRAY_SIZE(SCAN_TIMEOUTS))
     return false;
