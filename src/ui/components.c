@@ -59,6 +59,36 @@ void UI_RSSIBar(uint8_t y) {
   }
 }
 
+// Equal-height segments. The BK4819 value uses the existing approximate
+// S calibration; other receivers show relative RF strength, not S units.
+void UI_SMeter(uint8_t y) {
+  enum { SEGMENTS = 14, SEGMENT_W = 6, SEGMENT_GAP = 1, BAR_X = 29 };
+  uint8_t level = 0;
+
+  if (ctx->radio_type == RADIO_BK4819) {
+    if (vfo->msm.rssi) {
+      int16_t dBm = Rssi2DBm(vfo->msm.rssi) + BK4819_GetAttenuation();
+      level = DBm2S(dBm, ctx->frequency >= 300 * MHZ);
+    }
+    if (level > 9)
+      PrintSmallEx(2, y + 6, POS_L, C_FILL, "S9+");
+    else
+      PrintSmallEx(2, y + 6, POS_L, C_FILL, "S%u", level);
+  } else {
+    level = ConvertDomain(vfo->msm.rssi, 0, 75, 0, SEGMENTS);
+    PrintSmallEx(2, y + 6, POS_L, C_FILL, "RF");
+  }
+
+  if (level > SEGMENTS)
+    level = SEGMENTS;
+  for (uint8_t i = 0; i < SEGMENTS; ++i) {
+    uint8_t x = BAR_X + i * (SEGMENT_W + SEGMENT_GAP);
+    DrawRect(x, y, SEGMENT_W, 8, C_FILL);
+    if (i < level)
+      FillRect(x + 1, y + 1, SEGMENT_W - 2, 6, C_FILL);
+  }
+}
+
 void UI_Scanlists(uint8_t baseX, uint8_t baseY, uint16_t sl) {
   for (uint8_t i = 0; i < 16; ++i) {
     bool isActive = (sl >> i) & 1;

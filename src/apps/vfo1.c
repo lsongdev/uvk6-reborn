@@ -251,184 +251,40 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
   return false;
 }
 
-static void renderTxRxState(uint8_t y, bool isTx) {
-  if (isTx) {
-    if (ctx->tx_state.is_active) {
-      PrintMediumEx(0, 21, POS_L, C_FILL, "TX");
-    } else {
-      PrintMediumBoldEx(LCD_XCENTER, y, POS_C, C_FILL, "%s",
-                        RADIO_GetParamValueString(ctx, PARAM_TX_STATE));
-    }
-  } else if (vfo->msm.open) {
-    PrintMediumEx(0, 21, POS_L, C_FILL, "RX");
-  }
-}
-
-static void renderChannelName(uint8_t y, uint16_t channel) {
-  uint8_t vfoN = RADIO_GetCurrentVFONumber(gRadioState);
-  FillRect(0, y - 14, 30, 7, C_FILL);
-  PrintSmallEx(15, y - 9, POS_C, C_INVERT, "VFO %u/%u", vfoN + 1,
-               gRadioState->num_vfos);
-  if (gRadioState->vfos[vfoN].mode == MODE_CHANNEL) {
-    PrintSmallEx(32, y - 9, POS_L, C_FILL, "MR %03u", channel);
-    UI_Scanlists(LCD_WIDTH - 25, y - 13, gSettings.currentScanlist);
-  }
-}
-
-static void renderStatusLine(void) {
-  if (gIsNumNavInput) {
-    return;
-  }
-
-  if (!gSettings.mWatch || vfo->is_open) {
-    STATUSLINE_RenderRadioSettings();
-  } else {
-    STATUSLINE_SetText("Radio: %s",
-                       RADIO_GetParamValueString(ctx, PARAM_RADIO));
-  }
-}
-
-static void renderBandInfo(uint8_t BASE) {
-  if (vfo->mode == MODE_CHANNEL) {
-    PrintMediumEx(LCD_XCENTER, BASE - 16, POS_C, C_FILL, "%s", ctx->name);
-  } else {
-    const char *format =
-        (gCurrentBand.meta.type == TYPE_BAND_DETACHED) ? "*%s" : "%s:%u";
-    uint32_t channel = CHANNELS_GetChannel(&gCurrentBand, ctx->frequency) + 1;
-
-    if (gCurrentBand.meta.type == TYPE_BAND_DETACHED) {
-      PrintSmallEx(32, 12, POS_L, C_FILL, format, gCurrentBand.name);
-    } else {
-      PrintSmallEx(32, 12, POS_L, C_FILL, format, gCurrentBand.name, channel);
-    }
-  }
-}
-
-static void renderCodes(uint8_t BASE) {
-  if (ctx->code.type) {
-    PrintSmallEx(0, BASE - 6, POS_L, C_FILL, "R%s",
-                 RADIO_GetParamValueString(ctx, PARAM_RX_CODE));
-  }
-  if (ctx->tx_state.code.type) {
-    PrintSmallEx(0, BASE, POS_L, C_FILL, "T%s",
-                 RADIO_GetParamValueString(ctx, PARAM_TX_CODE));
-  }
-}
-
-static void renderExtraInfo(uint8_t BASE) {
-  uint32_t txF = RADIO_GetParam(ctx, PARAM_TX_FREQUENCY_FACT);
-  uint32_t rxF = RADIO_GetParam(ctx, PARAM_FREQUENCY);
-  bool isTxFDifferent = (txF != rxF);
-
-  int16_t afcVal = BK4819_GetAFCValue();
-  if (afcVal != 0) {
-    PrintSmallEx(14, 21, POS_L, C_FILL, "%+d", BK4819_GetAFCValue() * 10);
-  }
-
-  if (isTxFDifferent) {
-    PrintSmallEx(LCD_XCENTER, BASE + 6, POS_C, C_FILL, "TX: %s",
-                 RADIO_GetParamValueString(ctx, PARAM_TX_FREQUENCY_FACT));
-  }
-}
-
-static void renderLootInfo(void) {
-  if (!gLastActiveLoot)
-    return;
-
-  const uint32_t ago = (Now() - gLastActiveLoot->lastTimeOpen) / 1000;
-
-  if (gLastActiveLoot->ct != 255) {
-    PrintRTXCode(String, CODE_TYPE_CONTINUOUS_TONE, gLastActiveLoot->ct);
-    PrintSmallEx(0, LCD_HEIGHT - 1, POS_L, C_FILL, "%s", String);
-  } else if (gLastActiveLoot->cd != 255) {
-    PrintRTXCode(String, CODE_TYPE_DIGITAL, gLastActiveLoot->cd);
-    PrintSmallEx(0, LCD_HEIGHT - 1, POS_L, C_FILL, "%s", String);
-  }
-
-  UI_DrawLoot(gLastActiveLoot, LCD_XCENTER, LCD_HEIGHT - 1, POS_C);
-
-  if (ago) {
-    PrintSmallEx(LCD_WIDTH, LCD_HEIGHT - 1, POS_R, C_FILL, "%u:%02u", ago / 60,
-                 ago % 60);
-  }
-
-  if (gRadioState->multiwatch_enabled) {
-    PrintMediumEx(LCD_XCENTER, LCD_HEIGHT - 9, POS_C, C_FILL, "M");
-  }
-}
-
-static void renderMonitorMode(uint8_t BASE) {
-  SPECTRUM_Y = BASE + 2;
-  SPECTRUM_H = LCD_HEIGHT - SPECTRUM_Y;
-
-  if (false && gSettings.showLevelInVFO) {
-    static char *graphMeasurementNames[] = {
-        [GRAPH_RSSI] = "RSSI",
-        [GRAPH_NOISE] = "Noise",
-        [GRAPH_GLITCH] = "Glitch",
-        [GRAPH_SNR] = "SNR",
-    };
-
-    static const struct {
-      uint8_t min;
-      uint8_t max;
-    } graphRanges[] = {
-        [GRAPH_RSSI] = {RSSI_MIN, RSSI_MAX},
-        [GRAPH_NOISE] = {0, 255},
-        [GRAPH_GLITCH] = {0, 255},
-        [GRAPH_SNR] = {0, 30},
-        [GRAPH_COUNT] = {RSSI_MIN, RSSI_MAX},
-    };
-
-    SP_RenderGraph(graphRanges[graphMeasurement].min,
-                   graphRanges[graphMeasurement].max);
-    PrintSmallEx(0, SPECTRUM_Y + 5, POS_L, C_FILL, "%s %+3u",
-                 graphMeasurementNames[graphMeasurement],
-                 SP_GetLastGraphValue());
-  } else {
-    UI_RSSIBar(BASE + 1);
-  }
-}
-
+// Single-frequency main screen, with a dedicated band row and S-meter.
+// Coordinates are pixel baselines on the 128x64 display.
 void VFO1_render(void) {
-  // return;
-  const uint8_t BASE = 40;
-
-  renderStatusLine();
-
-  uint32_t f = RADIO_GetParam(
+  const uint8_t FREQ_BASE = 41;
+  uint32_t frequency = RADIO_GetParam(
       ctx, ctx->tx_state.is_active ? PARAM_TX_FREQUENCY_FACT : PARAM_FREQUENCY);
-  const char *mod = RADIO_GetParamValueString(ctx, PARAM_MODULATION);
+  const char *mode = RADIO_GetParamValueString(ctx, PARAM_MODULATION);
 
-  renderBandInfo(BASE);
-  renderTxRxState(BASE - 4,
-                  ctx->tx_state.is_active || ctx->tx_state.last_error);
+  STATUSLINE_SetText("RADIO");
 
-  if (!ctx->tx_state.last_error) {
-    UI_BigFrequency(BASE, f);
-  }
+  PrintMediumEx(2, 18, POS_L, C_FILL, "%.10s", gCurrentBand.name);
+  if (ctx->tx_state.is_active)
+    PrintMediumEx(LCD_WIDTH - 1, 18, POS_R, C_FILL, "TX");
+  else if (ctx->tx_state.last_error)
+    PrintSmallEx(LCD_WIDTH - 1, 18, POS_R, C_FILL, "TX ERR");
 
-  PrintMediumEx(LCD_WIDTH - 1, BASE - 12, POS_R, C_FILL, mod);
-  renderChannelName(21, vfo->channel_index);
+  // Left-aligned frequency; above 999 MHz use a slightly narrower font so
+  // the 5 decimal places still fit alongside the mode and unit.
+  if (frequency / MHZ < 1000)
+    PrintBiggestDigitsEx(2, FREQ_BASE, POS_L, C_FILL, "%u.%05u",
+                        frequency / MHZ, frequency % MHZ);
+  else
+    PrintBigDigitsEx(2, FREQ_BASE, POS_L, C_FILL, "%u.%05u",
+                     frequency / MHZ, frequency % MHZ);
 
-  const uint32_t step = StepFrequencyTable[ctx->step];
-  PrintSmallEx(LCD_WIDTH, BASE + 6, POS_R, C_FILL, "%d.%02d", step / KHZ,
-               step % KHZ);
+  // Mode (7px) plus the MHz unit (5px) and a 2px gap: 14px total.
+  PrintMediumEx(LCD_WIDTH - 1, FREQ_BASE - 7, POS_R, C_FILL, "%s",
+                mode ? mode : "?");
+  PrintSmallEx(LCD_WIDTH - 1, FREQ_BASE, POS_R, C_FILL, "MHz");
 
-  renderCodes(BASE);
-  renderExtraInfo(BASE);
-  renderLootInfo();
-
-  if (gMonitorMode) {
-    renderMonitorMode(BASE);
-  } else {
-    if (vfo->msm.open) {
-      UI_RSSIBar(BASE + 1);
-    }
-    if (ctx->tx_state.is_active) {
-      UI_TxBar(BASE + 1);
-    }
-  }
+  if (ctx->tx_state.is_active)
+    UI_TxBar(52);
+  else
+    UI_SMeter(52);
 
   REGSMENU_Draw();
 }

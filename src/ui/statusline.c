@@ -69,18 +69,27 @@ void STATUSLINE_render(void) {
   DrawHLine(0, 6, LCD_WIDTH, C_FILL);
 
   if (showBattery) {
-    switch (gSettings.batteryStyle) {
-    case BAT_CLEAN:
-      UI_Battery(previousBatteryLevel);
-      break;
-    case BAT_PERCENT:
-      PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_INVERT, "%u%%",
-                   gBatteryPercent);
-      break;
-    case BAT_VOLTAGE:
-      PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_FILL, "%u.%02uV",
-                   gBatteryVoltage / 100, gBatteryVoltage % 100);
-      break;
+    uint8_t bars = previousBatteryLevel > 10 ? gBatteryPercent / 10
+                                              : previousBatteryLevel;
+    if (bars > 10)
+      bars = 10;
+    // Keep the main radio header compact; preserve the setting in other apps.
+    if (gCurrentApp == APP_VFO1) {
+      UI_Battery(bars);
+    } else {
+      switch (gSettings.batteryStyle) {
+      case BAT_CLEAN:
+        UI_Battery(bars);
+        break;
+      case BAT_PERCENT:
+        PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_INVERT, "%u%%",
+                     gBatteryPercent);
+        break;
+      case BAT_VOLTAGE:
+        PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_FILL, "%u.%02uV",
+                     gBatteryVoltage / 100, gBatteryVoltage % 100);
+        break;
+      }
     }
   }
 
