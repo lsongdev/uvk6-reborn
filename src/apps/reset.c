@@ -118,7 +118,7 @@ void RESET_Render(void) {
   const uint8_t TOP = 28;
   DrawRect(13, TOP, 102, 9, C_FILL);
   FillRect(14, TOP + 1, progress, 7, C_FILL);
-  PrintMediumEx(LCD_XCENTER, TOP + 7, POS_C, C_INVERT, "%u%", progress);
+  PrintMediumEx(LCD_XCENTER, TOP + 7, POS_C, C_INVERT, "%u%%", progress);
 }
 
 bool RESET_key(KEY_Code_t k, Key_State_t state) {
