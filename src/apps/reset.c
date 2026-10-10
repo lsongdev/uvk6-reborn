@@ -9,12 +9,9 @@
 #include "../ui/statusline.h"
 
 typedef enum {
-  RESET_0xFF,
   RESET_FULL,
   RESET_UNKNOWN,
 } ResetType;
-
-static char *RESET_TYPE_NAMES[] = {"0xFF", "FULL"};
 
 static struct {
   uint32_t totalBytes;
@@ -23,6 +20,7 @@ static struct {
   uint16_t maxChannels;
   uint16_t currentItem;
   ResetType type;
+  bool confirm;
 } resetState;
 
 static VFO defaultVfos[4] = {
@@ -36,19 +34,11 @@ static void startReset(ResetType type) {
   resetState.type = type;
   resetState.doneBytes = 0;
   resetState.currentItem = 0;
-  resetState.totalBytes = (type == RESET_0xFF) ? SETTINGS_GetEEPROMSize() 
-                                                : resetState.maxChannels * CH_SIZE;
+  resetState.totalBytes = SETTINGS_SIZE + resetState.maxChannels * CH_SIZE;
 }
 
 static bool processReset(void) {
-  if (resetState.type == RESET_0xFF) {
-    uint16_t page = resetState.doneBytes / resetState.pageSize;
-    EEPROM_ClearPage(page);
-    resetState.doneBytes += resetState.pageSize;
-    return resetState.doneBytes >= resetState.totalBytes;
-  }
-
-  // RESET_FULL
+  // Initialize only this firmware's settings/channels, not the entire EEPROM.
   if (resetState.currentItem == 0) {
     SETTINGS_Save();
     resetState.doneBytes += SETTINGS_SIZE;
@@ -93,11 +83,14 @@ static bool processReset(void) {
 
 void RESET_Init(void) {
   resetState.type = RESET_UNKNOWN;
+  resetState.confirm = false;
   gSettings.keylock = false;
   gSettings.eepromType = EEPROM_DetectType();
   resetState.pageSize = SETTINGS_GetPageSize();
   resetState.maxChannels = CHANNELS_GetCountMax();
-  STATUSLINE_SetText("%s", EEPROM_TYPE_NAMES[gSettings.eepromType]);
+  STATUSLINE_SetText("%s", gSettings.eepromType < EEPROM_UNKNOWN
+                                 ? EEPROM_TYPE_NAMES[gSettings.eepromType]
+                                 : "EEPROM UNKNOWN");
 }
 
 void RESET_Update(void) {
@@ -109,8 +102,13 @@ void RESET_Update(void) {
 
 void RESET_Render(void) {
   if (resetState.type == RESET_UNKNOWN) {
-    for (uint8_t i = 0; i < ARRAY_SIZE(RESET_TYPE_NAMES); i++) {
-      PrintMedium(2, 18 + i * 8, "%u: %s", i, RESET_TYPE_NAMES[i]);
+    if (resetState.confirm) {
+      PrintMedium(2, 18, "Overwrite channels?");
+      PrintMedium(2, 30, "1: YES  EXIT: NO");
+    } else {
+      PrintMedium(2, 18, "No valid config");
+      PrintMedium(2, 30, "Back up EEPROM!");
+      PrintMedium(2, 42, "0: Initialize");
     }
     return;
   }
@@ -123,12 +121,24 @@ void RESET_Render(void) {
 }
 
 bool RESET_key(KEY_Code_t k, Key_State_t state) {
-  if (state == KEY_RELEASED && resetState.type == RESET_UNKNOWN) {
-    uint8_t t = k - KEY_0;
-    if (t < ARRAY_SIZE(RESET_TYPE_NAMES)) {
-      startReset(t);
-      return true;
-    }
+  if (state != KEY_RELEASED || resetState.type != RESET_UNKNOWN)
+    return false;
+
+  if (k == KEY_EXIT) {
+    resetState.confirm = false;
+    return true;
   }
-  return false;
+  if (gSettings.eepromType == EEPROM_UNKNOWN)
+    return true; // Unknown physical storage cannot be initialized safely.
+
+  if (!resetState.confirm && k == KEY_0) {
+    resetState.confirm = true;
+    return true;
+  }
+  if (resetState.confirm && k == KEY_1) {
+    EEPROM_SetWritesEnabled(true); // User explicitly authorizes data overwrite.
+    startReset(RESET_FULL);
+    return true;
+  }
+  return true;
 }
