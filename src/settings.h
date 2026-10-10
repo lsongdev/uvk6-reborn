@@ -107,15 +107,16 @@ typedef enum {
   EEPROM_BL24C256,  //
   EEPROM_BL24C512,  //
   EEPROM_BL24C1024, //
-  EEPROM_M24M02,    //
+  EEPROM_M24M02,    // 256 KiB
+  EEPROM_4MBIT,     // 512 KiB, eight I2C address banks
   EEPROM_UNKNOWN,
 } EEPROMType;
 
 extern uint32_t SCAN_TIMEOUTS[15];
 extern char *SCAN_TIMEOUT_NAMES[15];
-extern const char *EEPROM_TYPE_NAMES[6];
-extern const uint32_t EEPROM_SIZES[6];
-extern const uint16_t PAGE_SIZES[6];
+extern const char *EEPROM_TYPE_NAMES[7];
+extern const uint32_t EEPROM_SIZES[7];
+extern const uint16_t PAGE_SIZES[7];
 extern const char *MW_NAMES[4];
 
 typedef struct {
@@ -207,7 +208,7 @@ extern const char *rogerNames[2];
 extern const char *FC_TIME_NAMES[4];
 
 void SETTINGS_Save();
-void SETTINGS_Load();
+bool SETTINGS_Load(void);
 void SETTINGS_DelayedSave();
 uint32_t SETTINGS_GetFilterBound();
 uint32_t SETTINGS_GetEEPROMSize();
