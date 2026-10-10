@@ -6,6 +6,11 @@ DP32G030-based Quansheng UV-K6, including radios modified with SI4732.
 This initial branch fixes several startup and driver problems. It does **not**
 yet implement the planned unified A/B radio interface.
 
+## Documentation
+
+- [用户手册](docs/user-manual.md)
+- [硬件事实](docs/hardware-facts.md)
+
 ## Build
 
 Requires an ARM GNU toolchain (`arm-none-eabi-gcc`), Python 3 and `crcmod`.

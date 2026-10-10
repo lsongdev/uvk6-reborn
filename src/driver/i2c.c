@@ -81,16 +81,21 @@ static inline void scl_hi(void) {
 static inline bool scl_hi_wait(void) {
   scl_hi();
 
-  uint32_t timeout = 10000;
-  while (!scl_read() && timeout--) {
+  for (uint32_t elapsed = 0; elapsed < 10000; ++elapsed) {
+    if (scl_read()) {
+      return true;
+    }
     TIMER_DelayUs(1);
   }
-  return timeout > 0;
+  return false;
 }
 
 /* === Основные функции I2C === */
 
 void I2C_Init(void) {
+  /* Clock-stretch polling needs SCL's input buffer even in output mode. */
+  PORTCON_PORTA_IE |= PORTCON_PORTA_IE_A10_BITS_ENABLE;
+
   /* Open-drain для обеих линий */
   PORTCON_PORTA_OD |=
       PORTCON_PORTA_OD_A10_BITS_ENABLE | PORTCON_PORTA_OD_A11_BITS_ENABLE;
