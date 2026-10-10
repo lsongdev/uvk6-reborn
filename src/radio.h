@@ -223,6 +223,9 @@ ExtendedVFOContext *RADIO_GetCurrentVFO(RadioState *state);
 const ExtendedVFOContext *RADIO_GetCurrentVFOConst(const RadioState *state);
 
 void RADIO_SwitchAudioToVFO(RadioState *state, uint8_t vfo_index);
+// Output-only operations: squelch and unsupported tuning must not reinitialize RX.
+void RADIO_SetAudioOpen(bool open);
+void RADIO_StopReception(void);
 void RADIO_UpdateSquelch(RadioState *state);
 
 uint16_t RADIO_GetRSSI(const VFOContext *ctx);

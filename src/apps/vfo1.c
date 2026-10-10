@@ -2,6 +2,7 @@
 #include "../driver/st7565.h"
 #include "../helper/menu.h"
 #include "../radio.h"
+#include "../rx-runtime.h"
 #include "../scheduler.h"
 #include "../ui/components.h"
 #include "../ui/graphics.h"
@@ -10,7 +11,7 @@
 #include "finput.h"
 
 static bool initialized;
-static bool receiving;
+static RxRuntime runtime;
 static bool changed;
 static bool inMenu;
 static bool confirming;
@@ -29,20 +30,27 @@ static void notify(const char *text) {
   gRedrawScreen = true;
 }
 
+static bool applyReceiver(void *unused, const RxPlan *plan) {
+  (void)unused;
+  return RADIO_ApplyRxPlan(ctx, plan);
+}
+
+static void stopReceiver(void *unused) {
+  (void)unused;
+  RADIO_StopReception();
+}
+
 static void apply(const RxPlan *plan) {
   uint8_t nextBand = RADIO_MODEL_BandAt(plan->frequency_hz);
-  if (!RADIO_ApplyRxPlan(ctx, plan)) {
-    // A failed hardware change must not leave the UI claiming reception.
-    receiving = false;
-    vfo->is_open = false;
-    RADIO_SwitchAudioToVFO(gRadioState, 0);
-    notify("Tune failed");
+  RxTuneResult result = RX_RuntimeTune(&runtime, plan,
+                                      applyReceiver, stopReceiver, NULL);
+  if (result != RX_APPLIED) {
+    notify(result == RX_RESTORED ? "Tune failed" : "RX error");
     return;
   }
   frequencyHz = plan->frequency_hz;
   bandIndex = nextBand;
   parameters = plan->parameters;
-  receiving = true;
   lastFrequency[bandIndex] = frequencyHz;
   const RadioParameters *preset = &radioBands[bandIndex].preset;
   changed = parameters.mode != preset->mode || parameters.step_hz != preset->step_hz ||
@@ -63,9 +71,7 @@ static void request(uint32_t target, RadioParameters values, bool confirmParamet
     frequencyHz = target;
     parameters = values;
     bandIndex = RADIO_MODEL_BandAt(target);
-    receiving = false;
-    vfo->is_open = false;
-    RADIO_SwitchAudioToVFO(gRadioState, 0);
+    RX_RuntimeStop(&runtime, stopReceiver, NULL);
     notify(result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
     return;
   }
@@ -110,7 +116,7 @@ void VFO1_init(void) {
   request(frequencyHz, parameters, false);
 }
 
-bool VFO1_isReceiving(void) { return initialized && receiving; }
+bool VFO1_isReceiving(void) { return initialized && runtime.active; }
 
 void VFO1_update(void) {
   if (message && Now()-messageAt >= 2500) {
@@ -203,7 +209,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
   if (key == KEY_PTT) {
     if (state == KEY_RELEASED)
       RADIO_ToggleTX(ctx, false);
-    else if (!inMenu && !confirming && receiving)
+    else if (!inMenu && !confirming && runtime.active)
       RADIO_ToggleTX(ctx, true);
     return true;
   }
@@ -302,7 +308,7 @@ void VFO1_render(void) {
   PrintMediumEx(2, 18, POS_L, C_FILL, "%.10s%s", radioBands[bandIndex].name, changed ? "*" : "");
   if (ctx->tx_state.is_active)
     PrintSmallEx(127, 18, POS_R, C_FILL, "TX");
-  else if (!receiving)
+  else if (!runtime.active)
     PrintSmallEx(127, 18, POS_R, C_FILL, "RX --");
   else if (ctx->tx_state.last_error != TX_UNKNOWN)
     PrintSmallEx(127, 18, POS_R, C_FILL, "TX OFF");
@@ -316,6 +322,6 @@ void VFO1_render(void) {
     PrintSmall(2, 60, "%s", message);
   else if (ctx->tx_state.is_active)
     UI_TxBar(52);
-  else if (receiving)
+  else if (runtime.active)
     UI_SMeter(52);
 }
