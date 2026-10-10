@@ -763,7 +763,7 @@ static void RADIO_UpdateCurrentBand(VFOContext *ctx) {
         ctx->frequency <= SI47XX_FM_F_MAX) {
       LogC(LOG_C_BRIGHT_YELLOW, "[RADIO] BAND: SI FM");
       band = &si4732_bands[2]; // FM
-    } else if (ctx->modulation == SI47XX_LSB || ctx->modulation == SI47XX_USB) {
+    } else if (ctx->modulation == MOD_LSB || ctx->modulation == MOD_USB) {
       LogC(LOG_C_BRIGHT_YELLOW, "[RADIO] BAND: SI SSB");
       band = &si4732_bands[1]; // SSB
     } else {
