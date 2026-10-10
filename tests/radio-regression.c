@@ -101,6 +101,11 @@ int main(int argc, char **argv) {
   assert(exported.name[9] == '\0' && strcmp(exported.name, "VFO Test") == 0);
   assert(exported.power == TX_POW_LOW && !exported.allowTx);
   assert(exported.rxF == context.frequency && exported.modulation == context.modulation);
+  // Even trusted EEPROM metadata cannot authorize TX in an RX-only build.
+  context.tx_allowed = true;
+  context.radio_type = RADIO_BK4819;
+  context.modulation = MOD_FM;
+  assert(checkTX(&context) == TX_DISABLED);
   unsigned initialProbes = probes;
   RADIO_GetReceiverCapabilities();
   RADIO_GetReceiverCapabilities();

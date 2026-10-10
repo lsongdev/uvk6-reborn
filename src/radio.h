@@ -80,14 +80,6 @@ typedef enum {
   TX_POW_OVERDRIVE,
 } TXStatus;
 
-typedef enum {
-  RADIO_SCAN_STATE_IDLE,      // Сканирование не активно
-  RADIO_SCAN_STATE_SWITCHING, // Сканирование не активно
-  RADIO_SCAN_STATE_WARMUP, // Ожидание стабилизации после переключения
-  RADIO_SCAN_STATE_MEASURING, // Выполнение замера
-  RADIO_SCAN_STATE_DECISION // Принятие решения о переключении
-} RadioScanState;
-
 // Диапазон частот и его параметры
 typedef struct {
   uint32_t min_freq;
@@ -158,32 +150,20 @@ typedef struct {
   bool is_open;
 } ExtendedVFOContext;
 
-// Global radio state
+// Single receiver, temporarily using the old VFO storage structure.
 typedef struct {
-  ExtendedVFOContext vfos[MAX_VFOS]; // Array of VFOs
-  RadioScanState scan_state; // Состояние сканирования
-  uint32_t last_scan_time;   // Last scan time
-  uint8_t num_vfos;          // Number of configured VFOs
-  uint8_t active_vfo_index;  // Currently active VFO
-  uint8_t primary_vfo_index; //
-  uint8_t last_active_vfo; // Последний активный VFO с активностью
-  bool audio_routing_enabled; // Флаг управления аудио маршрутизацией
-  bool multiwatch_enabled; // Whether multiwatch is enabled
+  ExtendedVFOContext vfos[MAX_VFOS];
+  uint8_t num_vfos;
+  uint8_t active_vfo_index;
 } RadioState;
 
-// New functions for multi-VFO and multiwatch support
+// Single receiver; index 0 remains for the legacy EEPROM adapter.
 void RADIO_InitState(RadioState *state, uint8_t num_vfos);
-bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index);
 void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
                               const VFO *storage);
 void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
                             VFO *storage);
-void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
-                            uint16_t channel_index);
 bool RADIO_SaveCurrentVFO(RadioState *state);
-void RADIO_ToggleMultiwatch(RadioState *state, bool enable);
-void RADIO_UpdateMultiwatch(RadioState *state);
-bool RADIO_ToggleVFOMode(RadioState *state, uint8_t vfo_index);
 
 ReceiverCapabilities RADIO_GetReceiverCapabilities(void);
 bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan);
@@ -210,9 +190,6 @@ bool RADIO_AdjustParam(VFOContext *ctx, ParamType param, uint32_t inc,
 bool RADIO_IncDecParam(VFOContext *ctx, ParamType param, bool inc,
                        bool save_to_eeprom);
 void RADIO_LoadVFOs(RadioState *state);
-
-void RADIO_EnableAudioRouting(RadioState *state, bool enable);
-void RADIO_UpdateAudioRouting(RadioState *state);
 
 void RADIO_ToggleTX(VFOContext *ctx, bool on);
 bool RADIO_IsSSB(const VFOContext *ctx);

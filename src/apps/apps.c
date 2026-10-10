@@ -123,7 +123,6 @@ void APPS_run(AppType_t app) {
     gRadioState = &radioState;
     RADIO_InitState(gRadioState, 1);
     RADIO_LoadVFOs(gRadioState);
-    gRadioState->multiwatch_enabled = false;
     loadedVfoApp = gCurrentApp;
   }
 

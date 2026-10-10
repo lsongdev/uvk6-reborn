@@ -307,29 +307,10 @@ static void sendEOT() {
   BK4819_ExitSubAu();
 }
 
-static TXStatus checkTX(VFOContext *ctx) {
-  if (gSettings.upconverter) {
-    return TX_DISABLED_UPCONVERTER;
-  }
-
-  if (!ctx->tx_allowed || ctx->radio_type != RADIO_BK4819 ||
-      ctx->modulation != MOD_FM) {
-    return TX_DISABLED;
-  }
-
-  /* Band txBand = BANDS_ByFrequency(txF);
-
-  if (!txBand.allowTx && !(RADIO_IsChMode() && radio->allowTx)) {
-    return TX_DISABLED;
-  } */
-
-  if (gBatteryPercent == 0) {
-    return TX_BAT_LOW;
-  }
-  if (gChargingWithTypeC || gBatteryVoltage > 880) {
-    return TX_VOL_HIGH;
-  }
-  return TX_ON;
+// RX-only baseline: legacy EEPROM allowTx cannot enable the PA.
+static TXStatus checkTX(VFOContext *context) {
+  (void)context;
+  return TX_DISABLED;
 }
 
 static void toggleBK4819(bool on) {
@@ -1341,7 +1322,7 @@ bool RADIO_StartTX(VFOContext *ctx) {
 
   // HACK
   vfo->is_open = false;
-  RADIO_EnableAudioRouting(gRadioState, false);
+  RADIO_StopReception();
 
   BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_RX_ENABLE, false);
 
@@ -1402,26 +1383,13 @@ bool RADIO_IsSSB(const VFOContext *ctx) {
 // Initialize radio state
 void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
   Log("[RADIO] InitState");
-  memset(state, 0, sizeof(RadioState));
-  state->num_vfos = (num_vfos > MAX_VFOS) ? MAX_VFOS : num_vfos;
-
-  state->primary_vfo_index = state->active_vfo_index = 0;
-
-  for (uint8_t i = 0; i < state->num_vfos; i++) {
-    // RADIO_Init(&state->vfos[i].context, RADIO_BK4819); // Default to BK4819
-    memset(&state->vfos[i].context, 0, sizeof(VFOContext));
-    // RADIO_UpdateCurrentBand(&state->vfos[i].context);
-    state->vfos[i].mode = MODE_VFO;
-    state->vfos[i].channel_index = 0;
-    state->vfos[i].is_active =
-        (i == state->primary_vfo_index); // First VFO is active by default
-    state->vfos[i].is_open = false;
-  }
-
+  (void)num_vfos;
+  memset(state, 0, sizeof(*state));
+  state->num_vfos = 1; // Single EEPROM-backed legacy receiver.
+  state->active_vfo_index = 0;
+  state->vfos[0].mode = MODE_VFO;
+  state->vfos[0].is_active = true;
   updateContext();
-
-  state->last_scan_time = 0;
-  state->multiwatch_enabled = gSettings.mWatch;
 }
 
 // Функция проверки необходимости сохранения и собственно сохранения
@@ -1441,79 +1409,6 @@ void RADIO_CheckAndSaveVFO(RadioState *state) {
       ctx->save_to_eeprom = false;
     }
   }
-}
-
-static bool RADIO_SwitchVFOTemp(RadioState *state, uint8_t vfo_index) {
-  if (vfo_index >= state->num_vfos) {
-    return false;
-  }
-
-  // Log("RADIO_SwitchVFOTemp %u", vfo_index);
-
-  // Deactivate current VFO
-  // state->vfos[state->active_vfo_index].is_active = false;
-
-  VFOContext *oldCtx = &state->vfos[state->active_vfo_index].context;
-  VFOContext *newCtx = &state->vfos[vfo_index].context;
-
-  for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
-    newCtx->dirty[p] = RADIO_GetParam(oldCtx, p) != RADIO_GetParam(newCtx, p);
-  }
-
-  // mute previous vfo (fast fix)
-  /* state->vfos[state->active_vfo_index].is_open = false;
-  RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
-  RADIO_SwitchAudioToVFO(state, vfo_index); */
-
-  // Activate new VFO
-  state->vfos[vfo_index].is_active = true;
-  state->active_vfo_index = vfo_index;
-  gRedrawScreen = true;
-  // updateContext();
-
-  // Apply settings for the new VFO
-  RADIO_ApplySettings(&state->vfos[vfo_index].context);
-
-  return true;
-}
-
-// Switch to a different VFO
-bool RADIO_SwitchVFO(RadioState *state, uint8_t vfo_index) {
-  if (vfo_index >= state->num_vfos) {
-    return false;
-  }
-
-  Log("[RADIO] SwitchVFO");
-
-  RADIO_CheckAndSaveVFO(state);
-
-  // Deactivate current VFO
-  state->vfos[state->active_vfo_index].is_active = false;
-
-  VFOContext *oldCtx = &state->vfos[state->active_vfo_index].context;
-  VFOContext *newCtx = &state->vfos[vfo_index].context;
-
-  for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
-    newCtx->dirty[p] = RADIO_GetParam(oldCtx, p) != RADIO_GetParam(newCtx, p);
-  }
-
-  // mute previous vfo (fast fix)
-  state->vfos[state->active_vfo_index].is_open = false;
-  RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
-  RADIO_SwitchAudioToVFO(state, vfo_index);
-
-  // Activate new VFO
-  state->vfos[vfo_index].is_active = true;
-  state->primary_vfo_index = state->active_vfo_index = vfo_index;
-  updateContext();
-
-  // Apply settings for the new VFO
-  RADIO_ApplySettings(&state->vfos[vfo_index].context);
-
-  gSettings.activeVFO = vfo_index;
-  SETTINGS_DelayedSave();
-
-  return true;
 }
 
 static void setCommonParamsFromCh(VFOContext *ctx, const VFO *storage) {
@@ -1642,85 +1537,6 @@ bool RADIO_SaveCurrentVFO(RadioState *state) {
   return true;
 }
 
-// Load channel into VFO
-void RADIO_LoadChannelToVFO(RadioState *state, uint8_t vfo_index,
-                            uint16_t channel_index) {
-  if (vfo_index >= state->num_vfos) {
-    return;
-  }
-
-  LogC(LOG_C_BRIGHT_CYAN, "[RADIO] CH %u -> VFO", channel_index);
-
-  ExtendedVFOContext *vfo = &state->vfos[vfo_index];
-  VFOContext *ctx = &vfo->context;
-  CH channel;
-  CHANNELS_Load(channel_index, &channel);
-
-  vfo->mode = MODE_CHANNEL;
-  vfo->channel_index = channel_index;
-
-  setCommonParamsFromCh(ctx, &channel);
-}
-
-/**
- * @brief Переключает режим работы VFO между частотным и канальным
- * @param state Указатель на состояние радио
- * @param vfo_index Индекс VFO (0..MAX_VFOS-1)
- * @return true если переключение успешно, false при ошибке
- */
-bool RADIO_ToggleVFOMode(RadioState *state, uint8_t vfo_index) {
-  // Проверка допустимости индекса VFO
-  if (vfo_index >= state->num_vfos) {
-    return false;
-  }
-
-  ExtendedVFOContext *vfo = &state->vfos[vfo_index];
-  VFOContext *ctx = &vfo->context;
-
-  // Определяем новый режим (инвертируем текущий)
-  VFOMode new_mode = vfo->mode == MODE_CHANNEL ? MODE_VFO : MODE_CHANNEL;
-  MR ch;
-  CHANNELS_Load(vfo->vfo_ch_index, &ch);
-
-  ch.isChMode = new_mode == MODE_CHANNEL;
-  LogC(LOG_C_BRIGHT_CYAN, "[RADIO] VFOMode = %s", ch.isChMode ? "MR" : "VFO");
-
-  CHANNELS_Save(vfo->vfo_ch_index, &ch);
-
-  if (new_mode == MODE_CHANNEL) {
-    // TODO: if wrong CH num in VFO, load one from current SL
-    RADIO_LoadChannelToVFO(state, vfo_index, ch.channel);
-  } else {
-    RADIO_LoadVFOFromStorage(state, vfo_index, &ch);
-  }
-  RADIO_ApplySettings(&vfo->context);
-
-  // Помечаем для сохранения в EEPROM
-  ctx->save_to_eeprom = true;
-  ctx->last_save_time = Now();
-
-  gRedrawScreen = true;
-
-  return true;
-}
-
-// Toggle multiwatch on/off
-void RADIO_ToggleMultiwatch(RadioState *state, bool enable) {
-  if (state->multiwatch_enabled == enable) {
-    return;
-  }
-  state->multiwatch_enabled = enable;
-  if (!enable) {
-    // Return to the primary VFO when disabling multiwatch
-    RADIO_SwitchVFO(state, 0);
-  }
-}
-
-// Check if a VFO is a broadcast receiver
-static bool isBroadcastReceiver(const VFOContext *ctx) {
-  return (ctx->radio_type == RADIO_SI4732 || ctx->radio_type == RADIO_BK1080);
-}
-
 bool RADIO_CheckSquelch(VFOContext *ctx) {
   if (ctx->tx_state.is_active) {
     return false;
@@ -1759,103 +1575,6 @@ void RADIO_UpdateSquelch(RadioState *state) {
     gRedrawScreen = true;
   }
 }
-// Update multiwatch state (should be called periodically)
-
-void RADIO_UpdateMultiwatch(RadioState *state) {
-  if (state->num_vfos < 2) {
-    state->scan_state = RADIO_SCAN_STATE_IDLE;
-    return;
-  }
-  if (!state->multiwatch_enabled || gSettings.mWatch == 0) {
-    state->scan_state = RADIO_SCAN_STATE_IDLE;
-    return;
-  }
-
-  static int8_t current_scan_vfo = 0;
-  static uint32_t last_scan_time = 0;
-  uint32_t current_time = Now();
-
-  switch (state->scan_state) {
-  case RADIO_SCAN_STATE_IDLE:
-    // Log("IDLE");
-    // Начинаем новый цикл сканирования
-    current_scan_vfo = -1;
-    state->scan_state = RADIO_SCAN_STATE_SWITCHING;
-    break;
-
-  case RADIO_SCAN_STATE_SWITCHING:
-    // RADIO_CheckAndSaveVFO(gRadioState);
-    // Ищем следующий VFO для сканирования (пропускаем активный и вещательные)
-    do {
-      current_scan_vfo = (current_scan_vfo + 1) % state->num_vfos;
-    } while (current_scan_vfo == state->active_vfo_index ||
-             isBroadcastReceiver(&state->vfos[current_scan_vfo].context));
-
-    // Временно переключаемся
-    RADIO_SwitchVFOTemp(state, current_scan_vfo);
-    // Log("SW %u", state->vfos[current_scan_vfo].context.frequency);
-    state->scan_state = RADIO_SCAN_STATE_WARMUP;
-    last_scan_time = current_time;
-    break;
-
-  case RADIO_SCAN_STATE_WARMUP:
-    // Log("WU");
-    // Ждем стабилизации сигнала
-    if (last_scan_time && current_time - last_scan_time >= SQL_DELAY) {
-      state->scan_state = RADIO_SCAN_STATE_MEASURING;
-    }
-    break;
-
-  case RADIO_SCAN_STATE_MEASURING:
-    // Log("ME");
-    // Выполняем замер
-    RADIO_UpdateMeasurement(&state->vfos[current_scan_vfo]);
-    // Log("MSM: %u", state->vfos[current_scan_vfo].msm.open);
-    state->scan_state = RADIO_SCAN_STATE_DECISION;
-    break;
-
-  case RADIO_SCAN_STATE_DECISION: {
-    // Log("DEC");
-    // Только для режима с автопереключением
-    ExtendedVFOContext *scanned = &state->vfos[current_scan_vfo];
-    ExtendedVFOContext *active = &state->vfos[state->active_vfo_index];
-    if (gSettings.mWatch == 2) {
-
-      // Условия переключения:
-      bool should_switch =
-          scanned->msm.open &&
-          (scanned->msm.rssi > active->msm.rssi + 3 || // Гистерезис 3dB
-           !active->msm.open) &&
-          scanned->msm.rssi > 0;
-
-      if (should_switch) {
-        RADIO_SwitchVFO(state, current_scan_vfo);
-      }
-    } else {
-      if (scanned->msm.open != scanned->is_open) {
-        scanned->is_open = scanned->msm.open;
-        RADIO_SwitchAudioToVFO(state, current_scan_vfo);
-      }
-      if (scanned->msm.open) {
-        // Log("OPEN!!!");
-        state->scan_state = RADIO_SCAN_STATE_WARMUP;
-        last_scan_time = Now();
-        return;
-      }
-    }
-
-    // Переходим к следующему VFO или завершаем цикл
-    if (current_scan_vfo >= state->num_vfos - 1) {
-      last_scan_time = 0; // NOTE: IMPORTANT
-      state->scan_state = RADIO_SCAN_STATE_IDLE;
-    } else {
-      state->scan_state = RADIO_SCAN_STATE_SWITCHING;
-    }
-    break;
-  }
-  }
-}
-
 void RADIO_LoadVFOs(RadioState *state) {
   Log("[RADIO] LoadVFOs");
 
@@ -1909,8 +1628,7 @@ void RADIO_LoadVFOs(RadioState *state) {
     vfoIdx = 1;
   }
   state->num_vfos = vfoIdx;
-  state->active_vfo_index = state->primary_vfo_index = 0;
-  state->multiwatch_enabled = false;
+  state->active_vfo_index = 0;
 
   VFOContext *ctx = &state->vfos[state->active_vfo_index].context;
   for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
@@ -1920,55 +1638,6 @@ void RADIO_LoadVFOs(RadioState *state) {
   RADIO_ApplySettings(ctx);
 
   updateContext();
-}
-
-// Включаем/выключаем маршрутизацию аудио
-void RADIO_EnableAudioRouting(RadioState *state, bool enable) {
-  state->audio_routing_enabled = enable;
-  if (!enable) {
-    // При выключении возвращаем аудио на активный VFO
-    RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
-  }
-}
-
-// Обновление маршрутизации аудио
-void RADIO_UpdateAudioRouting(RadioState *state) {
-  if (!state->audio_routing_enabled)
-    return;
-
-  // Если текущий VFO - вещательный приемник, оставляем аудио на нем
-  if (isBroadcastReceiver(&state->vfos[state->active_vfo_index].context)) {
-    return;
-  }
-
-  // Проверяем активность на других VFO
-  for (uint8_t i = 0; i < state->num_vfos; i++) {
-    if (i == state->active_vfo_index)
-      continue;
-
-    ExtendedVFOContext *vfo = &state->vfos[i];
-
-    // Для вещательных приемников не переключаем аудио автоматически
-    if (isBroadcastReceiver(&vfo->context))
-      continue;
-
-    bool has_activity = RADIO_CheckSquelch(&vfo->context);
-
-    if (has_activity) {
-      // Если нашли активность и это не текущий VFO - переключаем аудио
-      if (state->last_active_vfo != i) {
-        RADIO_SwitchAudioToVFO(state, i);
-        state->last_active_vfo = i;
-      }
-      return;
-    }
-  }
-
-  // Если активность не обнаружена - возвращаем аудио на основной VFO
-  if (state->last_active_vfo != state->active_vfo_index) {
-    RADIO_SwitchAudioToVFO(state, state->active_vfo_index);
-    state->last_active_vfo = state->active_vfo_index;
-  }
 }
 
 const char *RADIO_GetParamValueString(const VFOContext *ctx, ParamType param) {
@@ -2075,7 +1744,7 @@ uint8_t RADIO_GetCurrentVFONumber(const RadioState *state) {
     }
   }
   return 0xFF; // Ошибка - активный VFO не найден */
-  return state->primary_vfo_index;
+  return state && state->num_vfos ? 0 : UINT8_MAX;
 }
 
 /**
