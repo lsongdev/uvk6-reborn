@@ -26,6 +26,7 @@ typedef struct {
 } PCal;
 
 void BANDS_Load();
+const char *BANDS_GetDisplayName(uint32_t frequency);
 
 PowerCalibration BANDS_GetPowerCalib(uint32_t f);
 

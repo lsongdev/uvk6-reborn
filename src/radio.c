@@ -219,6 +219,13 @@ static const FreqBand si4732_bands[] = {
     },
 };
 
+static const FreqBand bk1080_band = {
+    .min_freq = BK1080_F_MIN,
+    .max_freq = BK1080_F_MAX,
+    .num_available_mods = 1,
+    .available_mods = {MOD_FM},
+};
+
 static bool RADIO_HasSi() { return BK1080_ReadRegister(1) != 0x1080; }
 
 static uint32_t getRealTxFreq(const VFOContext *ctx) {
@@ -387,7 +394,7 @@ static void rxTurnOn(const VFOContext *ctx) {
         SI47XX_PowerUp();
       }
     } else {
-      SI47XX_SetVolume(63);
+      SI47XX_SetVolume(ConvertDomain(ctx->volume, 0, 100, 0, 63));
     }
     break;
   default:
@@ -564,6 +571,8 @@ static bool setParamSI4732(VFOContext *ctx, ParamType p) {
                                    ctx->gain == 0 ? 0 : ctx->gain);
     return true;
   case PARAM_BANDWIDTH:
+    if (ctx->modulation == MOD_FM)
+      return true; // AM/SSB bandwidth properties do not apply to FM.
     if (RADIO_IsSSB(ctx)) {
       SI47XX_SetSsbBandwidth(ctx->bandwidth);
     } else {
@@ -659,6 +668,37 @@ static void updateContext() {
   ctx = &vfo->context;
 }
 
+// Select a capable receiver before validating a requested RX frequency.
+// Broadcast FM needs the wideband receiver, even where BK4819 overlaps.
+static bool selectReceiverForFrequency(VFOContext *ctx, uint32_t frequency) {
+  Radio receiver;
+  if (frequency >= BK1080_F_MIN && frequency <= BK1080_F_MAX &&
+      ctx->modulation == MOD_FM) {
+    receiver = RADIO_HasSi() ? RADIO_SI4732 : RADIO_BK1080;
+  } else if (ctx->radio_type == RADIO_SI4732 &&
+             frequency >= SI47XX_F_MIN && frequency <= SI47XX_F_MAX) {
+    receiver = RADIO_SI4732;
+  } else if (frequency >= BK4819_F_MIN && frequency <= BK4819_F_MAX) {
+    receiver = RADIO_BK4819;
+  } else if (frequency >= SI47XX_F_MIN && frequency <= SI47XX_F_MAX &&
+             RADIO_HasSi()) {
+    receiver = RADIO_SI4732;
+  } else {
+    return false;
+  }
+
+  if (ctx->radio_type != receiver) {
+    ctx->radio_type = receiver;
+    // Gain indices belong to the receiver, not to the shared VFO.
+    ctx->gain = receiver == RADIO_BK4819 ? AUTO_GAIN_INDEX : 0;
+    for (uint8_t i = 0; i < PARAM_COUNT; ++i)
+      ctx->dirty[i] = true;
+  }
+  return true;
+}
+
+static void RADIO_UpdateCurrentBand(VFOContext *ctx);
+
 static void RADIO_ApplyCorrections(VFOContext *ctx, bool save_to_eeprom) {
   const FreqBand *band = ctx->current_band;
   if (!band)
@@ -671,25 +711,9 @@ static void RADIO_ApplyCorrections(VFOContext *ctx, bool save_to_eeprom) {
          "boundary",
          ctx->frequency);
 
-    // пробуем подобрать приёмник сперва
-    if (ctx->radio_type == RADIO_BK4819) {
-      if (RADIO_HasSi()) {
-        for (uint8_t i = 0; i < ARRAY_SIZE(si4732_bands); ++i) {
-          if (ctx->frequency >= si4732_bands[i].min_freq &&
-              ctx->frequency <= si4732_bands[i].max_freq) {
-            band = &si4732_bands[i];
-            // ctx->radio_type = RADIO_SI4732;
-            RADIO_SetParam(ctx, PARAM_RADIO, RADIO_SI4732, false);
-          }
-        }
-      } else if (ctx->frequency >= BK1080_F_MIN &&
-                 ctx->frequency <= BK1080_F_MAX) {
-        // ctx->radio_type = RADIO_BK1080;
-        RADIO_SetParam(ctx, PARAM_RADIO, RADIO_BK1080, false);
-      }
-    } else {
-      // ctx->radio_type = RADIO_BK4819;
-      RADIO_SetParam(ctx, PARAM_RADIO, RADIO_BK4819, false);
+    if (selectReceiverForFrequency(ctx, ctx->frequency)) {
+      RADIO_UpdateCurrentBand(ctx);
+      band = ctx->current_band;
     }
 
     if (ctx->frequency < band->min_freq) {
@@ -773,7 +797,7 @@ static void RADIO_UpdateCurrentBand(VFOContext *ctx) {
     break;
   case RADIO_BK1080:
     LogC(LOG_C_BRIGHT_YELLOW, "[RADIO] BAND: BK1080 FM");
-    band = &bk4819_bands[0]; // TODO: добавить свой диапазон
+    band = &bk1080_band;
     break;
   default:
     break;
@@ -889,7 +913,14 @@ bool RADIO_IsParamValid(VFOContext *ctx, ParamType param, uint32_t value) {
 // Установка параметра (всегда uint32_t!)
 void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
                     bool save_to_eeprom) {
-  if (!RADIO_IsParamValid(ctx, param, value)) {
+  if (param == PARAM_FREQUENCY) {
+    if (!selectReceiverForFrequency(ctx, value)) {
+      LogC(LOG_C_RED, "[RADIO] Unsupported frequency %u", value);
+      return;
+    }
+    // The SI band depends on the requested frequency, so refresh it after
+    // assigning the frequency below, rather than checking its old band.
+  } else if (!RADIO_IsParamValid(ctx, param, value)) {
     LogC(LOG_C_RED, "[RADIO] ERR: %-12s -> %u", PARAM_NAMES[param], value);
     return;
   }
@@ -1019,7 +1050,7 @@ void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
   }
 
   if (param == PARAM_FREQUENCY || param == PARAM_BANDWIDTH ||
-      param == PARAM_MODULATION) {
+      param == PARAM_MODULATION || param == PARAM_RADIO) {
     RADIO_UpdateCurrentBand(ctx);
     RADIO_ApplyCorrections(ctx, save_to_eeprom);
   }
@@ -1245,7 +1276,8 @@ static spf_ptr setParamForRadio[] = {
 
 // Применение настроек
 void RADIO_ApplySettings(VFOContext *ctx) {
-  if (ctx->dirty[PARAM_RADIO]) {
+  const bool receiverChanged = ctx->dirty[PARAM_RADIO];
+  if (receiverChanged) {
     LogC(LOG_C_BRIGHT_MAGENTA, "[RADIO] =%s",
          RADIO_GetParamValueString(ctx, PARAM_RADIO));
     ctx->dirty[PARAM_RADIO] = false;
@@ -1300,6 +1332,12 @@ void RADIO_ApplySettings(VFOContext *ctx) {
 
   if (needSetupToneDetection) {
     setupToneDetection(ctx);
+  }
+  // Squelch may remain open across a receiver change. Route audio even if
+  // its boolean state did not change, after the new receiver is configured.
+  if (receiverChanged && gRadioState &&
+      ctx == &gRadioState->vfos[gRadioState->active_vfo_index].context) {
+    RADIO_SwitchAudioToVFO(gRadioState, gRadioState->active_vfo_index);
   }
 }
 
@@ -1501,11 +1539,15 @@ static void setCommonParamsFromCh(VFOContext *ctx, const VFO *storage) {
   RADIO_UpdateCurrentBand(ctx);
   RADIO_ApplyCorrections(ctx, false);
 
-  RADIO_SetParam(ctx, PARAM_RADIO, storage->radio, false);
+  RADIO_SetParam(ctx, PARAM_RADIO, ctx->radio_type, false);
   RADIO_SetParam(ctx, PARAM_FREQUENCY, storage->rxF, false);
 
   RADIO_SetParam(ctx, PARAM_BANDWIDTH, storage->bw, false);
-  RADIO_SetParam(ctx, PARAM_GAIN, storage->gainIndex, false);
+  RADIO_SetParam(ctx, PARAM_GAIN,
+                 ctx->radio_type == storage->radio
+                     ? storage->gainIndex
+                     : (ctx->radio_type == RADIO_BK4819 ? AUTO_GAIN_INDEX : 0),
+                 false);
   RADIO_SetParam(ctx, PARAM_MODULATION, storage->modulation, false);
   RADIO_SetParam(ctx, PARAM_POWER, storage->power, false);
   RADIO_SetParam(ctx, PARAM_SQUELCH_TYPE, storage->squelch.type, false);
@@ -1532,7 +1574,9 @@ static void setCommonParamsFromCh(VFOContext *ctx, const VFO *storage) {
   RADIO_SetParam(ctx, PARAM_FILTER, FILTER_AUTO, false);
 
   RADIO_SetParam(ctx, PARAM_PRECISE_F_CHANGE, true, false);
-  // RADIO_SetParam(ctx, PARAM_VOLUME, 80, false);
+  // Volume is not stored in the channel record. The physical knob controls
+  // listening volume; keep the digital receiver output enabled.
+  RADIO_SetParam(ctx, PARAM_VOLUME, 100, false);
 
   // RADIO_UpdateCurrentBand(ctx);
   // RADIO_ApplyCorrections(ctx, false);

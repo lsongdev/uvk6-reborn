@@ -73,10 +73,19 @@ static uint32_t convertFromDisplayValue() {
   // Конвертируем в нативные единицы (десятки Герц)
   if (currentConfig.unit == UNIT_HZ || currentConfig.unit == UNIT_KHZ ||
       currentConfig.unit == UNIT_MHZ || currentConfig.unit == UNIT_VOLTS) {
+    if (integerPart > UINT32_MAX / currentConfig.multiplier)
+      return UINT32_MAX;
     uint32_t result = integerPart * currentConfig.multiplier;
     if (localFractionalDigits > 0) {
-      result += (fractionalPart * currentConfig.multiplier) /
-                POW[localFractionalDigits];
+      // Both scales are powers of ten. Divide the scales first so five
+      // MHz decimals cannot overflow (e.g. 92500 * 100000).
+      uint32_t divisor = POW[localFractionalDigits];
+      uint32_t fraction = divisor <= currentConfig.multiplier
+                              ? fractionalPart * (currentConfig.multiplier / divisor)
+                              : fractionalPart / (divisor / currentConfig.multiplier);
+      if (fraction > UINT32_MAX - result)
+        return UINT32_MAX;
+      result += fraction;
     }
     return result;
   }

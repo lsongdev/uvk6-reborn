@@ -10,6 +10,7 @@ yet implement the planned unified A/B radio interface.
 
 - [用户手册](docs/user-manual.md)
 - [硬件事实](docs/hardware-facts.md)
+- [极简无线电设计](docs/minimal-radio-design.md)
 
 ## Build
 
