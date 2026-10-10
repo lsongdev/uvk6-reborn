@@ -40,8 +40,7 @@ static void startReset(ResetType type) {
 static bool processReset(void) {
   // Initialize only this firmware's settings/channels, not the entire EEPROM.
   if (resetState.currentItem == 0) {
-    SETTINGS_Save();
-    resetState.doneBytes += SETTINGS_SIZE;
+    // Do not mark a new storage layout valid until channels are initialized.
     resetState.currentItem++;
     return false;
   }
@@ -78,6 +77,8 @@ static bool processReset(void) {
     return false;
   }
 
+  SETTINGS_Save();
+  resetState.doneBytes += SETTINGS_SIZE;
   return true;
 }
 
