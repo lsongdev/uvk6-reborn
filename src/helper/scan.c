@@ -289,7 +289,6 @@ static void UpdateSquelchAndRssi(bool isAnalyserMode) {
 }
 
 void SCAN_Check() {
-  RADIO_UpdateMultiwatch(gRadioState);
 
   // Режим анализатора — упрощенная логика
   if (scan.mode == SCAN_MODE_ANALYSER) {
@@ -369,7 +368,6 @@ void SCAN_Check() {
     lastFreqChangeTime = Now();
   }
 
-  RADIO_UpdateMultiwatch(gRadioState);
 
   if (isAnalyserMode) {
     HandleAnalyserMode();
