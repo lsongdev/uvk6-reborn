@@ -31,4 +31,10 @@ esac
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/si-regression.c "$dead_strip" -o "$test_binary"
 "$test_binary"
+"${CC:-cc}" -std=c2x -ffunction-sections -fdata-sections \
+  -Wno-incompatible-pointer-types \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
+  tests/bk1080-regression.c "$dead_strip" -o "$test_binary"
+"$test_binary"
 echo 'SI sidebands/BFO, VFO keys, confirmation, unavailable receivers, frequency input, legacy storage, cached detection, receiver plans, precision, and band boundaries passed.'

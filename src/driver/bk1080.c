@@ -18,11 +18,9 @@ static uint32_t currentF = 0;
 
 static uint16_t CH_SP_F[] = {20000, 10000, 5000};
 
-void BK1080_SetFrequency(uint32_t f) {
-  if (f == currentF) {
-    return;
-  }
-  currentF = f;
+bool BK1080_SetFrequency(uint32_t f) {
+  if (f == currentF)
+    return true;
   uint8_t vol = 0b1111;
   uint8_t chSp = BK1080_CHSP_100;
   uint8_t seekThres = 0b00001010;
@@ -35,13 +33,17 @@ void BK1080_SetFrequency(uint32_t f) {
 
   uint16_t sysCfg2 = (vol << 0) | (chSp << 4) | (band << 6) | (seekThres << 8);
 
-  BK1080_WriteRegister(BK1080_REG_05_SYSTEM_CONFIGURATION2, sysCfg2);
-  BK1080_WriteRegister(BK1080_REG_03_CHANNEL, channel);
+  if (!BK1080_WriteRegister(BK1080_REG_05_SYSTEM_CONFIGURATION2, sysCfg2) ||
+      !BK1080_WriteRegister(BK1080_REG_03_CHANNEL, channel))
+    return false;
   SYS_DelayMs(10);
-  BK1080_WriteRegister(BK1080_REG_03_CHANNEL, channel | 0x8000);
+  if (!BK1080_WriteRegister(BK1080_REG_03_CHANNEL, channel | 0x8000))
+    return false;
+  currentF = f; // Commit cache only after all writes were ACKed.
+  return true;
 }
 
-void BK1080_Init(uint32_t f, bool bEnable) {
+bool BK1080_Init(uint32_t f, bool bEnable) {
   uint8_t i;
 
   if (bEnable) {
@@ -49,22 +51,25 @@ void BK1080_Init(uint32_t f, bool bEnable) {
 
     if (!gIsInitBK1080) {
       for (i = 0; i < ARRAY_SIZE(BK1080_RegisterTable); i++) {
-        BK1080_WriteRegister(i, BK1080_RegisterTable[i]);
+        if (!BK1080_WriteRegister(i, BK1080_RegisterTable[i]))
+          return false;
       }
       SYS_DelayMs(250);
-      BK1080_WriteRegister(BK1080_REG_25_INTERNAL, 0xA83C);
-      BK1080_WriteRegister(BK1080_REG_25_INTERNAL, 0xA8BC);
+      if (!BK1080_WriteRegister(BK1080_REG_25_INTERNAL, 0xA83C) ||
+          !BK1080_WriteRegister(BK1080_REG_25_INTERNAL, 0xA8BC))
+        return false;
       SYS_DelayMs(60);
       gIsInitBK1080 = true;
-    } else {
-      BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x0201);
+    } else if (!BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x0201)) {
+      return false;
     }
     currentF = 0;
-    BK1080_SetFrequency(f);
-  } else {
-    BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x0241);
-    GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_BK1080);
+    return BK1080_SetFrequency(f);
   }
+  bool ok = BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x0241);
+  GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_BK1080);
+  currentF = 0;
+  return ok;
 }
 
 uint16_t BK1080_ReadRegister(BK1080_Register_t Register) {
@@ -77,13 +82,15 @@ uint16_t BK1080_ReadRegister(BK1080_Register_t Register) {
   return valid ? MAKE_WORD(Value[0], Value[1]) : UINT16_MAX;
 }
 
-void BK1080_WriteRegister(BK1080_Register_t Register, uint16_t Value) {
+bool BK1080_WriteRegister(BK1080_Register_t Register, uint16_t Value) {
   I2C_Start();
-  I2C_Write(0x80);
-  I2C_Write((Register << 1) | I2C_WRITE);
+  bool ok = I2C_Write(0x80) == 0 &&
+            I2C_Write((Register << 1) | I2C_WRITE) == 0;
   Value = ((Value >> 8) & 0xFF) | ((Value & 0xFF) << 8);
-  I2C_WriteBuffer(&Value, sizeof(Value));
+  if (ok)
+    ok = I2C_WriteBuffer(&Value, sizeof(Value)) == 0;
   I2C_Stop();
+  return ok;
 }
 
 void BK1080_Mute(bool Mute) {
