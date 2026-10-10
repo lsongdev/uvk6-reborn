@@ -1535,7 +1535,9 @@ static void setCommonParamsFromCh(VFOContext *ctx, const VFO *storage) {
   RADIO_SetParam(ctx, PARAM_TX_OFFSET, storage->txF, false);
   RADIO_SetParam(ctx, PARAM_TX_OFFSET_DIR, storage->offsetDir, false);
 
-  strcpy(ctx->name, storage->name);
+  // EEPROM names are fixed-width and may not contain a terminating NUL.
+  memcpy(ctx->name, storage->name, sizeof(ctx->name) - 1);
+  ctx->name[sizeof(ctx->name) - 1] = '\0';
 
   ctx->code = storage->code.rx;
   ctx->tx_state.code = storage->code.tx;
