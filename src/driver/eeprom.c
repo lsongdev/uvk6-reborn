@@ -7,6 +7,9 @@
 #include <string.h>
 
 bool gEepromWrite = false;
+static bool writes_enabled = false;
+
+void EEPROM_SetWritesEnabled(bool enabled) { writes_enabled = enabled; }
 
 static uint32_t g_eeprom_size = 0;
 static uint16_t g_eeprom_page_size = 0;
@@ -37,14 +40,15 @@ int EEPROM_ReadBufferSequential(uint32_t address, void *pBuffer,
                                 uint16_t size) {
   if (size == 0)
     return 0;
+  if (!pBuffer || address >= g_eeprom_size || size > g_eeprom_size - address)
+    return -1;
 
   uint8_t *pData = (uint8_t *)pBuffer;
-  address &= 0x3FFFF;
 
   while (size > 0) {
     // Определяем границу текущего чипа (64KB для большинства EEPROM)
     uint32_t chip_boundary =
-        (address & 0x30000) + 0x10000; // Следующая граница 64KB
+        (address & ~0xFFFFu) + 0x10000u; // Next 64-KiB bank
     uint32_t bytes_to_boundary = chip_boundary - address;
     uint16_t chunk_size = (size < bytes_to_boundary) ? size : bytes_to_boundary;
 
@@ -74,8 +78,10 @@ int EEPROM_ReadBufferSequential(uint32_t address, void *pBuffer,
     }
 
     // Sequential Read - читаем весь блок за раз
-    I2C_ReadBuffer(pData, chunk_size);
+    uint16_t read_size = I2C_ReadBuffer(pData, chunk_size);
     I2C_Stop();
+    if (read_size != chunk_size)
+      return -1;
 
     pData += chunk_size;
     address += chunk_size;
@@ -123,11 +129,13 @@ int EEPROM_ReadBuffer(uint32_t address, void *pBuffer, uint16_t size) {
 } */
 
 void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
-  if (pBuffer == NULL || size == 0)
+  if (!writes_enabled || pBuffer == NULL || size == 0 ||
+      address >= g_eeprom_size || size > g_eeprom_size - address)
     return;
 
   uint16_t PAGE_SIZE = EEPROM_GetPageSize();
-  address &= 0x3FFFF;
+  if (!PAGE_SIZE)
+    return;
 
   while (size > 0) {
     uint16_t page_offset = address % PAGE_SIZE;
@@ -224,7 +232,11 @@ void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
 
 void EEPROM_ClearPage(uint16_t page) {
   uint16_t PAGE_SIZE = EEPROM_GetPageSize();
-  uint32_t address = page * PAGE_SIZE;
+  if (!writes_enabled || !PAGE_SIZE)
+    return;
+  uint32_t address = (uint32_t)page * PAGE_SIZE;
+  if (address >= g_eeprom_size || PAGE_SIZE > g_eeprom_size - address)
+    return;
   uint8_t IIC_ADD = 0xA0 | ((address >> 15) & 0x0E);
 
   if (!EEPROM_WaitReady(IIC_ADD, 100))
@@ -274,15 +286,21 @@ EEPROMType EEPROM_DetectType(void) {
   case 4:
     return EEPROM_M24M02;
   case 8:
-    return EEPROM_BL24C512;
+    return EEPROM_4MBIT;
   default:
-    return EEPROM_BL24C64;
+    return EEPROM_UNKNOWN;
   }
 }
 
-uint32_t EEPROM_DetectSize(void) { return EEPROM_SIZES[EEPROM_DetectType()]; }
+uint32_t EEPROM_DetectSize(void) {
+  EEPROMType type = EEPROM_DetectType();
+  return type < EEPROM_UNKNOWN ? EEPROM_SIZES[type] : 0;
+}
 
-uint16_t EEPROM_GetPageSize(void) { return PAGE_SIZES[EEPROM_DetectType()]; }
+uint16_t EEPROM_GetPageSize(void) {
+  EEPROMType type = EEPROM_DetectType();
+  return type < EEPROM_UNKNOWN ? PAGE_SIZES[type] : 0;
+}
 
 int EEPROM_ReadByte(uint32_t address, uint8_t *value) {
   return EEPROM_ReadBuffer(address, value, 1);
