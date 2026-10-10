@@ -2151,6 +2151,12 @@ bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan) {
 
   // Preflight the SI receiver before committing user-visible state or EEPROM.
   // A missing patch, CTS timeout, or NACK must not be reported as a tune.
+  if (radio == RADIO_BK1080 &&
+      !BK1080_Init(plan->frequency_hz / 10u, true)) {
+    vfo->is_open = false;
+    AUDIO_ToggleSpeaker(false);
+    return false;
+  }
   if (radio == RADIO_SI4732) {
     SI47XX_MODE siMode = plan->parameters.mode == RX_WFM ? SI47XX_FM
                       : (SI47XX_MODE)modes[plan->parameters.mode];

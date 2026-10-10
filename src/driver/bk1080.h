@@ -22,11 +22,11 @@ typedef enum {
 } BK1080_ChannelSpacing;
 
 bool BK1080_Detect(void);
-void BK1080_Init(uint32_t Frequency, bool bEnable);
+bool BK1080_Init(uint32_t Frequency, bool bEnable);
 uint16_t BK1080_ReadRegister(BK1080_Register_t Register);
-void BK1080_WriteRegister(BK1080_Register_t Register, uint16_t Value);
+bool BK1080_WriteRegister(BK1080_Register_t Register, uint16_t Value);
 void BK1080_Mute(bool Mute);
-void BK1080_SetFrequency(uint32_t Frequency);
+bool BK1080_SetFrequency(uint32_t Frequency);
 uint16_t BK1080_GetFrequencyDeviation();
 uint16_t BK1080_GetRSSI();
 uint8_t BK1080_GetSNR();
