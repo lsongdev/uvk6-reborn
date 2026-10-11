@@ -23,7 +23,7 @@ esac
   -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
   -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/vfo-regression.c src/radio-model.c src/rx-runtime.c "$dead_strip" -o "$test_binary"
+  tests/vfo-regression.c src/radio-model.c src/radio-state.c src/rx-runtime.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
