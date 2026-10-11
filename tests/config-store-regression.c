@@ -49,6 +49,7 @@ int main(void) {
 
   FakeEEPROM memory;
   memset(&memory, 0xff, sizeof(memory));
+  memory.writes = 0;
   memory.write_limit = -1;
   ConfigStore io = {&memory, readIO, writeIO, sizeof(memory.bytes), 8840};
   assert(!CONFIG_Save(&io, &original, NULL)); // Reserved patch won't fit.
