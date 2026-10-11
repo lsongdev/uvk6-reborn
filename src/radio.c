@@ -1783,7 +1783,7 @@ ReceiverCapabilities RADIO_GetReceiverCapabilities(void) {
 }
 
 RadioParameters RADIO_ReadParameters(const VFOContext *context) {
-  RxMode mode = RX_FM;
+  RxMode mode = RX_NFM;
   if (context->modulation == MOD_WFM || context->radio_type == RADIO_BK1080 ||
       (context->radio_type == RADIO_SI4732 && context->modulation == MOD_FM))
     mode = RX_WFM;

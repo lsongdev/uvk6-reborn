@@ -3,7 +3,7 @@
 
 #define MHZ_HZ 1000000u
 #define PRESET(mode_, step_, bw_, sq_) {mode_, step_, bw_, sq_, false}
-const char *const rxModeNames[RX_MODE_COUNT] = {"FM", "WFM", "AM", "LSB", "USB"};
+const char *const rxModeNames[RX_MODE_COUNT] = {"NFM", "WFM", "AM", "LSB", "USB"};
 // Narrower ranges win. Shortcut order is independent of range matching.
 const RadioBand radioBands[] = {
     {"LW", 150000, 530000, 225000, true, PRESET(RX_AM, 1000, 6000, 0)},
@@ -11,10 +11,10 @@ const RadioBand radioBands[] = {
     {"SW", 1800000, 30000001, 7100000, true, PRESET(RX_AM, 5000, 6000, 0)},
     {"FM Radio", 64*MHZ_HZ, 108*MHZ_HZ+1, 95900000, true, PRESET(RX_WFM, 100000, 0, 0)},
     {"Airband", 118*MHZ_HZ, 137*MHZ_HZ, 125*MHZ_HZ, true, PRESET(RX_AM, 8330, 6000, 0)},
-    {"2m", 144*MHZ_HZ, 148*MHZ_HZ, 145500000, true, PRESET(RX_FM, 12500, 12000, 4)},
-    {"70cm", 430*MHZ_HZ, 440*MHZ_HZ, 438500000, true, PRESET(RX_FM, 12500, 12000, 4)},
-    {"VHF", 30*MHZ_HZ, 300*MHZ_HZ, 145500000, false, PRESET(RX_FM, 25000, 12000, 4)},
-    {"UHF", 300*MHZ_HZ, RADIO_MAX_HZ+1, 438500000, false, PRESET(RX_FM, 25000, 12000, 4)},
+    {"2m", 144*MHZ_HZ, 148*MHZ_HZ, 145500000, true, PRESET(RX_NFM, 12500, 12000, 4)},
+    {"70cm", 430*MHZ_HZ, 440*MHZ_HZ, 438500000, true, PRESET(RX_NFM, 12500, 12000, 4)},
+    {"VHF", 30*MHZ_HZ, 300*MHZ_HZ, 145500000, false, PRESET(RX_NFM, 25000, 12000, 4)},
+    {"UHF", 300*MHZ_HZ, RADIO_MAX_HZ+1, 438500000, false, PRESET(RX_NFM, 25000, 12000, 4)},
 };
 const uint8_t radioBandCount = sizeof(radioBands)/sizeof(radioBands[0]);
 
@@ -74,6 +74,7 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
   RxDevice device;
   switch (parameters.mode) {
   case RX_WFM:
+    // Broadcast wide FM must not fall back to the BK narrowband receiver.
     if (frequency_hz < 64000000 || frequency_hz > 108000000)
       return RX_UNSUPPORTED_MODE;
     if (capabilities.si)
@@ -102,7 +103,9 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
       return RX_UNSUPPORTED_MODE;
     device = RX_DEVICE_BK;
     break;
-  case RX_FM:
+  case RX_NFM:
+    // NFM always uses BK, including frequencies overlapping SI's AM or WFM.
+    // RX capability alone never grants transmit permission.
     if (frequency_hz < 15880000)
       return RX_UNSUPPORTED_MODE;
     device = RX_DEVICE_BK;

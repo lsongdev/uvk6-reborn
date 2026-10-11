@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 // User parameters use Hz and concrete demodulation modes, never driver enums.
-typedef enum { RX_FM, RX_WFM, RX_AM, RX_LSB, RX_USB, RX_MODE_COUNT } RxMode;
+typedef enum { RX_NFM, RX_WFM, RX_AM, RX_LSB, RX_USB, RX_MODE_COUNT } RxMode;
 typedef enum { RX_DEVICE_BK, RX_DEVICE_SI, RX_DEVICE_BROADCAST } RxDevice;
 typedef struct {
   RxMode mode;

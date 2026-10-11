@@ -19,7 +19,7 @@ static void stop(void *context) {
 }
 static RxPlan at(uint32_t hz) {
   return (RxPlan){.device=RX_DEVICE_BK, .frequency_hz=hz,
-                  .parameters={.mode=RX_FM,.step_hz=12500,.bandwidth_hz=12000}};
+                  .parameters={.mode=RX_NFM,.step_hz=12500,.bandwidth_hz=12000}};
 }
 
 int main(void) {
