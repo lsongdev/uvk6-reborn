@@ -159,7 +159,6 @@ void SYS_Main() {
     SETTINGS_UpdateSave();
 
     if (gRadioState && VFO1_isReceiving() && Now()-radioTimer >= SQL_DELAY) {
-      RADIO_CheckAndSaveVFO(gRadioState);
       RADIO_UpdateSquelch(gRadioState);
       radioTimer = Now();
     }

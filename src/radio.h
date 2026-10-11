@@ -157,14 +157,8 @@ typedef struct {
   uint8_t active_vfo_index;
 } RadioState;
 
-// Single receiver; index 0 remains for the legacy EEPROM adapter.
+// Single receiver. The persisted radio state is defined by radio-state.h.
 void RADIO_InitState(RadioState *state, uint8_t num_vfos);
-void RADIO_LoadVFOFromStorage(RadioState *state, uint8_t vfo_index,
-                              const VFO *storage);
-void RADIO_SaveVFOToStorage(const RadioState *state, uint8_t vfo_index,
-                            VFO *storage);
-bool RADIO_SaveCurrentVFO(RadioState *state);
-
 ReceiverCapabilities RADIO_GetReceiverCapabilities(void);
 bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan);
 RadioParameters RADIO_ReadParameters(const VFOContext *context);
@@ -176,7 +170,6 @@ void RADIO_Init(VFOContext *ctx, Radio radio_type);
 void RADIO_SetParam(VFOContext *ctx, ParamType param, uint32_t value,
                     bool save_to_eeprom);
 
-void RADIO_CheckAndSaveVFO(RadioState *state);
 
 // Применение настроек
 void RADIO_ApplySettings(VFOContext *ctx);
