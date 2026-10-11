@@ -12,7 +12,10 @@ static void leave(RxDevice device) {
     BK4819_Idle();
     break;
   case RX_DEVICE_SI:
-    (void)SI47XX_SetVolume(0);
+    if (gSettings.si4732PowerOff)
+      SI47XX_PowerDown();
+    else
+      (void)SI47XX_SetVolume(0);
     break;
   case RX_DEVICE_BROADCAST:
     BK1080_Mute(true);
