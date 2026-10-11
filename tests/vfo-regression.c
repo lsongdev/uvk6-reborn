@@ -61,7 +61,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
 static void press(KEY_Code_t key) { assert(VFO1_key(key, KEY_RELEASED)); }
 
 int main(void) {
-  RadioParameters fm = {RX_FM, 12500, 12000, 4, false};
+  RadioParameters fm = {RX_NFM, 12500, 12000, 4, false};
   setup(438500000, fm);
   assert(runtime.active && applied == 1 && bandIndex == 6);
   press(KEY_SIDE1);
@@ -69,12 +69,18 @@ int main(void) {
   press(KEY_SIDE1);
   assert(frequencyHz == 999000 && bandIndex == 1);
 
+  // The same 100 MHz carrier must use BK for NFM and SI for WFM.
+  setup(100000000, (RadioParameters){RX_NFM, 12500, 12000, 0, false});
+  assert(runtime.active && ctx->radio_type == RADIO_BK4819);
+  setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0, false});
+  assert(runtime.active && ctx->radio_type == RADIO_SI4732);
+
   setup(438500000, fm);
   press(KEY_SIDE2);
   assert(runtime.active && !confirming && parameters.mode == RX_AM);
   assert(frequencyHz == 438500000 && changed);
   press(KEY_SIDE2);
-  assert(parameters.mode == RX_FM && frequencyHz == 438500000);
+  assert(parameters.mode == RX_NFM && frequencyHz == 438500000);
 
   setup(7100000, (RadioParameters){RX_AM, 5000, 6000, 0, false});
   unsigned before = applied;
@@ -138,7 +144,7 @@ int main(void) {
   failFrequency = 0;
   failApply = true;
   press(KEY_UP);
-  assert(frequencyHz == 438500000 && parameters.mode == RX_FM && applied == 2);
+  assert(frequencyHz == 438500000 && parameters.mode == RX_NFM && applied == 2);
   assert(!runtime.active && !vfo->is_open && routed == 1);
   return 0;
 }
