@@ -6,7 +6,8 @@ Settings gSettings;
 static unsigned bkTunes, siTunes, broadcastTunes, bkIdle, siMuted;
 static unsigned bkModes, lastBkHz10;
 static bool siTuneOk = true, siBandwidthOk = true, siVolumeOk = true;
-static bool broadcastOk = true;
+static bool broadcastOk = true, broadcastMuteOk = true;
+static unsigned broadcastMutes;
 uint32_t SETTINGS_GetFilterBound(void) { return 24000000u; }
 bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index) {
   if (hz != 12000 && hz != 6000) return false;
@@ -48,7 +49,10 @@ bool BK1080_Init(uint32_t hz10, bool enable) {
   assert(hz10 == 10000000u && enable);
   ++broadcastTunes; return broadcastOk;
 }
-void BK1080_Mute(bool mute) { (void)mute; }
+bool BK1080_Mute(bool mute) {
+  ++broadcastMutes;
+  return mute || broadcastMuteOk;
+}
 static RxPlan plan(uint32_t hz, RxMode mode, RxDevice device) {
   return (RxPlan){device, hz, {mode, mode == RX_WFM ? 100000 : 12500,
     mode == RX_WFM ? 0 : mode == RX_NFM ? 12000 : 6000, 0, false}};
@@ -76,8 +80,12 @@ int main(void) {
   assert(!RX_DEVICE_Apply(&fmRadio, RX_DEVICE_SI));
   assert(siMuted == 1 && broadcastTunes == 1);
   broadcastOk = true;
+  broadcastMuteOk = false;
+  assert(!RX_DEVICE_Apply(&fmRadio, RX_DEVICE_SI));
+  assert(broadcastTunes == 2 && broadcastMutes >= 3);
+  broadcastMuteOk = true;
   assert(RX_DEVICE_Apply(&fmRadio, RX_DEVICE_SI));
-  assert(broadcastTunes == 2);
+  assert(broadcastTunes == 3);
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BROADCAST));
   assert(bkTunes == 2 && lastBkHz10 == 10000000u);
   return 0;

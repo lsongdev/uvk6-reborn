@@ -79,19 +79,29 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
     SI47XX_MODE siMode = mode == RX_WFM ? SI47XX_FM :
                          mode == RX_AM ? SI47XX_AM :
                          mode == RX_LSB ? SI47XX_LSB : SI47XX_USB;
-    if (!SI47XX_SwitchMode(siMode) || !SI47XX_TuneTo(frequency))
-      return false;
-    if (mode != RX_WFM &&
-        !(mode == RX_LSB || mode == RX_USB
-            ? SI47XX_SetSsbBandwidth(bandwidth)
-            : SI47XX_SetBandwidth(bandwidth, true)))
-      return false;
-    return SI47XX_SetVolume(63);
+    bool ready = SI47XX_SwitchMode(siMode) && SI47XX_TuneTo(frequency);
+    if (ready && mode != RX_WFM)
+      ready = (mode == RX_LSB || mode == RX_USB)
+                  ? SI47XX_SetSsbBandwidth(bandwidth)
+                  : SI47XX_SetBandwidth(bandwidth, true);
+    if (ready)
+      ready = SI47XX_SetVolume(63);
+    // Previous plan may be restored by rx-runtime; don't leave an aborted
+    // SI plan audible while the other receiver is being configured.
+    if (!ready)
+      (void)SI47XX_SetVolume(0);
+    return ready;
   }
   case RX_DEVICE_BROADCAST:
-    if (!BK1080_Init(frequency, true))
+    if (!BK1080_Init(frequency, true)) {
+      (void)BK1080_Mute(true);
       return false;
-    BK1080_Mute(false);
+    }
+    // An I2C NACK on unmute is not a successful reception.
+    if (!BK1080_Mute(false)) {
+      (void)BK1080_Mute(true);
+      return false;
+    }
     return true;
   }
   return false;
