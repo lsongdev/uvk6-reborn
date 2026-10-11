@@ -609,10 +609,14 @@ void SETTINGS_IncDecValue(Setting s, bool inc) {
 
 void SETTINGS_UpdateSave() {
   if (saveTime && (int32_t)(Now() - saveTime) >= 0) {
-    saveTime = 0;
-    SETTINGS_Save();
-    for (uint8_t i = 0; i < SETTING_COUNT; ++i)
-      dirty[i] = false;
+    if (DEVICE_SaveNow()) {
+      saveTime = 0;
+      for (uint8_t i = 0; i < SETTING_COUNT; ++i)
+        dirty[i] = false;
+    } else {
+      // A NACK or interrupted write must not silently clear pending settings.
+      saveTime = Now() + 1500u;
+    }
   }
   DEVICE_Update();
 }
