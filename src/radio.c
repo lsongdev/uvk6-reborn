@@ -1392,24 +1392,8 @@ void RADIO_InitState(RadioState *state, uint8_t num_vfos) {
   updateContext();
 }
 
-// Функция проверки необходимости сохранения и собственно сохранения
-void RADIO_CheckAndSaveVFO(RadioState *state) {
-  for (uint8_t i = 0; i < state->num_vfos; ++i) {
-    VFOContext *ctx = &state->vfos[i].context;
-    uint16_t num = state->vfos[i].vfo_ch_index;
-
-    if (num != UINT16_MAX && ctx->save_to_eeprom &&
-        (Now() - ctx->last_save_time >= RADIO_SAVE_DELAY_MS)) {
-      LogC(LOG_C_BRIGHT_YELLOW, "TRYING TO SAVE PARAM");
-      VFO ch;
-
-      RADIO_SaveVFOToStorage(state, i, &ch);
-      CHANNELS_Save(num, &ch);
-
-      ctx->save_to_eeprom = false;
-    }
-  }
-}
+// VFO memory is now part of the versioned radio user state, not a CH record.
+void RADIO_CheckAndSaveVFO(RadioState *state) { (void)state; }
 
 static void setCommonParamsFromCh(VFOContext *ctx, const VFO *storage) {
   ctx->radio_type = storage->radio;
@@ -1576,67 +1560,24 @@ void RADIO_UpdateSquelch(RadioState *state) {
   }
 }
 void RADIO_LoadVFOs(RadioState *state) {
-  Log("[RADIO] LoadVFOs");
-
-  // TODO: init each radio separately
+  // Startup initializes the hardware adapter only. The user's tuned state is
+  // restored by VFO1 from the validated UVR2 configuration, not old channels.
   BK4819_Init();
   BK4819_RX_TurnOn();
-
   BK1080_Init(0, false);
 
-  uint8_t vfoIdx = 0;
-  uint8_t selected = gSettings.activeVFO;
-  uint8_t found = 0;
-  uint16_t firstRecord = UINT16_MAX;
-  for (uint16_t i = 0; i < CHANNELS_GetCountMax(); ++i) {
-    CHMeta meta = CHANNELS_GetMeta(i);
-
-    bool isOurType = (TYPE_FILTER_VFO & (1 << meta.type)) != 0;
-    if (!isOurType) {
-      continue;
-    }
-
-    if (firstRecord == UINT16_MAX)
-      firstRecord = i;
-    if (found++ < selected)
-      continue;
-    state->vfos[0].vfo_ch_index = i;
-
-    MR ch;
-    CHANNELS_Load(i, &ch);
-    RADIO_LoadVFOFromStorage(state, 0, &ch);
-    state->vfos[0].mode = MODE_VFO;
-    vfoIdx = 1;
-    break;
-  }
-  if (!vfoIdx && firstRecord != UINT16_MAX) {
-    MR stored;
-    CHANNELS_Load(firstRecord, &stored);
-    state->vfos[0].vfo_ch_index = firstRecord;
-    RADIO_LoadVFOFromStorage(state, 0, &stored);
-    state->vfos[0].mode = MODE_VFO;
-    vfoIdx = 1;
-  }
-  if (!vfoIdx) {
-    // No usable stored VFO: run a receive-only default without inventing a
-    // writable EEPROM slot or overwriting existing channel records.
-    VFO fallback = {.rxF = 14550000, .radio = RADIO_BK4819,
-                    .modulation = MOD_FM, .bw = BK4819_FILTER_BW_12k,
-                    .step = STEP_12_5kHz};
-    RADIO_LoadVFOFromStorage(state, 0, &fallback);
-    state->vfos[0].vfo_ch_index = UINT16_MAX;
-    vfoIdx = 1;
-  }
-  state->num_vfos = vfoIdx;
+  VFO fallback = {.rxF = 14550000, .radio = RADIO_BK4819,
+                  .modulation = MOD_FM, .bw = BK4819_FILTER_BW_12k,
+                  .step = STEP_12_5kHz};
+  RADIO_LoadVFOFromStorage(state, 0, &fallback);
+  state->vfos[0].vfo_ch_index = UINT16_MAX; // No writable CH slot.
+  state->vfos[0].mode = MODE_VFO;
+  state->num_vfos = 1;
   state->active_vfo_index = 0;
-
-  VFOContext *ctx = &state->vfos[state->active_vfo_index].context;
-  for (uint8_t p = 0; p < PARAM_COUNT; ++p) {
-    ctx->dirty[p] = true;
-  }
-
-  RADIO_ApplySettings(ctx);
-
+  VFOContext *context = &state->vfos[0].context;
+  for (uint8_t p = 0; p < PARAM_COUNT; ++p)
+    context->dirty[p] = true;
+  RADIO_ApplySettings(context);
   updateContext();
 }
 
@@ -1881,8 +1822,8 @@ bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan) {
   context->step = step;
   RADIO_UpdateCurrentBand(context);
   RADIO_ApplySettings(context);
-  context->save_to_eeprom = true;
-  context->last_save_time = Now();
+  // Only VFO1 may commit a successfully applied user state into UVR2.
+  context->save_to_eeprom = false;
   gRedrawScreen = true;
   return true;
 }

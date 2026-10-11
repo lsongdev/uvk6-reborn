@@ -3,6 +3,7 @@
 #include "driver/backlight.h"
 #include "driver/bk4819.h"
 #include "driver/eeprom.h"
+#include "device-config.h"
 #include "driver/st7565.h"
 #include "driver/uart.h"
 #include "external/printf/printf.h"
@@ -108,47 +109,32 @@ const uint16_t PAGE_SIZES[7] = {
     [EEPROM_4MBIT] = 128,   // conservative chunk size; verify actual chip
 };
 
-// A format marker prevents interpreting foreign (e.g. LOSEHU) EEPROM as ours.
-#define SETTINGS_SIGNATURE 0x15
-static const uint8_t SETTINGS_MAGIC[4] = {'U', 'V', 'R', '1'};
-
-void SETTINGS_Save(void) {
-  gSettings.checkbyte = SETTINGS_SIGNATURE;
-  EEPROM_WriteBuffer(SETTINGS_OFFSET, (uint8_t *)&gSettings, SETTINGS_SIZE);
-  // Commit the format marker last when initializing new EEPROM data.
-  EEPROM_WriteBuffer(SETTINGS_MAGIC_OFFSET, (uint8_t *)SETTINGS_MAGIC,
-                     sizeof(SETTINGS_MAGIC));
-}
+// All persisted settings now use explicit, versioned UVR2 bytes.
+void SETTINGS_Save(void) { (void)DEVICE_SaveNow(); }
 
 bool SETTINGS_Load(void) {
-  uint8_t magic[sizeof(SETTINGS_MAGIC)];
-  if (EEPROM_ReadBuffer(SETTINGS_MAGIC_OFFSET, magic, sizeof(magic)) != 0 ||
-      memcmp(magic, SETTINGS_MAGIC, sizeof(magic)) != 0)
+  if (!DEVICE_Load())
     return false;
-
-  Settings saved;
-  if (EEPROM_ReadBuffer(SETTINGS_OFFSET, &saved, sizeof(saved)) != 0)
-    return false;
-
-  if (saved.checkbyte != SETTINGS_SIGNATURE ||
-      saved.eepromType >= EEPROM_UNKNOWN ||
-      saved.eepromType != EEPROM_DetectType() ||
-      saved.batteryCalibration < 1900 || saved.batteryCalibration > 2154 ||
-      saved.mainApp <= APP_NONE || saved.mainApp >= APPS_COUNT ||
-      saved.backlight >= ARRAY_SIZE(BL_TIME_VALUES) ||
-      saved.roger >= ARRAY_SIZE(rogerNames) ||
-      saved.chDisplayMode >= ARRAY_SIZE(CH_DISPLAY_MODE_NAMES) ||
-      saved.batteryType > BAT_3500 || saved.batteryStyle > BAT_VOLTAGE ||
-      saved.backlightOnSquelch > BL_SQL_OPEN ||
-      saved.sqOpenedTimeout >= ARRAY_SIZE(SCAN_TIMEOUTS) ||
-      saved.sqClosedTimeout >= ARRAY_SIZE(SCAN_TIMEOUTS))
-    return false;
-
-  gSettings = saved;
+  const ConfigPreferences *p = &gDeviceConfig.preferences;
+  gSettings.eepromType = EEPROM_DetectType();
+  gSettings.batteryCalibration = p->battery_calibration;
+  gSettings.backlight = p->backlight;
+  gSettings.contrast = p->contrast;
+  gSettings.brightness = p->brightness;
+  gSettings.batteryType = p->battery_type;
+  gSettings.batteryStyle = p->battery_style;
+  gSettings.backlightOnSquelch = p->backlight_on_squelch;
+  gSettings.keylock = p->keylock;
+  gSettings.pttLock = p->ptt_lock;
+  gSettings.beep = p->beep;
+  gSettings.si4732PowerOff = p->si4732_power_off;
+  gSettings.mic = p->mic;
+  gSettings.deviation = p->deviation;
+  gSettings.bound_240_280 = p->bound_240_280;
   return true;
 }
 
-void SETTINGS_DelayedSave(void) { SETTINGS_Save(); }
+void SETTINGS_DelayedSave(void) { DEVICE_RequestSave(); }
 
 uint32_t SETTINGS_GetFilterBound(void) {
   return gSettings.bound_240_280 ? VHF_UHF_BOUND2 : VHF_UHF_BOUND1;
@@ -622,11 +608,11 @@ void SETTINGS_IncDecValue(Setting s, bool inc) {
 }
 
 void SETTINGS_UpdateSave() {
-  if (saveTime && Now() > saveTime) {
+  if (saveTime && (int32_t)(Now() - saveTime) >= 0) {
     saveTime = 0;
     SETTINGS_Save();
-    for (uint8_t i = 0; i < SETTING_COUNT; ++i) {
+    for (uint8_t i = 0; i < SETTING_COUNT; ++i)
       dirty[i] = false;
-    }
   }
+  DEVICE_Update();
 }
