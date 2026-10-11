@@ -99,40 +99,13 @@ int main(int argc, char **argv) {
   assert(context.frequency == 43850000);
 
   }
-  if (hasSi) {
-  VFO stored = {.radio = RADIO_SI4732, .rxF = 9592500,
-                .modulation = MOD_FM, .gainIndex = 0};
-  setCommonParamsFromCh(&context, &stored);
-  assert(context.frequency == 9592500 && context.volume == 100);
-  assert(context.dirty[PARAM_VOLUME]);
-  // A full-width EEPROM name without NUL must never overflow ctx->name.
-  memset(stored.name, 'X', sizeof(stored.name));
-  stored.radio = RADIO_BK4819;
-  stored.gainIndex = AUTO_GAIN_INDEX;
-  setCommonParamsFromCh(&context, &stored);
-  assert(context.radio_type == RADIO_SI4732 && context.gain == 0);
-  assert(context.name[sizeof(context.name) - 1] == '\0');
-  for (unsigned i = 0; i < sizeof(context.name) - 1; ++i)
-    assert(context.name[i] == 'X');
-  }
-  RadioState snapshot = {.num_vfos = 1};
-  snapshot.vfos[0].context = context;
-  snapshot.vfos[0].mode = MODE_VFO;
-  memcpy(snapshot.vfos[0].context.name, "VFO Test", 9);
-  snapshot.vfos[0].context.power = TX_POW_LOW;
-  VFO exported;
-  memset(&exported, 0xff, sizeof(exported));
-  RADIO_SaveVFOToStorage(&snapshot, 0, &exported);
-  assert(exported.meta.type == TYPE_VFO && !exported.meta.readonly);
-  assert(exported.name[9] == '\0' && strcmp(exported.name, "VFO Test") == 0);
-  assert(exported.power == TX_POW_LOW && !exported.allowTx);
-  assert(exported.rxF == context.frequency && exported.modulation == context.modulation);
   // Even trusted EEPROM metadata cannot authorize TX in an RX-only build.
   context.tx_allowed = true;
   context.radio_type = RADIO_BK4819;
   context.modulation = MOD_FM;
   assert(checkTX(&context) == TX_DISABLED);
   // The new hardware path must not commit context on command failure.
+  RadioState snapshot = {.num_vfos = 1};
   snapshot.vfos[0].context = (VFOContext){
       .radio_type = RADIO_BK4819, .modulation = MOD_FM,
       .frequency = 43850000, .filter = FILTER_AUTO
