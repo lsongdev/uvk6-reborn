@@ -128,14 +128,14 @@ int EEPROM_ReadBuffer(uint32_t address, void *pBuffer, uint16_t size) {
   return 0;
 } */
 
-void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
+bool EEPROM_TryWriteBuffer(uint32_t address, const uint8_t *pBuffer, uint16_t size) {
   if (!writes_enabled || pBuffer == NULL || size == 0 ||
       address >= g_eeprom_size || size > g_eeprom_size - address)
-    return;
+    return false;
 
   uint16_t PAGE_SIZE = EEPROM_GetPageSize();
   if (!PAGE_SIZE)
-    return;
+    return false;
 
   while (size > 0) {
     uint16_t page_offset = address % PAGE_SIZE;
@@ -144,39 +144,44 @@ void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
     uint8_t IIC_ADD = 0xA0 | ((address >> 15) & 0x0E);
 
     if (!EEPROM_WaitReady(IIC_ADD, 10))
-      return;
+      return false;
 
     I2C_Start();
     if (I2C_Write(IIC_ADD) != 0) {
       I2C_Stop();
-      return;
+      return false;
     }
     if (I2C_Write((address >> 8) & 0xFF) != 0) {
       I2C_Stop();
-      return;
+      return false;
     }
     if (I2C_Write(address & 0xFF) != 0) {
       I2C_Stop();
-      return;
+      return false;
     }
 
     // Пишем всю страницу за раз
     if (I2C_WriteBuffer(pBuffer, chunk_size) != 0) {
       I2C_Stop();
-      return;
+      return false;
     }
 
     I2C_Stop();
 
     // Ждем завершения записи
     if (!EEPROM_WaitReady(IIC_ADD, 10))
-      return;
+      return false;
 
     pBuffer += chunk_size;
     address += chunk_size;
     size -= chunk_size;
     gEepromWrite = true;
   }
+  return true;
+}
+
+void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
+  (void)EEPROM_TryWriteBuffer(address, pBuffer, size);
 }
 
 /* void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
