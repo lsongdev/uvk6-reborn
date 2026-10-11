@@ -29,6 +29,11 @@ int main(void) {
   CONFIG_Default(&original);
   assert(RADIO_STATE_Valid(&original.radio));
   assert(original.radio.current.frequency_hz == 145500000);
+  assert(RADIO_STATE_Select(&original.radio, 7));
+  assert(RADIO_STATE_Valid(&original.radio));
+  assert(RADIO_STATE_Select(&original.radio, 8));
+  assert(RADIO_STATE_Valid(&original.radio));
+  assert(RADIO_STATE_Select(&original.radio, 5));
   assert(RADIO_STATE_Set(&original.radio, 100000000,
          (RadioParameters){RX_WFM,100000,0,0,false}));
   assert(RADIO_STATE_Select(&original.radio, 5));

@@ -13,8 +13,8 @@ const RadioBand radioBands[] = {
     {"Airband", 118*MHZ_HZ, 137*MHZ_HZ, 125*MHZ_HZ, true, PRESET(RX_AM, 8330, 6000, 0)},
     {"2m", 144*MHZ_HZ, 148*MHZ_HZ, 145500000, true, PRESET(RX_NFM, 12500, 12000, 4)},
     {"70cm", 430*MHZ_HZ, 440*MHZ_HZ, 438500000, true, PRESET(RX_NFM, 12500, 12000, 4)},
-    {"VHF", 30*MHZ_HZ, 300*MHZ_HZ, 145500000, false, PRESET(RX_NFM, 25000, 12000, 4)},
-    {"UHF", 300*MHZ_HZ, RADIO_MAX_HZ+1, 438500000, false, PRESET(RX_NFM, 25000, 12000, 4)},
+    {"VHF", 30*MHZ_HZ, 300*MHZ_HZ, 151000000, false, PRESET(RX_NFM, 25000, 12000, 4)},
+    {"UHF", 300*MHZ_HZ, RADIO_MAX_HZ+1, 445000000, false, PRESET(RX_NFM, 25000, 12000, 4)},
 };
 const uint8_t radioBandCount = sizeof(radioBands)/sizeof(radioBands[0]);
 
