@@ -3,7 +3,7 @@
 #include <assert.h>
 
 Settings gSettings;
-static unsigned bkTunes, siTunes, broadcastTunes, bkIdle, siMuted;
+static unsigned bkTunes, siTunes, broadcastTunes, bkIdle, siMuted, siPowerDowns;
 static unsigned bkModes, lastBkHz10;
 static bool siTuneOk = true, siBandwidthOk = true, siVolumeOk = true;
 static bool broadcastOk = true, broadcastMuteOk = true;
@@ -42,6 +42,7 @@ bool SI47XX_SetSsbBandwidth(SI47XX_SsbFilterBW bw) {
 bool SI47XX_SetBandwidth(SI47XX_FilterBW bw, bool amp) {
   (void)bw; (void)amp; return siBandwidthOk;
 }
+void SI47XX_PowerDown(void) { ++siPowerDowns; }
 bool SI47XX_SetVolume(uint8_t v) {
   if (!v) ++siMuted; return siVolumeOk;
 }
@@ -89,5 +90,8 @@ int main(void) {
   assert(broadcastTunes == 3);
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BROADCAST));
   assert(bkTunes == 2 && lastBkHz10 == 10000000u);
+  gSettings.si4732PowerOff = true;
+  assert(RX_DEVICE_Apply(&bk, RX_DEVICE_SI));
+  assert(siPowerDowns == 1 && bkTunes == 3);
   return 0;
 }
