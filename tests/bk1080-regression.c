@@ -38,6 +38,7 @@ int main(void) {
   assert(BK1080_SetFrequency(9590000));
   assert(writes == previous);
   ack = false;
+  assert(!BK1080_Mute(true) && !BK1080_Mute(false));
   assert(!BK1080_SetFrequency(10010000));
   assert(currentF == 9590000);
   ack = true;

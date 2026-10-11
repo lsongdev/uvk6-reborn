@@ -93,12 +93,9 @@ bool BK1080_WriteRegister(BK1080_Register_t Register, uint16_t Value) {
   return ok;
 }
 
-void BK1080_Mute(bool Mute) {
-  if (Mute) {
-    BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x4201);
-  } else {
-    BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x0201);
-  }
+bool BK1080_Mute(bool mute) {
+  return BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION,
+                              mute ? 0x4201 : 0x0201);
 }
 
 uint16_t BK1080_GetFrequencyDeviation() {
