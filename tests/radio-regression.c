@@ -28,6 +28,18 @@ uint16_t BK1080_ReadRegister(BK1080_Register_t reg) {
   (void)reg;
   return hasSi ? 0 : 0x1080;
 }
+void Log(const char *pattern, ...) { (void)pattern; }
+bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *bw) {
+  if (hz != 12000 && hz != 6000) return false;
+  *bw = hz == 12000 ? BK4819_FILTER_BW_12k : BK4819_FILTER_BW_6k;
+  return true;
+}
+bool SI47XX_BandwidthFromHz(uint32_t hz, bool ssb, uint16_t *bw) {
+  (void)ssb;
+  if (hz != 3000 && hz != 6000) return false;
+  *bw = 3;
+  return true;
+}
 void LogC(LogColor color, const char *pattern, ...) {
   (void)color; (void)pattern;
 }
