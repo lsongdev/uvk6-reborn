@@ -13,7 +13,7 @@ esac
   -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/radio-regression.c tests/finput-regression.c tests/bands-regression.c \
-  src/external/printf/printf.c "$dead_strip" -o "$test_binary"
+  src/radio-model.c src/external/printf/printf.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "$test_binary" --bk1080
 "${CC:-cc}" -std=c2x -Wall -Wextra -Werror tests/model-regression.c \
