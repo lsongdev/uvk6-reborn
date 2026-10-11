@@ -4,7 +4,7 @@
 
 ## 已完成的第一批
 
-- 新增独立的 `radio-model`：参数使用整数 Hz，模式明确为 FM、WFM、AM、LSB、USB，不包含 AUTO。
+- 新增独立的 `radio-model`：参数使用整数 Hz，模式明确为 NFM、WFM、AM、LSB、USB，不包含 AUTO。
 - 内置 LW、MW、SW、FM Radio、Airband、2m、70cm，以及 VHF/UHF 兜底频段；每段有独立默认参数。窄范围优先，快捷循环顺序固定。
 - 集中计算接收方案，选择与先前芯片无关；SI 缺失和 SSB 补丁缺失有明确结果。芯片探测通过各自驱动执行，并缓存。
 - 主界面只加载一个已存储 VFO，保持旧 EEPROM 布局。选择此前活动记录，记录不存在时回退首个现有 VFO；没有 VFO 时使用不自动写入记录的默认状态。
@@ -38,12 +38,19 @@
 - 删除旧频道列表的 `CHANNELS_LoadCurrentScanlistCH/CHANNELS_Next` 调频入口，防止未使用代码引用已经移除的多 VFO API。
 - 活跃的 EEPROM 频道读取、写入和旧格式适配仍保留。
 
+## 重叠频率路由核对
+
+- NFM（旧驱动 `MOD_FM`）在 18–26.1 MHz、64–108 MHz 等重叠范围始终选择 BK4819。
+- WFM 仅选择 SI4732，未安装 SI4732 时可按已确认的 BK1080 能力选择广播接收器，绝不使用 BK4819 的 NFM 进行 WFM 兜底。
+- 20 MHz 等短波重叠位置按明确的 NFM/AM/LSB/USB 模式分流；广播波段之外的 WFM 返回不支持。
+- TX 资格独立于 RX 芯片选择；当前仍一律禁止发射。主机回归固定这些路由约束。
+
 ## 当前操作
 
 | 操作 | 行为 |
 | --- | --- |
 | 侧键 1 短按 | LW → MW → SW → FM Radio → Airband → 2m → 70cm → LW；应用目标频段默认参数 |
-| 侧键 2 短按 | FM → WFM → AM → LSB → USB 中循环，跳过不支持的组合及缺失补丁的 SSB |
+| 侧键 2 短按 | NFM → WFM → AM → LSB → USB 中循环，跳过不支持的组合及缺失补丁的 SSB |
 | ▲ / ▼ | 按当前步进调频；长按连续调频 |
 | 数字键 | 输入 MHz；`*` 是小数点，MENU 提交 |
 | 短按 MENU | 当前参数菜单：Mode、Step、BW、SQ、Monitor |
