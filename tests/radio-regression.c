@@ -5,6 +5,20 @@
 static bool hasSi = true;
 Settings gSettings;
 static unsigned probes;
+static bool hardwareApplyOk = true;
+static unsigned hardwareApplies, audioMutes;
+bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
+  (void)plan; (void)previous;
+  ++hardwareApplies;
+  return hardwareApplyOk;
+}
+void AUDIO_ToggleSpeaker(bool on) { if (!on) ++audioMutes; }
+void BK4819_ToggleAFDAC(bool on) { (void)on; }
+void BK4819_ToggleAFBit(bool on) { (void)on; }
+void BOARD_ToggleGreen(bool on) { (void)on; }
+void BACKLIGHT_On(void) {}
+void BACKLIGHT_Toggle(bool on) { (void)on; }
+void SYS_DelayMs(uint32_t ms) { (void)ms; }
 bool BK1080_Detect(void) { ++probes; return !hasSi; }
 bool SI47XX_Detect(void) { ++probes; return hasSi; }
 bool SETTINGS_IsPatchPresent(void) { return true; }
@@ -106,6 +120,34 @@ int main(int argc, char **argv) {
   context.radio_type = RADIO_BK4819;
   context.modulation = MOD_FM;
   assert(checkTX(&context) == TX_DISABLED);
+  // The new hardware path must not commit context on command failure.
+  snapshot.vfos[0].context = (VFOContext){
+      .radio_type = RADIO_BK4819, .modulation = MOD_FM,
+      .frequency = 43850000, .filter = FILTER_AUTO
+  };
+  gRadioState = &snapshot;
+  updateContext();
+  RadioParameters wide = {RX_WFM, 100000, 0, 0, false};
+  RxPlan receivePlan;
+  assert(RADIO_MODEL_Plan(100000000, wide,
+         RADIO_GetReceiverCapabilities(), &receivePlan) == RX_OK);
+  hardwareApplyOk = false;
+  assert(!RADIO_ApplyRxPlan(ctx, &receivePlan));
+  assert(hardwareApplies == 1 && audioMutes > 0);
+  assert(ctx->frequency == 43850000 &&
+         ctx->radio_type == RADIO_BK4819 && ctx->modulation == MOD_FM);
+  hardwareApplyOk = true;
+  assert(RADIO_ApplyRxPlan(ctx, &receivePlan));
+  assert(hardwareApplies == 2 && ctx->frequency == 10000000 &&
+         ctx->radio_type == (hasSi ? RADIO_SI4732 : RADIO_BK1080) &&
+         !ctx->tx_allowed && !ctx->save_to_eeprom);
+  assert(!ctx->dirty[PARAM_FREQUENCY] && !ctx->dirty[PARAM_MODULATION]);
+  // No implicit WFM -> BK narrowband fallback.
+  RxPlan invalid = receivePlan;
+  invalid.device = RX_DEVICE_BK;
+  assert(!RADIO_ApplyRxPlan(ctx, &invalid));
+  assert(hardwareApplies == 2);
+
   unsigned initialProbes = probes;
   RADIO_GetReceiverCapabilities();
   RADIO_GetReceiverCapabilities();
