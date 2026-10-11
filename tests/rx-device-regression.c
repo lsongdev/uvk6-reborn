@@ -76,9 +76,10 @@ int main(void) {
   siVolumeOk = true;
   assert(RX_DEVICE_Apply(&wfm, RX_DEVICE_SI));
   RxPlan fmRadio = plan(100000000, RX_WFM, RX_DEVICE_BROADCAST);
+  unsigned mutedBeforeSwitch = siMuted;
   broadcastOk = false;
   assert(!RX_DEVICE_Apply(&fmRadio, RX_DEVICE_SI));
-  assert(siMuted == 1 && broadcastTunes == 1);
+  assert(siMuted == mutedBeforeSwitch + 1 && broadcastTunes == 1);
   broadcastOk = true;
   broadcastMuteOk = false;
   assert(!RX_DEVICE_Apply(&fmRadio, RX_DEVICE_SI));
