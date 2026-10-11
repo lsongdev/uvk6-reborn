@@ -39,4 +39,7 @@ esac
 "${CC:-cc}" -std=c2x -Wall -Wextra -Werror tests/rx-runtime-regression.c \
   src/rx-runtime.c -o "$test_binary"
 "$test_binary"
+"${CC:-cc}" -std=c2x -Wall -Wextra -Werror tests/config-store-regression.c \
+  src/config-store.c src/radio-state.c src/radio-model.c -o "$test_binary"
+"$test_binary"
 echo 'SI sidebands/BFO, VFO keys, confirmation, unavailable receivers, frequency input, legacy storage, cached detection, receiver plans, precision, and band boundaries passed.'
