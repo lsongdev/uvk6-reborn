@@ -136,6 +136,10 @@ bool EEPROM_TryWriteBuffer(uint32_t address, const uint8_t *pBuffer, uint16_t si
   uint16_t PAGE_SIZE = EEPROM_GetPageSize();
   if (!PAGE_SIZE)
     return false;
+  // ACK-count detection does not identify the physical part or its page size.
+  // Use a conservative 32-byte maximum until the actual EEPROM is verified.
+  if (PAGE_SIZE > 32)
+    PAGE_SIZE = 32;
 
   while (size > 0) {
     uint16_t page_offset = address % PAGE_SIZE;
