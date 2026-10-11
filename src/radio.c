@@ -1,4 +1,5 @@
 #include "radio.h"
+#include "rx-device.h"
 #include "board.h"
 #include "dcs.h"
 #include "driver/audio.h"
@@ -1560,25 +1561,30 @@ void RADIO_UpdateSquelch(RadioState *state) {
   }
 }
 void RADIO_LoadVFOs(RadioState *state) {
-  // Startup initializes the hardware adapter only. The user's tuned state is
-  // restored by VFO1 from the validated UVR2 configuration, not old channels.
+  // Initialize hardware once. VFO1 then applies the validated UVR2 plan.
+  // No synthetic legacy channel or second parameter replay.
   BK4819_Init();
   BK4819_RX_TurnOn();
-  BK1080_Init(0, false);
+  (void)BK1080_Init(0, false);
 
-  VFO fallback = {.rxF = 14550000, .radio = RADIO_BK4819,
-                  .modulation = MOD_FM, .bw = BK4819_FILTER_BW_12k,
-                  .step = STEP_12_5kHz};
-  RADIO_LoadVFOFromStorage(state, 0, &fallback);
-  state->vfos[0].vfo_ch_index = UINT16_MAX; // No writable CH slot.
-  state->vfos[0].mode = MODE_VFO;
+  ExtendedVFOContext *receiver = &state->vfos[0];
+  VFOContext *context = &receiver->context;
+  *context = (VFOContext){
+      .frequency = 14550000, .radio_type = RADIO_BK4819,
+      .modulation = MOD_FM, .bandwidth = BK4819_FILTER_BW_12k,
+      .gain = AUTO_GAIN_INDEX, .volume = 100,
+      .filter = FILTER_AUTO, .preciseFChange = true,
+      .step = STEP_12_5kHz
+  };
+  context->tx_state.last_error = TX_UNKNOWN;
+  receiver->vfo_ch_index = UINT16_MAX;
+  receiver->mode = MODE_VFO;
+  receiver->is_active = true;
+  receiver->is_open = false;
   state->num_vfos = 1;
   state->active_vfo_index = 0;
-  VFOContext *context = &state->vfos[0].context;
-  for (uint8_t p = 0; p < PARAM_COUNT; ++p)
-    context->dirty[p] = true;
-  RADIO_ApplySettings(context);
   updateContext();
+  RADIO_UpdateCurrentBand(context);
 }
 
 const char *RADIO_GetParamValueString(const VFOContext *ctx, ParamType param) {
@@ -1742,88 +1748,64 @@ RadioParameters RADIO_ReadParameters(const VFOContext *context) {
   return (RadioParameters){mode, step, bandwidth, context->squelch.value, false};
 }
 
+// Hardware is configured only through RX_DEVICE_Apply. The temporary
+// VFOContext mirrors successfully applied plans for measurements and UI.
 bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan) {
   if (!plan || !gRadioState || context != &gRadioState->vfos[0].context ||
-      context->tx_state.is_active || (unsigned)plan->parameters.mode >= RX_MODE_COUNT)
+      context->tx_state.is_active ||
+      (unsigned)plan->parameters.mode >= RX_MODE_COUNT)
     return false;
-  uint8_t step = UINT8_MAX;
-  for (uint8_t i = 0; i < ARRAY_SIZE(StepFrequencyTable); ++i)
-    if (StepFrequencyTable[i]*10u == plan->parameters.step_hz)
-      step = i;
-  if (step == UINT8_MAX)
-    return false; // Transitional EEPROM adapter cannot represent this step.
+
+  RxPlan resolved;
+  if (RADIO_MODEL_Plan(plan->frequency_hz, plan->parameters,
+                       RADIO_GetReceiverCapabilities(), &resolved) != RX_OK ||
+      resolved.device != plan->device ||
+      resolved.frequency_hz != plan->frequency_hz)
+    return false;
+
+  Radio next = plan->device == RX_DEVICE_BK ? RADIO_BK4819 :
+               plan->device == RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
+  RxDevice old = context->radio_type == RADIO_BK4819 ? RX_DEVICE_BK :
+                 context->radio_type == RADIO_SI4732 ? RX_DEVICE_SI :
+                 RX_DEVICE_BROADCAST;
+  const bool ssb = plan->parameters.mode == RX_LSB ||
+                   plan->parameters.mode == RX_USB;
   uint16_t bandwidth = 0;
-  bool isSsb = plan->parameters.mode == RX_LSB || plan->parameters.mode == RX_USB;
   if (plan->parameters.mode != RX_WFM &&
       !(plan->device == RX_DEVICE_BK
           ? BK4819_BandwidthFromHz(plan->parameters.bandwidth_hz, &bandwidth)
-          : SI47XX_BandwidthFromHz(plan->parameters.bandwidth_hz, isSsb, &bandwidth)))
+          : SI47XX_BandwidthFromHz(plan->parameters.bandwidth_hz, ssb, &bandwidth)))
     return false;
-  Radio radio = plan->device == RX_DEVICE_BK ? RADIO_BK4819
-              : plan->device == RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
-  static const ModulationType modes[] = {MOD_FM, MOD_WFM, MOD_AM, MOD_LSB, MOD_USB};
 
-  // Mute during changes, even when keeping the same receiver. On failure
-  // the runtime can reapply its previous plan before reopening squelch.
   RADIO_StopReception();
-
-  // Preflight the SI receiver before committing user-visible state or EEPROM.
-  // A missing patch, CTS timeout, or NACK must not be reported as a tune.
-  if (radio == RADIO_BK1080 &&
-      !BK1080_Init(plan->frequency_hz / 10u, true)) {
-    vfo->is_open = false;
-    AUDIO_ToggleSpeaker(false);
+  // On failure the previously committed context stays intact. rx-runtime
+  // may restore its last plan, otherwise reception remains safely muted.
+  if (!RX_DEVICE_Apply(plan, old))
     return false;
-  }
-  if (radio == RADIO_SI4732) {
-    SI47XX_MODE siMode = plan->parameters.mode == RX_WFM ? SI47XX_FM
-                      : (SI47XX_MODE)modes[plan->parameters.mode];
-    bool ready = SI47XX_SwitchMode(siMode);
-    if (ready)
-      ready = SI47XX_TuneTo(plan->frequency_hz / 10u);
-    if (ready && plan->parameters.mode != RX_WFM)
-      ready = isSsb ? SI47XX_SetSsbBandwidth(bandwidth)
-                    : SI47XX_SetBandwidth(bandwidth, true);
-    if (ready)
-      ready = SI47XX_SetVolume(63);
-    if (!ready) {
-      vfo->is_open = false;
-      AUDIO_ToggleSpeaker(false);
-      return false;
-    }
-  }
-  bool receiverChanged = context->radio_type != radio;
-  bool modeChanged = context->modulation != modes[plan->parameters.mode];
-  if (receiverChanged || modeChanged) {
-    // SI mode changes can power-cycle the DSP. Reapply its settings and
-    // reroute audio even if squelch was open before and remains open.
-    vfo->is_open = false;
-    AUDIO_ToggleSpeaker(false);
-  }
-  context->dirty[PARAM_RADIO] |= receiverChanged;
-  context->dirty[PARAM_MODULATION] |= context->modulation != modes[plan->parameters.mode];
-  context->dirty[PARAM_BANDWIDTH] |= context->bandwidth != bandwidth;
-  context->dirty[PARAM_SQUELCH_VALUE] |= context->squelch.value != plan->parameters.squelch;
-  context->dirty[PARAM_FREQUENCY] = true;
-  if (receiverChanged || modeChanged) {
-    context->gain = AUTO_GAIN_INDEX;
-    for (uint8_t i = 0; i < PARAM_COUNT; ++i)
-      context->dirty[i] = true;
-  }
-  context->radio_type = radio;
+
+  static const ModulationType modes[RX_MODE_COUNT] = {
+      MOD_FM, MOD_WFM, MOD_AM, MOD_LSB, MOD_USB
+  };
+  context->radio_type = next;
   context->modulation = modes[plan->parameters.mode];
+  context->frequency = plan->frequency_hz / 10u;
   context->bandwidth = bandwidth;
-  context->frequency = plan->frequency_hz/10;
   context->squelch.value = plan->parameters.squelch;
-  context->tx_allowed = RADIO_MODEL_CanTransmit(plan);
-  context->tx_state.offsetDirection = OFFSET_NONE;
+  context->gain = next == RADIO_BK4819 ? AUTO_GAIN_INDEX : 0;
   context->volume = 100;
-  context->dirty[PARAM_VOLUME] = true;
-  context->step = step;
-  RADIO_UpdateCurrentBand(context);
-  RADIO_ApplySettings(context);
-  // Only VFO1 may commit a successfully applied user state into UVR2.
+  context->tx_allowed = false;
+  context->tx_state.offsetDirection = OFFSET_NONE;
+  context->preciseFChange = true;
+  context->filter = FILTER_AUTO;
   context->save_to_eeprom = false;
+  // Only legacy diagnostic/readback code still uses this indexed step.
+  for (uint8_t n = 0; n < ARRAY_SIZE(StepFrequencyTable); ++n)
+    if (StepFrequencyTable[n] * 10u == plan->parameters.step_hz) {
+      context->step = n;
+      break;
+    }
+  memset(context->dirty, 0, sizeof(context->dirty));
+  RADIO_UpdateCurrentBand(context);
   gRedrawScreen = true;
   return true;
 }

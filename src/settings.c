@@ -373,8 +373,10 @@ void SETTINGS_SetValue(Setting s, uint32_t v) {
     break;
   case SETTING_BOUND240_280:
     gSettings.bound_240_280 = v;
-    ctx->dirty[PARAM_FILTER] = true; // filter update
-    RADIO_ApplySettings(ctx);
+    // Filter setting is independent of tuning; never invoke legacy replay.
+    if (ctx && ctx->radio_type == RADIO_BK4819)
+      BK4819_SelectFilterEx(ctx->frequency < SETTINGS_GetFilterBound()
+                               ? FILTER_VHF : FILTER_UHF);
     break;
   case SETTING_NOLISTEN:
     gSettings.noListen = v;
