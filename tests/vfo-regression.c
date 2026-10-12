@@ -17,11 +17,23 @@ static unsigned routed;
 static unsigned appRuns;
 static bool failApply;
 Settings gSettings;
-TxCapabilities TX_DEVICE_Capabilities(void) { return (TxCapabilities){0}; }
-TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
-void TX_DEVICE_Disable(void) {}
-bool TX_DEVICE_Prepare(const TxPlan *plan) { (void)plan; return false; }
-bool TX_DEVICE_Enable(void) { return false; }
+static bool txFakeVerified, txFakePrepareOK, txFakeEnableOK;
+static unsigned txFakePrepares, txFakeEnables, txFakeDisables;
+// These capabilities exist exclusively in the host test. Production HAL
+// returns unverified, and cannot energize the PA.
+TxCapabilities TX_DEVICE_Capabilities(void) {
+  return (TxCapabilities){txFakeVerified, txFakeVerified};
+}
+TxPolicy TX_DEVICE_Policy(void) {
+  return (TxPolicy){txFakeVerified, 430000000u, 440000000u};
+}
+void TX_DEVICE_Disable(void) { ++txFakeDisables; }
+bool TX_DEVICE_Prepare(const TxPlan *plan) {
+  ++txFakePrepares;
+  assert(plan->frequency_hz == 438500000u && plan->power == TX_POWER_LOW);
+  return txFakePrepareOK;
+}
+bool TX_DEVICE_Enable(void) { ++txFakeEnables; return txFakeEnableOK; }
 DeviceConfig gDeviceConfig;
 bool gDeviceConfigReady = true;
 static unsigned saveRequests;
@@ -113,6 +125,12 @@ static void setup(uint32_t frequency, RadioParameters values) {
   gDeviceConfig.tx = (TxConfig){0};
   gDeviceConfig.preferences.tx_timeout_seconds = 120;
   gDeviceConfig.preferences.tx_busy_lockout = 0;
+  gMonitorMode = false;
+  gSettings.pttLock = false;
+  txFakeVerified = false;
+  txFakePrepareOK = txFakeEnableOK = true;
+  txFakePrepares = txFakeEnables = txFakeDisables = 0;
+  vfo->is_open = false;
   assert(RADIO_STATE_Set(&gDeviceConfig.radio, frequency, values));
   *ctx = (RadioReceiver){.frequency = frequency/10};
   savedParameters = values;
@@ -412,6 +430,67 @@ int main(void) {
   assert(!strcmp(message, "TX mode not supported"));
   assert(transmitter.mode == RADIO_RX);
   VFO1_PttRelease();
+
+  // Busy-channel lockout remains active even when Monitor is on.
+  setup(438500000, fm);
+  gDeviceConfig.tx.enabled = true;
+  gDeviceConfig.preferences.tx_busy_lockout = 1;
+  txFakeVerified = true;
+  vfo->is_open = true;
+  gMonitorMode = true;
+  assert(VFO1_key(KEY_PTT, KEY_PRESSED));
+  assert(!strcmp(message, "Channel busy"));
+  assert(txFakePrepares == 0 && transmitter.mode == RADIO_RX);
+  VFO1_PttRelease();
+
+  // Exercise the full one-VFO PTT lifecycle using a host-only fake PA:
+  // no EEPROM mutation, timeout closes PA, RX restores, release re-arms.
+  setup(438500000, fm);
+  gDeviceConfig.tx.enabled = true;
+  gDeviceConfig.preferences.tx_timeout_seconds = 30;
+  txFakeVerified = true;
+  unsigned savesBeforePTT = saveRequests;
+  unsigned appliedBeforePTT = applied;
+  assert(VFO1_key(KEY_PTT, KEY_PRESSED));
+  assert(transmitter.mode == RADIO_TX);
+  assert(txFakePrepares == 1 && txFakeEnables == 1 &&
+         txFakeDisables == 1 && saveRequests == savesBeforePTT);
+  clockNow += 30000u;
+  VFO1_TxSafetyUpdate();
+  assert(transmitter.mode == RADIO_RX && transmitter.wait_release);
+  assert(txFakeDisables == 2 && applied == appliedBeforePTT + 1);
+  assert(saveRequests == savesBeforePTT && user.current.frequency_hz == 438500000);
+  assert(VFO1_key(KEY_PTT, KEY_PRESSED));
+  assert(txFakeEnables == 1); // TOT latch: no auto-rekey while held.
+  VFO1_PttRelease();
+  assert(!transmitter.wait_release);
+  assert(VFO1_key(KEY_PTT, KEY_PRESSED) && transmitter.mode == RADIO_TX);
+  VFO1_PttRelease();
+  assert(transmitter.mode == RADIO_RX);
+
+  // Prepare failure must never call enable, and requires a fresh PTT edge.
+  setup(438500000, fm);
+  gDeviceConfig.tx.enabled = true;
+  txFakeVerified = true;
+  txFakePrepareOK = false;
+  assert(VFO1_key(KEY_PTT, KEY_PRESSED));
+  assert(!strcmp(message, "TX hardware error"));
+  assert(transmitter.mode == RADIO_RX && transmitter.wait_release);
+  assert(txFakePrepares == 1 && txFakeEnables == 0 && txFakeDisables == 2);
+  VFO1_PttRelease();
+  assert(!transmitter.wait_release);
+
+  // Failed RX restoration must latch a permanent fault with PA disabled.
+  setup(438500000, fm);
+  gDeviceConfig.tx.enabled = true;
+  txFakeVerified = true;
+  assert(VFO1_key(KEY_PTT, KEY_PRESSED) && transmitter.mode == RADIO_TX);
+  failApply = true;
+  VFO1_PttRelease();
+  assert(transmitter.mode == RADIO_FAULT && txFakeDisables >= 2);
+  assert(!runtime.active);
+  assert(VFO1_key(KEY_PTT, KEY_PRESSED));
+  assert(txFakeEnables == 1); // No retry from a faulted radio.
 
   // SSB does not gain an unreliable RSSI-only auto-search path.
   setup(7100000, (RadioParameters){RX_USB,5000,3000,0});
