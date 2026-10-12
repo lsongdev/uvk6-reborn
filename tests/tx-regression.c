@@ -25,7 +25,10 @@ int main(void) {
   TxPlan plan = {0};
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
   assert(plan.frequency_hz==145500000);
-  cfg.enabled=false;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_DISABLED);
+  cfg.enabled=false;
+  plan.frequency_hz = 123456780u;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_DISABLED);
+  assert(plan.frequency_hz == 0); // No stale TX authorization on rejection.
   cfg.enabled=true;
   cfg.power=TX_POWER_HIGH;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_UNCALIBRATED);
   cfg.power=TX_POWER_LOW;
@@ -39,6 +42,21 @@ int main(void) {
   hw.verified=true;
   policy.upper_hz=145500000;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
   policy.upper_hz=148000000;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
+  cfg.power = (TxPower)255;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_UNCALIBRATED);
+  assert(plan.frequency_hz == 0);
+  cfg.power = TX_POWER_LOW;
+  rx.parameters.step_hz = 0;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
+  rx.parameters.step_hz = 12500;
+  rx.frequency_hz = 700000000u;
+  policy.lower_hz = 690000000u;
+  policy.upper_hz = 710000000u;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
+  policy.lower_hz = 144000000u;
+  policy.upper_hz = 148000000u;
+  rx.frequency_hz = 145500000u;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
 
   TxOperations ops = {NULL,mute,prepare,enable,disable,restore};

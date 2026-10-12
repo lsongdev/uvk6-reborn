@@ -3,12 +3,24 @@
 TxResult TX_MODEL_Plan(const RxPlan *rx, const TxConfig *config,
                        const TxCapabilities *capabilities,
                        const TxPolicy *policy, TxPlan *out) {
+  // Failure must never leave a previously authorized plan in the output.
+  if (out) *out = (TxPlan){0};
   if (!rx || !config || !capabilities || !policy || !out)
     return TX_HW_FAULT;
   if (!config->enabled)
     return TX_DISABLED;
   if (rx->parameters.mode != RX_NFM || rx->device != RX_DEVICE_BK)
     return TX_UNSUPPORTED_MODE;
+  if (!rx->parameters.step_hz || rx->parameters.squelch > 10 ||
+      rx->frequency_hz % 10u)
+    return TX_HW_FAULT;
+  // TX must never expand outside the RF chip's already-planned RX range,
+  // regardless of what a misconfigured board policy requests.
+  if (!((rx->frequency_hz >= 18000000u && rx->frequency_hz <= 660000000u) ||
+        (rx->frequency_hz >= 840000000u && rx->frequency_hz <= 1300000000u)))
+    return TX_OUT_OF_BAND;
+  if ((unsigned)config->power > TX_POWER_HIGH)
+    return TX_UNCALIBRATED;
   if (!capabilities->verified || !policy->authorized)
     return TX_UNVERIFIED_HARDWARE;
   if (rx->frequency_hz < policy->lower_hz ||
