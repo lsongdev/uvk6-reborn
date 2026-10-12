@@ -23,7 +23,7 @@ SRC := $(SRC_DIR)/main.c \
        $(filter-out $(SRC_DIR)/core/scan.c,$(wildcard $(SRC_DIR)/core/*.c)) \
        $(wildcard $(SRC_DIR)/hal/*.c) \
        $(wildcard $(SRC_DIR)/drivers/*/*.c) \
-       $(filter-out $(SRC_DIR)/ui/spectrum.c,$(wildcard $(SRC_DIR)/ui/*.c)) \
+       $(filter-out $(SRC_DIR)/ui/spectrum.c $(SRC_DIR)/ui/regs-menu.c,$(wildcard $(SRC_DIR)/ui/*.c)) \
        $(wildcard $(SRC_DIR)/ui/components/*.c) \
        $(addprefix $(SRC_DIR)/apps/,apps.c system.c vfo1.c bands.c finput.c settings.c reset.c)
 

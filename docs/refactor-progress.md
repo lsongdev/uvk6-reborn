@@ -18,7 +18,7 @@
 
 ## 仍待完成
 
-- **Radio Core 继续收敛**：正常接收已从 `RxPlan` 走 `RX_DEVICE_Apply()` 单次硬件配置，并将成功结果映射到 `VFOContext`；旧 `RADIO_ApplySettings()` 不再用于启动或正常调谐。剩余的 `PARAM_*`、多余的 TX 字段和 `vfos[0]` 待下一批删除。
+- **Radio Core 继续收敛**：已删除 `radio.c` 的旧参数设置、调制/频道修正、TX 功放控制和重复调谐实现；VFO1 的 PTT 固定显示 TX disabled。临时 `VFOContext` 与单元素 `vfos[0]` 仍只承载接收数据和静噪，待最终替换。
 - **物理 EEPROM 确认**：对本机芯片丝印、容量、bank 映射、校准数据、SSB patch 位置进行只读识别；不能仅凭 ACK 数量认定型号。物理确认前不主动进行全片写入或页擦除。
 - **功能离线测试**：加入更多驱动错误注入和单一配置状态收敛测试，并检验保存失败与重启场景。
 - **实机验收**：BK4819、SI4732 模式和音频切换、S 表读数、SSB patch、掉电恢复、PTT 禁止发射、以及 EEPROM 写回验证。
