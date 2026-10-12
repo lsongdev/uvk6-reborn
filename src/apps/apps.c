@@ -7,7 +7,7 @@
 #include "apps/finput.h"
 #include "apps/reset.h"
 #include "apps/settings.h"
-#include "apps/vfo1.h"
+#include "apps/vfo.h"
 #include "apps/bands.h"
 
 #define APPS_STACK_SIZE 8
@@ -45,7 +45,7 @@ AppType_t APPS_Peek(void) {
   return APP_NONE;
 }
 
-const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {APP_VFO1};
+const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {APP_VFO};
 
 // Only the minimal radio, input, settings and explicit reset remain reachable.
 const App apps[APPS_COUNT] = {
@@ -56,7 +56,7 @@ const App apps[APPS_COUNT] = {
     [APP_SETTINGS] = {"Settings", SETTINGS_init, NULL, SETTINGS_render,
                       SETTINGS_key, SETTINGS_deinit},
     [APP_RESET] = {"Reset", RESET_Init, RESET_Update, RESET_Render, RESET_key, NULL},
-    [APP_VFO1] = {"Radio", VFO1_init, VFO1_update, VFO1_render, VFO1_key, VFO1_deinit, true},
+    [APP_VFO] = {"Radio", VFO_init, VFO_update, VFO_render, VFO_key, VFO_deinit, true},
 };
 
 bool APPS_key(KEY_Code_t Key, Key_State_t state) {

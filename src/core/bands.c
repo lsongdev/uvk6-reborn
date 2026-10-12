@@ -157,7 +157,7 @@ void BANDS_Select(int16_t num, bool copyToVfo) {
   }
 }
 
-// Used in vfo1 to select first band from scanlist
+// Legacy scanlist band selection.
 void BANDS_SelectScan(int8_t i) {
   if (gScanlistSize) {
     scanlistBandIndex = i;

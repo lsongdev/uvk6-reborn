@@ -151,7 +151,7 @@ static bool handlePTTRelease(void) {
     RADIO_SetParam(ctx, PARAM_FREQUENCY, gLastActiveLoot->f, true);
     RADIO_ApplySettings(ctx);
     RADIO_SaveCurrentVFO(gRadioState);
-    APPS_run(APP_VFO1);
+    APPS_run(APP_VFO);
     return true;
   }
 

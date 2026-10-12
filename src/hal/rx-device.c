@@ -3,6 +3,7 @@
 #include "drivers/bk4819/bk4819.h"
 #include "drivers/si473x/si473x.h"
 #include "core/settings.h"
+#include "core/measurements.h"
 #include <string.h>
 
 // BK4819 has no write acknowledgement. Cache only the last *requested*
@@ -227,6 +228,38 @@ bool RX_DEVICE_SeekSignal(RxDevice device, bool *found) {
     *found = (rssi & 0xffu) >= 24u && (snr & 0x0fu) >= 5u;
     return true;
   }
+  }
+  return false;
+}
+
+// Watch detection is independent from SQ0/Monitor audio. A noise floor prevents
+// an always-open receiver monopolizing the pair; thresholds need RF validation.
+bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found) {
+  if (!plan || !found) return false;
+  *found=false;
+  if (plan->device==RX_DEVICE_BK) {
+    uint8_t level=plan->parameters.squelch;
+    SQL floor=GetSql(level<4 ? 4 : level);
+    bool carrier=BK4819_GetRSSI()>=floor.ro && BK4819_GetNoise()<=floor.no &&
+                 BK4819_GetGlitch()<=floor.go;
+    RadioTone tone=plan->parameters.rx_tone;
+    bool matched=!tone || BK4819_CssIsDetected(TONE_Type(tone)!=CODE_TYPE_CONTINUOUS_TONE);
+    *found=carrier && matched && (!level || BK4819_IsSquelchOpen());
+    return true;
+  }
+  if (plan->device==RX_DEVICE_SI) {
+    if (!RSQ_GET()) return false;
+    uint8_t snr=plan->parameters.squelch<7 ? 7 : plan->parameters.squelch+1u;
+    *found=rsqStatus.resp.RSSI>=16 && rsqStatus.resp.SNR>=snr;
+    return true;
+  }
+  if (plan->device==RX_DEVICE_BROADCAST) {
+    uint16_t rssi=BK1080_ReadRegister(BK1080_REG_10);
+    uint16_t snr=BK1080_ReadRegister(BK1080_REG_07);
+    if (rssi==UINT16_MAX || snr==UINT16_MAX) return false;
+    uint8_t minimum=plan->parameters.squelch<5 ? 5 : plan->parameters.squelch;
+    *found=(rssi&0xffu)>=24 && (snr&0xfu)>=minimum;
+    return true;
   }
   return false;
 }

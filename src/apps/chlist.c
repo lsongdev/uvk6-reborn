@@ -9,7 +9,7 @@
 #include "apps/apps.h"
 #include "apps/chcfg.h"
 #include "apps/textinput.h"
-#include "apps/vfo1.h"
+#include "apps/vfo.h"
 #include <string.h>
 
 typedef enum {
@@ -165,7 +165,7 @@ static bool action(const uint16_t index, KEY_Code_t key, Key_State_t state) {
       }
       RADIO_LoadChannelToVFO(gRadioState,
                              RADIO_GetCurrentVFONumber(gRadioState), chNum);
-      APPS_run(APP_VFO1);
+      APPS_run(APP_VFO);
       return true;
     case KEY_F:
       gChNum = chNum;

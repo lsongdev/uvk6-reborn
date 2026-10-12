@@ -247,6 +247,7 @@ static void textWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *t
   textClipRight = LCD_WIDTH;
 }
 
+uint16_t UI_SymbolsTextWidth(const char *text) { return textWidth(text, &Symbols); }
 uint16_t UI_SmallTextWidth(const char *text) { return textWidth(text, &TomThumb); }
 uint16_t UI_LargeBoldTextWidth(const char *text) { return textWidth(text, &muHeavy8ptBold)*2; }
 void UI_SmallTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset) {

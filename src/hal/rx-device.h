@@ -7,6 +7,7 @@
 // Apply an already validated receive plan once. This is the sole hardware
 // tuning path; callers own the user state and failed-plan recovery.
 bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous);
+bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found);
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo);
 
 typedef enum { RX_SEEK_BUSY, RX_SEEK_FOUND, RX_SEEK_LIMIT, RX_SEEK_ERROR } RxSeekResult;

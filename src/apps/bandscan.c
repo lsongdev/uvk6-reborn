@@ -56,7 +56,7 @@ bool BANDSCAN_key(KEY_Code_t key, Key_State_t state) {
       if (gLastActiveLoot && !gSettings.keylock) {
         RADIO_SetParam(ctx, gLastActiveLoot->f, PARAM_FREQUENCY, true);
         RADIO_ApplySettings(ctx);
-        APPS_run(APP_VFO1);
+        APPS_run(APP_VFO);
         return true;
       }
     default:

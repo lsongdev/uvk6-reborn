@@ -77,6 +77,7 @@ void PrintBiggestDigitsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                           const char *pattern, ...);
 void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                     const char *pattern, ...);
+uint16_t UI_SymbolsTextWidth(const char *text);
 uint16_t UI_SmallTextWidth(const char *text);
 void UI_SmallTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
 // 14 px capitals, with descenders fitting the VFO's 17 px body.

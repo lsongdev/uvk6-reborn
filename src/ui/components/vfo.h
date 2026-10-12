@@ -6,7 +6,7 @@
 // Receiver state is explicit; a valid RSSI alone does not mean squelch is open.
 typedef enum {
   UI_VFO_IDLE, UI_VFO_RECEIVING, UI_VFO_TRANSMITTING,
-  UI_VFO_SEEKING, UI_VFO_UNAVAILABLE, UI_VFO_FAULT
+  UI_VFO_SEEKING, UI_VFO_WATCHING, UI_VFO_UNAVAILABLE, UI_VFO_FAULT
 } UI_VfoActivity;
 // Each visible VFO owns its view and animation state; no receiver globals.
 typedef struct {
