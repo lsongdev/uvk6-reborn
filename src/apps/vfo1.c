@@ -463,12 +463,13 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       notify("Channel busy");
       return true;
     }
+    TxCapabilities capability = TX_DEVICE_Capabilities();
+    TxPolicy policy = TX_DEVICE_Policy();
     TxPlan planned;
     TxResult result = TX_MODEL_Plan(&runtime.current, &gDeviceConfig.tx,
-                                   &(TxCapabilities){0}, &(TxPolicy){0}, &planned);
-    // This build deliberately does not expose any verified TX capability.
-    // Future hardware enablement must replace both inputs with independently
-    // confirmed TX_DEVICE_* policy, never with the RX capability table.
+                                   &capability, &policy, &planned);
+    // The production TX HAL deliberately provides no verified capabilities.
+    // Receiver support can never be re-used as transmit authorization.
     if (result == TX_OK &&
         !TX_RuntimePress(&transmitter, &runtime.current, &planned,
                          gDeviceConfig.preferences.tx_timeout_seconds,
