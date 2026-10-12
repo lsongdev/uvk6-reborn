@@ -225,20 +225,13 @@ uint16_t I2C_ReadBuffer(void *pBuffer, uint16_t Size) {
 }
 
 int I2C_WriteBuffer(const uint8_t *pBuffer, uint16_t Size) {
-  for (uint16_t i = 0; i < Size; i++) {
-    int retry = 3; // 3 попытки
-    while (retry--) {
-      if (I2C_Write(pBuffer[i]) == 0) {
-        break; // ACK - успех
-      }
-      if (retry > 0) {
-        // printf("I2C_WriteBuffer: NACK at byte %u, retry %d\n", i, 3 - retry);
-        i2c_delay_short();
-      } else {
-        // printf("I2C_WriteBuffer: NACK at byte %u - FAILED\n", i);
-        return -1;
-      }
-    }
+  if (!pBuffer && Size)
+    return -1;
+  for (uint16_t i = 0; i < Size; ++i) {
+    // A NACK invalidates this transaction. Repeating the byte in the same
+    // transaction is not an EEPROM/Si47xx command retry.
+    if (I2C_Write(pBuffer[i]) != 0)
+      return -1;
   }
   return 0;
 }

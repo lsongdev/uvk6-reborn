@@ -13,7 +13,6 @@ void EEPROM_SetWritesEnabled(bool enabled);
 int EEPROM_ReadBuffer(uint32_t Address, void *pBuffer, uint16_t Size);
 void EEPROM_WriteBuffer(uint32_t Address, uint8_t *pBuffer, uint16_t Size);
 bool EEPROM_TryWriteBuffer(uint32_t address, const uint8_t *data, uint16_t size);
-void EEPROM_ClearPage(uint16_t page);
 void EEPROM_ScanBus(void);
 bool EEPROM_Test(uint32_t test_addr);
 bool EEPROM_Detect(uint8_t device_addr);

@@ -1,4 +1,5 @@
 #include "hal/eeprom.h"
+#include "hal/eeprom-layout.h"
 #include "external/printf/printf.h"
 #include "hal/scheduler.h"
 #include "hal/i2c.h"
@@ -129,7 +130,8 @@ int EEPROM_ReadBuffer(uint32_t address, void *pBuffer, uint16_t size) {
 } */
 
 bool EEPROM_TryWriteBuffer(uint32_t address, const uint8_t *pBuffer, uint16_t size) {
-  if (!writes_enabled || pBuffer == NULL || size == 0 ||
+  if (!writes_enabled || pBuffer == NULL ||
+      !EEPROM_WriteAllowed(address, size) ||
       address >= g_eeprom_size || size > g_eeprom_size - address)
     return false;
 
@@ -238,45 +240,6 @@ void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
     gEepromWrite = true;
   }
 } */
-
-void EEPROM_ClearPage(uint16_t page) {
-  uint16_t PAGE_SIZE = EEPROM_GetPageSize();
-  if (!writes_enabled || !PAGE_SIZE)
-    return;
-  uint32_t address = (uint32_t)page * PAGE_SIZE;
-  if (address >= g_eeprom_size || PAGE_SIZE > g_eeprom_size - address)
-    return;
-  uint8_t IIC_ADD = 0xA0 | ((address >> 15) & 0x0E);
-
-  if (!EEPROM_WaitReady(IIC_ADD, 100))
-    return;
-  TIMER_DelayUs(100);
-
-  I2C_Start();
-  if (I2C_Write(IIC_ADD) != 0) {
-    I2C_Stop();
-    return;
-  }
-  if (I2C_Write((address >> 8) & 0xFF) != 0) {
-    I2C_Stop();
-    return;
-  }
-  if (I2C_Write(address & 0xFF) != 0) {
-    I2C_Stop();
-    return;
-  }
-
-  for (uint16_t i = 0; i < PAGE_SIZE; i++) {
-    if (I2C_Write(0xFF) != 0) {
-      I2C_Stop();
-      return;
-    }
-  }
-
-  I2C_Stop();
-  SYS_DelayMs(10);
-  gEepromWrite = true;
-}
 
 EEPROMType EEPROM_DetectType(void) {
   static uint8_t found_devices = 0;

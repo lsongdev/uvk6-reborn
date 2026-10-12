@@ -1,4 +1,5 @@
 #include "../src/core/config-store.c"
+#include "../src/hal/eeprom-layout.h"
 #include <assert.h>
 #include <string.h>
 
@@ -25,6 +26,12 @@ static bool writeIO(void *ctx, uint32_t at, const void *data, uint16_t n) {
   return true;
 }
 int main(void) {
+  assert(EEPROM_WriteAllowed(0, 256));
+  assert(EEPROM_WriteAllowed(256, 256));
+  assert(!EEPROM_WriteAllowed(512, 1));
+  assert(!EEPROM_WriteAllowed(511, 2));
+  assert(!EEPROM_WriteAllowed(0x1e00, 1));
+  assert(!EEPROM_WriteAllowed(UINT32_MAX, 64));
   DeviceConfig original, loaded;
   CONFIG_Default(&original);
   assert(RADIO_STATE_Valid(&original.radio));
