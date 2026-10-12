@@ -17,6 +17,8 @@
 static uint32_t saveTime;
 
 static const uint16_t BAT_CAL_MIN = 1900;
+// The only surviving RF switch boundary choices are display settings.
+const char *FLT_BOUND_NAMES[2] = {"240MHz", "280MHz"};
 
 static const char *YES_NO[] = {"No", "Yes"};
 static const char *ON_OFF[] = {"Off", "On"};

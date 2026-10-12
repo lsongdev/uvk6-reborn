@@ -9,6 +9,7 @@
 #include "hal/system.h"
 #include "hal/systick.h"
 #include "hal/uart.h"
+#include <string.h>
 
 static const uint8_t SI47XX_I2C_ADDR = 0x22;
 
