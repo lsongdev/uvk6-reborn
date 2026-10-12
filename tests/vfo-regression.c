@@ -22,6 +22,28 @@ static unsigned saveRequests;
 static uint32_t clockNow=100;
 static unsigned rdsReads, rdsClears, rdsIndex;
 static bool rdsAvailable;
+static uint32_t soughtFrequency;
+static bool nativeSeekBusy;
+static unsigned nativeStarts, nativeCancels;
+static uint32_t nativeFrequency;
+bool RX_DEVICE_SeekNative(const RxPlan *plan) {
+  return plan->device == RX_DEVICE_SI &&
+         (plan->parameters.mode == RX_WFM || plan->parameters.mode == RX_AM);
+}
+bool RX_DEVICE_SeekStart(const RxPlan *plan, uint32_t low, uint32_t high) {
+  (void)plan; (void)low; (void)high;
+  ++nativeStarts; nativeSeekBusy = true; return true;
+}
+RxSeekResult RX_DEVICE_SeekPoll(RxDevice dev, uint32_t *found) {
+  (void)dev;
+  if (nativeSeekBusy) { nativeSeekBusy = false; return RX_SEEK_BUSY; }
+  *found = nativeFrequency;
+  return RX_SEEK_FOUND;
+}
+void RX_DEVICE_SeekCancel(RxDevice dev) { (void)dev; ++nativeCancels; }
+bool RX_DEVICE_SeekSignal(RxDevice dev, bool *found) {
+  (void)dev; *found = ctx->frequency*10u == soughtFrequency; return true;
+}
 bool UI_VfoUpdate(UI_VfoState *state, uint32_t now) { (void)state; (void)now; return false; }
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear) {
   ++rdsReads;
@@ -76,6 +98,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   rdsAvailable=false;
   initialized = changed = inMenu = confirming = false;
   functionPending = false;
+  seek = (Seek){0};
   runtime = (RxRuntime){0};
   message = NULL;
   RADIO_STATE_Default(&gDeviceConfig.radio);
@@ -85,6 +108,9 @@ static void setup(uint32_t frequency, RadioParameters values) {
   applied = routed = appRuns = saveRequests = 0;
   failApply = false;
   failFrequency = 0;
+  soughtFrequency = 0;
+  nativeFrequency = 100100000;
+  nativeStarts = nativeCancels = 0;
   capabilities = (ReceiverCapabilities){true, false, true};
   VFO1_init();
 }

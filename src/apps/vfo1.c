@@ -5,6 +5,7 @@
 #include "core/radio.h"
 #include "core/device-config.h"
 #include "core/rx-runtime.h"
+#include "core/seek.h"
 #include "core/rds-receiver.h"
 #include "hal/rx-device.h"
 #include "hal/scheduler.h"
@@ -39,6 +40,15 @@ static uint32_t messageAt;
 static bool functionPending;
 static uint32_t functionAt;
 
+// Search never mutates user/EEPROM until one final station is accepted.
+typedef enum { SEEK_STEP, SEEK_SETTLE, SEEK_VERIFY,
+               SEEK_NATIVE_START, SEEK_NATIVE_POLL, SEEK_WRAP_SETTLE } SeekPhase;
+static Seek seek;
+static SeekPhase seekPhase;
+static RxPlan seekOrigin;
+static bool seekNative;
+static uint32_t seekAt, seekDeadline;
+
 void VFO1_cancelShortcut(void) {
   if (functionPending) {
     functionPending = false;
@@ -46,7 +56,13 @@ void VFO1_cancelShortcut(void) {
   }
 }
 
-void VFO1_deinit(void) { VFO1_cancelShortcut(); }
+static void finishSeek(bool found, uint32_t frequency_hz, const char *status);
+
+void VFO1_deinit(void) {
+  VFO1_cancelShortcut();
+  if (seek.active)
+    finishSeek(false, 0, NULL);
+}
 
 static void expireShortcut(void) {
   if (functionPending && Now()-functionAt >= 3000)
@@ -101,6 +117,160 @@ static void apply(const RxPlan *plan) {
   message = NULL;
 }
 
+// Forward-only seek owns temporary RF tuning; RxRuntime retains the last
+// committed plan so cancel/exhaustion never writes the EEPROM.
+static void finishSeek(bool found, uint32_t frequency_hz, const char *status) {
+  if (!seek.active) return;
+  RX_DEVICE_SeekCancel(seekOrigin.device);
+  SEEK_Stop(&seek);
+  RDS_ReceiverReset(&rds, Now());
+  gRedrawScreen = true;
+
+  if (found) {
+    RxPlan selected;
+    if (RADIO_MODEL_Plan(frequency_hz, seekOrigin.parameters,
+                         RADIO_GetReceiverCapabilities(), &selected) == RX_OK &&
+        selected.device == seekOrigin.device &&
+        SEEK_Accept(&(Seek){.active=true, .origin_hz=seek.origin_hz,
+                             .lower_hz=seek.lower_hz,.end_hz=seek.end_hz,
+                             .wrapped=seek.wrapped}, selected.frequency_hz)) {
+      apply(&selected); // The only place a found station is saved.
+      return;
+    }
+    status = "Seek error";
+  }
+  // Restoring directly does not update RadioUserState or request a save.
+  if (!RADIO_ApplyRxPlan(ctx, &seekOrigin)) {
+    RX_RuntimeStop(&runtime, stopReceiver, NULL);
+    notify("RX error");
+  } else if (status) {
+    notify(status);
+  }
+}
+
+static void startSeek(void) {
+  if (!runtime.active || user.active_band >= radioBandCount) {
+    notify("RX unavailable");
+    return;
+  }
+  if (user.current.parameters.mode == RX_LSB ||
+      user.current.parameters.mode == RX_USB) {
+    notify("SSB seek off");
+    return;
+  }
+  seekOrigin = runtime.current;
+  if (!SEEK_Start(&seek, &radioBands[user.active_band],
+                  seekOrigin.frequency_hz, seekOrigin.parameters.step_hz)) {
+    notify("Seek unavailable");
+    return;
+  }
+  seekNative = RX_DEVICE_SeekNative(&seekOrigin);
+  seekPhase = seekNative ? SEEK_NATIVE_START : SEEK_STEP;
+  seekAt = Now();
+  seekDeadline = Now() + 15000;
+  RADIO_StopReception();
+  RDS_ReceiverReset(&rds, Now());
+  message = NULL;
+  gRedrawScreen = true;
+}
+
+static void seekUpdate(void) {
+  if (!seek.active) return;
+  uint32_t now = Now();
+  if (seekPhase == SEEK_STEP) {
+    uint32_t next;
+    if (!SEEK_Next(&seek, &next)) {
+      // SEEK_Next marks the search inactive after a complete circle.
+      seek.active = true;
+      finishSeek(false, 0, "No station");
+      return;
+    }
+    RxPlan candidate;
+    RadioParameters params = seekOrigin.parameters;
+    if (params.squelch < 4 && seekOrigin.device == RX_DEVICE_BK)
+      params.squelch = 4; // Monitor/SQ0 must not match every noise carrier.
+    if (RADIO_MODEL_Plan(next, params, RADIO_GetReceiverCapabilities(),
+                         &candidate) != RX_OK ||
+        candidate.device != seekOrigin.device ||
+        candidate.frequency_hz < seek.lower_hz ||
+        candidate.frequency_hz >= seek.end_hz)
+      return;
+    if (!RADIO_ApplyRxPlan(ctx, &candidate)) {
+      finishSeek(false, 0, "Seek error");
+      return;
+    }
+    seekAt = now;
+    seekPhase = SEEK_SETTLE;
+  } else if (seekPhase == SEEK_SETTLE || seekPhase == SEEK_VERIFY ||
+             seekPhase == SEEK_WRAP_SETTLE) {
+    uint32_t elapsed = now - seekAt;
+    uint32_t wait = seekPhase == SEEK_VERIFY ? 80u : 180u;
+    if (elapsed < wait) return;
+    bool detected;
+    if (!RX_DEVICE_SeekSignal(seekOrigin.device, &detected)) {
+      finishSeek(false, 0, "Seek error");
+      return;
+    }
+    if (detected && seekPhase == SEEK_SETTLE) {
+      seekPhase = SEEK_VERIFY;
+      seekAt = now;
+    } else if (detected) {
+      finishSeek(true, seek.cursor_hz, NULL);
+    } else if (seekPhase == SEEK_WRAP_SETTLE) {
+      seekPhase = SEEK_NATIVE_START;
+    } else {
+      seekPhase = SEEK_STEP;
+    }
+  } else if (seekPhase == SEEK_NATIVE_START) {
+    // The SI hardware cannot search over arbitrary VFO modes or spacings.
+    uint32_t end = seek.wrapped ? seek.origin_hz : seek.end_hz-1u;
+    if (!RX_DEVICE_SeekStart(&seekOrigin, seek.lower_hz, end)) {
+      finishSeek(false, 0, "Seek error");
+      return;
+    }
+    seekDeadline = now + 15000u;
+    seekAt = now;
+    seekPhase = SEEK_NATIVE_POLL;
+  } else if (seekPhase == SEEK_NATIVE_POLL) {
+    if ((int32_t)(now-seekDeadline) >= 0) {
+      finishSeek(false, 0, "Seek timeout");
+      return;
+    }
+    if (now-seekAt < 90u) return;
+    seekAt = now;
+    uint32_t frequency = 0;
+    RxSeekResult result = RX_DEVICE_SeekPoll(seekOrigin.device, &frequency);
+    if (result == RX_SEEK_BUSY) return;
+    if (result == RX_SEEK_ERROR) {
+      finishSeek(false, 0, "Seek error");
+      return;
+    }
+    if (result == RX_SEEK_FOUND && SEEK_Accept(&seek, frequency)) {
+      finishSeek(true, frequency, NULL);
+      return;
+    }
+    // A complete hardware segment ended; the application owns the one wrap.
+    if (seek.wrapped || !SEEK_Wrap(&seek)) {
+      if (!seek.active) seek.active = true;
+      finishSeek(false, 0, "No station");
+      return;
+    }
+    RX_DEVICE_SeekCancel(seekOrigin.device);
+    RxPlan first;
+    if (RADIO_MODEL_Plan(seek.lower_hz, seekOrigin.parameters,
+                         RADIO_GetReceiverCapabilities(), &first) != RX_OK ||
+        first.device != seekOrigin.device ||
+        !RADIO_ApplyRxPlan(ctx, &first)) {
+      finishSeek(false, 0, "Seek error");
+      return;
+    }
+    seek.cursor_hz = first.frequency_hz;
+    seekAt = now;
+    seekPhase = SEEK_WRAP_SETTLE; // Evaluate the first channel once.
+  }
+  gRedrawScreen = true;
+}
+
 static void request(uint32_t target, RadioParameters values) {
   RxPlan plan;
   RxResult result = RADIO_MODEL_Plan(target, values, RADIO_GetReceiverCapabilities(), &plan);
@@ -150,13 +320,14 @@ void VFO1_init(void) {
   if (initialized)
     return;
   initialized = true;
+  seek.active = false;
   user = gDeviceConfig.radio;
   if (!RADIO_STATE_Valid(&user))
     RADIO_STATE_Default(&user);
   request(user.current.frequency_hz, user.current.parameters);
 }
 
-bool VFO1_isReceiving(void) { return initialized && runtime.active; }
+bool VFO1_isReceiving(void) { return initialized && runtime.active && !seek.active; }
 
 static bool readRds(void *unused, RdsPacket *packet, bool clear_fifo) {
   (void)unused;
@@ -165,7 +336,8 @@ static bool readRds(void *unused, RdsPacket *packet, bool clear_fifo) {
 
 void VFO1_update(void) {
   expireShortcut();
-  bool rdsEnabled = runtime.active && runtime.current.device == RX_DEVICE_SI &&
+  seekUpdate();
+  bool rdsEnabled = !seek.active && runtime.active && runtime.current.device == RX_DEVICE_SI &&
                     runtime.current.parameters.mode == RX_WFM;
   if (RDS_ReceiverUpdate(&rds, Now(), rdsEnabled, readRds, NULL))
     gRedrawScreen = true;
@@ -211,6 +383,11 @@ static void changeValue(bool up) {
 
 bool VFO1_key(KEY_Code_t key, Key_State_t state) {
   expireShortcut();
+  if (seek.active) {
+    if (state == KEY_RELEASED && (key == KEY_EXIT || key == KEY_MENU))
+      finishSeek(false, 0, "Seek cancelled");
+    return true; // Search temporarily owns all controls except cancel.
+  }
   if (key == KEY_PTT) {
     VFO1_cancelShortcut();
     if (state == KEY_PRESSED)
@@ -256,6 +433,8 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
         nextBand();
       else if (key == KEY_0)
         nextMode();
+      else if (key == KEY_STAR)
+        startSeek();
       else if (key != KEY_F && key != KEY_EXIT)
         notify("Not supported");
     }
@@ -298,7 +477,8 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
 
 void VFO1_render(void) {
   char frequencyText[16];
-  STATUSLINE_SetText(functionPending ? "RADIO F" : "RADIO");
+  STATUSLINE_SetText(seek.active ? "SEEK >" :
+                     functionPending ? "RADIO F" : "RADIO");
   if (confirming) {
     const char *unit = UI_FormatFrequency(pending.frequency_hz, frequencyText);
     PrintMediumEx(2, 18, POS_L, C_FILL, "Apply %s?", rxModeNames[pending.parameters.mode]);
@@ -333,15 +513,16 @@ void VFO1_render(void) {
   const RadioParameters *preset = &gDeviceConfig.radio.presets[user.active_band];
   changed = user.current.parameters.mode != preset->mode || user.current.parameters.step_hz != preset->step_hz ||
             user.current.parameters.bandwidth_hz != preset->bandwidth_hz || user.current.parameters.squelch != preset->squelch;
-  uint32_t frequency = user.current.frequency_hz;
+  uint32_t frequency = seek.active ? seek.cursor_hz
+                                   : user.current.frequency_hz;
   UI_VfoView view = {
     .id = 'A', .selected = true,
     .frequency_hz = frequency, .mode = user.current.parameters.mode,
     .band_short = shortBandName(radioBands[user.active_band].name), .changed = changed,
     .name = rds.decoder.ps, .rds = rds.decoder.text,
-    .signal_valid = runtime.active,
-    .signal_level = runtime.active ? UI_SMeterLevel() : 0,
-    .status = !runtime.active ? "RX --" : NULL,
+    .signal_valid = runtime.active && !seek.active,
+    .signal_level = runtime.active && !seek.active ? UI_SMeterLevel() : 0,
+    .status = seek.active ? "SEEK >" : !runtime.active ? "RX --" : NULL,
   };
   UI_VfoRender(8, &view, &card, Now());
   if (message) PrintSmall(0, 43, "%s", message);
