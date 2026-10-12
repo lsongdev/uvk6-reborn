@@ -1,6 +1,6 @@
 #include "hal/system.h"
-#include "hal/dp32g030/pmu.h"
-#include "hal/dp32g030/syscon.h"
+#include "drivers/dp32g030/pmu.h"
+#include "drivers/dp32g030/syscon.h"
 #include "hal/systick.h"
 
 void SYS_DelayMs(uint32_t Delay) { TIMER_DelayUs(Delay * 1000); }

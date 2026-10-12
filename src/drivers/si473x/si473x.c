@@ -1,10 +1,8 @@
-#include "hal/si473x.h"
+#include "drivers/si473x/si473x.h"
 #include "external/printf/printf.h"
-#include "hal/dp32g030/gpio.h"
+#include "drivers/dp32g030/gpio.h"
 #include "core/misc.h"
 #include "core/settings.h"
-#include "apps/system.h"
-#include "hal/audio.h"
 #include "hal/eeprom.h"
 #include "hal/gpio.h"
 #include "hal/i2c.h"
@@ -74,14 +72,10 @@ static bool waitToSend(void) {
   return false; // The receiver must never stall the system indefinitely.
 }
 
-#include "ui/graphics.h" // X_X
 static bool SI47XX_downloadPatch(void) {
   if (!SETTINGS_IsPatchPresent())
     return false;
   // Log("DL patch");
-  FillRect(0, LCD_YCENTER - 4, LCD_WIDTH, 9, C_FILL);
-  PrintMediumBoldEx(LCD_XCENTER, LCD_YCENTER + 3, POS_C, C_INVERT, "WAIT...");
-  ST7565_Blit();
 
   uint8_t buf[64]; // 64 is optimal, more has no sense
   const uint16_t BUF_SIZE = ARRAY_SIZE(buf);

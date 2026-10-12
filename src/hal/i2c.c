@@ -1,8 +1,8 @@
 #include "hal/i2c.h"
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
 #include "external/printf/printf.h"
-#include "hal/dp32g030/gpio.h"
-#include "hal/dp32g030/portcon.h"
+#include "drivers/dp32g030/gpio.h"
+#include "drivers/dp32g030/portcon.h"
 #include "hal/gpio.h"
 #include "hal/systick.h"
 

@@ -16,7 +16,7 @@
 
 #include <stdbool.h>
 
-#include "hal/dp32g030/aes.h"
+#include "drivers/dp32g030/aes.h"
 #include "hal/aes.h"
 
 static void AES_Setup_ENC_CBC(const void *pKey, const void *pIv)

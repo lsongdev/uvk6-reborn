@@ -1,6 +1,6 @@
 #include "hal/scheduler.h"
 #include "hal/systick.h"
-#include "hal/dp32g030/timer.h"
+#include "drivers/dp32g030/timer.h"
 
 static uint32_t elapsedMilliseconds = 0;
 

@@ -1,5 +1,5 @@
 #include "apps/vfo1.h"
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "external/printf/printf.h"
 #include "ui/menu.h"
 #include "core/radio.h"
@@ -49,13 +49,22 @@ static void stopReceiver(void *unused) {
 }
 
 static void apply(const RxPlan *plan) {
-  uint8_t nextBand = RADIO_MODEL_BandAt(plan->frequency_hz);
+  bool needsSsb = plan->parameters.mode == RX_LSB || plan->parameters.mode == RX_USB;
+  bool wasSsb = runtime.active && (runtime.current.parameters.mode == RX_LSB ||
+                                  runtime.current.parameters.mode == RX_USB);
+  if (needsSsb && !wasSsb) {
+    FillRect(0, LCD_YCENTER-4, LCD_WIDTH, 9, C_FILL);
+    PrintMediumBoldEx(LCD_XCENTER, LCD_YCENTER+3, POS_C, C_INVERT, "WAIT...");
+    DISPLAY_Blit();
+  }
   RxTuneResult result = RX_RuntimeTune(&runtime, plan,
                                       applyReceiver, stopReceiver, NULL);
   if (result != RX_APPLIED) {
     notify(result == RX_RESTORED ? "Tune failed" : "RX error");
     return;
   }
+  for (uint8_t i = 0; i < radioBandCount; ++i)
+    user.presets[i] = gDeviceConfig.radio.presets[i];
   if (!RADIO_STATE_Set(&user, plan->frequency_hz, plan->parameters)) {
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
     notify("State error");
@@ -63,7 +72,7 @@ static void apply(const RxPlan *plan) {
   }
   gDeviceConfig.radio = user;
   DEVICE_RequestSave();
-  const RadioParameters *preset = &radioBands[user.active_band].preset;
+  const RadioParameters *preset = &gDeviceConfig.radio.presets[user.active_band];
   changed = user.current.parameters.mode != preset->mode || user.current.parameters.step_hz != preset->step_hz ||
             user.current.parameters.bandwidth_hz != preset->bandwidth_hz || user.current.parameters.squelch != preset->squelch;
   message = NULL;
@@ -109,7 +118,7 @@ static void tuneTo(uint32_t value, uint32_t unused) {
     return;
   }
   RadioParameters values = band == user.active_band ? user.current.parameters
-                                                     : user.bands[band].parameters;
+                                                     : gDeviceConfig.radio.presets[band];
   request(target, values);
 }
 
@@ -135,79 +144,33 @@ void VFO1_update(void) {
 static void nextBand(void) {
   uint8_t band = RADIO_MODEL_NextBand(user.active_band);
   const BandState *saved = &user.bands[band];
-  request(saved->frequency_hz, saved->parameters);
+  request(saved->frequency_hz, gDeviceConfig.radio.presets[band]);
 }
 
 static void nextMode(void) {
-  ReceiverCapabilities capabilities = RADIO_GetReceiverCapabilities();
-  for (uint8_t offset = 1; offset < RX_MODE_COUNT; ++offset) {
-    RadioParameters candidate = user.current.parameters;
-    candidate.mode = (user.current.parameters.mode+offset)%RX_MODE_COUNT;
-    if (candidate.mode == RX_WFM)
-      candidate.bandwidth_hz = 0;
-    uint32_t minimumStep = candidate.mode == RX_WFM ? (capabilities.si ? 10000 : 100000)
-                         : candidate.mode == RX_AM && user.current.frequency_hz <= 30000000 && capabilities.si ? 1000 : 10;
-    if (candidate.step_hz < minimumStep)
-      candidate.step_hz = minimumStep;
-    RxPlan plan;
-    RxResult result = RADIO_MODEL_Plan(user.current.frequency_hz, candidate, capabilities, &plan);
-    if (result == RX_INVALID_PARAMETERS) {
-      candidate.bandwidth_hz = candidate.mode == RX_WFM ? 0
-          : candidate.mode == RX_LSB || candidate.mode == RX_USB ? 3000
-          : candidate.mode == RX_AM ? 6000 : 12000;
-      result = RADIO_MODEL_Plan(user.current.frequency_hz, candidate, capabilities, &plan);
-    }
-    if (result != RX_OK)
-      continue;
+  RadioParameters candidate = user.current.parameters;
+  if (RADIO_MODEL_Adjust(user.current.frequency_hz, &candidate,
+                         RADIO_GetReceiverCapabilities(), RADIO_FIELD_MODE, true))
     request(user.current.frequency_hz, candidate);
-    return;
-  }
-  notify("No other mode");
+  else
+    notify("No other mode");
 }
 
 static void changeValue(bool up) {
-  RadioParameters candidate = user.current.parameters;
   if (menuIndex == 0) {
     nextMode();
     return;
   }
-  if (menuIndex == 1) {
-    static const uint32_t steps[] = {20,50,500,1000,2500,5000,6250,8330,9000,10000,12500,25000,50000,100000,500000};
-    uint8_t index = 0;
-    for (uint8_t i = 0; i < sizeof(steps)/sizeof(steps[0]); ++i)
-      if (steps[i] == candidate.step_hz)
-        index = i;
-    for (uint8_t offset = 1; offset < sizeof(steps)/sizeof(steps[0]); ++offset) {
-      uint8_t i = up ? (index+offset)%15 : (index+15-offset)%15;
-      candidate.step_hz = steps[i];
-      RxPlan plan;
-      if (RADIO_MODEL_Plan(user.current.frequency_hz, candidate, RADIO_GetReceiverCapabilities(), &plan) == RX_OK)
-        break;
-    }
-  } else if (menuIndex == 2) {
-    if (user.current.parameters.mode == RX_WFM) {
-      notify("Fixed bandwidth");
-      return;
-    }
-    static const uint16_t widths[] = {500,1000,1200,1800,2000,2200,2500,3000,4000,6000,7000,9000,10000,12000,14000,17000,20000,23000,26000};
-    uint8_t index = 0;
-    for (uint8_t i = 0; i < sizeof(widths)/sizeof(widths[0]); ++i)
-      if (widths[i] == candidate.bandwidth_hz)
-        index = i;
-    for (uint8_t offset = 1; offset < sizeof(widths)/sizeof(widths[0]); ++offset) {
-      uint8_t i = up ? (index+offset)%19 : (index+19-offset)%19;
-      candidate.bandwidth_hz = widths[i];
-      RxPlan plan;
-      if (RADIO_MODEL_Plan(user.current.frequency_hz, candidate, RADIO_GetReceiverCapabilities(), &plan) == RX_OK)
-        break;
-    }
-  } else if (menuIndex == 3) {
-    candidate.squelch = up ? (candidate.squelch+1)%11 : (candidate.squelch+10)%11;
-  } else {
+  if (menuIndex == 4) {
     gMonitorMode = !gMonitorMode;
     return;
   }
-  request(user.current.frequency_hz, candidate);
+  RadioParameters candidate = user.current.parameters;
+  if (RADIO_MODEL_Adjust(user.current.frequency_hz, &candidate,
+                         RADIO_GetReceiverCapabilities(), (RadioParameterField)menuIndex, up))
+    request(user.current.frequency_hz, candidate);
+  else if (menuIndex == 2 && candidate.mode == RX_WFM)
+    notify("Fixed bandwidth");
 }
 
 bool VFO1_key(KEY_Code_t key, Key_State_t state) {
@@ -252,7 +215,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
     uint8_t band = RADIO_MODEL_BandAt(target);
     if (band != UINT8_MAX)
       request(target, band == user.active_band ? user.current.parameters
-                                               : user.bands[band].parameters);
+                                               : gDeviceConfig.radio.presets[band]);
     return true;
   }
   if (state != KEY_RELEASED)
@@ -311,6 +274,9 @@ void VFO1_render(void) {
     }
     return;
   }
+  const RadioParameters *preset = &gDeviceConfig.radio.presets[user.active_band];
+  changed = user.current.parameters.mode != preset->mode || user.current.parameters.step_hz != preset->step_hz ||
+            user.current.parameters.bandwidth_hz != preset->bandwidth_hz || user.current.parameters.squelch != preset->squelch;
   uint32_t frequency = ctx->tx_state.is_active ? RADIO_GetParam(ctx, PARAM_TX_FREQUENCY_FACT)*10u : user.current.frequency_hz;
   const char *unit = formatFrequency(frequency, frequencyText);
   PrintMediumEx(2, 18, POS_L, C_FILL, "%.10s%s", radioBands[user.active_band].name, changed ? "*" : "");

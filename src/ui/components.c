@@ -1,6 +1,6 @@
 #include "ui/components.h"
 #include "apps/apps.h"
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "core/channels.h"
 #include "core/measurements.h"
 #include <stdint.h>

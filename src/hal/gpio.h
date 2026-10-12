@@ -53,7 +53,7 @@ enum GPIOC_PINS {
 	GPIOC_PIN_BK4819_SCL = 1,
 	GPIOC_PIN_BK4819_SDA = 2,
 
-	GPIOC_PIN_FLASHLIGHT = 3,
+	GPIOC_PIN_AUX_LED = 3, // Original flashlight position, modified to LED.
 
 	GPIOC_PIN_AUDIO_PATH = 4,
 

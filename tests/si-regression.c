@@ -1,4 +1,4 @@
-#include "../src/hal/si473x.c"
+#include "../src/drivers/si473x/si473x.c"
 #include <assert.h>
 #include <string.h>
 
@@ -43,13 +43,6 @@ int EEPROM_ReadBuffer(uint32_t address, void *buffer, uint16_t size) {
   memset(buffer, 0, size);
   return 0;
 }
-void FillRect(int16_t x, int16_t y, int16_t w, int16_t h, Color color) {
-  (void)x; (void)y; (void)w; (void)h; (void)color;
-}
-void PrintMediumBoldEx(uint8_t x, uint8_t y, TextPos pos, Color color, const char *pattern, ...) {
-  (void)x; (void)y; (void)pos; (void)color; (void)pattern;
-}
-void ST7565_Blit(void) {}
 
 int main(void) {
   si4732mode = SI47XX_FM;

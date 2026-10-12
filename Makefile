@@ -22,8 +22,9 @@ BUILD_TAG     := $(shell date -u +'%Y%m%d_%H%M')
 SRC := $(SRC_DIR)/main.c \
        $(filter-out $(SRC_DIR)/core/scan.c,$(wildcard $(SRC_DIR)/core/*.c)) \
        $(wildcard $(SRC_DIR)/hal/*.c) \
+       $(wildcard $(SRC_DIR)/drivers/*/*.c) \
        $(filter-out $(SRC_DIR)/ui/spectrum.c,$(wildcard $(SRC_DIR)/ui/*.c)) \
-       $(addprefix $(SRC_DIR)/apps/,apps.c system.c vfo1.c finput.c settings.c reset.c)
+       $(addprefix $(SRC_DIR)/apps/,apps.c system.c vfo1.c bands.c finput.c settings.c reset.c)
 
 OBJS := $(OBJ_DIR)/hal/start.o \
         $(OBJ_DIR)/external/printf/printf.o \

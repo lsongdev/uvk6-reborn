@@ -1,14 +1,15 @@
+#include "hal/led.h"
 #include "core/radio.h"
 #include "hal/rx-device.h"
 #include "hal/board.h"
 #include "core/dcs.h"
 #include "hal/audio.h"
 #include "hal/backlight.h"
-#include "hal/bk1080.h"
-#include "hal/bk4819-regs.h"
-#include "hal/bk4819.h"
-#include "hal/si473x.h"
-#include "hal/st7565.h"
+#include "drivers/bk1080/bk1080.h"
+#include "drivers/bk4819/bk4819-regs.h"
+#include "drivers/bk4819/bk4819.h"
+#include "drivers/si473x/si473x.h"
+#include "hal/display.h"
 #include "hal/system.h"
 #include "hal/uart.h"
 #include "external/printf/printf.h"
@@ -393,7 +394,7 @@ void RADIO_SetAudioOpen(bool open) {
   else
     toggleBK1080SI4732(open);
 
-  BOARD_ToggleGreen(open);
+  LED_SetGreen(open);
   if (open && gSettings.backlightOnSquelch != BL_SQL_OFF)
     BACKLIGHT_On();
   else if (!open && gSettings.backlightOnSquelch == BL_SQL_OPEN)
@@ -1331,7 +1332,7 @@ bool RADIO_StartTX(VFOContext *ctx) {
   BK4819_SelectFilter(txF);
   BK4819_TuneTo(txF, true);
 
-  BOARD_ToggleRed(gSettings.brightness > 1);
+  LED_SetRed(gSettings.brightness > 1);
   BK4819_PrepareTransmit();
 
   SYS_DelayMs(10);
@@ -1357,7 +1358,7 @@ void RADIO_StopTX(VFOContext *ctx) {
   sendEOT();
 
   ctx->tx_state.is_active = false;
-  BOARD_ToggleRed(false);
+  LED_SetRed(false);
   BK4819_TurnsOffTones_TurnsOnRX();
 
   BK4819_SetupPowerAmplifier(0, 0);

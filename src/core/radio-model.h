@@ -42,6 +42,9 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
                           ReceiverCapabilities capabilities, RxPlan *plan);
 uint32_t RADIO_MODEL_Resolution(RxDevice device, RxMode mode);
 uint32_t RADIO_MODEL_Step(uint32_t frequency_hz, uint32_t step_hz, bool up);
+typedef enum { RADIO_FIELD_MODE, RADIO_FIELD_STEP, RADIO_FIELD_BANDWIDTH, RADIO_FIELD_SQUELCH } RadioParameterField;
+bool RADIO_MODEL_Adjust(uint32_t frequency_hz, RadioParameters *parameters,
+                        ReceiverCapabilities capabilities, RadioParameterField field, bool up);
 bool RADIO_MODEL_CanTransmit(const RxPlan *plan);
 
 #endif

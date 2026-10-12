@@ -7,7 +7,7 @@
 
 #define CONFIG_STORE_SLOT_SIZE 256u
 #define CONFIG_STORE_SLOTS 2u
-#define CONFIG_STORE_FORMAT 1u
+#define CONFIG_STORE_FORMAT 2u
 
 // Explicit on-disk fields. Never serialize C compiler bitfields or structs.
 typedef struct {

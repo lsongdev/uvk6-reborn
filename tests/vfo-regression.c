@@ -19,6 +19,13 @@ static bool failApply;
 DeviceConfig gDeviceConfig;
 bool gDeviceConfigReady = true;
 static unsigned saveRequests;
+void DISPLAY_Blit(void) {}
+void FillRect(int16_t x, int16_t y, int16_t w, int16_t h, Color color) {
+  (void)x; (void)y; (void)w; (void)h; (void)color;
+}
+void PrintMediumBoldEx(uint8_t x, uint8_t y, TextPos pos, Color color, const char *format, ...) {
+  (void)x; (void)y; (void)pos; (void)color; (void)format;
+}
 void DEVICE_RequestSave(void) { ++saveRequests; }
 static uint32_t failFrequency;
 
@@ -150,6 +157,18 @@ int main(void) {
   assert(user.current.frequency_hz == 438500000 && applied == 1);
   press(KEY_EXIT);
   assert(!inMenu && appRuns == 0);
+  // A saved preset is applied on band entry; live overrides never replace it.
+  setup(438500000, fm);
+  gDeviceConfig.radio.presets[6] = (RadioParameters){RX_AM,25000,6000,2,false};
+  press(KEY_SIDE2); // Temporary AM, preserving the edited preset fields.
+  assert(gDeviceConfig.radio.presets[6].step_hz == 25000);
+  press(KEY_SIDE1); // Leave 70cm for LW.
+  tuneTo(43850000, 0); // Enter 70cm again.
+  assert(user.current.parameters.mode == RX_AM && user.current.parameters.step_hz == 25000);
+  assert(user.current.parameters.squelch == 2 && !changed);
+  press(KEY_SIDE2); // Temporary NFM override.
+  assert(gDeviceConfig.radio.presets[6].mode == RX_AM);
+  setup(438500000, fm);
   // A transient failed tune restores the last working receiver.
   failFrequency = 438512500;
   press(KEY_UP);

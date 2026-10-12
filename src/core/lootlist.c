@@ -1,6 +1,6 @@
 #include "core/lootlist.h"
 #include "core/dcs.h"
-#include "hal/bk4819.h"
+#include "drivers/bk4819/bk4819.h"
 #include "external/printf/printf.h"
 #include "core/radio.h"
 #include "hal/scheduler.h"

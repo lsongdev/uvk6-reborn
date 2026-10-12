@@ -7,6 +7,8 @@
 #define HEADER_BANDS 5u
 #define HEADER_SEQUENCE 8u
 #define HEADER_CRC 12u
+_Static_assert(PAYLOAD_START + 1 + 14*(RADIO_STATE_BANDS+1) + 15 + 8*RADIO_STATE_BANDS <= RECORD_BYTES,
+               "Band presets must fit in the existing configuration slot");
 
 static void put16(uint8_t *p, uint16_t n) {
   p[0] = n & 255u; p[1] = n >> 8;
@@ -88,13 +90,21 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
     pref->deviation, pref->bound_240_280
   };
   memcpy(p, values, sizeof(values));
+  p += sizeof(values);
+  for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i) {
+    const RadioParameters *preset = &config->radio.presets[i];
+    put32(p, preset->step_hz);
+    put16(p+4, preset->bandwidth_hz);
+    p[6] = preset->mode; p[7] = preset->squelch;
+    p += 8;
+  }
   put32(bytes + HEADER_CRC, crc32(bytes));
   return true;
 }
 bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
                    uint32_t *sequence) {
   if (!bytes || !config || memcmp(bytes, "UVR2", 4) != 0 ||
-      bytes[HEADER_VERSION] != CONFIG_STORE_FORMAT ||
+      (bytes[HEADER_VERSION] != 1 && bytes[HEADER_VERSION] != CONFIG_STORE_FORMAT) ||
       bytes[HEADER_BANDS] != RADIO_STATE_BANDS ||
       get32(bytes + HEADER_CRC) != crc32(bytes))
     return false;
@@ -112,6 +122,17 @@ bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
     &pref->mic, &pref->deviation, &pref->bound_240_280};
   for (unsigned i = 0; i < sizeof(values)/sizeof(values[0]); ++i)
     *values[i] = *p++;
+  for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i) {
+    if (bytes[HEADER_VERSION] == 1) {
+      // Preserve existing per-band choices when upgrading UVR2 format 1.
+      candidate.radio.presets[i] = candidate.radio.bands[i].parameters;
+    } else {
+      candidate.radio.presets[i] = (RadioParameters){
+          .step_hz = get32(p), .bandwidth_hz = get16(p+4),
+          .mode = (RxMode)p[6], .squelch = p[7], .tx_enabled = false};
+      p += 8;
+    }
+  }
   if (!valid(&candidate))
     return false;
   *config = candidate;

@@ -1,6 +1,6 @@
 #include "hal/audio.h"
-#include "hal/dp32g030/gpio.h"
-#include "hal/bk4819.h"
+#include "drivers/dp32g030/gpio.h"
+#include "drivers/bk4819/bk4819.h"
 #include "hal/gpio.h"
 #include "hal/system.h"
 

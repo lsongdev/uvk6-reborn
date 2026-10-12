@@ -1,7 +1,7 @@
 #ifndef DRIVER_BK4819_h
 #define DRIVER_BK4819_h
 
-#include "hal/bk4819-regs.h"
+#include "drivers/bk4819/bk4819-regs.h"
 #include "core/measurements.h"
 #include <stdbool.h>
 #include <stdint.h>

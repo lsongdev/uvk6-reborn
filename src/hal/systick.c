@@ -1,6 +1,6 @@
 #include "hal/systick.h"
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
-#include "hal/dp32g030/timer.h"
+#include "drivers/dp32g030/timer.h"
 /* 48 MHz PCLK  →  DIV = 47  gives exactly 1 MHz tick (1 µs) */
 #define TICKS_PER_US 1
 #define TICKS_PER_MS 1000

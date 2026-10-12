@@ -4,9 +4,9 @@ Experimental fork of [Hawk5](https://github.com/fagci/hawk5) for the
 DP32G030-based Quansheng UV-K6, including radios modified with SI4732.
 
 The minimal-radio refactor provides one VFO, explicit demodulation modes,
-built-in band defaults, per-band last-used parameters, UVR2 persistence and
-automatic receiver selection. A dedicated band preset editor and validated
-transmit routing remain planned; transmission is currently disabled. See the
+built-in band defaults, an independent band preset editor, UVR2 persistence
+and automatic receiver selection. Validated transmit routing remains planned;
+transmission is currently disabled. See the
 [user manual](docs/user-manual.md) for current controls and the
 [implementation status](docs/refactor-progress.md) before testing.
 

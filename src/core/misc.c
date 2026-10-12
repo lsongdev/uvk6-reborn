@@ -1,5 +1,5 @@
 #include "core/misc.h"
-#include "hal/bk4819.h"
+#include "drivers/bk4819/bk4819.h"
 #include "external/printf/printf.h"
 
 char IsPrintable(char ch) { return (ch < 32 || 126 < ch) ? ' ' : ch; }

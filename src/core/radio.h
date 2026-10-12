@@ -1,7 +1,7 @@
 #ifndef RADIO_H
 #define RADIO_H
 
-#include "hal/bk4819.h"
+#include "drivers/bk4819/bk4819.h"
 #include "core/radio-model.h"
 #include "core/channels.h"
 #include "core/lootlist.h"

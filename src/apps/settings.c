@@ -104,8 +104,17 @@ static Menu batteryMenu = {.title = "Battery",
                            .items = batMenuItems,
                            .num_items = ARRAY_SIZE(batMenuItems)};
 
+static bool openBands(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
+  (void)item;
+  if (key != KEY_MENU || state != KEY_RELEASED)
+    return false;
+  APPS_run(APP_BANDS);
+  return true;
+}
+
 // Main menu
 static const MenuItem menuItems[] = {
+    {"Bands", .action = openBands},
     {"SQL", .submenu = &sqlMenu},
     {"Radio", .submenu = &radioMenu},
     {"Display", .submenu = &displayMenu},

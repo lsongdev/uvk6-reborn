@@ -1,6 +1,6 @@
 #include "hal/backlight.h"
-#include "hal/dp32g030/portcon.h"
-#include "hal/dp32g030/pwmplus.h"
+#include "drivers/dp32g030/portcon.h"
+#include "drivers/dp32g030/pwmplus.h"
 #include "core/settings.h"
 #include "hal/system.h"
 

@@ -1,6 +1,6 @@
 #include "core/scan.h"
 #include "apps/apps.h"
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "hal/system.h"
 #include "hal/systick.h"
 #include "hal/uart.h"
