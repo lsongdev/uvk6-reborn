@@ -13,6 +13,7 @@ bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index) {
   if (hz != 12000 && hz != 6000) return false;
   *index = hz == 12000 ? 4 : 0; return true;
 }
+bool BK4819_IsSquelchOpen(void) { return true; }
 void BK4819_Idle(void) { ++bkIdle; }
 void BK4819_RX_TurnOn(void) {}
 void BK4819_SetModulation(ModulationType mode) {
@@ -42,9 +43,21 @@ bool SI47XX_SetSsbBandwidth(SI47XX_SsbFilterBW bw) {
 bool SI47XX_SetBandwidth(SI47XX_FilterBW bw, bool amp) {
   (void)bw; (void)amp; return siBandwidthOk;
 }
+bool RSQ_GET(void) { return true; }
+RSQStatus rsqStatus;
+bool SI47XX_SeekStart(uint32_t lo, uint32_t hi, uint32_t step) {
+  (void)lo; (void)hi; (void)step; return true;
+}
+SiSeekResult SI47XX_SeekPoll(uint32_t *frequency_hz) {
+  *frequency_hz = 100100000; return SI_SEEK_FOUND;
+}
+void SI47XX_SeekCancel(void) {}
 void SI47XX_PowerDown(void) { ++siPowerDowns; }
 bool SI47XX_SetVolume(uint8_t v) {
   if (!v) ++siMuted; return siVolumeOk;
+}
+uint16_t BK1080_ReadRegister(BK1080_Register_t reg) {
+  (void)reg; return 0x003f;
 }
 bool BK1080_Init(uint32_t hz10, bool enable) {
   assert(hz10 == 10000000u && enable);
@@ -60,6 +73,16 @@ static RxPlan plan(uint32_t hz, RxMode mode, RxDevice device) {
 }
 int main(void) {
   RxPlan bk = plan(100000000, RX_NFM, RX_DEVICE_BK);
+  RxPlan native = plan(100000000, RX_WFM, RX_DEVICE_SI);
+  uint32_t found = 0;
+  assert(RX_DEVICE_SeekNative(&native));
+  assert(RX_DEVICE_SeekStart(&native, 64000000, 108000000));
+  assert(RX_DEVICE_SeekPoll(RX_DEVICE_SI, &found) == RX_SEEK_FOUND);
+  assert(found == 100100000);
+  assert(!RX_DEVICE_SeekNative(&bk));
+  assert(!RX_DEVICE_SeekStart(&bk, 64000000, 108000000));
+  bool signal;
+  assert(RX_DEVICE_SeekSignal(RX_DEVICE_BK, &signal) && signal);
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BK));
   assert(bkTunes == 1 && lastBkHz10 == 10000000u && bkModes == 1);
   RxPlan bkNext = plan(100012500, RX_NFM, RX_DEVICE_BK);
