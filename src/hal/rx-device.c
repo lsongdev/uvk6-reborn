@@ -46,7 +46,9 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
   if (!plan || plan->frequency_hz < RADIO_MIN_HZ ||
       plan->frequency_hz > RADIO_MAX_HZ ||
       plan->frequency_hz % 10u ||
-      (unsigned)plan->parameters.mode >= RX_MODE_COUNT)
+      (unsigned)plan->parameters.mode >= RX_MODE_COUNT ||
+      !TONE_Valid(plan->parameters.rx_tone) ||
+      (plan->parameters.rx_tone && (plan->device != RX_DEVICE_BK || plan->parameters.mode != RX_NFM)))
     return false;
 
   const uint32_t frequency = plan->frequency_hz / 10u; // Drivers use 10 Hz.
@@ -86,6 +88,7 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
                 bkPrevious.parameters.mode == mode &&
                 bkPrevious.parameters.bandwidth_hz == plan->parameters.bandwidth_hz &&
                 bkPrevious.parameters.squelch == plan->parameters.squelch &&
+                bkPrevious.parameters.rx_tone == plan->parameters.rx_tone &&
                 bkSqlOpenTime == gSettings.sqlOpenTime &&
                 bkSqlCloseTime == gSettings.sqlCloseTime;
   uint32_t oldBkFrequency = bkPrevious.frequency_hz;
@@ -109,6 +112,20 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
                     (frequency < SETTINGS_GetFilterBound())))
       BK4819_SelectFilterEx(frequency < SETTINGS_GetFilterBound()
                               ? FILTER_VHF : FILTER_UHF);
+    if (!fastBk || oldBkFrequency != plan->frequency_hz) {
+      RadioTone tone = plan->parameters.rx_tone;
+      if (!tone) {
+        BK4819_ExitSubAu();
+        BK4819_WriteRegister(BK4819_REG_3F, 0);
+      } else {
+        DCS_CodeType_t type = TONE_Type(tone);
+        if (type == CODE_TYPE_CONTINUOUS_TONE)
+          BK4819_SetCTCSSFrequency(CTCSS_Options[TONE_Code(tone)]);
+        else
+          BK4819_SetCDCSSCodeWord(DCS_GetGolayCodeWord(type, TONE_Code(tone)));
+        BK4819_CssResetDetection(type != CODE_TYPE_CONTINUOUS_TONE);
+      }
+    }
     if (!fastBk || oldBkFrequency != plan->frequency_hz)
       BK4819_TuneTo(frequency, true);
     bkPrevious = *plan;

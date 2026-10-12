@@ -113,6 +113,8 @@ uint8_t BK4819_GetAttenuation();
 
 void BK4819_ToggleGpioOut(BK4819_GPIO_PIN_t Pin, bool bSet);
 
+void BK4819_CssResetDetection(bool digital);
+bool BK4819_CssIsDetected(bool digital);
 void BK4819_SetCDCSSCodeWord(uint32_t CodeWord);
 void BK4819_SetCTCSSFrequency(uint32_t BaudRate);
 void BK4819_SetTailDetection(const uint32_t freq_10Hz);

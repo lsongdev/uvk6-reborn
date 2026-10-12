@@ -4,6 +4,7 @@
 
 void UI_RSSIBar(uint8_t y);
 uint8_t UI_SMeterLevel(void);
-void UI_SignalBar(uint8_t x, uint8_t y, uint8_t level);
+// Eight ascending columns; baseline is the bottom row, level is 0..14.
+void UI_SignalIcon(uint8_t x, uint8_t baseline, uint8_t level);
 void UI_SMeter(uint8_t y);
 #endif

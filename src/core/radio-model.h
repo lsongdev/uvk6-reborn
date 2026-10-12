@@ -1,6 +1,7 @@
 #ifndef RADIO_MODEL_H
 #define RADIO_MODEL_H
 
+#include "core/tone.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -12,6 +13,7 @@ typedef struct {
   uint32_t step_hz;
   uint32_t bandwidth_hz; // Zero means fixed bandwidth (WFM).
   uint8_t squelch;
+  RadioTone rx_tone; // Off or a CTCSS/DCS option, NFM only.
 } RadioParameters;
 typedef struct {
   const char *name;
@@ -41,7 +43,7 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
                           ReceiverCapabilities capabilities, RxPlan *plan);
 uint32_t RADIO_MODEL_Resolution(RxDevice device, RxMode mode);
 uint32_t RADIO_MODEL_Step(uint32_t frequency_hz, uint32_t step_hz, bool up);
-typedef enum { RADIO_FIELD_MODE, RADIO_FIELD_STEP, RADIO_FIELD_BANDWIDTH, RADIO_FIELD_SQUELCH } RadioParameterField;
+typedef enum { RADIO_FIELD_MODE, RADIO_FIELD_STEP, RADIO_FIELD_BANDWIDTH, RADIO_FIELD_SQUELCH, RADIO_FIELD_RX_TONE } RadioParameterField;
 bool RADIO_MODEL_Adjust(uint32_t frequency_hz, RadioParameters *parameters,
                         ReceiverCapabilities capabilities, RadioParameterField field, bool up);
 

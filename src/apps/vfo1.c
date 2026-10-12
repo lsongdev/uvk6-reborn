@@ -22,13 +22,6 @@
 #include "apps/finput.h"
 #include <string.h>
 
-static const char *shortBandName(const char *name) {
-  if (!strcmp(name, "FM Radio")) return "FM";
-  if (!strcmp(name, "Airband")) return "AIR";
-  if (!strcmp(name, "70cm")) return "70c";
-  return name;
-}
-
 static bool initialized;
 static UI_VfoState card;
 static RxRuntime runtime;
@@ -38,6 +31,7 @@ static bool changed;
 static bool inMenu;
 static bool confirming;
 static uint8_t menuIndex;
+enum { MENU_CHANNEL_NAME = 9, MENU_CHANNEL_SAVE, MENU_ITEM_COUNT };
 static RadioUserState user; // Current UI state, committed only on successful RX.
 static RxPlan pending;
 static const char *message;
@@ -153,8 +147,9 @@ static void apply(const RxPlan *plan) {
   DEVICE_RequestSave();
   const RadioParameters *preset = &gDeviceConfig.radio.presets[user.active_band];
   changed = user.current.parameters.mode != preset->mode || user.current.parameters.step_hz != preset->step_hz ||
-            user.current.parameters.bandwidth_hz != preset->bandwidth_hz || user.current.parameters.squelch != preset->squelch;
+            user.current.parameters.bandwidth_hz != preset->bandwidth_hz || user.current.parameters.squelch != preset->squelch || user.current.parameters.rx_tone != preset->rx_tone;
   message = NULL;
+  UI_VfoShowFrequency(&card, Now());
 }
 
 // Forward-only seek owns temporary RF tuning; RxRuntime retains the last
@@ -415,13 +410,48 @@ static void nextMode(void) {
     notify("No other mode");
 }
 
+static void setTxFrequency(uint32_t value, uint32_t unused) {
+  (void)unused;
+  if (value > UINT32_MAX/10u || !TX_MODEL_FrequencyValid(value*10u)) {
+    inMenu = false;
+    notify("Invalid TX freq");
+    return;
+  }
+  gDeviceConfig.tx.frequency_hz = value*10u;
+  DEVICE_RequestSave();
+  notify("TX freq saved");
+}
+
 static void changeValue(bool up) {
+  if (menuIndex == MENU_CHANNEL_NAME || menuIndex == MENU_CHANNEL_SAVE) {
+    notify("Not implemented");
+    return;
+  }
   if (menuIndex == 0) {
     nextMode();
     return;
   }
-  if (menuIndex == 4) {
-    gMonitorMode = !gMonitorMode;
+  if (menuIndex == 7) {
+    if (!up) {
+      gDeviceConfig.tx.frequency_hz = 0;
+      DEVICE_RequestSave();
+    } else {
+      gFInputValue1 = (gDeviceConfig.tx.frequency_hz ? gDeviceConfig.tx.frequency_hz : user.current.frequency_hz)/10u;
+      gFInputValue2 = 0;
+      gFInputCallback = setTxFrequency;
+      FINPUT_setup(0, 130000000u, UNIT_MHZ, false);
+      APPS_run(APP_FINPUT);
+      STATUSLINE_SetText("TX Frequency");
+    }
+    return;
+  }
+  if (menuIndex == 8) {
+    gDeviceConfig.tx.tone = TONE_Next(gDeviceConfig.tx.tone, up);
+    DEVICE_RequestSave();
+    return;
+  }
+  if (menuIndex == 4 && user.current.parameters.mode != RX_NFM) {
+    notify("Tone: NFM only");
     return;
   }
   if (menuIndex == 5) {
@@ -513,7 +543,8 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       if (key == KEY_EXIT)
         inMenu = false;
       else if (key == KEY_UP || key == KEY_DOWN)
-        menuIndex = key == KEY_DOWN ? (menuIndex+1)%7 : (menuIndex+6)%7;
+        menuIndex = key == KEY_DOWN ? (menuIndex+1)%MENU_ITEM_COUNT
+                                   : (menuIndex+MENU_ITEM_COUNT-1)%MENU_ITEM_COUNT;
       else if (key == KEY_STAR || key == KEY_F || key == KEY_MENU)
         changeValue(key != KEY_F);
     }
@@ -587,32 +618,52 @@ void VFO1_render(void) {
   }
   if (inMenu) {
     static const char *const names[] = {
-      "Mode", "Step", "BW", "SQ", "Monitor", "TX Enable", "TX Power"
+      "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone", "TX Enable", "TX Power", "TX Frequency", "TX Tone", "Name", "Save"
     };
-    uint8_t first = menuIndex < 4 ? 0 : menuIndex - 3;
-    for (uint8_t i = first; i < 7 && i < first + 4; ++i) {
+    _Static_assert(sizeof(names)/sizeof(names[0]) == MENU_ITEM_COUNT,
+                   "Every VFO menu item needs a label");
+    uint8_t first = menuIndex < 5 ? 0 : menuIndex-4;
+    for (uint8_t i = first; i < MENU_ITEM_COUNT && i < first+5; ++i) {
       uint8_t y = 17+(i-first)*11;
       PrintMediumEx(2, y, POS_L, C_FILL, "%s", names[i]);
       if (i == 0)
         PrintSmallEx(124, y, POS_R, C_FILL, "%s", rxModeNames[user.current.parameters.mode]);
-      else if (i == 1)
-        PrintSmallEx(124, y, POS_R, C_FILL, "%u Hz", user.current.parameters.step_hz);
+      else if (i == 1) {
+        const char *unit = UI_FormatFrequency(user.current.parameters.step_hz, frequencyText);
+        PrintSmallEx(124, y, POS_R, C_FILL, "%s %s", frequencyText, unit);
+      }
       else if (i == 2) {
         if (user.current.parameters.mode == RX_WFM)
           PrintSmallEx(124, y, POS_R, C_FILL, "Fixed");
-        else
-          PrintSmallEx(124, y, POS_R, C_FILL, "%u Hz", user.current.parameters.bandwidth_hz);
+        else {
+          const char *unit = UI_FormatFrequency(user.current.parameters.bandwidth_hz, frequencyText);
+          PrintSmallEx(124, y, POS_R, C_FILL, "%s %s", frequencyText, unit);
+        }
       } else if (i == 3)
         PrintSmallEx(124, y, POS_R, C_FILL, "%u", user.current.parameters.squelch);
-      else if (i == 4)
-        PrintSmallEx(124, y, POS_R, C_FILL, "%s", gMonitorMode ? "On" : "Off");
+      else if (i == 4 || i == 8) {
+        char toneText[24];
+        if (i == 4 && user.current.parameters.mode != RX_NFM)
+          snprintf(toneText,sizeof(toneText),"NFM only");
+        else
+          TONE_Format(i == 4 ? user.current.parameters.rx_tone : gDeviceConfig.tx.tone, toneText);
+        PrintSmallEx(124, y, POS_R, C_FILL, "%s", toneText);
+      }
       else if (i == 5)
         PrintSmallEx(124, y, POS_R, C_FILL, "%s", gDeviceConfig.tx.enabled ? "On" : "Off");
-      else {
+      else if (i == 7) {
+        if (!gDeviceConfig.tx.frequency_hz) PrintSmallEx(124,y,POS_R,C_FILL,"Same");
+        else {
+          const char *unit = UI_FormatFrequency(gDeviceConfig.tx.frequency_hz,frequencyText);
+          PrintSmallEx(124,y,POS_R,C_FILL,"%s %s",frequencyText,unit);
+        }
+      } else if (i == 6) {
         static const char *const powers[] = {"Low", "Medium", "High"};
         PrintSmallEx(124, y, POS_R, C_FILL, "%s",
                      powers[gDeviceConfig.tx.power <= TX_POWER_HIGH ?
                             gDeviceConfig.tx.power : 0]);
+      } else {
+        PrintSmallEx(124,y,POS_R,C_FILL,"Not implemented");
       }
       if (i == menuIndex)
         FillRect(0, y-7, 128, 10, C_INVERT);
@@ -621,19 +672,23 @@ void VFO1_render(void) {
   }
   const RadioParameters *preset = &gDeviceConfig.radio.presets[user.active_band];
   changed = user.current.parameters.mode != preset->mode || user.current.parameters.step_hz != preset->step_hz ||
-            user.current.parameters.bandwidth_hz != preset->bandwidth_hz || user.current.parameters.squelch != preset->squelch;
+            user.current.parameters.bandwidth_hz != preset->bandwidth_hz || user.current.parameters.squelch != preset->squelch || user.current.parameters.rx_tone != preset->rx_tone;
   uint32_t frequency = seek.active ? seek.cursor_hz
                                    : user.current.frequency_hz;
   UI_VfoView view = {
     .id = 'A', .selected = true,
     .frequency_hz = frequency, .mode = user.current.parameters.mode,
-    .band_short = shortBandName(radioBands[user.active_band].name), .changed = changed,
+    .band_name = radioBands[user.active_band].name, .changed = changed,
+    .step_hz = user.current.parameters.step_hz,
     .name = rds.decoder.ps, .rds = rds.decoder.text,
-    .signal_valid = runtime.active && !seek.active,
+    .signal_valid = runtime.active && !seek.active && transmitter.mode == RADIO_RX,
     .signal_level = runtime.active && !seek.active ? UI_SMeterLevel() : 0,
-    .status = transmitter.mode == RADIO_TX ? "TX" :
-              transmitter.mode == RADIO_FAULT ? "TX Fault" :
-              seek.active ? "SEEK >" : !runtime.active ? "RX --" : NULL,
+    .activity = transmitter.mode == RADIO_TX ? UI_VFO_TRANSMITTING :
+                transmitter.mode == RADIO_FAULT ? UI_VFO_FAULT :
+                seek.active ? UI_VFO_SEEKING : !runtime.active ? UI_VFO_UNAVAILABLE :
+                vfo->is_open ? UI_VFO_RECEIVING : UI_VFO_IDLE,
+    .power_label = gDeviceConfig.tx.power == TX_POWER_HIGH ? "HIGH" :
+                   gDeviceConfig.tx.power == TX_POWER_MEDIUM ? "MID" : "LOW",
   };
   UI_VfoRender(8, &view, &card, Now());
   if (message) PrintSmall(0, 43, "%s", message);

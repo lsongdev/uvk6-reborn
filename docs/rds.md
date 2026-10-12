@@ -2,11 +2,11 @@
 
 2026-10-12：当前单 VFO 在 **SI4732 接收路径 + WFM 模式** 下轮询 RDS。BK4819 的 NFM/AM、SI4732 的 AM/SSB 和 BK1080 接收路径不读取 RDS。
 
-当前支持 PI 电台识别码、0A/0B 的 8 字符 Programme Service（PS）电台名，以及 2A 的最多 64 字符、2B 的最多 32 字符 RadioText。PS 与 RadioText 放在同一个名称区域，以 ` / ` 拼接，只有一个时直接显示；超宽滚动。获得文本后名称在上、频率在下，二者同字号；无文本时显示大字号频率。VFO 自定义名称编辑尚未实现。
+当前支持 PI 电台识别码、0A/0B 的 8 字符 Programme Service（PS）电台名，以及 2A 的最多 64 字符、2B 的最多 32 字符 RadioText。PS 与 RadioText 放在同一个名称区域，以 ` / ` 拼接，只有一个时直接显示；超宽滚动。调谐后大字号频率保持 1 秒，有文本时正文切换为名称，完整频率移入黑底横条；再次调谐恢复大字号频率。无文本时保持频率。布局见 [VFO 首屏布局](ui-layout.md)。VFO 自定义名称编辑尚未实现。
 
-![RDS 解码显示预览](images/rds-preview.png)
+![当前频率与名称布局](images/vfo-states.png)
 
-右图使用实际解析器处理模拟 RDS 数据组后渲染，不是实机收台截图。运行 `python3 tools/ui-preview.py --frames plain rds --output docs/images/rds-preview.png` 可重建。
+上图为当前组件的频率／名称状态示例，不是实机收台截图。运行 `python3 tools/ui-preview.py` 可重建；如需查看模拟 RDS 数据组经过实际解析器的显示，运行 `python3 tools/ui-preview.py --frames plain rds --output /tmp/vfo-rds.png`。
 
 ## 数据链路
 

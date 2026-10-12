@@ -8,7 +8,7 @@
 #define HEADER_SEQUENCE 8u
 #define HEADER_CRC 12u
 _Static_assert(PAYLOAD_START + 1 + 14*(RADIO_STATE_BANDS+1) + 18 +
-               8*RADIO_STATE_BANDS + 5 <= RECORD_BYTES,
+               8*RADIO_STATE_BANDS + 5 + 2*(2*RADIO_STATE_BANDS+1) + 6 <= RECORD_BYTES,
                "Band presets must fit in the existing configuration slot");
 
 static void put16(uint8_t *p, uint16_t n) {
@@ -65,6 +65,7 @@ static bool valid(const DeviceConfig *config) {
   const ConfigPreferences *p = &config->preferences;
   return RADIO_STATE_Valid(&config->radio) &&
          (unsigned)config->tx.power <= TX_POWER_HIGH &&
+         TONE_Valid(config->tx.tone) && TX_MODEL_FrequencyValid(config->tx.frequency_hz) &&
          p->tx_timeout_seconds >= 15 && p->tx_timeout_seconds <= 600 &&
          p->tx_busy_lockout <= 1 &&
          p->battery_calibration >= 1900 && p->battery_calibration <= 2154 &&
@@ -113,13 +114,21 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
   *p++ = (uint8_t)config->tx.power;
   put16(p, pref->tx_timeout_seconds); p += 2;
   *p++ = pref->tx_busy_lockout;
+  // Format 5 appends fields; format 4's payload offsets stay unchanged.
+  put16(p, config->radio.current.parameters.rx_tone); p += 2;
+  for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
+    put16(p, config->radio.bands[i].parameters.rx_tone); p += 2;
+    put16(p, config->radio.presets[i].rx_tone); p += 2;
+  }
+  put16(p, config->tx.tone); p += 2;
+  put32(p, config->tx.frequency_hz);
   put32(bytes + HEADER_CRC, crc32(bytes));
   return true;
 }
 bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
                    uint32_t *sequence) {
   if (!bytes || !config || memcmp(bytes, "UVR2", 4) != 0 ||
-      bytes[HEADER_VERSION] != CONFIG_STORE_FORMAT ||
+      (bytes[HEADER_VERSION] != CONFIG_STORE_FORMAT && bytes[HEADER_VERSION] != 4u) ||
       bytes[HEADER_BANDS] != RADIO_STATE_BANDS ||
       get32(bytes + HEADER_CRC) != crc32(bytes))
     return false;
@@ -150,6 +159,16 @@ bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
   candidate.tx.power = (TxPower)p[1];
   candidate.preferences.tx_timeout_seconds = get16(p+2);
   candidate.preferences.tx_busy_lockout = p[4];
+  if (bytes[HEADER_VERSION] == CONFIG_STORE_FORMAT) {
+    p += 5;
+    candidate.radio.current.parameters.rx_tone = get16(p); p += 2;
+    for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
+      candidate.radio.bands[i].parameters.rx_tone = get16(p); p += 2;
+      candidate.radio.presets[i].rx_tone = get16(p); p += 2;
+    }
+    candidate.tx.tone = get16(p); p += 2;
+    candidate.tx.frequency_hz = get32(p);
+  } // Valid format 4 keeps all settings, defaulting new fields to Off/Same.
   if (!valid(&candidate))
     return false;
   *config = candidate;

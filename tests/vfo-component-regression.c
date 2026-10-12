@@ -13,6 +13,25 @@ static void sameRows(unsigned first, unsigned last) {
       assert(GetPixel(x,y) == !!(saved[y/8][x] & (1<<(y%8))));
 }
 int main(void) {
+  // Names use 14 px capitals, matching the main frequency's digit height.
+  memset(gFrameBuffer,0,sizeof(gFrameBuffer));
+  UI_LargeBoldTextWindow(30,22,98,"A",0);
+  unsigned inkRows=0;
+  for(unsigned y=0;y<64;++y) {
+    bool ink=false;
+    for(unsigned x=30;x<128;++x) ink |= GetPixel(x,y);
+    inkRows += ink;
+  }
+  assert(inkRows == 14);
+  // Odd-pixel scrolling must clip scaled pixels and retain descenders.
+  memset(gFrameBuffer,0,sizeof(gFrameBuffer));
+  UI_LargeBoldTextWindow(30,22,98,"Agjp WWWWWWWWW",1);
+  bool descender=false;
+  for(unsigned y=0;y<64;++y) for(unsigned x=0;x<128;++x) {
+    if(x<30 || y<9 || y>25) assert(!GetPixel(x,y));
+    if(y==25 && GetPixel(x,y)) descender=true;
+  }
+  assert(descender);
   const struct { uint32_t frequency; const char *text, *unit; } cases[] = {
     {103900000,"103.900","MHz"},
     {410000,"410","kHz"},
@@ -34,41 +53,68 @@ int main(void) {
     assert(!strcmp(text,cases[i].text));
   }
   UI_VfoState a={0}, b={0};
-  UI_VfoView view={.id='A',.selected=true,.frequency_hz=1340000000,.mode=RX_NFM,
-                  .band_short="UHF",.changed=true,.name="Main receiver",.signal_valid=true,.signal_level=14};
-  view.frequency_hz=103900000;
-  UI_VfoRender(8,&view,&a,0);
-  memcpy(saved,gFrameBuffer,sizeof(saved));
-  view.frequency_hz=1339999980;
-  UI_VfoRender(8,&view,&a,0);
-  for (unsigned y=8;y<28;++y) for (unsigned x=0;x<128;++x)
-    if (x<12 || x>=114)
-      assert(GetPixel(x,y) == !!(saved[y/8][x] & (1<<(y%8))));
+  UI_VfoView view={.id='A',.selected=true,.frequency_hz=103900000,.step_hz=100000,
+    .mode=RX_WFM,.band_name="FM Radio",.name="Main receiver",
+    .activity=UI_VFO_RECEIVING,.signal_valid=true,.signal_level=14};
   memset(gFrameBuffer,0xaa,sizeof(gFrameBuffer));
   memcpy(saved,gFrameBuffer,sizeof(saved));
-  UI_VfoRender(8,&view,&a,0);
-  sameRows(0,8); sameRows(28,64);
-  assert(!strcmp(a.label,"Main receiver") && !a.overflow);
+  UI_VfoRender(8,&view,&a,100);
+  sameRows(0,8); sameRows(36,64);
+  assert(!a.show_name && !UI_VfoUpdate(&a,1099));
+  assert(UI_VfoUpdate(&a,1100) && a.show_name);
+  UI_VfoRender(8,&view,&a,1100);
+  assert(!strcmp(a.label,"Main receiver"));
+  UI_VfoShowFrequency(&a,1200);
+  UI_VfoRender(8,&view,&a,1200);
+  assert(!a.show_name); // Same-frequency retune starts a fresh hold.
+  assert(!UI_VfoUpdate(&a,2199));
+  assert(UI_VfoUpdate(&a,2200));
+  view.frequency_hz=1339999980;view.mode=RX_NFM;view.band_name="UHF";
+  UI_VfoRender(8,&view,&a,2300);
+  assert(!a.show_name && a.tuned_at == 2300);
+  for(unsigned y=17;y<34;++y) {
+    assert(!GetPixel(28,y) && !GetPixel(29,y)); // Longest frequency cannot hit status.
+  }
   memcpy(saved,gFrameBuffer,sizeof(saved));
-  view=(UI_VfoView){.id='B',.frequency_hz=401000,.mode=RX_AM,.band_short="LW",.rds="Radio text"};
-  UI_VfoRender(28,&view,&b,0);
-  sameRows(0,28);
-  assert(!strcmp(b.label,"Radio text"));
-  view.name="Very long station name";
-  view.rds="Another long radio text message";
-  UI_VfoRender(28,&view,&b,100);
+  view=(UI_VfoView){.id='B',.frequency_hz=401000,.step_hz=1000,.mode=RX_AM,
+    .band_name="Longwave",.rds="Radio text"};
+  UI_VfoRender(36,&view,&b,2300);
+  sameRows(0,36);
+  view.name="Very long station name";view.rds="Another long radio text message";
+  UI_VfoRender(36,&view,&b,2400);
   assert(!strcmp(b.label,"Very long station name / Another long radio text message"));
-  assert(b.overflow && !UI_VfoUpdate(&b,1000));
+  assert(!b.show_name && b.overflow);
+  assert(UI_VfoUpdate(&b,3300));
+  UI_VfoRender(36,&view,&b,3300);
+  assert(!b.offset && !UI_VfoUpdate(&b,4499));
   memcpy(saved,gFrameBuffer,sizeof(saved));
-  assert(UI_VfoUpdate(&b,2000) && b.offset > 0);
-  UI_VfoRender(28,&view,&b,2000);
-  sameRows(0,28); sameRows(36,64); // Scroll cannot alter frequency or other VFO.
+  assert(UI_VfoUpdate(&b,4650) && b.offset == 1);
+  UI_VfoRender(36,&view,&b,4650);
+  sameRows(0,44); sameRows(62,64);
+  for(unsigned y=44;y<62;++y) for(unsigned x=0;x<30;++x)
+    assert(GetPixel(x,y) == !!(saved[y/8][x] & (1<<(y%8))));
+  view.name=NULL;view.rds=NULL;UI_VfoRender(36,&view,&b,4700);
+  assert(!b.show_name && !b.label[0] && !b.overflow && !b.offset);
+  view.name="Late RDS";UI_VfoRender(36,&view,&b,4800);
+  assert(b.show_name); // RDS arriving after the hold can be shown immediately.
+  view.activity=UI_VFO_SEEKING;UI_VfoRender(36,&view,&b,4900);
+  assert(!b.show_name && !UI_VfoUpdate(&b,10000));
+  view.activity=UI_VFO_IDLE;UI_VfoRender(36,&view,&b,10000);
+  assert(!b.show_name); // Search holds frequency until its last activity expires.
+  assert(!UI_VfoUpdate(&b,10999));
+  assert(UI_VfoUpdate(&b,11000));
+  view.band_name="Very long custom band name that must never overlap the frequency or mode";
+  UI_VfoRender(36,&view,&b,11001);
+  assert(b.band_overflow);
   memcpy(saved,gFrameBuffer,sizeof(saved));
-  view.name=NULL; view.rds=NULL;
-  UI_VfoRender(28,&view,&b,2100);
-  for (unsigned y=28;y<48;++y) for (unsigned x=0;x<128;++x)
-    if (x<12 || x>=117)
-      assert(GetPixel(x,y) == !!(saved[y/8][x] & (1<<(y%8))));
-  assert(!b.label[0] && !b.overflow && !b.offset);
+  assert(UI_VfoUpdate(&b,12351));UI_VfoRender(36,&view,&b,12351);
+  for(unsigned y=36;y<44;++y) for(unsigned x=14+b.band_width;x<128;++x)
+    assert(GetPixel(x,y) == !!(saved[y/8][x] & (1<<(y%8))));
+  memcpy(saved,gFrameBuffer,sizeof(saved));UI_VfoRender(37,&view,&b,13000);
+  sameRows(0,64); // Out-of-bounds cards never touch the framebuffer.
+  a=(UI_VfoState){0};view.band_name="LW";
+  UI_VfoRender(8,&view,&a,UINT32_MAX-500);
+  assert(!UI_VfoUpdate(&a,498));
+  assert(UI_VfoUpdate(&a,499) && a.show_name);
   return 0;
 }

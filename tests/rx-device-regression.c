@@ -13,6 +13,13 @@ bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index) {
   if (hz != 12000 && hz != 6000) return false;
   *index = hz == 12000 ? 4 : 0; return true;
 }
+static uint32_t lastCtcss, lastDcs;
+static unsigned toneResets, tonesOff;
+void BK4819_SetCTCSSFrequency(uint32_t hz10) { lastCtcss=hz10; }
+void BK4819_SetCDCSSCodeWord(uint32_t word) { lastDcs=word; }
+void BK4819_ExitSubAu(void) { ++tonesOff; }
+void BK4819_WriteRegister(BK4819_REGISTER_t reg, uint16_t value) { (void)reg; (void)value; }
+void BK4819_CssResetDetection(bool digital) { (void)digital; ++toneResets; }
 bool BK4819_IsSquelchOpen(void) { return true; }
 void BK4819_Idle(void) { ++bkIdle; }
 void BK4819_RX_TurnOn(void) {}
@@ -123,5 +130,20 @@ int main(void) {
   gSettings.si4732PowerOff = true;
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_SI));
   assert(siPowerDowns == 1 && bkTunes == 5);
+  bk.parameters.rx_tone=1;
+  unsigned resetBefore=toneResets;
+  assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
+  assert(lastCtcss==670 && toneResets==resetBefore+1);
+  assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));assert(toneResets==resetBefore+1);
+  bk.frequency_hz+=12500;assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
+  assert(toneResets==resetBefore+2);
+  bk.parameters.rx_tone=51;assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
+  uint32_t normal=lastDcs;
+  bk.parameters.rx_tone=155;assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
+  assert(lastDcs==(normal^0x7fffffu));
+  bk.parameters.rx_tone=0;unsigned offBefore=tonesOff;
+  assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));assert(tonesOff==offBefore+1);
+  bk.parameters.rx_tone=1;bk.parameters.mode=RX_AM;
+  assert(!RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
   return 0;
 }

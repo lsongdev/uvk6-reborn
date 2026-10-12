@@ -55,11 +55,12 @@ uint8_t UI_SMeterLevel(void) {
   return level > SEGMENTS ? SEGMENTS : level;
 }
 
-void UI_SignalBar(uint8_t x, uint8_t y, uint8_t level) {
-  for (uint8_t i = 0; i < 14; ++i) {
-    uint8_t sx = x+i*7;
-    if (i < level) FillRect(sx, y, 6, 3, C_FILL);
-    else DrawHLine(sx, y+2, 6, C_FILL);
+void UI_SignalIcon(uint8_t x, uint8_t baseline, uint8_t level) {
+  if (level > 14) level = 14;
+  uint8_t bars = (level*8+13)/14;
+  for (uint8_t i = 0; i < 8; ++i) {
+    if (i < bars) FillRect(x+i*3, baseline-i, 2, i+1, C_FILL);
+    else DrawHLine(x+i*3, baseline, 2, C_FILL);
   }
 }
 
