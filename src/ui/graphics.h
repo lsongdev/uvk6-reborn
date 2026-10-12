@@ -75,8 +75,15 @@ void PrintBigDigitsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                       const char *pattern, ...);
 void PrintBiggestDigitsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                           const char *pattern, ...);
+// Same 14-pixel digit bitmaps, with the spare pixel after the decimal point
+// removed. Right aligned; the widest supported frequency occupies 101 px.
+void UI_CompactFrequencyDigits(uint8_t right, uint8_t baseline, const char *text);
 void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                     const char *pattern, ...);
+uint16_t UI_SmallTextWidth(const char *text);
+void UI_SmallTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
+uint16_t UI_MediumBoldTextWidth(const char *text);
+void UI_MediumBoldTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
 void FSmall(uint8_t x, uint8_t y, TextPos align, uint32_t frequency);
 
 #endif /* end of include guard: GRAPHICS_H */

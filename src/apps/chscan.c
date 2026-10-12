@@ -7,7 +7,7 @@
 #include "core/scan.h"
 #include "core/radio.h"
 #include "hal/scheduler.h"
-#include "ui/components.h"
+#include "ui/components/scan.h"
 #include "ui/graphics.h"
 #include "apps/apps.h"
 

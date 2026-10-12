@@ -8,7 +8,8 @@
 #include "core/channels.h"
 #include "ui/numnav.h"
 #include "hal/scheduler.h"
-#include "ui/components.h"
+#include "ui/components/battery.h"
+#include "ui/components/scan.h"
 #include "ui/graphics.h"
 #include <string.h>
 

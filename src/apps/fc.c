@@ -5,7 +5,8 @@
 #include "core/radio.h"
 #include "hal/scheduler.h"
 #include "core/settings.h"
-#include "ui/components.h"
+#include "ui/components/frequency.h"
+#include "ui/components/scan.h"
 #include "ui/graphics.h"
 #include "apps/apps.h"
 #include <stdint.h>
