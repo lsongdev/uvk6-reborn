@@ -14,15 +14,15 @@ void UI_VfoShowFrequency(UI_VfoState *state, uint32_t now) {
 
 static uint16_t scrollOffset(uint32_t now, uint32_t started, uint16_t overflow) {
   if (!overflow) return 0;
-  uint32_t phase = (now-started)%(2400u+overflow*150u);
-  return phase < 1200 ? 0 : phase < 1200u+overflow*150u
-                              ? (phase-1200)/150 : overflow;
+  uint32_t phase = (now-started)%(2u*UI_VFO_SCROLL_PAUSE_MS+overflow*UI_VFO_SCROLL_PIXEL_MS);
+  return phase < UI_VFO_SCROLL_PAUSE_MS ? 0 : phase < UI_VFO_SCROLL_PAUSE_MS+overflow*UI_VFO_SCROLL_PIXEL_MS
+                              ? (phase-UI_VFO_SCROLL_PAUSE_MS)/UI_VFO_SCROLL_PIXEL_MS : overflow;
 }
 
 bool UI_VfoUpdate(UI_VfoState *state, uint32_t now) {
   if (!state->initialized) return false;
-  bool show = state->label[0] && !state->tuning &&
-              now-state->tuned_at >= UI_VFO_NAME_DELAY_MS;
+  bool show = state->label[0] && (state->showing_message || (!state->tuning &&
+              now-state->tuned_at >= UI_VFO_NAME_DELAY_MS));
   bool changed = show != state->show_name;
   if (show && !state->show_name) state->label_started = now;
   state->show_name = show;
@@ -90,7 +90,9 @@ void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_
   char label[128], frequency[16];
   const char *name = view->name ? view->name : "";
   const char *rds = view->rds ? view->rds : "";
-  snprintf(label, sizeof(label), "%s%s%s", name, *name && *rds ? " / " : "", rds);
+  state->showing_message = view->message && *view->message;
+  if (state->showing_message) snprintf(label, sizeof(label), "%s", view->message);
+  else snprintf(label, sizeof(label), "%s%s%s", name, *name && *rds ? " / " : "", rds);
   if (strcmp(label, state->label)) {
     strcpy(state->label, label);
     state->label_started = now;

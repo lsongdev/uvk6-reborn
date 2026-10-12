@@ -47,3 +47,5 @@ make flash PORT=/dev/ttyUSB0
 A/B 首屏切换预览：`python3 tools/ui-preview.py --frames ab-a ab-b --output docs/images/ab-vfo.png`，左图选中 A，右图选中 B，使用固件真实组件及字体绘制。
 
 多 VFO 分页：`python3 tools/ui-preview.py --frames multi-ab multi-cd --output docs/images/multi-vfo.png`。双守听探测／接收归属：`python3 tools/ui-preview.py --frames watch-probe watch-rx --output docs/images/dual-watch.png`。
+
+VFO 提示位置预览：`python3 tools/ui-preview.py --frames error-short error-long --output /tmp/vfo-errors.png`，分别展示长提示的起始位置和滚动到末尾的位置。

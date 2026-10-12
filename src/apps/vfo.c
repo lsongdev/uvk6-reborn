@@ -400,6 +400,17 @@ void VFO_TxSafetyUpdate(void) {
 void VFO_update(void) {
   expireShortcut();
   VFO_TxSafetyUpdate(); // Also permit deterministic host/UI unit tests.
+  if (message || (!inMenu && !confirming))
+    for (uint8_t id=0; id<RADIO_VFO_CAPACITY; ++id)
+      if (UI_VfoUpdate(&cards[id], Now())) gRedrawScreen = true;
+  const UI_VfoState *card=&cards[selectedVfo];
+  uint32_t duration=2500u;
+  if (card->showing_message && card->overflow)
+    duration=2u*UI_VFO_SCROLL_PAUSE_MS+card->overflow*UI_VFO_SCROLL_PIXEL_MS;
+  if (message && Now()-messageAt >= duration) {
+    message = NULL;
+    gRedrawScreen = true;
+  }
   if (transmitter.mode != RADIO_RX)
     return;
   seekUpdate();
@@ -413,13 +424,6 @@ void VFO_update(void) {
       memcpy(labels[receivingVfo].ps, rds.decoder.ps, sizeof(rds.decoder.ps));
       memcpy(labels[receivingVfo].text, rds.decoder.text, sizeof(rds.decoder.text));
     }
-    gRedrawScreen = true;
-  }
-  if (!inMenu && !confirming)
-    for (uint8_t id=0; id<RADIO_VFO_CAPACITY; ++id)
-      if (UI_VfoUpdate(&cards[id], Now())) gRedrawScreen = true;
-  if (message && Now()-messageAt >= 2500) {
-    message = NULL;
     gRedrawScreen = true;
   }
 }
@@ -759,13 +763,11 @@ bool VFO_key(KEY_Code_t key, Key_State_t state) {
 
 void VFO_render(void) {
   char frequencyText[16];
-  if (message) STATUSLINE_SetText("%s", message);
-  else if (inMenu || confirming) STATUSLINE_SetText("VFO %c", 'A'+selectedVfo);
-  else if (gDeviceConfig.radio.watch_enabled && watchStatus) STATUSLINE_SetText("%s",watchStatus);
+  if (inMenu || confirming) STATUSLINE_SetText("VFO %c", 'A'+selectedVfo);
   else if (gDeviceConfig.radio.watch_enabled)
     STATUSLINE_SetText("DW %c", receivingVfo<RADIO_VFO_CAPACITY ? 'A'+receivingVfo : '-');
   else STATUSLINE_SetText("RADIO");
-  if (confirming) {
+  if (confirming && !message) {
     const char *unit = UI_FormatFrequency(pending.frequency_hz, frequencyText);
     PrintMediumEx(2, 18, POS_L, C_FILL, "Apply %s?", rxModeNames[pending.parameters.mode]);
     PrintMediumEx(2, 30, POS_L, C_FILL, "%s %s", frequencyText, unit);
@@ -773,7 +775,7 @@ void VFO_render(void) {
     PrintSmall(2, 57, "MENU: apply  EXIT: cancel");
     return;
   }
-  if (inMenu) {
+  if (inMenu && !message) {
     static const char *const names[] = {
       "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone", "TX Enable", "TX Power", "TX Frequency", "TX Tone", "RX Watch", "Name", "Save"
     };
@@ -850,6 +852,8 @@ void VFO_render(void) {
       .changed = modified, .step_hz = p->step_hz,
       .name = textValid ? labels[id].ps : NULL,
       .rds = textValid ? labels[id].text : NULL,
+      .message = selected ? (message ? message :
+          gDeviceConfig.radio.watch_enabled ? watchStatus : NULL) : NULL,
       .signal_valid = receiving, .signal_level = receiving ? UI_SMeterLevel() : 0,
       .activity = selected && transmitter.mode==RADIO_TX ? UI_VFO_TRANSMITTING :
         selected && transmitter.mode==RADIO_FAULT ? UI_VFO_FAULT :

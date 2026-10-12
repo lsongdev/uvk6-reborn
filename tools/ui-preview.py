@@ -50,7 +50,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'docs/images/vfo-states.png')
     parser.add_argument('--scale', type=int, choices=range(1, 13), default=4)
-    parser.add_argument('--frames', nargs=2, choices=['multi-ab', 'multi-cd', 'watch-probe', 'watch-rx', 'ab-a', 'ab-b', 'single', 'dual', 'plain', 'max', 'maxtext', 'lw', 'rds', 'frequency', 'name', 'tuned', 'tx', 'seek'],
+    parser.add_argument('--frames', nargs=2, choices=['error-short', 'error-long', 'multi-ab', 'multi-cd', 'watch-probe', 'watch-rx', 'ab-a', 'ab-b', 'single', 'dual', 'plain', 'max', 'maxtext', 'lw', 'rds', 'frequency', 'name', 'tuned', 'tx', 'seek'],
                         default=['frequency', 'name'], help='left and right preview scenarios')
     args = parser.parse_args()
     try:

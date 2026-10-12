@@ -62,6 +62,11 @@ int main(int argc, char **argv) {
   UI_VfoRender(8,&v,&a,0);UI_VfoRender(36,&second,&b,0);snapshot("watch-probe.pbm");
   second.activity=UI_VFO_RECEIVING;second.signal_valid=true;second.signal_level=11;
   UI_VfoRender(36,&second,&b,0);snapshot("watch-rx.pbm");
+  second.activity=UI_VFO_IDLE;second.signal_valid=false;
+  v.message="TX mode not supported";
+  base();FillRect(100,0,10,5,C_CLEAR);
+  UI_VfoRender(8,&v,&a,0);UI_VfoRender(36,&second,&b,0);snapshot("error-short.pbm");
+  UI_VfoRender(8,&v,&a,UI_VFO_SCROLL_PAUSE_MS+a.overflow*UI_VFO_SCROLL_PIXEL_MS);snapshot("error-long.pbm");
   base();a=(UI_VfoState){0};
   v=(UI_VfoView){.id='A',.selected=true,.frequency_hz=1339999980,.step_hz=25000,
     .mode=RX_NFM,.band_name="UHF",.activity=UI_VFO_RECEIVING,.signal_level=14,.signal_valid=true};

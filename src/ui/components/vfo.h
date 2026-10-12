@@ -3,6 +3,8 @@
 #include "core/radio-model.h"
 #define UI_VFO_HEIGHT 28
 #define UI_VFO_NAME_DELAY_MS 1000u
+#define UI_VFO_SCROLL_PAUSE_MS 1200u
+#define UI_VFO_SCROLL_PIXEL_MS 150u
 // Receiver state is explicit; a valid RSSI alone does not mean squelch is open.
 typedef enum {
   UI_VFO_IDLE, UI_VFO_RECEIVING, UI_VFO_TRANSMITTING,
@@ -14,6 +16,7 @@ typedef struct {
   RxMode mode;
   UI_VfoActivity activity;
   const char *band_name, *name, *rds, *power_label;
+  const char *message; // Temporarily replaces frequency/name, using the same scrolling text renderer.
   char id;
   bool selected, changed, signal_valid;
   uint8_t signal_level; // Existing 0..14 relative/S mapping, rendered as 8 bars.
@@ -22,7 +25,7 @@ typedef struct {
   char label[128], band[64];
   uint32_t tuned_at, label_started, band_started, frequency_hz;
   uint16_t offset, overflow, band_offset, band_overflow, band_width;
-  bool initialized, show_name, tuning;
+  bool initialized, show_name, tuning, showing_message;
 } UI_VfoState;
 // Restart the one-second frequency hold even when retuning to the same Hz.
 void UI_VfoShowFrequency(UI_VfoState *state, uint32_t now);
