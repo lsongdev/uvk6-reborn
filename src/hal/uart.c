@@ -11,6 +11,7 @@
 #include "hal/eeprom.h"
 #include "hal/gpio.h"
 #include "hal/uart.h"
+#include "hal/uart-protocol.h"
 #include <stdbool.h>
 #include <string.h>
 
@@ -270,39 +271,17 @@ static void CMD_051B(const uint8_t *pBuffer) {
 
   memset(&Reply, 0, sizeof(Reply));
   Reply.Header.ID = 0x051C;
+  // Range checked here, not only in the transport parser. Never expose
+  // uninitialized reply bytes or exceed the 128-byte reply storage.
+  const uint32_t capacity = EEPROM_DetectSize();
+  if (!pCmd->Size || pCmd->Size > sizeof(Reply.Data.Data) ||
+      pCmd->Offset >= capacity || pCmd->Size > capacity-pCmd->Offset ||
+      EEPROM_ReadBuffer(pCmd->Offset, Reply.Data.Data, pCmd->Size) != 0)
+    return;
   Reply.Header.Size = pCmd->Size + 8 + 4;
   Reply.Data.Offset = pCmd->Offset;
   Reply.Data.Size = pCmd->Size;
-
-  EEPROM_ReadBuffer(pCmd->Offset, Reply.Data.Data, pCmd->Size);
-
   SendReply(&Reply, pCmd->Size + 8 + 4);
-}
-
-static void CMD_051D(const uint8_t *pBuffer) {
-  const CMD_051D_t *pCmd = (const CMD_051D_t *)pBuffer;
-  REPLY_051D_t Reply;
-
-  if (pCmd->Timestamp != Timestamp) {
-    return;
-  }
-
-  Reply.Header.ID = 0x051E;
-  Reply.Header.Size = sizeof(Reply.Data);
-  Reply.Data.Offset = pCmd->Offset;
-
-  uint16_t i;
-
-  for (i = 0; i < (pCmd->Size / 8U); i++) {
-    uint32_t Offset = pCmd->Offset + (i * 8U);
-
-    if ((Offset < 0x0E98 || Offset >= 0x0EA0) || !bIsInLockScreen ||
-        pCmd->bAllowPassword) {
-      EEPROM_WriteBuffer(Offset, (void *)&pCmd->Data[i * 8U], 8);
-    }
-  }
-
-  SendReply(&Reply, sizeof(Reply));
 }
 
 static void CMD_052F(const uint8_t *pBuffer) {
@@ -402,9 +381,9 @@ bool UART_IsCommandAvailable(void) {
   }
 
   CRC = UART_Command.Buffer[Size] | (UART_Command.Buffer[Size + 1] << 8);
-  if (CRC_Calculate(UART_Command.Buffer, Size) != CRC) {
+  if (CRC_Calculate(UART_Command.Buffer, Size) != CRC ||
+      !UART_CommandValid(UART_Command.Buffer, Size))
     return false;
-  }
 
   return true;
 }
@@ -419,11 +398,6 @@ void UART_HandleCommand(void) {
     // EEPROM READ
   case 0x051B:
     CMD_051B(UART_Command.Buffer);
-    break;
-
-    // EEPROM WRITE
-  case 0x051D:
-    CMD_051D(UART_Command.Buffer);
     break;
 
     // VERSION, BL OFF
