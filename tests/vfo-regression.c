@@ -17,6 +17,8 @@ static unsigned routed;
 static unsigned appRuns;
 static bool failApply;
 Settings gSettings;
+TxCapabilities TX_DEVICE_Capabilities(void) { return (TxCapabilities){0}; }
+TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
 void TX_DEVICE_Disable(void) {}
 bool TX_DEVICE_Prepare(const TxPlan *plan) { (void)plan; return false; }
 bool TX_DEVICE_Enable(void) { return false; }
