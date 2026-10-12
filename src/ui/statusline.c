@@ -1,7 +1,7 @@
 #include "ui/statusline.h"
 #include "core/device-config.h"
 #include "apps/apps.h"
-#include "apps/vfo1.h"
+#include "apps/vfo.h"
 #include "hal/eeprom.h"
 #include "drivers/si473x/si473x.h"
 #include "hal/display.h"
@@ -77,7 +77,7 @@ void STATUSLINE_render(void) {
     if (bars > 10)
       bars = 10;
     // Keep the main radio header compact; preserve the setting in other apps.
-    if (gCurrentApp == APP_VFO1) {
+    if (gCurrentApp == APP_VFO) {
       UI_Battery(bars);
     } else {
       switch (gSettings.batteryStyle) {
@@ -116,7 +116,7 @@ void STATUSLINE_render(void) {
   }
 
   uint8_t iconsRight = LCD_WIDTH - 1 - 22;
-  if (gCurrentApp == APP_VFO1 && VFO1_isShortcutPending()) {
+  if (gCurrentApp == APP_VFO && VFO_isShortcutPending()) {
     PrintSmallEx(iconsRight, BASE_Y, POS_R, C_FILL, "F");
     iconsRight -= 8;
   }
@@ -125,14 +125,20 @@ void STATUSLINE_render(void) {
   if (gIsNumNavInput) {
     PrintSmall(0, BASE_Y, "Select: %s", gNumNavInput);
   } else {
-    PrintSmall(0, BASE_Y,
-               statuslineTicker[0] == '\0' ? statuslineText : statuslineTicker);
+    const char *text = statuslineTicker[0] == '\0' ? statuslineText : statuslineTicker;
+    if (gCurrentApp == APP_VFO) {
+      uint16_t iconWidth = UI_SymbolsTextWidth(icons);
+      uint8_t textWidth = iconWidth+2 < iconsRight ? iconsRight-iconWidth-2 : 0;
+      UI_SmallTextWindow(0, BASE_Y, textWidth, text, 0);
+    } else {
+      PrintSmall(0, BASE_Y, "%s", text);
+    }
   }
 }
 
 // Current receiver settings come from the Hz-based radio user state.
 void STATUSLINE_RenderRadioSettings(void) {
-  const RadioParameters *p = &gDeviceConfig.radio.current.parameters;
+  const RadioParameters *p = &gDeviceConfig.radio.vfos[gDeviceConfig.radio.selected_vfo].current.parameters;
   STATUSLINE_SetText("%s %u Hz SQ%u",
                      rxModeNames[p->mode], (unsigned)p->bandwidth_hz,
                      (unsigned)p->squelch);

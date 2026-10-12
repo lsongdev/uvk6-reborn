@@ -28,8 +28,8 @@ int main(void) {
   field = FIELD_SAVE;
   press(KEY_MENU);
   assert(!editing && saves == 1 && gDeviceConfig.radio.presets[6].mode == RX_AM);
-  assert(gDeviceConfig.radio.current.parameters.mode == RX_NFM);
-  assert(gDeviceConfig.radio.bands[6].parameters.mode == RX_NFM);
+  assert(gDeviceConfig.radio.vfos[0].current.parameters.mode == RX_NFM);
+  assert(gDeviceConfig.radio.vfos[0].bands[6].parameters.mode == RX_NFM);
   assert(gDeviceConfig.radio.presets[5].mode == RX_NFM);
 
   press(KEY_MENU);
@@ -71,7 +71,7 @@ int main(void) {
   selected = 5;
   press(KEY_MENU);
   field = FIELD_CURRENT;
-  gDeviceConfig.radio.current.parameters.squelch = 7;
+  gDeviceConfig.radio.vfos[0].current.parameters.squelch = 7;
   press(KEY_MENU);
   assert(draft.squelch == 7 && gDeviceConfig.radio.presets[5].squelch == 4);
   press(KEY_SIDE1);
@@ -81,5 +81,13 @@ int main(void) {
   press(KEY_EXIT);
   press(KEY_EXIT);
   assert(exits == 1);
+  // Editor follows B and only updates shared presets, not either VFO.
+  gDeviceConfig.radio.selected_vfo=1;
+  gDeviceConfig.radio.vfos[1].current.parameters.squelch=8;
+  BANDS_init();assert(selected==6);press(KEY_MENU);field=FIELD_CURRENT;
+  press(KEY_MENU);assert(draft.squelch==8);
+  field=FIELD_SAVE;press(KEY_MENU);assert(gDeviceConfig.radio.presets[6].squelch==8);
+  assert(gDeviceConfig.radio.vfos[0].current.parameters.squelch==7);
+  assert(gDeviceConfig.radio.vfos[1].current.parameters.squelch==8);
   return 0;
 }

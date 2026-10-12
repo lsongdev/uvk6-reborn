@@ -20,7 +20,7 @@ typedef enum {
   APP_TEXTINPUT,
   APP_CH_CFG,
   APP_SETTINGS,
-  APP_VFO1,
+  APP_VFO,
   // APP_GENERATOR,
   APP_ABOUT,
   APP_BANDS,

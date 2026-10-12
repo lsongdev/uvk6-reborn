@@ -50,7 +50,8 @@ bool SI47XX_SetSsbBandwidth(SI47XX_SsbFilterBW bw) {
 bool SI47XX_SetBandwidth(SI47XX_FilterBW bw, bool amp) {
   (void)bw; (void)amp; return siBandwidthOk;
 }
-bool RSQ_GET(void) { return true; }
+static bool rsqOK=true;
+bool RSQ_GET(void) { return rsqOK; }
 RSQStatus rsqStatus;
 bool SI47XX_SeekStart(uint32_t lo, uint32_t hi, uint32_t step) {
   (void)lo; (void)hi; (void)step; return true;
@@ -73,6 +74,16 @@ bool BK1080_Init(uint32_t hz10, bool enable) {
 bool BK1080_Mute(bool mute) {
   ++broadcastMutes;
   return mute || broadcastMuteOk;
+}
+static uint16_t watchRSSI=130;
+static uint8_t watchNoise=20,watchGlitch=20;
+static bool watchTone=true;
+uint16_t BK4819_GetRSSI(void) { return watchRSSI; }
+uint8_t BK4819_GetNoise(void) { return watchNoise; }
+uint8_t BK4819_GetGlitch(void) { return watchGlitch; }
+bool BK4819_CssIsDetected(bool digital) { (void)digital; return watchTone; }
+SQL GetSql(uint8_t level) {
+  assert(level>=4); return (SQL){.ro=108,.no=44,.go=60};
 }
 static RxPlan plan(uint32_t hz, RxMode mode, RxDevice device) {
   return (RxPlan){device, hz, {mode, mode == RX_WFM ? 100000 : 12500,
@@ -145,5 +156,19 @@ int main(void) {
   assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));assert(tonesOff==offBefore+1);
   bk.parameters.rx_tone=1;bk.parameters.mode=RX_AM;
   assert(!RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
+  // SQ0/always-open audio cannot classify arbitrary noise as a watch hit.
+  RxPlan watch=plan(145500000,RX_NFM,RX_DEVICE_BK);
+  assert(RX_DEVICE_WatchSignal(&watch,&signal) && signal);
+  watchRSSI=50;assert(RX_DEVICE_WatchSignal(&watch,&signal) && !signal);
+  watchRSSI=130;watchNoise=100;assert(RX_DEVICE_WatchSignal(&watch,&signal) && !signal);
+  watchNoise=20;watchGlitch=100;assert(RX_DEVICE_WatchSignal(&watch,&signal) && !signal);
+  watchGlitch=20;watch.parameters.rx_tone=1;watchTone=false;
+  assert(RX_DEVICE_WatchSignal(&watch,&signal) && !signal);
+  watchTone=true;assert(RX_DEVICE_WatchSignal(&watch,&signal) && signal);
+  rsqStatus.resp.RSSI=20;rsqStatus.resp.SNR=8;
+  assert(RX_DEVICE_WatchSignal(&native,&signal) && signal);
+  native.parameters.squelch=8;assert(RX_DEVICE_WatchSignal(&native,&signal) && !signal);
+  rsqOK=false;assert(!RX_DEVICE_WatchSignal(&native,&signal));
+  assert(!RX_DEVICE_WatchSignal(NULL,&signal) && !RX_DEVICE_WatchSignal(&watch,NULL));
   return 0;
 }

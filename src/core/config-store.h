@@ -6,9 +6,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define CONFIG_STORE_SLOT_SIZE 512u
+#define CONFIG_STORE_SLOT_SIZE 1024u
 #define CONFIG_STORE_SLOTS 2u
-#define CONFIG_STORE_FORMAT 5u
+#define CONFIG_STORE_BASE 0x0800u
+#define CONFIG_STORE_END (CONFIG_STORE_BASE + CONFIG_STORE_SLOT_SIZE*CONFIG_STORE_SLOTS)
+#define CONFIG_LEGACY_SLOT_SIZE 512u
+#define CONFIG_STORE_FORMAT 7u
 
 // Explicit on-disk fields. Never serialize C compiler bitfields or structs.
 typedef struct {
@@ -23,7 +26,6 @@ typedef struct {
 
 typedef struct {
   RadioUserState radio;
-  TxConfig tx;                 // One VFO only, no per-band channel TX profile.
   ConfigPreferences preferences;
 } DeviceConfig;
 
@@ -39,7 +41,7 @@ typedef struct {
 } ConfigStore;
 
 void CONFIG_Default(DeviceConfig *config);
-bool CONFIG_Decode(const uint8_t bytes[CONFIG_STORE_SLOT_SIZE],
+bool CONFIG_Decode(const uint8_t *bytes, uint16_t size,
                    DeviceConfig *config, uint32_t *sequence);
 bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
                    uint8_t bytes[CONFIG_STORE_SLOT_SIZE]);

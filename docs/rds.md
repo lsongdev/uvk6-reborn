@@ -1,6 +1,6 @@
 # RDS 接收与文本解析
 
-2026-10-12：当前单 VFO 在 **SI4732 接收路径 + WFM 模式** 下轮询 RDS。BK4819 的 NFM/AM、SI4732 的 AM/SSB 和 BK1080 接收路径不读取 RDS。
+2026-10-13：实际接收归属的 VFO 在 **SI4732 接收路径 + WFM 模式** 下轮询 RDS。BK4819 的 NFM/AM、SI4732 的 AM/SSB 和 BK1080 接收路径不读取 RDS。
 
 当前支持 PI 电台识别码、0A/0B 的 8 字符 Programme Service（PS）电台名，以及 2A 的最多 64 字符、2B 的最多 32 字符 RadioText。PS 与 RadioText 放在同一个名称区域，以 ` / ` 拼接，只有一个时直接显示；超宽滚动。调谐后大字号频率保持 1 秒，有文本时正文切换为名称，完整频率移入黑底横条；再次调谐恢复大字号频率。无文本时保持频率。布局见 [VFO 首屏布局](ui-layout.md)。VFO 自定义名称编辑尚未实现。
 
@@ -13,7 +13,7 @@
 1. `drivers/si473x/si473x.c` 设置 RDS 接收、FIFO 门限 1 组和最多 1～2 位纠错门限；`SI47XX_ReadRDS` 检查电源、模式、I2C 应答、CTS 和 ERR，将 13 字节响应转换为块、错误等级、同步和 FIFO 状态。失败不修改调用者的输出。
 2. `hal/rx-device.c` 将芯片返回的数据适配为与芯片协议无关的 `RdsPacket`。
 3. `core/rds-receiver.c` 管理轮询及过期，`core/rds.c` 只处理 RDS 数据组和文本，均不依赖硬件或 UI。
-4. `apps/vfo1.c` 按实际成功应用的接收方案启停 RDS，把 PS/RadioText 送给 VFO 组件；文本变化时才请求重绘，滚动由组件独立处理。
+4. `apps/vfo.c` 按实际成功应用的接收方案启停 RDS，把 PS/RadioText 送给 VFO 组件；文本变化时才请求重绘，滚动由组件独立处理。
 
 ## 完整性与生命周期
 
@@ -29,3 +29,5 @@
 `sh tests/run.sh` 包含解析器、FIFO 轮询、SI 命令与响应、VFO 接收路径切换的回归检查：0A/B、2A/B、重复确认、缺段、末尾段、完整长度、A/B 翻转、PI 变化、块错误、总线失败、过期、定时器回绕及调频失败恢复。主机测试不替代实机信号验证，广播台必须实际发送 RDS 才会出现文本。
 
 芯片命令布局、FIFO 计数、BLE 错误等级及广播数据组示例依据厂商 [AN332：Si47xx Programming Guide](https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN332.pdf)，RDS 分组及文本说明参考厂商 [AN243：Using RDS/RBDS with the Si4703](https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN243.pdf)。
+
+各 VFO 各自缓存已确认 PS／RadioText，关联对应频率。仅实际使用 SI WFM、守听已经确认信号并驻留（或正常单项接收）的路径轮询 RDS；A/B 切换重置芯片 FIFO 轮询和解析器，不将前一项数据交给后一项。重新调谐清空所属项缓存，活动路径 15 秒无新数据时清空文本；后台行保留其自己的已确认文本，不显示实时接收或信号。

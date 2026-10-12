@@ -3,11 +3,11 @@
 #include "core/config-store.h"
 #include "core/settings.h"
 
-// Only the two UVR2 slots are writable in normal firmware. EEPROM contents
-// beyond this range (especially RF calibration and SI SSB patch) are read-only.
+// Only format7 slots at 0x0800..0x0fff are writable in normal firmware.
+// Legacy 0x0000..0x03ff slots, RF calibration and SI patch stay read-only.
 static inline bool EEPROM_WriteAllowed(uint32_t address, uint16_t size) {
-  const uint32_t limit = CONFIG_STORE_SLOT_SIZE*CONFIG_STORE_SLOTS;
-  return size > 0 && address < limit && size <= limit-address;
+  return size > 0 && address >= CONFIG_STORE_BASE &&
+         address < CONFIG_STORE_END && size <= CONFIG_STORE_END-address;
 }
 // ACK address patterns can only identify a candidate memory mapping.
 // They do not establish the physical part number, capacity, or page size.

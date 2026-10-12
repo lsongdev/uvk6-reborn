@@ -66,8 +66,28 @@ static Menu displayMenu = {.title = "Display",
                            .items = displayMenuItems,
                            .num_items = ARRAY_SIZE(displayMenuItems)};
 
+static void getVfoCount(const MenuItem *item, char *out, uint8_t size) {
+  (void)item; snprintf(out,size,"%u",gDeviceConfig.radio.vfo_count);
+}
+static void setVfoCount(const MenuItem *item, bool up) {
+  (void)item;
+  uint8_t count=gDeviceConfig.radio.vfo_count;
+  if (up) count=count==RADIO_VFO_CAPACITY ? 2 : count+1;
+  else count=count==2 ? RADIO_VFO_CAPACITY : count-1;
+  if (RADIO_STATE_SetCount(&gDeviceConfig.radio,count)) DEVICE_RequestSave();
+}
+static void getWatch(const MenuItem *item, char *out, uint8_t size) {
+  (void)item; snprintf(out,size,"%s",gDeviceConfig.radio.watch_enabled ? "On" : "Off");
+}
+static void setWatch(const MenuItem *item, bool up) {
+  (void)item; (void)up; gDeviceConfig.radio.watch_enabled^=1;
+  DEVICE_RequestSave();
+}
+
 // Radio submenu
 static const MenuItem radioMenuItems[] = {
+    {"VFO Count", .get_value_text=getVfoCount, .change_value=setVfoCount},
+    {"Dual Watch", .get_value_text=getWatch, .change_value=setWatch},
     {"Filter bound", SETTING_BOUND240_280, getValS, updateValS},
     {"SI power off", SETTING_SI4732POWEROFF, getValS, updateValS},
 };

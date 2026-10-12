@@ -212,7 +212,7 @@ static bool action(const uint16_t index, KEY_Code_t key, Key_State_t state) {
       return true;
     case KEY_PTT:
       tuneToLoot(loot, true);
-      APPS_run(APP_VFO1);
+      APPS_run(APP_VFO);
       return true;
     case KEY_1:
       sort(SORT_LOT);

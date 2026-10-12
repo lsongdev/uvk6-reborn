@@ -40,6 +40,28 @@ int main(int argc, char **argv) {
   UI_VfoRender(8,&v,&a,3000);UI_VfoRender(8+UI_VFO_HEIGHT,&second,&b,3000);snapshot("name.pbm");
   snapshot("dual.pbm");
   UI_VfoShowFrequency(&a,3100);UI_VfoRender(8,&v,&a,3100);snapshot("tuned.pbm");
+  // First-release A/B: only the selected row owns RX and valid signal.
+  base();FillRect(100,0,10,5,C_CLEAR);a=(UI_VfoState){0};b=(UI_VfoState){0};
+  v=(UI_VfoView){.id='A',.selected=true,.frequency_hz=145500000,.step_hz=12500,
+    .mode=RX_NFM,.band_name="2m",.activity=UI_VFO_RECEIVING,.signal_valid=true,.signal_level=8};
+  second=(UI_VfoView){.id='B',.frequency_hz=438500000,.step_hz=12500,
+    .mode=RX_NFM,.band_name="70cm",.activity=UI_VFO_IDLE};
+  UI_VfoRender(8,&v,&a,0);UI_VfoRender(36,&second,&b,0);snapshot("ab-a.pbm");
+  v.selected=false;v.activity=UI_VFO_IDLE;v.signal_valid=false;
+  second.selected=true;second.activity=UI_VFO_RECEIVING;second.signal_valid=true;second.signal_level=11;
+  base();FillRect(100,0,10,5,C_CLEAR);UI_VfoRender(8,&v,&a,1000);UI_VfoRender(36,&second,&b,1000);snapshot("ab-b.pbm");
+  snapshot("multi-ab.pbm");
+  v.id='C';v.selected=true;v.frequency_hz=145600000;
+  second.id='D';second.selected=false;second.frequency_hz=438600000;
+  second.activity=UI_VFO_IDLE;second.signal_valid=false;
+  base();FillRect(100,0,10,5,C_CLEAR);
+  UI_VfoRender(8,&v,&a,0);UI_VfoRender(36,&second,&b,0);snapshot("multi-cd.pbm");
+  v.id='A';v.frequency_hz=145500000;
+  second.id='B';second.frequency_hz=438500000;second.activity=UI_VFO_WATCHING;
+  base();FillRect(0,0,110,5,C_CLEAR);PrintSmall(0,4,"DW B");
+  UI_VfoRender(8,&v,&a,0);UI_VfoRender(36,&second,&b,0);snapshot("watch-probe.pbm");
+  second.activity=UI_VFO_RECEIVING;second.signal_valid=true;second.signal_level=11;
+  UI_VfoRender(36,&second,&b,0);snapshot("watch-rx.pbm");
   base();a=(UI_VfoState){0};
   v=(UI_VfoView){.id='A',.selected=true,.frequency_hz=1339999980,.step_hz=25000,
     .mode=RX_NFM,.band_name="UHF",.activity=UI_VFO_RECEIVING,.signal_level=14,.signal_valid=true};

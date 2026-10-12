@@ -7,9 +7,10 @@
 #define HEADER_BANDS 5u
 #define HEADER_SEQUENCE 8u
 #define HEADER_CRC 12u
-_Static_assert(PAYLOAD_START + 1 + 14*(RADIO_STATE_BANDS+1) + 18 +
-               8*RADIO_STATE_BANDS + 5 + 2*(2*RADIO_STATE_BANDS+1) + 6 <= RECORD_BYTES,
-               "Band presets must fit in the existing configuration slot");
+#define FORMAT7_BYTES (PAYLOAD_START + 3u + RADIO_VFO_CAPACITY*(2u + 16u*(RADIO_STATE_BANDS+1u) + 8u) + 10u*RADIO_STATE_BANDS + 21u)
+_Static_assert(FORMAT7_BYTES == 810u && FORMAT7_BYTES <= RECORD_BYTES,
+               "Multi VFO configuration must fit in a slot");
+_Static_assert(CONFIG_STORE_END <= 0x1e00u, "Never overlap RF calibration");
 
 static void put16(uint8_t *p, uint16_t n) {
   p[0] = n & 255u; p[1] = n >> 8;
@@ -23,9 +24,9 @@ static uint16_t get16(const uint8_t *p) {
 static uint32_t get32(const uint8_t *p) {
   return (uint32_t)get16(p) | ((uint32_t)get16(p+2) << 16);
 }
-static uint32_t crc32(const uint8_t *bytes) {
+static uint32_t crc32(const uint8_t *bytes, uint16_t size) {
   uint32_t crc = 0xffffffffu;
-  for (unsigned i = 0; i < RECORD_BYTES; ++i) {
+  for (unsigned i = 0; i < size; ++i) {
     uint8_t value = i >= HEADER_CRC && i < HEADER_CRC+4 ? 0 : bytes[i];
     crc ^= value;
     for (unsigned bit = 0; bit < 8; ++bit)
@@ -53,7 +54,6 @@ void CONFIG_Default(DeviceConfig *config) {
     return;
   *config = (DeviceConfig){0};
   RADIO_STATE_Default(&config->radio);
-  config->tx = (TxConfig){.enabled = false, .power = TX_POWER_LOW};
   config->preferences = (ConfigPreferences){
       .battery_calibration = 2000, .backlight = 3, .contrast = 8,
       .brightness = 8, .battery_type = 0, .battery_style = 1,
@@ -64,8 +64,6 @@ void CONFIG_Default(DeviceConfig *config) {
 static bool valid(const DeviceConfig *config) {
   const ConfigPreferences *p = &config->preferences;
   return RADIO_STATE_Valid(&config->radio) &&
-         (unsigned)config->tx.power <= TX_POWER_HIGH &&
-         TONE_Valid(config->tx.tone) && TX_MODEL_FrequencyValid(config->tx.frequency_hz) &&
          p->tx_timeout_seconds >= 15 && p->tx_timeout_seconds <= 600 &&
          p->tx_busy_lockout <= 1 &&
          p->battery_calibration >= 1900 && p->battery_calibration <= 2154 &&
@@ -77,20 +75,47 @@ static bool valid(const DeviceConfig *config) {
          p->brightness_low <= 15 && p->sql_open_time <= 7 &&
          p->sql_close_time <= 3;
 }
+static uint8_t *encodeBand6(uint8_t *p, const BandState *band) {
+  encodeBand(p, band);
+  put16(p+14, band->parameters.rx_tone);
+  return p+16;
+}
+static const uint8_t *decodeBand6(const uint8_t *p, BandState *band) {
+  decodeBand(p, band);
+  band->parameters.rx_tone = get16(p+14);
+  return p+16;
+}
 bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
                    uint8_t bytes[RECORD_BYTES]) {
-  if (!config || !bytes || !valid(config))
-    return false;
+  if (!config || !bytes || !valid(config)) return false;
   memset(bytes, 0, RECORD_BYTES);
   memcpy(bytes, "UVR2", 4);
   bytes[HEADER_VERSION] = CONFIG_STORE_FORMAT;
   bytes[HEADER_BANDS] = RADIO_STATE_BANDS;
   put32(bytes + HEADER_SEQUENCE, sequence);
   uint8_t *p = bytes + PAYLOAD_START;
-  *p++ = config->radio.active_band;
-  p = encodeBand(p, &config->radio.current);
-  for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i)
-    p = encodeBand(p, &config->radio.bands[i]);
+  bytes[6] = RADIO_VFO_CAPACITY;
+  *p++ = config->radio.vfo_count;
+  *p++ = config->radio.selected_vfo;
+  *p++ = config->radio.watch_enabled;
+  for (uint8_t id=0; id<RADIO_VFO_CAPACITY; ++id) {
+    const VfoConfig *vfo = &config->radio.vfos[id];
+    *p++ = vfo->active_band;
+    *p++ = vfo->watch;
+    p = encodeBand6(p, &vfo->current);
+    for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
+      p = encodeBand6(p, &vfo->bands[i]);
+    *p++ = vfo->tx.enabled;
+    *p++ = vfo->tx.power;
+    put32(p, vfo->tx.frequency_hz); p+=4;
+    put16(p, vfo->tx.tone); p+=2;
+  }
+  for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
+    const RadioParameters *preset = &config->radio.presets[i];
+    put32(p, preset->step_hz); put16(p+4, preset->bandwidth_hz);
+    p[6] = preset->mode; p[7] = preset->squelch;
+    put16(p+8, preset->rx_tone); p+=10;
+  }
   const ConfigPreferences *pref = &config->preferences;
   put16(p, pref->battery_calibration); p += 2;
   const uint8_t values[] = {
@@ -102,43 +127,13 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
   };
   memcpy(p, values, sizeof(values));
   p += sizeof(values);
-  for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i) {
-    const RadioParameters *preset = &config->radio.presets[i];
-    put32(p, preset->step_hz);
-    put16(p+4, preset->bandwidth_hz);
-    p[6] = preset->mode; p[7] = preset->squelch;
-    p += 8;
-  }
-  // TX settings are explicitly encoded; C enums/bitfields never persisted.
-  *p++ = config->tx.enabled ? 1u : 0u;
-  *p++ = (uint8_t)config->tx.power;
-  put16(p, pref->tx_timeout_seconds); p += 2;
+  put16(p, pref->tx_timeout_seconds); p+=2;
   *p++ = pref->tx_busy_lockout;
-  // Format 5 appends fields; format 4's payload offsets stay unchanged.
-  put16(p, config->radio.current.parameters.rx_tone); p += 2;
-  for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
-    put16(p, config->radio.bands[i].parameters.rx_tone); p += 2;
-    put16(p, config->radio.presets[i].rx_tone); p += 2;
-  }
-  put16(p, config->tx.tone); p += 2;
-  put32(p, config->tx.frequency_hz);
-  put32(bytes + HEADER_CRC, crc32(bytes));
+  if (p != bytes+FORMAT7_BYTES) return false;
+  put32(bytes + HEADER_CRC, crc32(bytes, RECORD_BYTES));
   return true;
 }
-bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
-                   uint32_t *sequence) {
-  if (!bytes || !config || memcmp(bytes, "UVR2", 4) != 0 ||
-      (bytes[HEADER_VERSION] != CONFIG_STORE_FORMAT && bytes[HEADER_VERSION] != 4u) ||
-      bytes[HEADER_BANDS] != RADIO_STATE_BANDS ||
-      get32(bytes + HEADER_CRC) != crc32(bytes))
-    return false;
-  DeviceConfig candidate = {0};
-  const uint8_t *p = bytes + PAYLOAD_START;
-  candidate.radio.active_band = *p++;
-  p = decodeBand(p, &candidate.radio.current);
-  for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i)
-    p = decodeBand(p, &candidate.radio.bands[i]);
-  ConfigPreferences *pref = &candidate.preferences;
+static const uint8_t *decodePreferences(const uint8_t *p, ConfigPreferences *pref) {
   pref->battery_calibration = get16(p); p += 2;
   uint8_t *values[] = {&pref->backlight, &pref->contrast, &pref->brightness,
     &pref->battery_type, &pref->battery_style, &pref->backlight_on_squelch,
@@ -147,28 +142,93 @@ bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
     &pref->brightness_low, &pref->sql_open_time, &pref->sql_close_time};
   for (unsigned i = 0; i < sizeof(values)/sizeof(values[0]); ++i)
     *values[i] = *p++;
-  for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i) {
-    candidate.radio.presets[i] = (RadioParameters){
-        .step_hz = get32(p), .bandwidth_hz = get16(p+4),
-        .mode = (RxMode)p[6], .squelch = p[7]};
-    p += 8;
-  }
-  if (p[0] > 1 || p[1] > TX_POWER_HIGH)
+  return p;
+}
+bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
+                   uint32_t *sequence) {
+  if (!bytes || !config || size < CONFIG_LEGACY_SLOT_SIZE || memcmp(bytes, "UVR2", 4) != 0 ||
+      (bytes[HEADER_VERSION] < 4u || bytes[HEADER_VERSION] > CONFIG_STORE_FORMAT) ||
+      bytes[HEADER_BANDS] != RADIO_STATE_BANDS ||
+      size != (bytes[HEADER_VERSION] == CONFIG_STORE_FORMAT ? RECORD_BYTES : CONFIG_LEGACY_SLOT_SIZE) ||
+      get32(bytes + HEADER_CRC) != crc32(bytes, size))
     return false;
-  candidate.tx.enabled = p[0] != 0;
-  candidate.tx.power = (TxPower)p[1];
-  candidate.preferences.tx_timeout_seconds = get16(p+2);
-  candidate.preferences.tx_busy_lockout = p[4];
-  if (bytes[HEADER_VERSION] == CONFIG_STORE_FORMAT) {
-    p += 5;
-    candidate.radio.current.parameters.rx_tone = get16(p); p += 2;
-    for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
-      candidate.radio.bands[i].parameters.rx_tone = get16(p); p += 2;
-      candidate.radio.presets[i].rx_tone = get16(p); p += 2;
+  DeviceConfig candidate;
+  CONFIG_Default(&candidate);
+  const uint8_t *p = bytes + PAYLOAD_START;
+  if (bytes[HEADER_VERSION] >= 6u) {
+    bool native = bytes[HEADER_VERSION] == CONFIG_STORE_FORMAT;
+    uint8_t records = native ? RADIO_VFO_CAPACITY : 2;
+    if (native && bytes[6] != RADIO_VFO_CAPACITY) return false;
+    candidate.radio.vfo_count = *p++;
+    if (!native && candidate.radio.vfo_count != 2) return false;
+    candidate.radio.selected_vfo = *p++;
+    if (native) {
+      if (*p>1) return false;
+      candidate.radio.watch_enabled = *p++;
     }
-    candidate.tx.tone = get16(p); p += 2;
-    candidate.tx.frequency_hz = get32(p);
-  } // Valid format 4 keeps all settings, defaulting new fields to Off/Same.
+    for (uint8_t id=0; id<records; ++id) {
+      VfoConfig *vfo = &candidate.radio.vfos[id];
+      vfo->active_band = *p++;
+      if (native) {
+        if (*p>1) return false;
+        vfo->watch = *p++;
+      }
+      p = decodeBand6(p, &vfo->current);
+      for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
+        p = decodeBand6(p, &vfo->bands[i]);
+      if (p[0] > 1 || p[1] > TX_POWER_HIGH) return false;
+      vfo->tx.enabled = *p++;
+      vfo->tx.power = *p++;
+      vfo->tx.frequency_hz = get32(p); p+=4;
+      vfo->tx.tone = get16(p); p+=2;
+    }
+    for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
+      candidate.radio.presets[i] = (RadioParameters){
+        .step_hz=get32(p), .bandwidth_hz=get16(p+4),
+        .mode=p[6], .squelch=p[7], .rx_tone=get16(p+8)};
+      p+=10;
+    }
+    p = decodePreferences(p, &candidate.preferences);
+    candidate.preferences.tx_timeout_seconds = get16(p); p+=2;
+    candidate.preferences.tx_busy_lockout = *p++;
+    if (p != bytes+(native ? FORMAT7_BYTES : 467u)) return false;
+    if (!native)
+      for (uint8_t id=2; id<RADIO_VFO_CAPACITY; ++id)
+        RADIO_STATE_InitVfo(&candidate.radio, id, id%2 ? 6 : 5);
+  } else {
+    // Legacy format 4/5 stores one VFO. Keep its exact byte offsets.
+    VfoConfig *vfo = &candidate.radio.vfos[0];
+    vfo->active_band = *p++;
+    p = decodeBand(p, &vfo->current);
+    for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i)
+      p = decodeBand(p, &vfo->bands[i]);
+    p = decodePreferences(p, &candidate.preferences);
+    for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i) {
+      candidate.radio.presets[i] = (RadioParameters){
+          .step_hz = get32(p), .bandwidth_hz = get16(p+4),
+          .mode = (RxMode)p[6], .squelch = p[7]};
+      p += 8;
+    }
+    if (p[0] > 1 || p[1] > TX_POWER_HIGH) return false;
+    vfo->tx.enabled = p[0] != 0;
+    vfo->tx.power = (TxPower)p[1];
+    candidate.preferences.tx_timeout_seconds = get16(p+2);
+    candidate.preferences.tx_busy_lockout = p[4];
+    if (bytes[HEADER_VERSION] == 5u) {
+      p += 5;
+      vfo->current.parameters.rx_tone = get16(p); p += 2;
+      for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
+        vfo->bands[i].parameters.rx_tone = get16(p); p += 2;
+        candidate.radio.presets[i].rx_tone = get16(p); p += 2;
+      }
+      vfo->tx.tone = get16(p); p += 2;
+      vfo->tx.frequency_hz = get32(p);
+    } // Format 4 defaults the new fields to Off/Same.
+    for (uint8_t id=1; id<RADIO_VFO_CAPACITY; ++id) {
+      RADIO_STATE_InitVfo(&candidate.radio, id, id%2 ? 6 : 5);
+      candidate.radio.vfos[id].watch = id<2;
+    }
+  }
   if (!valid(&candidate))
     return false;
   *config = candidate;
@@ -177,53 +237,62 @@ bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
   return true;
 }
 static bool ready(const ConfigStore *store) {
-  return store && store->read &&
-         store->capacity >= CONFIG_STORE_SLOT_SIZE*CONFIG_STORE_SLOTS &&
-         store->reserved_tail <= store->capacity -
-               CONFIG_STORE_SLOT_SIZE*CONFIG_STORE_SLOTS;
+  return store && store->read && store->capacity >= CONFIG_STORE_END &&
+         store->reserved_tail <= store->capacity-CONFIG_STORE_END;
 }
-static int slotRead(const ConfigStore *store, unsigned slot, DeviceConfig *out,
-                    uint32_t *seq) {
+static bool slotRead(const ConfigStore *store, uint32_t address, uint16_t size,
+                     DeviceConfig *out, uint32_t *seq) {
   uint8_t bytes[RECORD_BYTES];
-  return store->read(store->context, slot*RECORD_BYTES, bytes, RECORD_BYTES) &&
-         CONFIG_Decode(bytes, out, seq);
+  return store->read(store->context, address, bytes, size) &&
+         CONFIG_Decode(bytes, size, out, seq);
 }
-static bool later(uint32_t a, uint32_t b) {
-  return (int32_t)(a - b) > 0;
+static bool later(uint32_t a, uint32_t b) { return (int32_t)(a-b)>0; }
+// One candidate reused throughout: EEPROM growth must not multiply stack copies.
+static bool loadPair(const ConfigStore *store, uint32_t base, uint16_t size,
+                     DeviceConfig *config, uint32_t *sequence) {
+  DeviceConfig candidate;
+  uint32_t seq=0, best=0;
+  bool found=false;
+  for (unsigned i=0; i<CONFIG_STORE_SLOTS; ++i) {
+    if (slotRead(store, base+i*size, size, &candidate, &seq) &&
+        (!found || later(seq,best))) {
+      *config=candidate; best=seq; found=true;
+    }
+  }
+  if (found && sequence) *sequence=best;
+  return found;
 }
 bool CONFIG_Load(const ConfigStore *store, DeviceConfig *config, uint32_t *sequence) {
-  if (!ready(store) || !config)
-    return false;
-  DeviceConfig a, b;
-  uint32_t seqA = 0, seqB = 0;
-  bool okA = slotRead(store, 0, &a, &seqA);
-  bool okB = slotRead(store, 1, &b, &seqB);
-  if (!okA && !okB)
-    return false;
-  bool chooseB = okB && (!okA || later(seqB, seqA));
-  *config = chooseB ? b : a;
-  if (sequence) *sequence = chooseB ? seqB : seqA;
-  return true;
+  if (!ready(store) || !config) return false;
+  if (loadPair(store, CONFIG_STORE_BASE, RECORD_BYTES, config, sequence)) return true;
+  return loadPair(store, 0, CONFIG_LEGACY_SLOT_SIZE, config, sequence);
 }
 bool CONFIG_Save(const ConfigStore *store, const DeviceConfig *config,
                  uint32_t *sequence) {
-  if (!ready(store) || !store->write || !config)
-    return false;
-  DeviceConfig a, b;
-  uint32_t seqA = 0, seqB = 0;
-  bool okA = slotRead(store, 0, &a, &seqA);
-  bool okB = slotRead(store, 1, &b, &seqB);
-  bool newestB = okB && (!okA || later(seqB, seqA));
-  unsigned target = !okA && !okB ? 0 : (newestB ? 0 : 1);
-  uint32_t nextSeq = !okA && !okB ? 1 : (newestB ? seqB : seqA)+1;
+  if (!ready(store) || !store->write || !config) return false;
+  DeviceConfig candidate;
+  uint32_t seq=0, best=0;
+  unsigned newest=0;
+  bool found=false;
+  for (unsigned i=0; i<CONFIG_STORE_SLOTS; ++i) {
+    if (slotRead(store, CONFIG_STORE_BASE+i*RECORD_BYTES, RECORD_BYTES, &candidate, &seq) &&
+        (!found || later(seq,best))) {
+      newest=i; best=seq; found=true;
+    }
+  }
+  unsigned target=found ? newest^1u : 0;
+  if (!found) {
+    // Start beyond the legacy sequence, keeping both old 512-byte slots intact.
+    for (unsigned i=0; i<CONFIG_STORE_SLOTS; ++i)
+      if (slotRead(store, i*CONFIG_LEGACY_SLOT_SIZE, CONFIG_LEGACY_SLOT_SIZE, &candidate, &seq) &&
+          (!found || later(seq,best))) { best=seq; found=true; }
+  }
+  uint32_t next=found ? best+1u : 1u;
   uint8_t bytes[RECORD_BYTES];
-  if (!CONFIG_Encode(config, nextSeq, bytes) ||
-      !store->write(store->context, target*RECORD_BYTES, bytes, RECORD_BYTES))
-    return false;
-  DeviceConfig verify;
-  uint32_t verifySeq;
-  if (!slotRead(store, target, &verify, &verifySeq) || verifySeq != nextSeq)
-    return false;
-  if (sequence) *sequence = nextSeq;
+  uint32_t address=CONFIG_STORE_BASE+target*RECORD_BYTES;
+  if (!CONFIG_Encode(config,next,bytes) ||
+      !store->write(store->context,address,bytes,RECORD_BYTES) ||
+      !slotRead(store,address,RECORD_BYTES,&candidate,&seq) || seq!=next) return false;
+  if (sequence) *sequence=next;
   return true;
 }

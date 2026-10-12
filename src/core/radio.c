@@ -234,6 +234,8 @@ bool RADIO_ApplyRxPlan(RadioReceiver *context, const RxPlan *plan) {
   context->bandwidth = bandwidth;
   context->squelch = plan->parameters.squelch;
   context->rx_tone = plan->parameters.rx_tone;
+  // Samples belong to a tuned RF plan; never carry RSSI across VFO handoffs.
+  gRadioState->msm = (Measurement){0};
   gRedrawScreen = true;
   return true;
 }

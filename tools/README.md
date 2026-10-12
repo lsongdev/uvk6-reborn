@@ -43,3 +43,7 @@ make flash PORT=/dev/ttyUSB0
 
 独立调用：`python3 tools/flash.py --port /dev/ttyUSB0 --firmware bin/firmware.bin`。
 主机模拟测试：`python3 tests/flash-regression.py`，不访问设备。
+
+A/B 首屏切换预览：`python3 tools/ui-preview.py --frames ab-a ab-b --output docs/images/ab-vfo.png`，左图选中 A，右图选中 B，使用固件真实组件及字体绘制。
+
+多 VFO 分页：`python3 tools/ui-preview.py --frames multi-ab multi-cd --output docs/images/multi-vfo.png`。双守听探测／接收归属：`python3 tools/ui-preview.py --frames watch-probe watch-rx --output docs/images/dual-watch.png`。

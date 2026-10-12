@@ -188,7 +188,7 @@ bool FC_key(KEY_Code_t key, Key_State_t state) {
       if (gLastActiveLoot) {
         FC_deinit();
         RADIO_SetParam(ctx, PARAM_FREQUENCY, gLastActiveLoot->f, true);
-        APPS_run(APP_VFO1);
+        APPS_run(APP_VFO);
       }
       return true;
     default:
