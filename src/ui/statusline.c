@@ -1,6 +1,7 @@
 #include "ui/statusline.h"
 #include "core/device-config.h"
 #include "apps/apps.h"
+#include "apps/vfo1.h"
 #include "hal/eeprom.h"
 #include "drivers/si473x/si473x.h"
 #include "hal/display.h"
@@ -114,7 +115,12 @@ void STATUSLINE_render(void) {
     icons[idx++] = SYM_LOCK;
   }
 
-  PrintSymbolsEx(LCD_WIDTH - 1 - 22, BASE_Y, POS_R, C_FILL, "%s", icons);
+  uint8_t iconsRight = LCD_WIDTH - 1 - 22;
+  if (gCurrentApp == APP_VFO1 && VFO1_isShortcutPending()) {
+    PrintSmallEx(iconsRight, BASE_Y, POS_R, C_FILL, "F");
+    iconsRight -= 8;
+  }
+  PrintSymbolsEx(iconsRight, BASE_Y, POS_R, C_FILL, "%s", icons);
 
   if (gIsNumNavInput) {
     PrintSmall(0, BASE_Y, "Select: %s", gNumNavInput);

@@ -53,6 +53,7 @@ static SeekPhase seekPhase;
 static RxPlan seekOrigin;
 static bool seekNative;
 static uint32_t seekAt, seekDeadline;
+bool VFO1_isShortcutPending(void) { return functionPending; }
 
 void VFO1_cancelShortcut(void) {
   if (functionPending) {
@@ -575,8 +576,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
 
 void VFO1_render(void) {
   char frequencyText[16];
-  STATUSLINE_SetText(seek.active ? "SEEK >" :
-                     functionPending ? "RADIO F" : "RADIO");
+  STATUSLINE_SetText("RADIO");
   if (confirming) {
     const char *unit = UI_FormatFrequency(pending.frequency_hz, frequencyText);
     PrintMediumEx(2, 18, POS_L, C_FILL, "Apply %s?", rxModeNames[pending.parameters.mode]);
