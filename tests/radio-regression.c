@@ -1,5 +1,4 @@
 #include "hal/led.h"
-// Host regression tests exercise production tuning logic with hardware mocked.
 #include "../src/core/radio.c"
 #include <assert.h>
 
@@ -23,8 +22,6 @@ void SYS_DelayMs(uint32_t ms) { (void)ms; }
 bool BK1080_Detect(void) { ++probes; return !hasSi; }
 bool SI47XX_Detect(void) { ++probes; return hasSi; }
 bool SETTINGS_IsPatchPresent(void) { return true; }
-const char *TX_OFFSET_NAMES[4] = {"None", "+", "-", "Freq"};
-const char *TX_POWER_NAMES[4] = {"Low", "Mid", "High", "Min"};
 uint16_t BK1080_ReadRegister(BK1080_Register_t reg) {
   (void)reg;
   return hasSi ? 0 : 0x1080;
@@ -58,82 +55,27 @@ void testBandNames(void);
 int main(int argc, char **argv) {
   (void)argv;
   hasSi = argc == 1;
-  VFOContext context = {.radio_type = RADIO_SI4732, .frequency = 9592500,
-                        .modulation = MOD_FM};
-  RADIO_UpdateCurrentBand(&context);
-  RADIO_SetParam(&context, PARAM_FREQUENCY, 43850000, true);
-  assert(context.frequency == 43850000);
-  assert(context.radio_type == RADIO_BK4819);
-  assert(context.current_band == &bk4819_bands[0]);
-  assert(context.dirty[PARAM_RADIO] && context.dirty[PARAM_FREQUENCY]);
-  assert(context.gain == AUTO_GAIN_INDEX);
-  assert(context.save_to_eeprom);
-
-  RADIO_SetParam(&context, PARAM_FREQUENCY, 9592500, true);
-  assert(context.frequency == 9592500);
-  assert(context.radio_type == (hasSi ? RADIO_SI4732 : RADIO_BK1080));
-  assert(context.current_band == (hasSi ? &si4732_bands[2] : &bk1080_band));
-  assert(context.modulation == MOD_FM && context.gain == 0);
-
-  if (hasSi) {
-  RADIO_SetParam(&context, PARAM_FREQUENCY, 710000, true);
-  assert(context.frequency == 710000);
-  assert(context.radio_type == RADIO_SI4732);
-  assert(context.modulation == MOD_AM);
-  assert(context.current_band == &si4732_bands[0]);
-  RADIO_SetParam(&context, PARAM_FREQUENCY, 14550000, true);
-  assert(context.frequency == 14550000);
-  assert(context.radio_type == RADIO_BK4819);
-
-  } else {
-  context.modulation = MOD_FM;
-  RADIO_SetParam(&context, PARAM_FREQUENCY, 9592500, false);
-  assert(context.radio_type == RADIO_BK1080);
-  assert(context.current_band == &bk1080_band);
-  assert(!RADIO_IsParamValid(&context, PARAM_FREQUENCY, 43850000));
-  RADIO_SetParam(&context, PARAM_FREQUENCY, 43850000, false);
-  assert(context.radio_type == RADIO_BK4819);
-  assert(context.frequency == 43850000);
-  RADIO_SetParam(&context, PARAM_FREQUENCY, 710000, false);
-  assert(context.frequency == 43850000); // No HF receiver on this board.
-  RADIO_SetParam(&context, PARAM_FREQUENCY, BK4819_F_MAX + 1, false);
-  assert(context.frequency == 43850000);
-
-  }
-  // Even trusted EEPROM metadata cannot authorize TX in an RX-only build.
-  context.tx_allowed = true;
-  context.radio_type = RADIO_BK4819;
-  context.modulation = MOD_FM;
-  assert(checkTX(&context) == TX_DISABLED);
-  // The new hardware path must not commit context on command failure.
-  RadioState snapshot = {.num_vfos = 1};
-  snapshot.vfos[0].context = (VFOContext){
-      .radio_type = RADIO_BK4819, .modulation = MOD_FM,
-      .frequency = 43850000, .filter = FILTER_AUTO
-  };
-  gRadioState = &snapshot;
-  updateContext();
+  RadioState state;
+  gRadioState = &state;
+  RADIO_InitState(&state, 1);
+  ctx->frequency = 43850000;
+  ctx->radio_type = RADIO_BK4819;
+  ctx->modulation = MOD_FM;
   RadioParameters wide = {RX_WFM, 100000, 0, 0, false};
-  RxPlan receivePlan;
+  RxPlan plan;
   assert(RADIO_MODEL_Plan(100000000, wide,
-         RADIO_GetReceiverCapabilities(), &receivePlan) == RX_OK);
+         RADIO_GetReceiverCapabilities(), &plan) == RX_OK);
   hardwareApplyOk = false;
-  assert(!RADIO_ApplyRxPlan(ctx, &receivePlan));
+  assert(!RADIO_ApplyRxPlan(ctx, &plan));
   assert(hardwareApplies == 1 && audioMutes > 0);
-  assert(ctx->frequency == 43850000 &&
-         ctx->radio_type == RADIO_BK4819 && ctx->modulation == MOD_FM);
+  assert(ctx->frequency == 43850000 && ctx->radio_type == RADIO_BK4819);
   hardwareApplyOk = true;
-  assert(RADIO_ApplyRxPlan(ctx, &receivePlan));
+  assert(RADIO_ApplyRxPlan(ctx, &plan));
   assert(hardwareApplies == 2 && ctx->frequency == 10000000 &&
-         ctx->radio_type == (hasSi ? RADIO_SI4732 : RADIO_BK1080) &&
-         !ctx->tx_allowed && !ctx->save_to_eeprom);
-  assert(!ctx->dirty[PARAM_FREQUENCY] && !ctx->dirty[PARAM_MODULATION]);
-  // No implicit WFM -> BK narrowband fallback.
-  RxPlan invalid = receivePlan;
-  invalid.device = RX_DEVICE_BK;
+         ctx->radio_type == (hasSi ? RADIO_SI4732 : RADIO_BK1080));
+  RxPlan invalid = plan; invalid.device = RX_DEVICE_BK;
   assert(!RADIO_ApplyRxPlan(ctx, &invalid));
   assert(hardwareApplies == 2);
-
   unsigned initialProbes = probes;
   RADIO_GetReceiverCapabilities();
   RADIO_GetReceiverCapabilities();

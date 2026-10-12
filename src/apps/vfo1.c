@@ -213,14 +213,10 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
   expireShortcut();
   if (key == KEY_PTT) {
     VFO1_cancelShortcut();
-    if (state == KEY_RELEASED)
-      RADIO_ToggleTX(ctx, false);
-    else if (!inMenu && !confirming && runtime.active)
-      RADIO_ToggleTX(ctx, true);
+    if (state == KEY_PRESSED)
+      notify("TX disabled");
     return true;
   }
-  if (ctx->tx_state.is_active)
-    return true;
   if (confirming) {
     if (state == KEY_RELEASED) {
       if (key == KEY_MENU) {
@@ -337,7 +333,7 @@ void VFO1_render(void) {
   const RadioParameters *preset = &gDeviceConfig.radio.presets[user.active_band];
   changed = user.current.parameters.mode != preset->mode || user.current.parameters.step_hz != preset->step_hz ||
             user.current.parameters.bandwidth_hz != preset->bandwidth_hz || user.current.parameters.squelch != preset->squelch;
-  uint32_t frequency = ctx->tx_state.is_active ? RADIO_GetParam(ctx, PARAM_TX_FREQUENCY_FACT)*10u : user.current.frequency_hz;
+  uint32_t frequency = user.current.frequency_hz;
   UI_VfoView view = {
     .id = 'A', .selected = true,
     .frequency_hz = frequency, .mode = user.current.parameters.mode,
@@ -345,8 +341,7 @@ void VFO1_render(void) {
     .name = rds.decoder.ps, .rds = rds.decoder.text,
     .signal_valid = runtime.active,
     .signal_level = runtime.active ? UI_SMeterLevel() : 0,
-    .status = ctx->tx_state.is_active ? "TX" : !runtime.active ? "RX --"
-            : ctx->tx_state.last_error != TX_UNKNOWN ? "TX OFF" : NULL,
+    .status = !runtime.active ? "RX --" : NULL,
   };
   UI_VfoRender(8, &view, &card, Now());
   if (message) PrintSmall(0, 43, "%s", message);
