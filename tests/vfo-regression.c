@@ -24,6 +24,7 @@ static unsigned rdsReads, rdsClears, rdsIndex;
 static bool rdsAvailable;
 static uint32_t soughtFrequency;
 static bool nativeSeekBusy;
+static RxSeekResult nativeReply;
 static unsigned nativeStarts, nativeCancels;
 static uint32_t nativeFrequency;
 bool RX_DEVICE_SeekNative(const RxPlan *plan) {
@@ -38,7 +39,7 @@ RxSeekResult RX_DEVICE_SeekPoll(RxDevice dev, uint32_t *found) {
   (void)dev;
   if (nativeSeekBusy) { nativeSeekBusy = false; return RX_SEEK_BUSY; }
   *found = nativeFrequency;
-  return RX_SEEK_FOUND;
+  return nativeReply;
 }
 void RX_DEVICE_SeekCancel(RxDevice dev) { (void)dev; ++nativeCancels; }
 bool RX_DEVICE_SeekSignal(RxDevice dev, bool *found) {
@@ -110,6 +111,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   failFrequency = 0;
   soughtFrequency = 0;
   nativeFrequency = 100100000;
+  nativeReply = RX_SEEK_FOUND;
   nativeStarts = nativeCancels = 0;
   capabilities = (ReceiverCapabilities){true, false, true};
   VFO1_init();
@@ -309,5 +311,69 @@ int main(void) {
   press(KEY_UP);
   assert(user.current.frequency_hz == 438500000 && user.current.parameters.mode == RX_NFM && applied == 2);
   assert(!runtime.active && !vfo->is_open && routed == 1);
+
+  // F,* starts forward-only BK software seek. Intermediate tunes are not
+  // persisted, and a stable carrier commits exactly once.
+  setup(438500000, fm);
+  unsigned savedBeforeSeek = saveRequests;
+  soughtFrequency = 438512500;
+  press(KEY_F);press(KEY_STAR);
+  assert(seek.active && !seekNative && !functionPending);
+  assert(user.current.frequency_hz == 438500000);
+  VFO1_update();
+  assert(seek.active && ctx->frequency == 43851250 &&
+         saveRequests == savedBeforeSeek);
+  clockNow += 185;
+  VFO1_update(); // First squelch sample.
+  assert(seek.active && saveRequests == savedBeforeSeek);
+  clockNow += 85;
+  VFO1_update(); // Stable second sample.
+  assert(!seek.active && user.current.frequency_hz == 438512500);
+  assert(saveRequests == savedBeforeSeek + 1);
+
+  // EXIT cancels without persisting and restores the exact original plan.
+  setup(438500000, fm);
+  savedBeforeSeek = saveRequests;
+  press(KEY_F);press(KEY_STAR);
+  VFO1_update();
+  press(KEY_EXIT);
+  assert(!seek.active && runtime.active &&
+         user.current.frequency_hz == 438500000 &&
+         ctx->frequency == 43850000 && saveRequests == savedBeforeSeek);
+  assert(VFO1_key(KEY_UP, KEY_PRESSED) == false); // Manual tuning unchanged.
+
+  // Hardware seek must not overwrite RadioUserState until the final tune.
+  setup(100000000, (RadioParameters){RX_WFM,100000,0,0,false});
+  savedBeforeSeek = saveRequests;
+  press(KEY_F);press(KEY_STAR);
+  assert(seek.active && seekNative && nativeStarts == 0);
+  VFO1_update();
+  assert(nativeStarts == 1 && saveRequests == savedBeforeSeek);
+  clockNow += 100;VFO1_update();
+  clockNow += 100;VFO1_update();
+  assert(!seek.active && user.current.frequency_hz == 100100000);
+  assert(saveRequests == savedBeforeSeek+1 && nativeCancels == 1);
+
+  // No signal: reach hardware band end, wrap, reach the origin, stop.
+  setup(100000000, (RadioParameters){RX_WFM,100000,0,0,false});
+  savedBeforeSeek = saveRequests;
+  nativeReply = RX_SEEK_LIMIT;
+  press(KEY_F);press(KEY_STAR);
+  VFO1_update();
+  clockNow += 100;VFO1_update();
+  clockNow += 100;VFO1_update();
+  assert(seek.active && seek.wrapped && ctx->frequency == 6400000);
+  assert(saveRequests == savedBeforeSeek);
+  clockNow += 190;VFO1_update(); // Check the band start once.
+  clockNow += 10;VFO1_update(); // Continue native seek from the band start.
+  clockNow += 100;VFO1_update();
+  clockNow += 100;VFO1_update();
+  assert(!seek.active && user.current.frequency_hz == 100000000);
+  assert(ctx->frequency == 10000000 && saveRequests == savedBeforeSeek);
+
+  // SSB does not gain an unreliable RSSI-only auto-search path.
+  setup(7100000, (RadioParameters){RX_USB,5000,3000,0,false});
+  press(KEY_F);press(KEY_STAR);
+  assert(!seek.active && !strcmp(message,"SSB seek off"));
   return 0;
 }
