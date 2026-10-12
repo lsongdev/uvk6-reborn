@@ -7,7 +7,8 @@
 #define HEADER_BANDS 5u
 #define HEADER_SEQUENCE 8u
 #define HEADER_CRC 12u
-_Static_assert(PAYLOAD_START + 1 + 14*(RADIO_STATE_BANDS+1) + 18 + 8*RADIO_STATE_BANDS <= RECORD_BYTES,
+_Static_assert(PAYLOAD_START + 1 + 14*(RADIO_STATE_BANDS+1) + 18 +
+               8*RADIO_STATE_BANDS + 5 <= RECORD_BYTES,
                "Band presets must fit in the existing configuration slot");
 
 static void put16(uint8_t *p, uint16_t n) {
@@ -52,15 +53,20 @@ void CONFIG_Default(DeviceConfig *config) {
     return;
   *config = (DeviceConfig){0};
   RADIO_STATE_Default(&config->radio);
+  config->tx = (TxConfig){.enabled = false, .power = TX_POWER_LOW};
   config->preferences = (ConfigPreferences){
       .battery_calibration = 2000, .backlight = 3, .contrast = 8,
       .brightness = 8, .battery_type = 0, .battery_style = 1,
       .backlight_on_squelch = 1, .mic = 0, .deviation = 130,
-      .brightness_low = 0, .sql_open_time = 1, .sql_close_time = 1};
+      .brightness_low = 0, .sql_open_time = 1, .sql_close_time = 1,
+      .tx_timeout_seconds = 120, .tx_busy_lockout = 1};
 }
 static bool valid(const DeviceConfig *config) {
   const ConfigPreferences *p = &config->preferences;
   return RADIO_STATE_Valid(&config->radio) &&
+         (unsigned)config->tx.power <= TX_POWER_HIGH &&
+         p->tx_timeout_seconds >= 15 && p->tx_timeout_seconds <= 600 &&
+         p->tx_busy_lockout <= 1 &&
          p->battery_calibration >= 1900 && p->battery_calibration <= 2154 &&
          p->backlight <= 6 && p->contrast <= 15 && p->brightness <= 15 &&
          p->battery_type <= 2 && p->battery_style <= 2 &&
@@ -102,6 +108,11 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
     p[6] = preset->mode; p[7] = preset->squelch;
     p += 8;
   }
+  // TX settings are explicitly encoded; C enums/bitfields never persisted.
+  *p++ = config->tx.enabled ? 1u : 0u;
+  *p++ = (uint8_t)config->tx.power;
+  put16(p, pref->tx_timeout_seconds); p += 2;
+  *p++ = pref->tx_busy_lockout;
   put32(bytes + HEADER_CRC, crc32(bytes));
   return true;
 }
@@ -133,6 +144,12 @@ bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
         .mode = (RxMode)p[6], .squelch = p[7], .tx_enabled = false};
     p += 8;
   }
+  if (p[0] > 1 || p[1] > TX_POWER_HIGH)
+    return false;
+  candidate.tx.enabled = p[0] != 0;
+  candidate.tx.power = (TxPower)p[1];
+  candidate.preferences.tx_timeout_seconds = get16(p+2);
+  candidate.preferences.tx_busy_lockout = p[4];
   if (!valid(&candidate))
     return false;
   *config = candidate;

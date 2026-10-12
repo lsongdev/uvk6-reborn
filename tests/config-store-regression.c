@@ -32,10 +32,10 @@ int main(void) {
   assert(EEPROM_CandidateFromAckMask(0xff) == EEPROM_4MBIT);
   assert(EEPROM_CandidateFromAckMask(0x05) == EEPROM_UNKNOWN);
   assert(EEPROM_CandidateFromAckMask(0x07) == EEPROM_UNKNOWN);
-  assert(EEPROM_WriteAllowed(0, 256));
-  assert(EEPROM_WriteAllowed(256, 256));
-  assert(!EEPROM_WriteAllowed(512, 1));
-  assert(!EEPROM_WriteAllowed(511, 2));
+  assert(EEPROM_WriteAllowed(0, 512));
+  assert(EEPROM_WriteAllowed(512, 512));
+  assert(!EEPROM_WriteAllowed(1024, 1));
+  assert(!EEPROM_WriteAllowed(1023, 2));
   assert(!EEPROM_WriteAllowed(0x1e00, 1));
   assert(!EEPROM_WriteAllowed(UINT32_MAX, 64));
   DeviceConfig original, loaded;
@@ -55,6 +55,9 @@ int main(void) {
   assert(original.radio.current.frequency_hz == 100000000);
   assert(!RADIO_STATE_Set(&original.radio, 100000000,
          (RadioParameters){RX_WFM,100000,0,0,true})); // RX-only
+  original.tx = (TxConfig){.enabled = true, .power = TX_POWER_LOW};
+  original.preferences.tx_timeout_seconds = 90;
+  original.preferences.tx_busy_lockout = 1;
   uint8_t record[CONFIG_STORE_SLOT_SIZE];
   assert(CONFIG_Encode(&original, 1, record));
   assert(!CONFIG_Decode(record, NULL, NULL));
@@ -64,11 +67,16 @@ int main(void) {
   assert(CONFIG_Decode(record, &loaded, NULL));
   assert(loaded.radio.bands[3].frequency_hz == 100000000);
   assert(loaded.radio.current.parameters.mode == RX_WFM);
+  assert(loaded.tx.enabled && loaded.tx.power == TX_POWER_LOW);
+  assert(loaded.preferences.tx_timeout_seconds == 90);
+  assert(loaded.preferences.tx_busy_lockout == 1);
 
   // Development storage is intentionally strict: never decode old layouts.
   record[4] = 1;
   assert(!CONFIG_Decode(record, &loaded, NULL));
   record[4] = 2;
+  assert(!CONFIG_Decode(record, &loaded, NULL));
+  record[4] = 3;
   assert(!CONFIG_Decode(record, &loaded, NULL));
   original.preferences.brightness_low = 5;
   original.preferences.sql_open_time = 3;
