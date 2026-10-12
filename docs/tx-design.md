@@ -26,7 +26,7 @@
                              RadioRuntime / TX HAL
 ```
 
-- `RxConfig`：RX 模式、步进、带宽、静噪；**不承载发射授权**。
+- `RxConfig`：RX 模式、步进、带宽、静噪；**不承载发射授权**。当前代码的 `RadioParameters` 已移除旧 `tx_enabled` 字段。
 - `TxConfig`：用户发射意图，例如显式启用、功率档；高级设置未来加入异频与发射信令。配置即使启用也不代表硬件允许发射。
 - `TxCapabilities`：已确认的整机 TX 硬件特性（BK 路径、PA、输出滤波、可用功率级、校准有效性等）。
 - `TxPolicy`：整机经过验证的发射频率白名单、可选区域约束以及保护限制；必须与用户的操作许可相符。用户不能靠修改频段名称、RX 模式或 `TxConfig.enabled` 扩大发射资格。

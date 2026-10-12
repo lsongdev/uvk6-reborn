@@ -16,8 +16,8 @@ int main(void) {
   assert(RADIO_MODEL_Plan(95925000, parameters, none, &plan) == RX_UNSUPPORTED_MODE);
 
   // The selected demodulation mode determines the receiver at an overlap.
-  RadioParameters nfm = {RX_NFM, 12500, 12000, 0, false};
-  RadioParameters wfm = {RX_WFM, 100000, 0, 0, false};
+  RadioParameters nfm = {RX_NFM, 12500, 12000, 0};
+  RadioParameters wfm = {RX_WFM, 100000, 0, 0};
   assert(strcmp(rxModeNames[RX_NFM], "NFM") == 0);
   assert(RADIO_MODEL_Plan(100000000, nfm, si, &plan) == RX_OK);
   assert(plan.device == RX_DEVICE_BK && plan.frequency_hz == 100000000);
@@ -40,9 +40,9 @@ int main(void) {
   assert(RADIO_MODEL_Plan(438500000, parameters, si, &plan) == RX_OK);
   assert(plan.device == RX_DEVICE_BK && plan.frequency_hz == 438500000);
   assert(!RADIO_MODEL_CanTransmit(&plan));
-  parameters.tx_enabled = true;
+  parameters.squelch = 11;
   assert(RADIO_MODEL_Plan(438500000, parameters, si, &plan) == RX_INVALID_PARAMETERS);
-  assert(!RADIO_MODEL_CanTransmit(&plan)); // Band flags cannot invent board TX limits.
+  assert(!RADIO_MODEL_CanTransmit(&plan)); // RX planning never grants TX.
 
   parameters = radioBands[RADIO_MODEL_BandAt(20000000)].preset;
   assert(parameters.mode == RX_AM);

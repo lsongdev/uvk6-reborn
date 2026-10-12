@@ -2,7 +2,7 @@
 #include <stddef.h>
 
 #define MHZ_HZ 1000000u
-#define PRESET(mode_, step_, bw_, sq_) {mode_, step_, bw_, sq_, false}
+#define PRESET(mode_, step_, bw_, sq_) {mode_, step_, bw_, sq_}
 const char *const rxModeNames[RX_MODE_COUNT] = {"NFM", "WFM", "AM", "LSB", "USB"};
 // Narrower ranges win. Shortcut order is independent of range matching.
 const RadioBand radioBands[] = {
@@ -67,7 +67,7 @@ static bool bandwidthSupported(RxDevice device, RxMode mode, uint32_t width) {
 RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
                           ReceiverCapabilities capabilities, RxPlan *plan) {
   if (!plan || (unsigned)parameters.mode >= RX_MODE_COUNT || !parameters.step_hz ||
-      parameters.squelch > 10 || parameters.tx_enabled)
+      parameters.squelch > 10)
     return RX_INVALID_PARAMETERS;
   if (frequency_hz < RADIO_MIN_HZ || frequency_hz > RADIO_MAX_HZ)
     return RX_OUT_OF_RANGE;

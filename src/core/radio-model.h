@@ -12,7 +12,6 @@ typedef struct {
   uint32_t step_hz;
   uint32_t bandwidth_hz; // Zero means fixed bandwidth (WFM).
   uint8_t squelch;
-  bool tx_enabled;
 } RadioParameters;
 typedef struct {
   const char *name;

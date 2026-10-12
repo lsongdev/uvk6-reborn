@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
   ctx->frequency = 43850000;
   ctx->radio_type = RADIO_BK4819;
   ctx->modulation = MOD_FM;
-  RadioParameters wide = {RX_WFM, 100000, 0, 0, false};
+  RadioParameters wide = {RX_WFM, 100000, 0, 0};
   RxPlan plan;
   assert(RADIO_MODEL_Plan(100000000, wide,
          RADIO_GetReceiverCapabilities(), &plan) == RX_OK);

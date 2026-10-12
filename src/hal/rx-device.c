@@ -45,7 +45,7 @@ static void leave(RxDevice device) {
 bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
   if (!plan || plan->frequency_hz < RADIO_MIN_HZ ||
       plan->frequency_hz > RADIO_MAX_HZ ||
-      plan->frequency_hz % 10u || plan->parameters.tx_enabled ||
+      plan->frequency_hz % 10u ||
       (unsigned)plan->parameters.mode >= RX_MODE_COUNT)
     return false;
 

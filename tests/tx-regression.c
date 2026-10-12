@@ -18,7 +18,7 @@ static bool restore(void *x, const RxPlan *plan) {
   return restore_ok;
 }
 int main(void) {
-  RxPlan rx = {RX_DEVICE_BK,145500000,{RX_NFM,12500,12000,4,false}};
+  RxPlan rx = {RX_DEVICE_BK,145500000,{RX_NFM,12500,12000,4}};
   TxConfig cfg = {true,TX_POWER_LOW};
   TxCapabilities hw = {true,true};
   TxPolicy policy = {true,144000000,148000000};

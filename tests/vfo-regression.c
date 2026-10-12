@@ -129,7 +129,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
 static void press(KEY_Code_t key) { assert(VFO1_key(key, KEY_RELEASED)); }
 
 int main(void) {
-  RadioParameters fm = {RX_NFM, 12500, 12000, 4, false};
+  RadioParameters fm = {RX_NFM, 12500, 12000, 4};
   setup(438500000, fm);
   press(KEY_F);press(KEY_0);
   assert(!functionPending && !confirming && appRuns == 0 && applied == 2);
@@ -138,12 +138,12 @@ int main(void) {
   assert(user.current.parameters.mode == RX_NFM);
   press(KEY_0);assert(appRuns == 1); // Plain 0 still enters frequency input.
 
-  setup(100000000, (RadioParameters){RX_WFM,100000,0,0,false});
+  setup(100000000, (RadioParameters){RX_WFM,100000,0,0});
   press(KEY_F);press(KEY_0);
   assert(!confirming && user.current.parameters.mode == RX_AM && ctx->radio_type == RADIO_BK4819);
   assert(user.current.frequency_hz == 100000000);
 
-  setup(7100000, (RadioParameters){RX_AM,5000,6000,0,false});
+  setup(7100000, (RadioParameters){RX_AM,5000,6000,0});
   capabilities.ssb_patch = false;
   press(KEY_F);press(KEY_0);
   assert(!functionPending && user.current.parameters.mode == RX_AM);
@@ -192,7 +192,7 @@ int main(void) {
   press(KEY_EXIT);press(KEY_SIDE1);assert(user.active_band == 0);
 
   setup(438500000, fm);
-  gDeviceConfig.radio.presets[0] = (RadioParameters){RX_AM,5000,3000,2,false};
+  gDeviceConfig.radio.presets[0] = (RadioParameters){RX_AM,5000,3000,2};
   press(KEY_F);press(KEY_1);
   assert(user.current.parameters.step_hz == 5000 && user.current.parameters.bandwidth_hz == 3000);
   assert(user.current.parameters.squelch == 2 && saveRequests == 2);
@@ -205,9 +205,9 @@ int main(void) {
   assert(user.current.frequency_hz == 999000 && user.active_band == 1);
 
   // The same 100 MHz carrier must use BK for NFM and SI for WFM.
-  setup(100000000, (RadioParameters){RX_NFM, 12500, 12000, 0, false});
+  setup(100000000, (RadioParameters){RX_NFM, 12500, 12000, 0});
   assert(runtime.active && ctx->radio_type == RADIO_BK4819);
-  setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0, false});
+  setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0});
   assert(runtime.active && ctx->radio_type == RADIO_SI4732);
   VFO1_update();assert(!rdsReads);
   clockNow=400;VFO1_update();assert(rdsClears==1);
@@ -219,12 +219,12 @@ int main(void) {
   press(KEY_SIDE2);assert(!rds.decoder.ps[0]);
   clockNow=1000;VFO1_update();assert(rdsReads==readsBefore); // NFM doesn't poll SI RDS.
 
-  setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0, false});
+  setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0});
   strcpy(rds.decoder.ps,"OLD FM");
   failFrequency=100100000;press(KEY_UP);
   assert(runtime.active && user.current.frequency_hz==100000000 && !rds.decoder.ps[0]);
 
-  setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0, false});
+  setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0});
   capabilities.si=false;capabilities.broadcast=true;request(100000000,user.current.parameters);
   assert(runtime.current.device==RX_DEVICE_BROADCAST);
   clockNow=500;VFO1_update();assert(!rdsReads); // BK1080 has no RDS path.
@@ -236,14 +236,14 @@ int main(void) {
   press(KEY_SIDE2);
   assert(user.current.parameters.mode == RX_NFM && user.current.frequency_hz == 438500000);
 
-  setup(7100000, (RadioParameters){RX_AM, 5000, 6000, 0, false});
+  setup(7100000, (RadioParameters){RX_AM, 5000, 6000, 0});
   unsigned before = applied;
   press(KEY_SIDE2);
   assert(!confirming && user.current.parameters.mode == RX_LSB);
   assert(user.current.parameters.bandwidth_hz == 3000 && applied == before+1);
   assert(user.current.frequency_hz == 7100000);
 
-  setup(7100000, (RadioParameters){RX_AM, 5000, 6000, 0, false});
+  setup(7100000, (RadioParameters){RX_AM, 5000, 6000, 0});
   capabilities.ssb_patch = false;
   press(KEY_SIDE2);
   assert(!confirming && user.current.parameters.mode == RX_AM);
@@ -266,7 +266,7 @@ int main(void) {
   assert(user.current.frequency_hz == 95930000 && ctx->radio_type == RADIO_BK4819);
 
   // WFM to NFM also applies immediately when SSB modes are unavailable.
-  setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0, false});
+  setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0});
   capabilities.ssb_patch = false;
   press(KEY_SIDE2);
   assert(!confirming && user.current.parameters.mode == RX_AM);
@@ -302,7 +302,7 @@ int main(void) {
   assert(!inMenu && appRuns == 0);
   // A saved preset is applied on band entry; live overrides never replace it.
   setup(438500000, fm);
-  gDeviceConfig.radio.presets[6] = (RadioParameters){RX_AM,25000,6000,2,false};
+  gDeviceConfig.radio.presets[6] = (RadioParameters){RX_AM,25000,6000,2};
   press(KEY_SIDE2); // Temporary AM, preserving the edited preset fields.
   assert(gDeviceConfig.radio.presets[6].step_hz == 25000);
   press(KEY_SIDE1); // Leave 70cm for LW.
@@ -353,7 +353,7 @@ int main(void) {
   assert(VFO1_key(KEY_UP, KEY_PRESSED) == false); // Manual tuning unchanged.
 
   // Hardware seek must not overwrite RadioUserState until the final tune.
-  setup(100000000, (RadioParameters){RX_WFM,100000,0,0,false});
+  setup(100000000, (RadioParameters){RX_WFM,100000,0,0});
   savedBeforeSeek = saveRequests;
   press(KEY_F);press(KEY_STAR);
   assert(seek.active && seekNative && nativeStarts == 0);
@@ -365,7 +365,7 @@ int main(void) {
   assert(saveRequests == savedBeforeSeek+1 && nativeCancels == 1);
 
   // No signal: reach hardware band end, wrap, reach the origin, stop.
-  setup(100000000, (RadioParameters){RX_WFM,100000,0,0,false});
+  setup(100000000, (RadioParameters){RX_WFM,100000,0,0});
   savedBeforeSeek = saveRequests;
   nativeReply = RX_SEEK_LIMIT;
   press(KEY_F);press(KEY_STAR);
@@ -406,7 +406,7 @@ int main(void) {
   VFO1_PttRelease();
   assert(transmitter.mode == RADIO_RX);
   // RX mode is still authoritative, even when a TX request is stored.
-  setup(100000000, (RadioParameters){RX_WFM,100000,0,0,false});
+  setup(100000000, (RadioParameters){RX_WFM,100000,0,0});
   gDeviceConfig.tx.enabled = true;
   assert(VFO1_key(KEY_PTT, KEY_PRESSED));
   assert(!strcmp(message, "TX mode not supported"));
@@ -414,7 +414,7 @@ int main(void) {
   VFO1_PttRelease();
 
   // SSB does not gain an unreliable RSSI-only auto-search path.
-  setup(7100000, (RadioParameters){RX_USB,5000,3000,0,false});
+  setup(7100000, (RadioParameters){RX_USB,5000,3000,0});
   press(KEY_F);press(KEY_STAR);
   assert(!seek.active && !strcmp(message,"SSB seek off"));
   return 0;
