@@ -51,6 +51,9 @@ esac
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/rx-device-regression.c "$dead_strip" -o "$test_binary"
 "$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/tx-regression.c \
+  src/core/tx-model.c src/core/tx-runtime.c -o "$test_binary"
+"$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/rx-runtime-regression.c \
   src/core/rx-runtime.c -o "$test_binary"
 "$test_binary"
