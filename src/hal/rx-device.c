@@ -1,7 +1,7 @@
 #include "hal/rx-device.h"
-#include "hal/bk1080.h"
-#include "hal/bk4819.h"
-#include "hal/si473x.h"
+#include "drivers/bk1080/bk1080.h"
+#include "drivers/bk4819/bk4819.h"
+#include "drivers/si473x/si473x.h"
 #include "core/settings.h"
 
 // Silence the previous RF chip when moving to another receiver. The audio

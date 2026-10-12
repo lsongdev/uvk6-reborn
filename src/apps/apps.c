@@ -1,5 +1,5 @@
 #include "apps/apps.h"
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "hal/uart.h"
 #include "ui/menu.h"
 #include "ui/graphics.h"
@@ -8,6 +8,7 @@
 #include "apps/reset.h"
 #include "apps/settings.h"
 #include "apps/vfo1.h"
+#include "apps/bands.h"
 
 #define APPS_STACK_SIZE 8
 
@@ -48,6 +49,7 @@ const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {APP_VFO1};
 
 // Only the minimal radio, input, settings and explicit reset remain reachable.
 const App apps[APPS_COUNT] = {
+    [APP_BANDS] = {"Bands", BANDS_init, NULL, BANDS_render, BANDS_key, NULL},
     [APP_NONE] = {"None", NULL, NULL, NULL, NULL, NULL},
     [APP_FINPUT] = {"Freq input", FINPUT_init, FINPUT_update, FINPUT_render,
                     FINPUT_key, FINPUT_deinit},

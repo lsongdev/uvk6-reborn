@@ -1,7 +1,7 @@
 #ifndef DRIVER_SPI_H
 #define DRIVER_SPI_H
 
-#include "hal/dp32g030/spi.h"
+#include "drivers/dp32g030/spi.h"
 #include <stdbool.h>
 #include <stdint.h>
 

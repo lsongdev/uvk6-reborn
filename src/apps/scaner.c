@@ -1,5 +1,5 @@
 #include "apps/scaner.h"
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "hal/uart.h"
 #include "core/bands.h"
 #include "core/lootlist.h"

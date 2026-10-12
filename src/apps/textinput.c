@@ -1,5 +1,5 @@
 #include "apps/textinput.h"
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "ui/graphics.h"
 #include "apps/apps.h"
 #include <string.h>

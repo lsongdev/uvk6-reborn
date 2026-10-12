@@ -3,7 +3,7 @@
 
 #define SCANLIST_MAX 1024
 
-#include "hal/bk4819.h"
+#include "drivers/bk4819/bk4819.h"
 #include "hal/keyboard.h"
 #include "core/settings.h"
 #include <stdint.h>

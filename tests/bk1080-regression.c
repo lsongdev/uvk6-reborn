@@ -1,5 +1,5 @@
 // Exercise the real BK1080 I2C path without accessing hardware.
-#include "../src/hal/bk1080.c"
+#include "../src/drivers/bk1080/bk1080.c"
 #include <assert.h>
 #include <string.h>
 

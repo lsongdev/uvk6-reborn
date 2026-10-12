@@ -1,10 +1,10 @@
 #include "core/settings.h"
 #include "apps/apps.h"
 #include "hal/backlight.h"
-#include "hal/bk4819.h"
+#include "drivers/bk4819/bk4819.h"
 #include "hal/eeprom.h"
 #include "core/device-config.h"
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "hal/uart.h"
 #include "external/printf/printf.h"
 #include "core/battery.h"
@@ -324,7 +324,7 @@ void SETTINGS_SetValue(Setting s, uint32_t v) {
     break;
   case SETTING_CONTRAST:
     gSettings.contrast = v;
-    ST7565_Init(false);
+    DISPLAY_Init(false, gSettings.contrast);
     break;
   case SETTING_MAINAPP:
     gSettings.mainApp = v;

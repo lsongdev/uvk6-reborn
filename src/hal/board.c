@@ -3,12 +3,12 @@
 #include "hal/backlight.h"
 #include "hal/crc.h"
 #include "hal/gpio.h"
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "hal/uart.h"
-#include "hal/dp32g030/gpio.h"
-#include "hal/dp32g030/portcon.h"
-#include "hal/dp32g030/saradc.h"
-#include "hal/dp32g030/syscon.h"
+#include "drivers/dp32g030/gpio.h"
+#include "drivers/dp32g030/portcon.h"
+#include "drivers/dp32g030/saradc.h"
+#include "drivers/dp32g030/syscon.h"
 
 // Макросы для сокращения кода
 #define SET_BITS(reg, mask) ((reg) |= (mask))
@@ -219,15 +219,6 @@ void BOARD_ADC_GetBatteryInfo(uint16_t *pVoltage, uint16_t *pCurrent) {
   // Даже если таймаут, читаем значения (могут быть невалидными)
   *pVoltage = ADC_GetValue(ADC_CH4);
   *pCurrent = ADC_GetValue(ADC_CH9);
-}
-
-// Inline функции для частых операций (могут быть в .h)
-inline void BOARD_ToggleGreen(bool on) {
-  BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_GREEN, on);
-}
-
-inline void BOARD_ToggleRed(bool on) {
-  BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, on);
 }
 
 void BOARD_Init(void) {

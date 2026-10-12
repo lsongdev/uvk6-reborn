@@ -1,15 +1,14 @@
-#include "hal/st7565.h"
-#include "hal/dp32g030/gpio.h"
-#include "hal/dp32g030/spi.h"
-#include "core/misc.h"
-#include "core/settings.h"
+#include "drivers/st7565/st7565.h"
+#include "drivers/dp32g030/gpio.h"
+#include "drivers/dp32g030/spi.h"
 #include "hal/gpio.h"
 #include "hal/spi.h"
 #include "hal/system.h"
 #include "hal/systick.h"
-#include "hal/uart.h"
 #include <stdint.h>
 #include <string.h>
+
+static void ST7565_WriteByte(uint8_t value);
 
 static void waitToSend() {
   while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
@@ -17,11 +16,8 @@ static void waitToSend() {
   }
 }
 
-uint8_t gFrameBuffer[8][LCD_WIDTH];
-static uint8_t frameBufferSecond[8][LCD_WIDTH];
+static uint8_t frameBufferSecond[8][ST7565_WIDTH];
 
-static uint32_t gLastRender;
-bool gRedrawScreen = true;
 
 static void ST7565_Configure_GPIO_B11(void) {
   GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_ST7565_RES);
@@ -59,35 +55,35 @@ static void ST7565_FillScreen(uint8_t Value) {
   SPI_ToggleMasterMode(&SPI0->CR, true);
 }
 
-void ST7565_Blit(void) {
+void ST7565_Blit(const uint8_t frame[ST7565_HEIGHT/8][ST7565_WIDTH]) {
   uint8_t Line;
   uint8_t Column;
 
   SPI_ToggleMasterMode(&SPI0->CR, false);
   ST7565_WriteByte(0x40);
 
-  for (Line = 0; Line < ARRAY_SIZE(gFrameBuffer); Line++) {
-    if (memcmp(gFrameBuffer[Line], frameBufferSecond[Line],
-               ARRAY_SIZE(frameBufferSecond[Line])) == 0) {
+  for (Line = 0; Line < ST7565_HEIGHT/8; Line++) {
+    if (memcmp(frame[Line], frameBufferSecond[Line],
+               ST7565_WIDTH) == 0) {
       continue;
     }
 
     ST7565_SelectColumnAndLine(4U, Line);
     GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_ST7565_A0);
-    for (Column = 0; Column < ARRAY_SIZE(gFrameBuffer[0]); Column++) {
+    for (Column = 0; Column < ST7565_WIDTH; Column++) {
       waitToSend();
-      SPI0->WDR = gFrameBuffer[Line][Column];
+      SPI0->WDR = frame[Line][Column];
     }
     SPI_WaitForUndocumentedTxFifoStatusBit();
 
-    memcpy(frameBufferSecond[Line], gFrameBuffer[Line],
-           ARRAY_SIZE(frameBufferSecond[Line]));
+    memcpy(frameBufferSecond[Line], frame[Line],
+           ST7565_WIDTH);
   }
 
   SPI_ToggleMasterMode(&SPI0->CR, true);
 }
 
-void ST7565_Init(bool full) {
+void ST7565_Init(bool full, uint8_t contrast) {
   if (full) {
     SPI0_Init();
     ST7565_Configure_GPIO_B11();
@@ -105,7 +101,7 @@ void ST7565_Init(bool full) {
   ST7565_WriteByte(0xA4);
   ST7565_WriteByte(0x24);
   ST7565_WriteByte(0x81);
-  ST7565_WriteByte(23 + gSettings.contrast); // default 31
+  ST7565_WriteByte(23 + contrast); // default 31
 
   if (full) {
     // setup power circuit
@@ -131,7 +127,7 @@ void ST7565_Init(bool full) {
   }
 }
 
-void ST7565_WriteByte(uint8_t Value) {
+static void ST7565_WriteByte(uint8_t Value) {
   GPIO_ClearBit(&GPIOB->DATA, GPIOB_PIN_ST7565_A0);
   waitToSend();
   SPI0->WDR = Value;

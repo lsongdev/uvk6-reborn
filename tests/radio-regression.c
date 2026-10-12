@@ -1,3 +1,4 @@
+#include "hal/led.h"
 // Host regression tests exercise production tuning logic with hardware mocked.
 #include "../src/core/radio.c"
 #include <assert.h>
@@ -15,7 +16,7 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
 void AUDIO_ToggleSpeaker(bool on) { if (!on) ++audioMutes; }
 void BK4819_ToggleAFDAC(bool on) { (void)on; }
 void BK4819_ToggleAFBit(bool on) { (void)on; }
-void BOARD_ToggleGreen(bool on) { (void)on; }
+void LED_SetGreen(bool on) { (void)on; }
 void BACKLIGHT_On(void) {}
 void BACKLIGHT_Toggle(bool on) { (void)on; }
 void SYS_DelayMs(uint32_t ms) { (void)ms; }

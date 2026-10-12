@@ -1,15 +1,15 @@
-#include "hal/bk4819.h"
+#include "drivers/bk4819/bk4819.h"
 #include "hal/gpio.h"
 #include "hal/system.h"
 #include "hal/systick.h"
 #include "hal/uart.h"
 #include "external/printf/printf.h"
-#include "hal/dp32g030/gpio.h"
-#include "hal/dp32g030/portcon.h"
+#include "drivers/dp32g030/gpio.h"
+#include "drivers/dp32g030/portcon.h"
 #include "core/misc.h"
 #include "core/settings.h"
 #include "hal/audio.h"
-#include "hal/bk4819-regs.h"
+#include "drivers/bk4819/bk4819-regs.h"
 #include <stdint.h>
 #include <stdio.h>
 

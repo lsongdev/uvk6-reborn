@@ -16,9 +16,9 @@
 
 #include "ARMCM0.h"
 #include "hal/adc.h"
-#include "hal/dp32g030/irq.h"
-#include "hal/dp32g030/saradc.h"
-#include "hal/dp32g030/syscon.h"
+#include "drivers/dp32g030/irq.h"
+#include "drivers/dp32g030/saradc.h"
+#include "drivers/dp32g030/syscon.h"
 
 uint8_t ADC_GetChannelNumber(ADC_CH_MASK Mask)
 {

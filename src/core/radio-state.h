@@ -16,6 +16,7 @@ typedef struct {
   uint8_t active_band;
   BandState current;
   BandState bands[RADIO_STATE_BANDS];
+  RadioParameters presets[RADIO_STATE_BANDS];
 } RadioUserState;
 
 bool RADIO_STATE_Default(RadioUserState *state);

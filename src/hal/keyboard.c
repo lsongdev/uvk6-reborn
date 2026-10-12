@@ -1,5 +1,5 @@
 #include "hal/keyboard.h"
-#include "hal/dp32g030/gpio.h"
+#include "drivers/dp32g030/gpio.h"
 #include "hal/scheduler.h"
 #include "apps/system.h"
 #include "hal/gpio.h"

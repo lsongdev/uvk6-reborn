@@ -1,5 +1,5 @@
 #include "apps/finput.h"
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "hal/uart.h"
 #include "hal/scheduler.h"
 #include "ui/graphics.h"

@@ -7,7 +7,7 @@
 #include "hal/systick.h"
 #include "hal/uart.h"
 #include "external/printf/printf.h"
-#include "hal/dp32g030/gpio.h"
+#include "drivers/dp32g030/gpio.h"
 #include "apps/system.h"
 
 static const char *APP_NAME = "hawk5";

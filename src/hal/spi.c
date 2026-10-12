@@ -1,7 +1,7 @@
 #include "hal/spi.h"
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
-#include "hal/dp32g030/irq.h"
-#include "hal/dp32g030/syscon.h"
+#include "drivers/dp32g030/irq.h"
+#include "drivers/dp32g030/syscon.h"
 
 void SPI0_Init(void) {
   SPI_Config_t Config;

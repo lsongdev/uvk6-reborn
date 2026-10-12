@@ -12,6 +12,10 @@ bool RADIO_STATE_Valid(const RadioUserState *state) {
     return false;
   for (uint8_t i = 0; i < radioBandCount; ++i) {
     const BandState *band = &state->bands[i];
+    const RadioParameters *preset = &state->presets[i];
+    if ((unsigned)preset->mode >= RX_MODE_COUNT || !preset->step_hz ||
+        preset->bandwidth_hz > UINT16_MAX || preset->squelch > 10 || preset->tx_enabled)
+      return false;
     if (band->frequency_hz < radioBands[i].start_hz ||
         band->frequency_hz >= radioBands[i].end_hz ||
         (unsigned)band->parameters.mode >= RX_MODE_COUNT ||
@@ -26,6 +30,7 @@ bool RADIO_STATE_Default(RadioUserState *state) {
   if (!state || radioBandCount != RADIO_STATE_BANDS)
     return false;
   for (uint8_t i = 0; i < radioBandCount; ++i) {
+    state->presets[i] = radioBands[i].preset;
     state->bands[i] = (BandState){radioBands[i].initial_hz,
                                    radioBands[i].preset};
   }
@@ -53,5 +58,6 @@ bool RADIO_STATE_Select(RadioUserState *state, uint8_t band) {
     return false;
   state->active_band = band;
   state->current = state->bands[band];
+  state->current.parameters = state->presets[band];
   return true;
 }

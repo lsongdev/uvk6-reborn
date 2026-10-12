@@ -23,6 +23,7 @@ typedef enum {
   APP_VFO1,
   // APP_GENERATOR,
   APP_ABOUT,
+  APP_BANDS,
 
   APPS_COUNT,
 } AppType_t;

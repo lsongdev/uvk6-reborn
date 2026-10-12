@@ -1,4 +1,4 @@
-#include "../src/core/config-store.h"
+#include "../src/core/config-store.c"
 #include <assert.h>
 #include <string.h>
 
@@ -52,6 +52,26 @@ int main(void) {
   assert(loaded.radio.bands[3].frequency_hz == 100000000);
   assert(loaded.radio.current.parameters.mode == RX_WFM);
 
+  // Upgrade format 1 without erasing choices: independent presets inherit
+  // the old per-band last-used parameters, while the current VFO survives.
+  original.radio.bands[6].parameters.mode = RX_AM;
+  assert(CONFIG_Encode(&original, 9, record));
+  record[4] = 1;
+  memset(record+172, 0, sizeof(record)-172);
+  put32(record+12, crc32(record));
+  assert(CONFIG_Decode(record, &loaded, NULL));
+  assert(loaded.radio.presets[6].mode == RX_AM);
+  assert(loaded.radio.current.parameters.mode == RX_WFM);
+  assert(CONFIG_Encode(&loaded, 10, record) && record[4] == CONFIG_STORE_FORMAT);
+  loaded.radio.presets[6].step_hz = 25000;
+  loaded.radio.presets[6].squelch = 2;
+  assert(CONFIG_Encode(&loaded, 11, record));
+  DeviceConfig roundTrip;
+  assert(CONFIG_Decode(record, &roundTrip, NULL));
+  assert(roundTrip.radio.presets[6].step_hz == 25000 && roundTrip.radio.presets[6].squelch == 2);
+  assert(roundTrip.radio.bands[6].parameters.step_hz == 12500);
+  original.radio.bands[6].parameters.mode = RX_NFM;
+
   FakeEEPROM memory;
   memset(&memory, 0xff, sizeof(memory));
   memory.writes = 0;
@@ -62,11 +82,13 @@ int main(void) {
   assert(!CONFIG_Load(&io, &loaded, NULL));
   uint32_t sequence = 0;
   assert(CONFIG_Save(&io, &original, &sequence) && sequence == 1);
+  original.radio.presets[6].squelch = 3;
   original.radio.current.frequency_hz = 100010000;
   original.radio.bands[3] = original.radio.current;
   assert(CONFIG_Save(&io, &original, &sequence) && sequence == 2);
   assert(CONFIG_Load(&io, &loaded, &sequence) && sequence == 2);
   assert(loaded.radio.current.frequency_hz == 100010000);
+  assert(loaded.radio.presets[6].squelch == 3);
   memory.bytes[CONFIG_STORE_SLOT_SIZE+90] ^= 1; // Latest CRC corrupted.
   assert(CONFIG_Load(&io, &loaded, &sequence) && sequence == 1);
   assert(loaded.radio.current.frequency_hz == 100000000);
@@ -76,5 +98,6 @@ int main(void) {
   assert(CONFIG_Load(&io, &loaded, &sequence) && sequence == 1);
   assert(loaded.radio.current.frequency_hz == 100000000);
   assert(memory.writes == 3);
+  assert(loaded.radio.presets[6].squelch == 4);
   return 0;
 }

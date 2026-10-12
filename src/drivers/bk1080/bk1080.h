@@ -1,7 +1,7 @@
 #ifndef DRIVER_BK1080_H
 #define DRIVER_BK1080_H
 
-#include "hal/bk1080-regs.h"
+#include "drivers/bk1080/bk1080-regs.h"
 #include <stdbool.h>
 #include <stdint.h>
 

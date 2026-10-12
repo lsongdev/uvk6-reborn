@@ -2,7 +2,7 @@
 
 #define GRAPHICS_H
 
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "external/printf/printf.h"
 #include "ui/gfxfont.h"
 #include <stdbool.h>

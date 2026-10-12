@@ -139,3 +139,56 @@ bool RADIO_MODEL_CanTransmit(const RxPlan *plan) {
   (void)plan;
   return false;
 }
+
+// Shared option filtering for live controls and the band preset editor.
+bool RADIO_MODEL_Adjust(uint32_t frequency, RadioParameters *parameters,
+                        ReceiverCapabilities capabilities, RadioParameterField field, bool up) {
+  if (!parameters || (unsigned)parameters->mode >= RX_MODE_COUNT)
+    return false;
+  RadioParameters candidate = *parameters;
+  RxPlan plan;
+  if (field == RADIO_FIELD_MODE) {
+    for (uint8_t offset = 1; offset < RX_MODE_COUNT; ++offset) {
+      candidate = *parameters;
+      candidate.mode = (parameters->mode + (up ? offset : RX_MODE_COUNT-offset))%RX_MODE_COUNT;
+      uint32_t minimum = candidate.mode == RX_WFM ? (capabilities.si ? 10000 : 100000)
+                       : candidate.mode == RX_AM && frequency <= 30000000 && capabilities.si ? 1000 : 10;
+      if (candidate.step_hz < minimum) candidate.step_hz = minimum;
+      if (candidate.mode == RX_WFM) candidate.bandwidth_hz = 0;
+      RxResult result = RADIO_MODEL_Plan(frequency, candidate, capabilities, &plan);
+      if (result == RX_INVALID_PARAMETERS) {
+        candidate.bandwidth_hz = candidate.mode == RX_WFM ? 0
+          : candidate.mode == RX_LSB || candidate.mode == RX_USB ? 3000
+          : candidate.mode == RX_AM ? 6000 : 12000;
+        result = RADIO_MODEL_Plan(frequency, candidate, capabilities, &plan);
+      }
+      if (result == RX_OK) { *parameters = candidate; return true; }
+    }
+    return false;
+  }
+  if (field == RADIO_FIELD_SQUELCH) {
+    candidate.squelch = (candidate.squelch + (up ? 1 : 10))%11;
+    *parameters = candidate;
+    return true;
+  }
+  static const uint32_t steps[] = {20,50,500,1000,2500,5000,6250,8330,9000,10000,12500,25000,50000,100000,500000};
+  static const uint32_t widths[] = {500,1000,1200,1800,2000,2200,2500,3000,4000,6000,7000,9000,10000,12000,14000,17000,20000,23000,26000};
+  if (field != RADIO_FIELD_STEP && field != RADIO_FIELD_BANDWIDTH)
+    return false;
+  if (field == RADIO_FIELD_BANDWIDTH && candidate.mode == RX_WFM)
+    return false;
+  const uint32_t *values = field == RADIO_FIELD_STEP ? steps : widths;
+  uint8_t count = field == RADIO_FIELD_STEP ? sizeof(steps)/sizeof(steps[0]) : sizeof(widths)/sizeof(widths[0]);
+  uint32_t current = field == RADIO_FIELD_STEP ? candidate.step_hz : candidate.bandwidth_hz;
+  uint8_t index = 0;
+  for (uint8_t i = 0; i < count; ++i) if (values[i] == current) index = i;
+  for (uint8_t offset = 1; offset < count; ++offset) {
+    uint8_t i = (index + (up ? offset : count-offset))%count;
+    if (field == RADIO_FIELD_STEP) candidate.step_hz = values[i];
+    else candidate.bandwidth_hz = values[i];
+    if (RADIO_MODEL_Plan(frequency, candidate, capabilities, &plan) == RX_OK) {
+      *parameters = candidate; return true;
+    }
+  }
+  return false;
+}

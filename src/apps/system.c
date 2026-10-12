@@ -4,7 +4,7 @@
 #include "hal/backlight.h"
 #include "hal/eeprom.h"
 #include "hal/keyboard.h"
-#include "hal/st7565.h"
+#include "hal/display.h"
 #include "hal/uart.h"
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
 #include "core/bands.h"
@@ -24,6 +24,7 @@
 static char notificationMessage[16] = "";
 static uint32_t notificationTimeoutAt;
 
+static uint32_t gLastRender;
 static uint32_t secondTimer;
 static uint32_t appsKeyboardTimer;
 static uint32_t radioTimer;
@@ -56,7 +57,7 @@ static void appRender() {
 
   STATUSLINE_render(); // coz of APPS_render calls STATUSLINE_SetText
 
-  ST7565_Blit();
+  DISPLAY_Blit();
   gLastRender = Now();
 }
 
@@ -121,7 +122,7 @@ static void processKeyboard() {
 
 void initDisplay() {
   LogC(LOG_C_BRIGHT_WHITE, "DISPLAY");
-  ST7565_Init(true);
+  DISPLAY_Init(true, gSettings.contrast);
   LogC(LOG_C_BRIGHT_WHITE, "BACKLIGHT");
   BACKLIGHT_Init();
 }
@@ -145,7 +146,7 @@ void SYS_Main() {
 
     // better UX
     STATUSLINE_render();
-    ST7565_Blit();
+    DISPLAY_Blit();
 
     LogC(LOG_C_BRIGHT_WHITE, "LOAD BANDS");
     // Built-in frequency profiles no longer depend on EEPROM band records.
