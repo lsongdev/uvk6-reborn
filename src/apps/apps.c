@@ -56,7 +56,7 @@ const App apps[APPS_COUNT] = {
     [APP_SETTINGS] = {"Settings", SETTINGS_init, NULL, SETTINGS_render,
                       SETTINGS_key, SETTINGS_deinit},
     [APP_RESET] = {"Reset", RESET_Init, RESET_Update, RESET_Render, RESET_key, NULL},
-    [APP_VFO1] = {"Radio", VFO1_init, VFO1_update, VFO1_render, VFO1_key, NULL, true},
+    [APP_VFO1] = {"Radio", VFO1_init, VFO1_update, VFO1_render, VFO1_key, VFO1_deinit, true},
 };
 
 bool APPS_key(KEY_Code_t Key, Key_State_t state) {

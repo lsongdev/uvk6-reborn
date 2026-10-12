@@ -74,6 +74,7 @@ static bool checkKeylock(Key_State_t state, KEY_Code_t key) {
   bool isLongPressF = state == KEY_LONG_PRESSED && key == KEY_F;
 
   if (isLongPressF) {
+    VFO1_cancelShortcut();
     gSettings.keylock = !gSettings.keylock;
     SETTINGS_Save();
     return true;

@@ -50,7 +50,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'docs/images/compact-vfo-preview.png')
     parser.add_argument('--scale', type=int, choices=range(1, 13), default=4)
-    parser.add_argument('--frames', nargs=2, choices=['single', 'dual', 'plain', 'max', 'maxtext', 'lw'],
+    parser.add_argument('--frames', nargs=2, choices=['single', 'dual', 'plain', 'max', 'maxtext', 'lw', 'rds'],
                         default=['single', 'dual'], help='left and right preview scenarios')
     args = parser.parse_args()
     try:
@@ -59,6 +59,7 @@ def main():
             binary = directory / 'preview'
             sources = ['tools/ui-preview.c', 'src/ui/graphics.c', 'src/ui/components/vfo.c',
                        'src/ui/components/frequency.c',
+                       'src/core/rds.c',
                        'src/ui/components/signal.c', 'src/core/radio-model.c', 'src/external/printf/printf.c']
             command = shlex.split(os.environ.get('CC', 'cc')) + [
                 '-Isrc', '-std=c2x', '-ffunction-sections', '-fdata-sections',

@@ -21,6 +21,7 @@ static SsbMode currentSsbMode;
 SI47XX_MODE si4732mode = SI47XX_FM;
 uint16_t siCurrentFreq = 0;
 bool isSi4732On = false;
+static bool rdsReady;
 
 static uint16_t fDiv() { return si4732mode == SI47XX_FM ? 1000 : 100; }
 
@@ -146,18 +147,13 @@ void setAvcAmMaxGain(uint8_t gain) {
   SI47XX_SetProperty(PROP_AM_AUTOMATIC_VOLUME_CONTROL_MAX_GAIN, gain * 340);
 }
 
-void enableRDS(void) {
-  // Enable and configure RDS reception
-  if (si4732mode == SI47XX_FM) {
-    SI47XX_SetProperty(PROP_FM_RDS_INT_SOURCE, FLG_RDSRECV);
-    // Set the FIFO high-watermark to 12 RDS blocks, which is safe even for
-    // old chips, yet large enough to improve performance.
-    SI47XX_SetProperty(PROP_FM_RDS_INT_FIFO_COUNT, 12);
+static void enableRDS(void) {
+  rdsReady = SI47XX_SetProperty(PROP_FM_RDS_INT_SOURCE, FLG_RDSRECV) &&
+    SI47XX_SetProperty(PROP_FM_RDS_INT_FIFO_COUNT, 1) &&
     SI47XX_SetProperty(
         PROP_FM_RDS_CONFIG,
-        ((FLG_BLETHA_35 | FLG_BLETHB_35 | FLG_BLETHC_35 | FLG_BLETHD_35) << 8) |
+        ((FLG_BLETHA_12 | FLG_BLETHB_12 | FLG_BLETHC_12 | FLG_BLETHD_12) << 8) |
             FLG_RDSEN);
-  };
 }
 
 void SI47XX_SetAutomaticGainControl(uint8_t AGCDIS, uint8_t AGCIDX) {
@@ -305,6 +301,7 @@ uint32_t SI47XX_getFrequency(bool *valid) {
 }
 
 void SI47XX_PowerDown() {
+  rdsReady = false;
   // printf("SI PD\n");
   uint8_t cmd[1] = {CMD_POWER_DOWN};
 
@@ -388,11 +385,26 @@ bool SI47XX_SetBandwidth(SI47XX_FilterBW AMCHFLT, bool AMPLFLT) {
                               (cfg.raw[1] << 8) | cfg.raw[0]);
 }
 
-void SI47XX_ReadRDS(uint8_t buf[13]) {
-  uint8_t cmd[2] = {CMD_FM_RDS_STATUS, RDS_STATUS_ARG1_CLEAR_INT};
-  waitToSend();
-  SI47XX_WriteBuffer(cmd, 2);
-  SI47XX_ReadBuffer(buf, 13);
+bool SI47XX_ReadRDS(SI47XX_RdsStatus *status, bool clear_fifo) {
+  if (!status || !isSi4732On || si4732mode != SI47XX_FM || !rdsReady)
+    return false;
+  uint8_t cmd[2] = {CMD_FM_RDS_STATUS, RDS_STATUS_ARG1_CLEAR_INT |
+                    (clear_fifo ? RDS_STATUS_ARG1_CLEAR_FIFO : 0)};
+  uint8_t buf[13];
+  if (!waitToSend() || !SI47XX_WriteBuffer(cmd, sizeof(cmd)) ||
+      !waitToSend() || !SI47XX_ReadBuffer(buf, sizeof(buf)) ||
+      !(buf[0] & STATUS_CTS) || (buf[0] & STATUS_ERR)) return false;
+  SI47XX_RdsStatus result = {
+    .fifo_used = clear_fifo ? 0 : buf[3],
+    .synchronized = !!(buf[2] & FIELD_RDS_STATUS_RESP2_SYNC),
+    .overflow = !!(buf[2] & FIELD_RDS_STATUS_RESP2_FIFO_OVERFLOW),
+  };
+  for (unsigned i=0; i<4; ++i) {
+    result.blocks[i] = (uint16_t)buf[4+2*i]<<8 | buf[5+2*i];
+    result.errors[i] = (buf[12] >> (6-2*i)) & 3;
+  }
+  *status = result;
+  return true;
 }
 
 void SI47XX_SetSeekFmLimits(uint32_t bottom, uint32_t top) {
