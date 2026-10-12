@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
   hasSi = argc == 1;
   RadioState state;
   gRadioState = &state;
-  RADIO_InitState(&state, 1);
+  RADIO_InitState(&state);
   ctx->frequency = 43850000;
   ctx->radio_type = RADIO_BK4819;
   ctx->modulation = MOD_FM;
