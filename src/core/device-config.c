@@ -38,6 +38,9 @@ static void exportPreferences(void) {
   p->mic = gSettings.mic;
   p->deviation = gSettings.deviation;
   p->bound_240_280 = gSettings.bound_240_280;
+  p->brightness_low = gSettings.brightnessLow;
+  p->sql_open_time = gSettings.sqlOpenTime;
+  p->sql_close_time = gSettings.sqlCloseTime;
 }
 bool DEVICE_Load(void) {
   gDeviceConfigReady = false;

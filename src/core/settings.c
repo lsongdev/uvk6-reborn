@@ -131,6 +131,9 @@ bool SETTINGS_Load(void) {
   gSettings.mic = p->mic;
   gSettings.deviation = p->deviation;
   gSettings.bound_240_280 = p->bound_240_280;
+  gSettings.brightnessLow = p->brightness_low;
+  gSettings.sqlOpenTime = p->sql_open_time;
+  gSettings.sqlCloseTime = p->sql_close_time;
   return true;
 }
 
