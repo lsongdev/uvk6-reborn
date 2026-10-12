@@ -112,9 +112,8 @@ void APPS_run(AppType_t app) {
   if (loadedVfoApp != gCurrentApp && apps[gCurrentApp].needsRadioState) {
     LogC(LOG_C_MAGENTA, "[APP] Load radio state for %s",
          apps[gCurrentApp].name);
-    gRadioState = &radioState;
-    RADIO_InitState(gRadioState, 1);
-    RADIO_LoadVFOs(gRadioState);
+    RADIO_InitState(&radioState);
+    RADIO_InitHardware(&radioState);
     loadedVfoApp = gCurrentApp;
   }
 
