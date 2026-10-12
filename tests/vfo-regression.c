@@ -381,6 +381,38 @@ int main(void) {
   assert(!seek.active && user.current.frequency_hz == 100000000);
   assert(ctx->frequency == 10000000 && saveRequests == savedBeforeSeek);
 
+  // The single VFO owns TX intent, never a per-band transmit flag.
+  setup(438500000, fm);
+  assert(!gDeviceConfig.tx.enabled);
+  assert(VFO1_key(KEY_PTT, KEY_PRESSED));
+  assert(!strcmp(message, "TX disabled"));
+  press(KEY_MENU);
+  for (unsigned i=0;i<5;++i) press(KEY_DOWN);
+  assert(menuIndex == 5);
+  unsigned savedBeforeTX = saveRequests;
+  press(KEY_MENU);
+  assert(gDeviceConfig.tx.enabled && saveRequests == savedBeforeTX+1);
+  press(KEY_DOWN);
+  press(KEY_MENU);
+  assert(gDeviceConfig.tx.power == TX_POWER_MEDIUM);
+  assert(saveRequests == savedBeforeTX+2);
+  press(KEY_F);
+  assert(gDeviceConfig.tx.power == TX_POWER_LOW);
+  press(KEY_EXIT);
+  assert(!inMenu);
+  assert(VFO1_key(KEY_PTT, KEY_PRESSED));
+  assert(!strcmp(message, "TX HW locked"));
+  assert(transmitter.mode == RADIO_RX);
+  VFO1_PttRelease();
+  assert(transmitter.mode == RADIO_RX);
+  // RX mode is still authoritative, even when a TX request is stored.
+  setup(100000000, (RadioParameters){RX_WFM,100000,0,0,false});
+  gDeviceConfig.tx.enabled = true;
+  assert(VFO1_key(KEY_PTT, KEY_PRESSED));
+  assert(!strcmp(message, "TX mode not supported"));
+  assert(transmitter.mode == RADIO_RX);
+  VFO1_PttRelease();
+
   // SSB does not gain an unreliable RSSI-only auto-search path.
   setup(7100000, (RadioParameters){RX_USB,5000,3000,0,false});
   press(KEY_F);press(KEY_STAR);
