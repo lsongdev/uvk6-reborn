@@ -134,7 +134,7 @@ void TX_DEVICE_Disable(void);              // 幂等，任何时候可调用
 
 实现位于 `src/core/tx-model.[ch]`、`tx-runtime.[ch]` 和 `src/hal/tx-device.[ch]`。当前 `TxPlan` 仅能表示 **BK4819 + NFM + 同频 + 已标定 Low**；更高功率档允许保留用户选择，但未校准之前不得执行。当前板级 TX HAL 明确返回无有效发射能力，不调用 PA 或 BK TX 寄存器；PTT 只返回诸如 `TX HW locked` 的拒绝原因。
 
-当前 TX 状态由 VFO1 以 `RxRuntime + TxRuntime` 一起管理，不引入第二个并发收发控制者。PTT release 由系统层优先处理，防止键盘锁和菜单吞掉必要的关断事件。发射超时、恢复失败和故障锁存已由无 RF 主机模拟测试验证，**并非真实发射验收**。
+当前 TX 状态由 VFO1 以 `RxRuntime + TxRuntime` 一起管理，不引入第二个并发收发控制者。PTT release 由系统层优先处理，防止键盘锁和菜单吞掉必要的关断事件。TOT 检查也在系统主循环每次迭代优先运行，不仅依赖 VFO 页面更新；这仍不是独立硬件 watchdog，真实 PA 使能前必须测试最长阻塞时间及硬件关断保障。发射超时、恢复失败和故障锁存已由无 RF 主机模拟测试验证，**并非真实发射验收**。
 
 ### EEPROM
 
