@@ -1,4 +1,5 @@
 #include "ui/statusline.h"
+#include "core/device-config.h"
 #include "apps/apps.h"
 #include "hal/eeprom.h"
 #include "drivers/si473x/si473x.h"
@@ -135,19 +136,10 @@ void STATUSLINE_render(void) {
   }
 }
 
-void STATUSLINE_RenderRadioSettings() {
-  char gain[8];
-  char bandwidth[8];
-  char squelch_type[8];
-  char squelch_value[8];
-  char modulation[8];
-
-  strcpy(gain, RADIO_GetParamValueString(ctx, PARAM_GAIN));
-  strcpy(bandwidth, RADIO_GetParamValueString(ctx, PARAM_BANDWIDTH));
-  strcpy(squelch_type, RADIO_GetParamValueString(ctx, PARAM_SQUELCH_TYPE));
-  strcpy(squelch_value, RADIO_GetParamValueString(ctx, PARAM_SQUELCH_VALUE));
-  strcpy(modulation, RADIO_GetParamValueString(ctx, PARAM_MODULATION));
-
-  STATUSLINE_SetText("%s %s %s %s %s", gain, bandwidth, squelch_type,
-                     squelch_value, modulation);
+// Current receiver settings come from the Hz-based radio user state.
+void STATUSLINE_RenderRadioSettings(void) {
+  const RadioParameters *p = &gDeviceConfig.radio.current.parameters;
+  STATUSLINE_SetText("%s %u Hz SQ%u",
+                     rxModeNames[p->mode], (unsigned)p->bandwidth_hz,
+                     (unsigned)p->squelch);
 }
