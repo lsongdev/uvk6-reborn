@@ -148,14 +148,6 @@ uint32_t RADIO_MODEL_Step(uint32_t frequency_hz, uint32_t step_hz, bool up) {
   return step_hz > frequency_hz-RADIO_MIN_HZ ? RADIO_MIN_HZ : frequency_hz-step_hz;
 }
 
-bool RADIO_MODEL_CanTransmit(const RxPlan *plan) {
-  // Board TX limits are not independently verified: default to RX only.
-  // A band flag alone cannot enable the PA; add a validated board TX table
-  // before exposing a transmit-enable control.
-  (void)plan;
-  return false;
-}
-
 // Shared option filtering for live controls and the band preset editor.
 bool RADIO_MODEL_Adjust(uint32_t frequency, RadioParameters *parameters,
                         ReceiverCapabilities capabilities, RadioParameterField field, bool up) {
