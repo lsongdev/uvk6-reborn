@@ -16,8 +16,8 @@ int main(void) {
   assert(RADIO_MODEL_Plan(95925000, parameters, none, &plan) == RX_UNSUPPORTED_MODE);
 
   // The selected demodulation mode determines the receiver at an overlap.
-  RadioParameters nfm = {RX_NFM, 12500, 12000, 0, true};
-  RadioParameters wfm = {RX_WFM, 100000, 0, 0, true};
+  RadioParameters nfm = {RX_NFM, 12500, 12000, 0, false};
+  RadioParameters wfm = {RX_WFM, 100000, 0, 0, false};
   assert(strcmp(rxModeNames[RX_NFM], "NFM") == 0);
   assert(RADIO_MODEL_Plan(100000000, nfm, si, &plan) == RX_OK);
   assert(plan.device == RX_DEVICE_BK && plan.frequency_hz == 100000000);
@@ -41,7 +41,7 @@ int main(void) {
   assert(plan.device == RX_DEVICE_BK && plan.frequency_hz == 438500000);
   assert(!RADIO_MODEL_CanTransmit(&plan));
   parameters.tx_enabled = true;
-  assert(RADIO_MODEL_Plan(438500000, parameters, si, &plan) == RX_OK);
+  assert(RADIO_MODEL_Plan(438500000, parameters, si, &plan) == RX_INVALID_PARAMETERS);
   assert(!RADIO_MODEL_CanTransmit(&plan)); // Band flags cannot invent board TX limits.
 
   parameters = radioBands[RADIO_MODEL_BandAt(20000000)].preset;
@@ -81,5 +81,14 @@ int main(void) {
   assert(RADIO_MODEL_Step(RADIO_MAX_HZ, UINT32_MAX, true) == RADIO_MAX_HZ);
   assert(RADIO_MODEL_Step(RADIO_MIN_HZ, UINT32_MAX, false) == RADIO_MIN_HZ);
   assert(RADIO_MODEL_Step(438500000, 12500, false) == 438487500);
+  assert(RADIO_MODEL_Step(118000000, 8330, true) == 118008330);
+  assert(RADIO_MODEL_Step(118008330, 8330, true) == 118016670);
+  assert(RADIO_MODEL_Step(118016670, 8330, true) == 118025000);
+  assert(RADIO_MODEL_Step(118025000, 8330, false) == 118016670);
+  assert(RADIO_MODEL_Step(118000000, 8330, false) == 118000000);
+  assert(RADIO_MODEL_Plan(700000000, nfm, si, &plan) == RX_UNSUPPORTED_MODE);
+  assert(RADIO_MODEL_Plan(1320000000u, nfm, si, &plan) == RX_UNSUPPORTED_MODE);
+  assert(RADIO_MODEL_Plan(920000000, nfm, si, &plan) == RX_OK);
+  assert(RADIO_MODEL_Plan(17000000, nfm, si, &plan) == RX_UNSUPPORTED_MODE);
   return 0;
 }

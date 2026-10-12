@@ -67,7 +67,7 @@ static bool bandwidthSupported(RxDevice device, RxMode mode, uint32_t width) {
 RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
                           ReceiverCapabilities capabilities, RxPlan *plan) {
   if (!plan || (unsigned)parameters.mode >= RX_MODE_COUNT || !parameters.step_hz ||
-      parameters.squelch > 10)
+      parameters.squelch > 10 || parameters.tx_enabled)
     return RX_INVALID_PARAMETERS;
   if (frequency_hz < RADIO_MIN_HZ || frequency_hz > RADIO_MAX_HZ)
     return RX_OUT_OF_RANGE;
@@ -99,14 +99,16 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
     }
     // Fall through to BK where its existing AM implementation is available.
     // No BK pseudo-SSB fallback is exposed as a supported SSB receiver.
-    if (frequency_hz < 15880000)
+    if (!((frequency_hz >= 18000000u && frequency_hz <= 660000000u) ||
+          (frequency_hz >= 840000000u && frequency_hz <= 1300000000u)))
       return RX_UNSUPPORTED_MODE;
     device = RX_DEVICE_BK;
     break;
   case RX_NFM:
     // NFM always uses BK, including frequencies overlapping SI's AM or WFM.
     // RX capability alone never grants transmit permission.
-    if (frequency_hz < 15880000)
+    if (!((frequency_hz >= 18000000u && frequency_hz <= 660000000u) ||
+          (frequency_hz >= 840000000u && frequency_hz <= 1300000000u)))
       return RX_UNSUPPORTED_MODE;
     device = RX_DEVICE_BK;
     break;
@@ -127,6 +129,20 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
 uint32_t RADIO_MODEL_Step(uint32_t frequency_hz, uint32_t step_hz, bool up) {
   if (frequency_hz < RADIO_MIN_HZ || frequency_hz > RADIO_MAX_HZ)
     return frequency_hz;
+  // Airband's 8.33... kHz spacing is exactly 25 kHz / 3, not 8,330 Hz.
+  // Store the legacy 8330 menu choice but use a 25 kHz / 3 channel raster
+  // relative to 118 MHz, rounded to the BK4819's 10 Hz resolution.
+  if (step_hz == 8330u && frequency_hz >= 118000000u &&
+      frequency_hz < 137000000u) {
+    uint32_t channel = ((frequency_hz - 118000000u)*3u + 12500u)/25000u;
+    if (!up && channel == 0)
+      return frequency_hz;
+    if (up && channel >= 2279u)
+      return frequency_hz;
+    channel = up ? channel+1u : channel-1u;
+    uint32_t offset = (channel*25000u + 1u)/3u;
+    return 118000000u + ((offset+5u)/10u)*10u;
+  }
   if (up)
     return step_hz > RADIO_MAX_HZ-frequency_hz ? RADIO_MAX_HZ : frequency_hz+step_hz;
   return step_hz > frequency_hz-RADIO_MIN_HZ ? RADIO_MIN_HZ : frequency_hz-step_hz;
