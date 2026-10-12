@@ -120,8 +120,9 @@ static void apply(const RxPlan *plan) {
 // Forward-only seek owns temporary RF tuning; RxRuntime retains the last
 // committed plan so cancel/exhaustion never writes the EEPROM.
 static void finishSeek(bool found, uint32_t frequency_hz, const char *status) {
-  if (!seek.active) return;
-  RX_DEVICE_SeekCancel(seekOrigin.device);
+  // SEEK_Next/SEEK_Wrap may already have marked exhaustion.
+  if (seekNative)
+    RX_DEVICE_SeekCancel(seekOrigin.device);
   SEEK_Stop(&seek);
   RDS_ReceiverReset(&rds, Now());
   gRedrawScreen = true;
@@ -180,8 +181,6 @@ static void seekUpdate(void) {
   if (seekPhase == SEEK_STEP) {
     uint32_t next;
     if (!SEEK_Next(&seek, &next)) {
-      // SEEK_Next marks the search inactive after a complete circle.
-      seek.active = true;
       finishSeek(false, 0, "No station");
       return;
     }
@@ -251,7 +250,6 @@ static void seekUpdate(void) {
     }
     // A complete hardware segment ended; the application owns the one wrap.
     if (seek.wrapped || !SEEK_Wrap(&seek)) {
-      if (!seek.active) seek.active = true;
       finishSeek(false, 0, "No station");
       return;
     }
