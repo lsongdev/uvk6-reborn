@@ -249,20 +249,6 @@ ReceiverCapabilities RADIO_GetReceiverCapabilities(void) {
   return capabilities;
 }
 
-ReceiverCapabilities RADIO_GetReceiverCapabilities(void) {
-  static bool detected;
-  static ReceiverCapabilities capabilities;
-  if (!detected) {
-    capabilities.broadcast = BK1080_Detect();
-    // Probe each chip through its own driver. A failed BK read is not SI.
-    capabilities.si = !capabilities.broadcast && SI47XX_Detect();
-    capabilities.ssb_patch = capabilities.si && SETTINGS_IsPatchPresent();
-    detected = true;
-  }
-  return capabilities;
-}
-
-
 // Hardware is configured only through RX_DEVICE_Apply. The temporary
 // VFOContext mirrors successfully applied plans for measurements and UI.
 bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan) {
