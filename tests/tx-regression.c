@@ -1,6 +1,7 @@
 #include "core/tx-model.h"
 #include "core/tx-runtime.h"
 #include <assert.h>
+#include <stddef.h>
 
 static unsigned muted, prepared, enabled, disabled, restored;
 static bool enable_ok = true, restore_ok = true, prepare_ok = true;
