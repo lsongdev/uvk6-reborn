@@ -41,6 +41,8 @@ static void exportPreferences(void) {
   p->brightness_low = gSettings.brightnessLow;
   p->sql_open_time = gSettings.sqlOpenTime;
   p->sql_close_time = gSettings.sqlCloseTime;
+  // TX runtime safety preferences live in the native configuration model;
+  // they have no legacy Settings bitfield counterpart.
 }
 bool DEVICE_Load(void) {
   gDeviceConfigReady = false;

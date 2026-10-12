@@ -2,12 +2,13 @@
 #define CONFIG_STORE_H
 
 #include "core/radio-state.h"
+#include "core/tx-model.h"
 #include <stdbool.h>
 #include <stdint.h>
 
-#define CONFIG_STORE_SLOT_SIZE 256u
+#define CONFIG_STORE_SLOT_SIZE 512u
 #define CONFIG_STORE_SLOTS 2u
-#define CONFIG_STORE_FORMAT 3u
+#define CONFIG_STORE_FORMAT 4u
 
 // Explicit on-disk fields. Never serialize C compiler bitfields or structs.
 typedef struct {
@@ -16,10 +17,13 @@ typedef struct {
   uint8_t backlight_on_squelch, keylock, ptt_lock, beep;
   uint8_t si4732_power_off, mic, deviation, bound_240_280;
   uint8_t brightness_low, sql_open_time, sql_close_time;
+  uint16_t tx_timeout_seconds; // Global PTT time-out, enforced by runtime.
+  uint8_t tx_busy_lockout;     // User preference, not a hardware bypass.
 } ConfigPreferences;
 
 typedef struct {
   RadioUserState radio;
+  TxConfig tx;                 // One VFO only, no per-band channel TX profile.
   ConfigPreferences preferences;
 } DeviceConfig;
 
