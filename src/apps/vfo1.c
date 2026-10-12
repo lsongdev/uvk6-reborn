@@ -5,6 +5,10 @@
 #include "core/radio.h"
 #include "core/device-config.h"
 #include "core/rx-runtime.h"
+#include "core/tx-model.h"
+#include "core/tx-runtime.h"
+#include "hal/tx-device.h"
+#include "core/settings.h"
 #include "core/seek.h"
 #include "core/rds-receiver.h"
 #include "hal/rx-device.h"
@@ -28,6 +32,7 @@ static const char *shortBandName(const char *name) {
 static bool initialized;
 static UI_VfoState card;
 static RxRuntime runtime;
+static TxRuntime transmitter;
 static RdsReceiver rds;
 static bool changed;
 static bool inMenu;
@@ -58,7 +63,41 @@ void VFO1_cancelShortcut(void) {
 
 static void finishSeek(bool found, uint32_t frequency_hz, const char *status);
 
+static void stopReceiver(void *unused);
+static void txMute(void *unused) {
+  (void)unused;
+  RADIO_StopReception();
+  RDS_ReceiverReset(&rds, Now());
+}
+static bool txPrepare(void *unused, const TxPlan *plan) {
+  (void)unused; return TX_DEVICE_Prepare(plan);
+}
+static bool txEnable(void *unused) {
+  (void)unused; return TX_DEVICE_Enable();
+}
+static void txDisable(void *unused) {
+  (void)unused; TX_DEVICE_Disable();
+}
+static bool txRestore(void *unused, const RxPlan *plan) {
+  (void)unused;
+  if (!RADIO_ApplyRxPlan(ctx, plan)) {
+    RX_RuntimeStop(&runtime, stopReceiver, NULL);
+    return false;
+  }
+  RDS_ReceiverReset(&rds, Now());
+  return true;
+}
+static const TxOperations txOperations = {
+  .mute_rx = txMute, .prepare = txPrepare, .enable = txEnable,
+  .disable = txDisable, .restore_rx = txRestore
+};
+
+void VFO1_PttRelease(void) {
+  TX_RuntimeRelease(&transmitter, &txOperations);
+}
+
 void VFO1_deinit(void) {
+  VFO1_PttRelease();
   VFO1_cancelShortcut();
   if (seek.active)
     finishSeek(false, 0, NULL);
@@ -318,6 +357,7 @@ void VFO1_init(void) {
   if (initialized)
     return;
   initialized = true;
+  transmitter = (TxRuntime){0};
   seek.active = false;
   user = gDeviceConfig.radio;
   if (!RADIO_STATE_Valid(&user))
@@ -325,7 +365,10 @@ void VFO1_init(void) {
   request(user.current.frequency_hz, user.current.parameters);
 }
 
-bool VFO1_isReceiving(void) { return initialized && runtime.active && !seek.active; }
+bool VFO1_isReceiving(void) {
+  return initialized && runtime.active && !seek.active &&
+         transmitter.mode == RADIO_RX;
+}
 
 static bool readRds(void *unused, RdsPacket *packet, bool clear_fifo) {
   (void)unused;
@@ -334,6 +377,10 @@ static bool readRds(void *unused, RdsPacket *packet, bool clear_fifo) {
 
 void VFO1_update(void) {
   expireShortcut();
+  if (TX_RuntimeUpdate(&transmitter, Now(), &txOperations))
+    notify(transmitter.mode == RADIO_FAULT ? "RX restore error" : "TX timeout");
+  if (transmitter.mode != RADIO_RX)
+    return;
   seekUpdate();
   bool rdsEnabled = !seek.active && runtime.active && runtime.current.device == RX_DEVICE_SI &&
                     runtime.current.parameters.mode == RX_WFM;
@@ -371,6 +418,17 @@ static void changeValue(bool up) {
     gMonitorMode = !gMonitorMode;
     return;
   }
+  if (menuIndex == 5) {
+    gDeviceConfig.tx.enabled = !gDeviceConfig.tx.enabled;
+    DEVICE_RequestSave();
+    return;
+  }
+  if (menuIndex == 6) {
+    gDeviceConfig.tx.power = (gDeviceConfig.tx.power +
+                              (up ? 1u : 2u)) % 3u;
+    DEVICE_RequestSave();
+    return;
+  }
   RadioParameters candidate = user.current.parameters;
   if (RADIO_MODEL_Adjust(user.current.frequency_hz, &candidate,
                          RADIO_GetReceiverCapabilities(), (RadioParameterField)menuIndex, up))
@@ -388,10 +446,46 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
   }
   if (key == KEY_PTT) {
     VFO1_cancelShortcut();
-    if (state == KEY_PRESSED)
+    if (state == KEY_RELEASED) {
+      VFO1_PttRelease();
+      return true;
+    }
+    if (state != KEY_PRESSED || transmitter.wait_release ||
+        transmitter.mode != RADIO_RX)
+      return true;
+    if (inMenu || confirming || !runtime.active || !gDeviceConfigReady ||
+        gSettings.pttLock) {
+      notify("TX busy/locked");
+      return true;
+    }
+    if (gDeviceConfig.preferences.tx_busy_lockout && !gMonitorMode &&
+        vfo && vfo->is_open) {
+      notify("Channel busy");
+      return true;
+    }
+    TxPlan planned;
+    TxResult result = TX_MODEL_Plan(&runtime.current, &gDeviceConfig.tx,
+                                   &(TxCapabilities){0}, &(TxPolicy){0}, &planned);
+    // This build deliberately does not expose any verified TX capability.
+    // Future hardware enablement must replace both inputs with independently
+    // confirmed TX_DEVICE_* policy, never with the RX capability table.
+    if (result == TX_OK &&
+        !TX_RuntimePress(&transmitter, &runtime.current, &planned,
+                         gDeviceConfig.preferences.tx_timeout_seconds,
+                         Now(), &txOperations))
+      notify("TX hardware error");
+    else if (result == TX_DISABLED)
       notify("TX disabled");
+    else if (result == TX_UNSUPPORTED_MODE)
+      notify("TX mode not supported");
+    else if (result == TX_UNVERIFIED_HARDWARE)
+      notify("TX HW locked");
+    else if (result != TX_OK)
+      notify("TX not allowed");
     return true;
   }
+  if (transmitter.mode != RADIO_RX || transmitter.wait_release)
+    return true;
   if (confirming) {
     if (state == KEY_RELEASED) {
       if (key == KEY_MENU) {
@@ -412,7 +506,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       if (key == KEY_EXIT)
         inMenu = false;
       else if (key == KEY_UP || key == KEY_DOWN)
-        menuIndex = key == KEY_DOWN ? (menuIndex+1)%5 : (menuIndex+4)%5;
+        menuIndex = key == KEY_DOWN ? (menuIndex+1)%7 : (menuIndex+6)%7;
       else if (key == KEY_STAR || key == KEY_F || key == KEY_MENU)
         changeValue(key != KEY_F);
     }
@@ -486,9 +580,12 @@ void VFO1_render(void) {
     return;
   }
   if (inMenu) {
-    static const char *const names[] = {"Mode", "Step", "BW", "SQ", "Monitor"};
-    for (uint8_t i = 0; i < 5; ++i) {
-      uint8_t y = 17+i*10;
+    static const char *const names[] = {
+      "Mode", "Step", "BW", "SQ", "Monitor", "TX Enable", "TX Power"
+    };
+    uint8_t first = menuIndex < 4 ? 0 : menuIndex - 3;
+    for (uint8_t i = first; i < 7 && i < first + 4; ++i) {
+      uint8_t y = 17+(i-first)*11;
       PrintMediumEx(2, y, POS_L, C_FILL, "%s", names[i]);
       if (i == 0)
         PrintSmallEx(124, y, POS_R, C_FILL, "%s", rxModeNames[user.current.parameters.mode]);
@@ -501,8 +598,16 @@ void VFO1_render(void) {
           PrintSmallEx(124, y, POS_R, C_FILL, "%u Hz", user.current.parameters.bandwidth_hz);
       } else if (i == 3)
         PrintSmallEx(124, y, POS_R, C_FILL, "%u", user.current.parameters.squelch);
-      else
+      else if (i == 4)
         PrintSmallEx(124, y, POS_R, C_FILL, "%s", gMonitorMode ? "On" : "Off");
+      else if (i == 5)
+        PrintSmallEx(124, y, POS_R, C_FILL, "%s", gDeviceConfig.tx.enabled ? "On" : "Off");
+      else {
+        static const char *const powers[] = {"Low", "Medium", "High"};
+        PrintSmallEx(124, y, POS_R, C_FILL, "%s",
+                     powers[gDeviceConfig.tx.power <= TX_POWER_HIGH ?
+                            gDeviceConfig.tx.power : 0]);
+      }
       if (i == menuIndex)
         FillRect(0, y-7, 128, 10, C_INVERT);
     }
@@ -520,7 +625,9 @@ void VFO1_render(void) {
     .name = rds.decoder.ps, .rds = rds.decoder.text,
     .signal_valid = runtime.active && !seek.active,
     .signal_level = runtime.active && !seek.active ? UI_SMeterLevel() : 0,
-    .status = seek.active ? "SEEK >" : !runtime.active ? "RX --" : NULL,
+    .status = transmitter.mode == RADIO_TX ? "TX" :
+              transmitter.mode == RADIO_FAULT ? "TX Fault" :
+              seek.active ? "SEEK >" : !runtime.active ? "RX --" : NULL,
   };
   UI_VfoRender(8, &view, &card, Now());
   if (message) PrintSmall(0, 43, "%s", message);

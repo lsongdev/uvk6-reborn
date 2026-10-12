@@ -16,6 +16,10 @@ static unsigned applied;
 static unsigned routed;
 static unsigned appRuns;
 static bool failApply;
+Settings gSettings;
+void TX_DEVICE_Disable(void) {}
+bool TX_DEVICE_Prepare(const TxPlan *plan) { (void)plan; return false; }
+bool TX_DEVICE_Enable(void) { return false; }
 DeviceConfig gDeviceConfig;
 bool gDeviceConfigReady = true;
 static unsigned saveRequests;
@@ -99,10 +103,14 @@ static void setup(uint32_t frequency, RadioParameters values) {
   rdsAvailable=false;
   initialized = changed = inMenu = confirming = false;
   functionPending = false;
+  transmitter = (TxRuntime){0};
   seek = (Seek){0};
   runtime = (RxRuntime){0};
   message = NULL;
   RADIO_STATE_Default(&gDeviceConfig.radio);
+  gDeviceConfig.tx = (TxConfig){0};
+  gDeviceConfig.preferences.tx_timeout_seconds = 120;
+  gDeviceConfig.preferences.tx_busy_lockout = 0;
   assert(RADIO_STATE_Set(&gDeviceConfig.radio, frequency, values));
   *ctx = (RadioReceiver){.frequency = frequency/10};
   savedParameters = values;

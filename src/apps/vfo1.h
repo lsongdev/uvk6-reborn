@@ -9,6 +9,7 @@ bool VFO1_isReceiving(void);
 void VFO1_init();
 void VFO1_deinit(void);
 void VFO1_cancelShortcut(void);
+void VFO1_PttRelease(void); // High priority, even under keyboard lock.
 void VFO1_update();
 bool VFO1_key(KEY_Code_t key, Key_State_t state);
 void VFO1_render();

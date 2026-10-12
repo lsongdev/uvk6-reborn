@@ -6,6 +6,7 @@
 #include "ui/menu.h"
 #include "core/misc.h"
 #include "core/settings.h"
+#include "core/device-config.h"
 #include "apps/apps.h"
 #include "apps/finput.h"
 
@@ -94,11 +95,44 @@ static bool openBands(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   return true;
 }
 
+static void getTXTime(const MenuItem *item, char *out, uint8_t size) {
+  (void)item;
+  snprintf(out, size, "%u s", (unsigned)gDeviceConfig.preferences.tx_timeout_seconds);
+}
+static void setTXTime(const MenuItem *item, bool up) {
+  (void)item;
+  static const uint16_t values[] = {30, 60, 120, 180, 300, 600};
+  uint16_t current = gDeviceConfig.preferences.tx_timeout_seconds;
+  uint8_t i = 0;
+  while (i < 6 && values[i] != current) ++i;
+  if (i == 6) i = 2;
+  else i = (uint8_t)((i + (up ? 1u : 5u)) % 6u);
+  gDeviceConfig.preferences.tx_timeout_seconds = values[i];
+  DEVICE_RequestSave();
+}
+static void getBusyLockout(const MenuItem *item, char *out, uint8_t size) {
+  (void)item;
+  snprintf(out, size, "%s", gDeviceConfig.preferences.tx_busy_lockout ? "On" : "Off");
+}
+static void setBusyLockout(const MenuItem *item, bool up) {
+  (void)item; (void)up;
+  gDeviceConfig.preferences.tx_busy_lockout ^= 1u;
+  DEVICE_RequestSave();
+}
+static const MenuItem txSafetyItems[] = {
+    {"TX timeout", .get = getTXTime, .update = setTXTime},
+    {"Busy lock", .get = getBusyLockout, .update = setBusyLockout},
+};
+static Menu txSafetyMenu = {.title = "TX Safety",
+                           .items = txSafetyItems,
+                           .num_items = ARRAY_SIZE(txSafetyItems)};
+
 // Main menu
 static const MenuItem menuItems[] = {
     {"Bands", .action = openBands},
     {"SQL", .submenu = &sqlMenu},
     {"Radio", .submenu = &radioMenu},
+    {"TX Safety", .submenu = &txSafetyMenu},
     {"Display", .submenu = &displayMenu},
     {"Battery", .submenu = &batteryMenu},
     {"Beep", SETTING_BEEP, getValS, updateValS},

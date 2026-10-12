@@ -91,7 +91,11 @@ static bool checkKeylock(Key_State_t state, KEY_Code_t key) {
 static void processKeyboard() {
   SystemMessages n = KEYBOARD_GetKey();
   // Process system notifications
-  if (n.message == MSG_KEYPRESSED && !isUartWaiting()) {
+  if (n.message == MSG_KEYPRESSED) {
+    // Release cannot be swallowed by keylock, menu, or UART activity.
+    if (n.key == KEY_PTT && n.state == KEY_RELEASED)
+      VFO1_PttRelease();
+    if (isUartWaiting()) return;
     BACKLIGHT_On();
 
     if (checkKeylock(n.state, n.key)) {
