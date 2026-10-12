@@ -36,13 +36,13 @@ const char *MW_NAMES[4] = {
     [MW_EXTRA] = "Extra",
 };
 const char *EEPROM_TYPE_NAMES[7] = {
-    [EEPROM_BL24C64] = "64 #",   //
+    [EEPROM_BL24C64] = "64 ?",   //
     [EEPROM_BL24C128] = "128",   //
     [EEPROM_BL24C256] = "256",   //
     [EEPROM_BL24C512] = "512",   //
     [EEPROM_BL24C1024] = "1024", //
-    [EEPROM_M24M02] = "M02",     //
-    [EEPROM_4MBIT] = "4Mbit",  //
+    [EEPROM_M24M02] = "M02?",     //
+    [EEPROM_4MBIT] = "4Mb?",  //
 };
 uint32_t SCAN_TIMEOUTS[15] = {
     0,         100,       200,           300,           400,
