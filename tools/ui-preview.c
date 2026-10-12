@@ -91,5 +91,12 @@ int main(int argc, char **argv) {
     .band_name="FM Radio",.name=decoder.ps,.rds=decoder.text,
     .activity=UI_VFO_RECEIVING,.signal_level=8,.signal_valid=true};
   UI_VfoRender(8,&v,&a,0);UI_VfoRender(8,&v,&a,1000);snapshot("rds.pbm");
+  base();FillRect(100,0,10,5,C_CLEAR);a=(UI_VfoState){0};b=(UI_VfoState){0};
+  v=(UI_VfoView){.id='A',.selected=true,.frequency_hz=438500000,.step_hz=12500,
+    .mode=RX_NFM,.band_name="70cm",.name="CH438.500"};
+  second=(UI_VfoView){.id='B',.frequency_hz=145500000,.step_hz=12500,
+    .mode=RX_NFM,.band_name="2m",.name="RX145.500"};
+  UI_VfoRender(8,&v,&a,0);UI_VfoRender(36,&second,&b,0);snapshot("font-frequency.pbm");
+  UI_VfoRender(8,&v,&a,1000);UI_VfoRender(36,&second,&b,1000);snapshot("font-name.pbm");
   return 0;
 }

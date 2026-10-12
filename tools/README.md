@@ -5,6 +5,7 @@
 - `flash.py`：macOS / Linux 串口 Bootloader 刷机，只写原始固件，不操作 EEPROM。
 - `fw-pack.py`：固件打包，由 Makefile 自动调用。
 - `gains.py`：生成 BK4819 增益表。
+- `bdf-to-gfx.py`：将原生 ASCII BDF 点阵转换为固件 GFX 字库，来源及命令见 [字库说明](../src/ui/fonts/README.md)。
 - `map_analyze.py`：分析链接器 map 文件中的空间占用。
 - `hawk5.py`：历史 Hawk5 CHIRP 驱动模块。
 - `ui-preview.py` / `ui-preview.c`：使用固件绘图代码生成 VFO 布局预览。
@@ -49,3 +50,5 @@ A/B 首屏切换预览：`python3 tools/ui-preview.py --frames ab-a ab-b --outpu
 多 VFO 分页：`python3 tools/ui-preview.py --frames multi-ab multi-cd --output docs/images/multi-vfo.png`。双守听探测／接收归属：`python3 tools/ui-preview.py --frames watch-probe watch-rx --output docs/images/dual-watch.png`。
 
 VFO 提示位置预览：`python3 tools/ui-preview.py --frames error-short error-long --output /tmp/vfo-errors.png`，分别展示长提示的起始位置和滚动到末尾的位置。
+
+统一字库预览：`python3 tools/ui-preview.py --frames font-frequency font-name --output docs/images/vfo-font.png`，对照频率数字与名称中相同数字的字形。
