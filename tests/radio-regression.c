@@ -3,6 +3,15 @@
 #include <assert.h>
 
 static bool hasSi = true;
+static bool carrierOpen, toneDetected;
+bool BK4819_IsSquelchOpen(void) { return carrierOpen; }
+bool BK4819_CssIsDetected(bool digital) { (void)digital; return toneDetected; }
+uint8_t BK4819_GetSNR(void) { return 100; }
+uint8_t BK1080_GetSNR(void) { return 10; }
+RSQStatus rsqStatus;
+int ConvertDomain(int value, int in_min, int in_max, int out_min, int out_max) {
+  (void)value;(void)in_min;(void)in_max;(void)out_min;(void)out_max;return 10;
+}
 Settings gSettings;
 static unsigned probes;
 static bool hardwareApplyOk = true;
@@ -57,6 +66,12 @@ int main(int argc, char **argv) {
   RadioState state;
   gRadioState = &state;
   RADIO_InitState(&state);
+  carrierOpen=true;toneDetected=false;
+  ctx->rx_tone=1;
+  assert(!RADIO_CheckSquelch(ctx));
+  toneDetected=true;assert(RADIO_CheckSquelch(ctx));
+  carrierOpen=false;assert(!RADIO_CheckSquelch(ctx));
+  ctx->rx_tone=0;carrierOpen=true;assert(RADIO_CheckSquelch(ctx));
   ctx->frequency = 43850000;
   ctx->radio_type = RADIO_BK4819;
   ctx->modulation = MOD_FM;

@@ -18,8 +18,8 @@ static bool restore(void *x, const RxPlan *plan) {
   return restore_ok;
 }
 int main(void) {
-  RxPlan rx = {RX_DEVICE_BK,145500000,{RX_NFM,12500,12000,4}};
-  TxConfig cfg = {true,TX_POWER_LOW};
+  RxPlan rx = {RX_DEVICE_BK,145500000,{RX_NFM,12500,12000,4,0}};
+  TxConfig cfg = {.enabled=true,.power=TX_POWER_LOW};
   TxCapabilities hw = {true,true};
   TxPolicy policy = {true,144000000,148000000};
   TxPlan plan = {0};
@@ -58,6 +58,21 @@ int main(void) {
   policy.upper_hz = 148000000u;
   rx.frequency_hz = 145500000u;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
+
+  cfg.frequency_hz=146500000;cfg.tone=155;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
+  assert(plan.frequency_hz==146500000 && plan.tone==155);
+  assert(rx.frequency_hz==145500000); // Split TX never changes RX.
+  cfg.frequency_hz=438500000;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
+  assert(plan.frequency_hz==0);
+  cfg.frequency_hz=700000000;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
+  cfg.frequency_hz=146500001;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
+  cfg.frequency_hz=0;cfg.tone=259;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
+  cfg.tone=0;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
 
   TxOperations ops = {NULL,mute,prepare,enable,disable,restore};
   TxRuntime state = {0};

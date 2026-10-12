@@ -10,7 +10,7 @@ static bool editing;
 static RadioParameters draft;
 static const char *message;
 
-enum { FIELD_CURRENT = 4, FIELD_DEFAULTS, FIELD_SAVE, FIELD_COUNT };
+enum { FIELD_CURRENT = 5, FIELD_DEFAULTS, FIELD_SAVE, FIELD_COUNT };
 
 void BANDS_init(void) {
   selected = gDeviceConfig.radio.active_band;
@@ -98,7 +98,7 @@ bool BANDS_key(KEY_Code_t key, Key_State_t state) {
 }
 
 void BANDS_render(void) {
-  static const char *const labels[] = {"Mode", "Step", "BW", "SQ", "Use current", "Defaults", "Save"};
+  static const char *const labels[] = {"Mode", "Step", "BW", "SQ", "RX Tone", "Use current", "Defaults", "Save"};
   STATUSLINE_SetText(editing ? radioBands[selected].name : "Bands");
   uint8_t index = editing ? field : selected;
   uint8_t start = index >= 4 ? index-3 : 0;
@@ -119,6 +119,10 @@ void BANDS_render(void) {
         PrintSmallEx(124, y, POS_R, C_FILL, "%u Hz", draft.bandwidth_hz);
     } else if (i == RADIO_FIELD_SQUELCH) {
       PrintSmallEx(124, y, POS_R, C_FILL, "%u", draft.squelch);
+    } else if (i == RADIO_FIELD_RX_TONE) {
+      char toneText[24];
+      TONE_Format(draft.rx_tone, toneText);
+      PrintSmallEx(124,y,POS_R,C_FILL,"%s",toneText);
     }
     if (i == index)
       FillRect(0, y-8, 128, 11, C_INVERT);

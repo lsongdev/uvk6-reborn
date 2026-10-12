@@ -16,8 +16,8 @@ int main(void) {
   assert(RADIO_MODEL_Plan(95925000, parameters, none, &plan) == RX_UNSUPPORTED_MODE);
 
   // The selected demodulation mode determines the receiver at an overlap.
-  RadioParameters nfm = {RX_NFM, 12500, 12000, 0};
-  RadioParameters wfm = {RX_WFM, 100000, 0, 0};
+  RadioParameters nfm = {RX_NFM, 12500, 12000, 0, 0};
+  RadioParameters wfm = {RX_WFM, 100000, 0, 0, 0};
   assert(strcmp(rxModeNames[RX_NFM], "NFM") == 0);
   assert(RADIO_MODEL_Plan(100000000, nfm, si, &plan) == RX_OK);
   assert(plan.device == RX_DEVICE_BK && plan.frequency_hz == 100000000);
@@ -87,5 +87,18 @@ int main(void) {
   assert(RADIO_MODEL_Plan(1320000000u, nfm, si, &plan) == RX_UNSUPPORTED_MODE);
   assert(RADIO_MODEL_Plan(920000000, nfm, si, &plan) == RX_OK);
   assert(RADIO_MODEL_Plan(17000000, nfm, si, &plan) == RX_UNSUPPORTED_MODE);
+  nfm.rx_tone = 258;
+  assert(RADIO_MODEL_Plan(438500000,nfm,si,&plan)==RX_OK && plan.parameters.rx_tone==258);
+  nfm.rx_tone = 259;
+  assert(RADIO_MODEL_Plan(438500000,nfm,si,&plan)==RX_INVALID_PARAMETERS);
+  nfm.rx_tone = 0;
+  assert(RADIO_MODEL_Adjust(438500000,&nfm,si,RADIO_FIELD_RX_TONE,true));
+  assert(nfm.rx_tone==1);
+  assert(RADIO_MODEL_Adjust(438500000,&nfm,si,RADIO_FIELD_RX_TONE,false));
+  assert(nfm.rx_tone==0);
+  nfm.rx_tone=51;
+  assert(RADIO_MODEL_Adjust(438500000,&nfm,si,RADIO_FIELD_MODE,true));
+  assert(nfm.mode!=RX_NFM && nfm.rx_tone==0);
+  assert(!RADIO_MODEL_Adjust(438500000,&nfm,si,RADIO_FIELD_RX_TONE,true));
   return 0;
 }

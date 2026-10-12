@@ -138,7 +138,9 @@ bool RADIO_CheckSquelch(RadioReceiver *ctx) {
     return true;
   }
   if (ctx->radio_type == RADIO_BK4819) {
-    return BK4819_IsSquelchOpen();
+    bool open = BK4819_IsSquelchOpen();
+    bool tone = !ctx->rx_tone || BK4819_CssIsDetected(TONE_Type(ctx->rx_tone) != CODE_TYPE_CONTINUOUS_TONE);
+    return open && tone;
   }
 
   return ctx->squelch == 0 || RADIO_GetSNR(ctx) > ctx->squelch;
@@ -231,6 +233,7 @@ bool RADIO_ApplyRxPlan(RadioReceiver *context, const RxPlan *plan) {
   context->frequency = plan->frequency_hz / 10u;
   context->bandwidth = bandwidth;
   context->squelch = plan->parameters.squelch;
+  context->rx_tone = plan->parameters.rx_tone;
   gRedrawScreen = true;
   return true;
 }

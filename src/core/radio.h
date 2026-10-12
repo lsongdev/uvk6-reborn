@@ -15,6 +15,7 @@ typedef struct {
   uint32_t frequency; // Driver's 10-Hz representation.
   uint16_t bandwidth; // Hardware-specific filter index.
   uint8_t squelch;
+  RadioTone rx_tone;
   Radio radio_type;
   ModulationType modulation;
 } RadioReceiver;

@@ -7,6 +7,7 @@ RadioState *gRadioState = &state;
 RadioState *vfo = &state;
 RadioReceiver *ctx = &state.context;
 bool gRedrawScreen;
+void STATUSLINE_SetText(const char *pattern, ...) { (void)pattern; }
 bool gMonitorMode;
 uint32_t gFInputValue1, gFInputValue2;
 void (*gFInputCallback)(uint32_t, uint32_t);
@@ -63,6 +64,7 @@ void RX_DEVICE_SeekCancel(RxDevice dev) { (void)dev; ++nativeCancels; }
 bool RX_DEVICE_SeekSignal(RxDevice dev, bool *found) {
   (void)dev; *found = ctx->frequency*10u == soughtFrequency; return true;
 }
+void UI_VfoShowFrequency(UI_VfoState *state, uint32_t now) { state->tuned_at = now; }
 bool UI_VfoUpdate(UI_VfoState *state, uint32_t now) { (void)state; (void)now; return false; }
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear) {
   ++rdsReads;
@@ -496,5 +498,37 @@ int main(void) {
   setup(7100000, (RadioParameters){RX_USB,5000,3000,0});
   press(KEY_F);press(KEY_STAR);
   assert(!seek.active && !strcmp(message,"SSB seek off"));
+  // Tone controls replace Monitor without changing its runtime flag.
+  setup(438500000,fm);menuIndex=0;press(KEY_MENU);
+  for(unsigned i=0;i<4;++i) press(KEY_DOWN);
+  assert(menuIndex==4);
+  press(KEY_MENU);
+  assert(user.current.parameters.rx_tone==1 && runtime.current.parameters.rx_tone==1);
+  assert(!gMonitorMode);
+  press(KEY_F);assert(user.current.parameters.rx_tone==0);
+  for(unsigned i=0;i<3;++i) press(KEY_DOWN);
+  assert(menuIndex==7);
+  unsigned appliesBefore=applied;
+  press(KEY_MENU);
+  assert(appRuns==1 && gFInputCallback==setTxFrequency);
+  setTxFrequency(43860000,0);
+  assert(gDeviceConfig.tx.frequency_hz==438600000 && applied==appliesBefore);
+  assert(user.current.frequency_hz==438500000);
+  setTxFrequency(70000000,0);
+  assert(gDeviceConfig.tx.frequency_hz==438600000 && !strcmp(message,"Invalid TX freq"));
+  inMenu=true;press(KEY_F);assert(!gDeviceConfig.tx.frequency_hz);
+  press(KEY_DOWN);assert(menuIndex==8);
+  press(KEY_MENU);assert(gDeviceConfig.tx.tone==1);
+  press(KEY_F);assert(gDeviceConfig.tx.tone==0);
+  unsigned savesBeforePlaceholder=saveRequests;
+  appliesBefore=applied;
+  press(KEY_DOWN);assert(menuIndex==MENU_CHANNEL_NAME);
+  press(KEY_MENU);assert(!strcmp(message,"Not implemented"));
+  press(KEY_STAR);press(KEY_F);
+  press(KEY_DOWN);assert(menuIndex==MENU_CHANNEL_SAVE);
+  press(KEY_MENU);press(KEY_STAR);press(KEY_F);
+  assert(saveRequests==savesBeforePlaceholder && applied==appliesBefore);
+  assert(inMenu && !confirming);
+  press(KEY_DOWN);assert(menuIndex==0); // Includes placeholders, no section titles.
   return 0;
 }

@@ -2,7 +2,7 @@
 #include <stddef.h>
 
 #define MHZ_HZ 1000000u
-#define PRESET(mode_, step_, bw_, sq_) {mode_, step_, bw_, sq_}
+#define PRESET(mode_, step_, bw_, sq_) {mode_, step_, bw_, sq_, 0}
 const char *const rxModeNames[RX_MODE_COUNT] = {"NFM", "WFM", "AM", "LSB", "USB"};
 // Narrower ranges win. Shortcut order is independent of range matching.
 const RadioBand radioBands[] = {
@@ -67,7 +67,8 @@ static bool bandwidthSupported(RxDevice device, RxMode mode, uint32_t width) {
 RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
                           ReceiverCapabilities capabilities, RxPlan *plan) {
   if (!plan || (unsigned)parameters.mode >= RX_MODE_COUNT || !parameters.step_hz ||
-      parameters.squelch > 10)
+      parameters.squelch > 10 || !TONE_Valid(parameters.rx_tone) ||
+      (parameters.rx_tone && parameters.mode != RX_NFM))
     return RX_INVALID_PARAMETERS;
   if (frequency_hz < RADIO_MIN_HZ || frequency_hz > RADIO_MAX_HZ)
     return RX_OUT_OF_RANGE;
@@ -159,6 +160,7 @@ bool RADIO_MODEL_Adjust(uint32_t frequency, RadioParameters *parameters,
     for (uint8_t offset = 1; offset < RX_MODE_COUNT; ++offset) {
       candidate = *parameters;
       candidate.mode = (parameters->mode + (up ? offset : RX_MODE_COUNT-offset))%RX_MODE_COUNT;
+      if (candidate.mode != RX_NFM) candidate.rx_tone = 0;
       uint32_t minimum = candidate.mode == RX_WFM ? (capabilities.si ? 10000 : 100000)
                        : candidate.mode == RX_AM && frequency <= 30000000 && capabilities.si ? 1000 : 10;
       if (candidate.step_hz < minimum) candidate.step_hz = minimum;
@@ -173,6 +175,13 @@ bool RADIO_MODEL_Adjust(uint32_t frequency, RadioParameters *parameters,
       if (result == RX_OK) { *parameters = candidate; return true; }
     }
     return false;
+  }
+  if (field == RADIO_FIELD_RX_TONE) {
+    if (candidate.mode != RX_NFM || !TONE_Valid(candidate.rx_tone)) return false;
+    candidate.rx_tone = TONE_Next(candidate.rx_tone, up);
+    if (RADIO_MODEL_Plan(frequency, candidate, capabilities, &plan) != RX_OK) return false;
+    *parameters = candidate;
+    return true;
   }
   if (field == RADIO_FIELD_SQUELCH) {
     candidate.squelch = (candidate.squelch + (up ? 1 : 10))%11;

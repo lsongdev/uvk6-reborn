@@ -15,6 +15,7 @@
  */
 
 #include "core/dcs.h"
+#include "core/tone.h"
 #include "external/printf/printf.h"
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
@@ -111,4 +112,14 @@ void PrintRTXCode(char *Output, uint8_t codeType, uint8_t code) {
   } else if (codeType == CODE_TYPE_OFF) {
     sprintf(Output, "No code");
   }
+}
+
+void TONE_Format(RadioTone tone, char text[24]) {
+  if (!TONE_Valid(tone)) { snprintf(text,24,"Invalid"); return; }
+  if (!tone) snprintf(text,24,"Off");
+  else if (TONE_Type(tone) == CODE_TYPE_CONTINUOUS_TONE) {
+    uint16_t hz10 = CTCSS_Options[TONE_Code(tone)];
+    snprintf(text,24,"%u.%u Hz",hz10/10,hz10%10);
+  } else snprintf(text,24,"D%03o%c",DCS_Options[TONE_Code(tone)],
+    TONE_Type(tone) == CODE_TYPE_DIGITAL ? 'N' : 'I');
 }

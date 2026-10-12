@@ -48,13 +48,13 @@ int main(void) {
   assert(RADIO_STATE_Valid(&original.radio));
   assert(RADIO_STATE_Select(&original.radio, 5));
   assert(RADIO_STATE_Set(&original.radio, 100000000,
-         (RadioParameters){RX_WFM,100000,0,0}));
+         (RadioParameters){RX_WFM,100000,0,0,0}));
   assert(RADIO_STATE_Select(&original.radio, 5));
   assert(original.radio.current.frequency_hz == 145500000);
   assert(RADIO_STATE_Select(&original.radio, 3));
   assert(original.radio.current.frequency_hz == 100000000);
   assert(!RADIO_STATE_Set(&original.radio, 100000000,
-         (RadioParameters){RX_WFM,100000,0,11})); // Invalid squelch
+         (RadioParameters){RX_WFM,100000,0,11,0})); // Invalid squelch
   original.tx = (TxConfig){.enabled = true, .power = TX_POWER_LOW};
   original.preferences.tx_timeout_seconds = 90;
   original.preferences.tx_busy_lockout = 1;
@@ -71,7 +71,26 @@ int main(void) {
   assert(loaded.preferences.tx_timeout_seconds == 90);
   assert(loaded.preferences.tx_busy_lockout == 1);
 
-  // Development storage is intentionally strict: never decode old layouts.
+  // Format 5 extends format 4 without losing its existing settings.
+  assert(CONFIG_Encode(&original,1,record));
+  record[4]=4;put32(record+HEADER_CRC,crc32(record));
+  assert(CONFIG_Decode(record,&loaded,NULL));
+  assert(loaded.tx.enabled && !loaded.tx.frequency_hz && !loaded.tx.tone);
+  assert(!loaded.radio.current.parameters.rx_tone);
+  assert(CONFIG_Encode(&original,1,record));
+  original.radio.bands[6].parameters.rx_tone=51;
+  original.radio.presets[6].rx_tone=155;
+  original.tx.tone=258;original.tx.frequency_hz=438600000;
+  assert(CONFIG_Encode(&original,1,record));
+  assert(CONFIG_Decode(record,&loaded,NULL));
+  assert(loaded.radio.bands[6].parameters.rx_tone==51);
+  assert(loaded.radio.presets[6].rx_tone==155);
+  assert(loaded.tx.tone==258 && loaded.tx.frequency_hz==438600000);
+  original.tx.tone=259;assert(!CONFIG_Encode(&original,1,record));
+  original.tx.tone=258;
+  original.tx.frequency_hz=700000000;assert(!CONFIG_Encode(&original,1,record));
+  original.tx.frequency_hz=438600000;
+  // Earlier layouts remain rejected: never decode old layouts.
   record[4] = 1;
   assert(!CONFIG_Decode(record, &loaded, NULL));
   record[4] = 2;
@@ -96,6 +115,13 @@ int main(void) {
   original.radio.bands[6].parameters.mode = RX_NFM;
 
   FakeEEPROM memory;
+  DeviceConfig receiveTone = original;
+  assert(RADIO_STATE_Set(&receiveTone.radio,438500000,
+    (RadioParameters){RX_NFM,12500,12000,4,155}));
+  assert(CONFIG_Encode(&receiveTone,12,record));
+  assert(CONFIG_Decode(record,&loaded,NULL));
+  assert(loaded.radio.current.parameters.rx_tone==155);
+  assert(loaded.radio.bands[6].parameters.rx_tone==155);
   memset(&memory, 0xff, sizeof(memory));
   memory.writes = 0;
   memory.write_limit = -1;

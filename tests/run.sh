@@ -31,7 +31,7 @@ esac
   -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
   -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/vfo-regression.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/tx-model.c src/core/tx-runtime.c src/core/seek.c \
+  tests/vfo-regression.c src/core/dcs.c src/external/printf/printf.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/tx-model.c src/core/tx-runtime.c src/core/seek.c \
   src/core/rds.c src/core/rds-receiver.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
@@ -49,7 +49,7 @@ esac
   -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
   -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/rx-device-regression.c "$dead_strip" -o "$test_binary"
+  tests/rx-device-regression.c src/core/dcs.c src/external/printf/printf.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/tx-regression.c \
   src/core/tx-model.c src/core/tx-runtime.c -o "$test_binary"
@@ -76,4 +76,7 @@ esac
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/rds-regression.c \
   src/core/rds.c src/core/rds-receiver.c -o "$test_binary"
 "$test_binary"
-echo 'Radio, VFO UI, storage, receiver plans, SI sidebands/BFO, and RDS PS/RadioText regressions passed.'
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -DPRINTF_INCLUDE_CONFIG_H -Isrc/config \
+  tests/tone-regression.c src/drivers/bk4819/css.c src/core/dcs.c src/external/printf/printf.c -o "$test_binary"
+"$test_binary"
+echo 'Radio, VFO UI, storage, receiver plans, SI sidebands/BFO, RDS PS/RadioText, and RX/TX tone/split-frequency regressions passed.'
