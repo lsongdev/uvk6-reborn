@@ -20,7 +20,7 @@ const char *UI_FormatFrequency(uint32_t frequency_hz, char text[16]) {
 }
 
 void UI_BigFrequency(uint8_t y, uint32_t f) {
-  PrintBiggestDigitsEx(LCD_WIDTH - 22, y, POS_R, C_FILL, "%4u.%03u", f / MHZ,
+  PrintBodyTextEx(LCD_WIDTH - 22, y, POS_R, C_FILL, "%4u.%03u", f / MHZ,
                        f / 100 % 1000);
   PrintMediumEx(LCD_WIDTH - 1, y, POS_R, C_FILL, "%02u", f % 100);
 }

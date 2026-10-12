@@ -1,6 +1,6 @@
 #include "ui/graphics.h"
 #include "core/misc.h"
-#include "ui/fonts/NumbersStepanv3.h"
+#include "ui/fonts/helvetica12.h"
 #include "ui/fonts/NumbersStepanv4.h"
 #include "ui/fonts/TomThumb.h"
 #include "ui/fonts/muHeavy8ptBold.h"
@@ -13,7 +13,7 @@ static Cursor cursor;
 static int16_t textClipLeft = 0, textClipRight = LCD_WIDTH;
 
 static const GFXfont *const fonts[] = {&TomThumb, &MuMatrix8ptRegular,
-                                       &muHeavy8ptBold, &dig_11, &dig_14};
+                                       &muHeavy8ptBold, &dig_11, &uiBodyFont};
 
 void UI_ClearStatus(void) { FillRect(0, 0, LCD_WIDTH, 7, C_CLEAR); }
 void UI_ClearScreen(void) {
@@ -206,7 +206,7 @@ static void printStr(const GFXfont *f, uint8_t x, uint8_t y, Color col,
 
 P(Small, 0)
 PX(Small, 0) P(Medium, 1) PX(Medium, 1) P(MediumBold, 2) PX(MediumBold, 2)
-    P(BigDigits, 3) PX(BigDigits, 3) P(BiggestDigits, 4) PX(BiggestDigits, 4)
+    P(BigDigits, 3) PX(BigDigits, 3) P(BodyText, 4) PX(BodyText, 4)
 
         void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos p, Color c,
                             const char *f, ...) {
@@ -249,10 +249,10 @@ static void textWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *t
 
 uint16_t UI_SymbolsTextWidth(const char *text) { return textWidth(text, &Symbols); }
 uint16_t UI_SmallTextWidth(const char *text) { return textWidth(text, &TomThumb); }
-uint16_t UI_LargeBoldTextWidth(const char *text) { return textWidth(text, &muHeavy8ptBold)*2; }
+uint16_t UI_BodyTextWidth(const char *text) { return textWidth(text, &uiBodyFont); }
 void UI_SmallTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset) {
   textWindow(x, baseline, width, text, offset, &TomThumb, 1);
 }
-void UI_LargeBoldTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset) {
-  textWindow(x, baseline, width, text, offset, &muHeavy8ptBold, 2);
+void UI_BodyTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset) {
+  textWindow(x, baseline, width, text, offset, &uiBodyFont, 1);
 }

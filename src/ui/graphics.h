@@ -63,7 +63,7 @@ void PrintSmall(uint8_t x, uint8_t y, const char *pattern, ...);
 void PrintMedium(uint8_t x, uint8_t y, const char *pattern, ...);
 void PrintMediumBold(uint8_t x, uint8_t y, const char *pattern, ...);
 void PrintBigDigits(uint8_t x, uint8_t y, const char *pattern, ...);
-void PrintBiggestDigits(uint8_t x, uint8_t y, const char *pattern, ...);
+void PrintBodyText(uint8_t x, uint8_t y, const char *pattern, ...);
 
 void PrintSmallEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                   const char *pattern, ...);
@@ -73,16 +73,16 @@ void PrintMediumBoldEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                        const char *pattern, ...);
 void PrintBigDigitsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                       const char *pattern, ...);
-void PrintBiggestDigitsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
+void PrintBodyTextEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                           const char *pattern, ...);
 void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                     const char *pattern, ...);
 uint16_t UI_SymbolsTextWidth(const char *text);
 uint16_t UI_SmallTextWidth(const char *text);
 void UI_SmallTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
-// 14 px capitals, with descenders fitting the VFO's 17 px body.
-uint16_t UI_LargeBoldTextWidth(const char *text);
-void UI_LargeBoldTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
+// Native 12 px capitals/digits; printable ASCII fits the 17 px VFO body.
+uint16_t UI_BodyTextWidth(const char *text);
+void UI_BodyTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
 void FSmall(uint8_t x, uint8_t y, TextPos align, uint32_t frequency);
 
 #endif /* end of include guard: GRAPHICS_H */

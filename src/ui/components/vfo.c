@@ -98,7 +98,7 @@ void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_
     state->label_started = now;
     state->offset = 0;
   }
-  uint16_t textWidth = UI_LargeBoldTextWidth(state->label);
+  uint16_t textWidth = UI_BodyTextWidth(state->label);
   state->overflow = textWidth > LCD_WIDTH-BODY_X ? textWidth-(LCD_WIDTH-BODY_X) : 0;
   UI_VfoUpdate(state, now);
   const char *unit = UI_FormatFrequency(view->frequency_hz, frequency);
@@ -137,16 +137,17 @@ void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_
   if (state->show_name) {
     int16_t offset = state->overflow ? state->offset :
                      (int16_t)textWidth-(LCD_WIDTH-BODY_X);
-    UI_LargeBoldTextWindow(BODY_X, y+22, LCD_WIDTH-BODY_X, state->label, offset);
+    UI_BodyTextWindow(BODY_X, y+22, LCD_WIDTH-BODY_X, state->label, offset);
   } else {
     char *tail = NULL;
     char *dot = strchr(frequency, '.');
     if (unit[0] == 'M' && dot && strlen(dot+1) > 3) {
       tail = dot+4;
-      PrintSmallEx(LCD_WIDTH, y+17, POS_R, C_FILL, "%s", tail);
+      PrintSmallEx(LCD_WIDTH, y+13, POS_R, C_FILL, "%s", tail);
       *tail = 0;
     }
-    PrintBiggestDigitsEx(FREQUENCY_RIGHT, y+24, POS_R, C_FILL, "%s", frequency);
-    PrintSmallEx(LCD_WIDTH, y+24, POS_R, C_FILL, "%s", unit);
+    UI_BodyTextWindow(BODY_X, y+22, FREQUENCY_RIGHT-BODY_X, frequency,
+        (int16_t)UI_BodyTextWidth(frequency)-(FREQUENCY_RIGHT-BODY_X));
+    PrintSmallEx(LCD_WIDTH, y+21, POS_R, C_FILL, "%s", unit);
   }
 }

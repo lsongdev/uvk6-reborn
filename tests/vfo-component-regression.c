@@ -13,19 +13,28 @@ static void sameRows(unsigned first, unsigned last) {
       assert(GetPixel(x,y) == !!(saved[y/8][x] & (1<<(y%8))));
 }
 int main(void) {
-  // Names use 14 px capitals, matching the main frequency's digit height.
+  // Names and frequencies use the same native 12 px ASCII glyphs.
   memset(gFrameBuffer,0,sizeof(gFrameBuffer));
-  UI_LargeBoldTextWindow(30,22,98,"A",0);
+  UI_BodyTextWindow(30,22,98,"A",0);
   unsigned inkRows=0;
   for(unsigned y=0;y<64;++y) {
     bool ink=false;
     for(unsigned x=30;x<128;++x) ink |= GetPixel(x,y);
     inkRows += ink;
   }
-  assert(inkRows == 14);
-  // Odd-pixel scrolling must clip scaled pixels and retain descenders.
+  assert(inkRows == 12);
+  // Frequency and name use identical glyph pixels and the same baseline.
+  UI_VfoState matching={0};
+  UI_VfoView match={.frequency_hz=438500000,.mode=RX_NFM,.step_hz=12500,.band_name="70cm"};
+  UI_VfoRender(8,&match,&matching,0);
+  memcpy(saved,gFrameBuffer,sizeof(saved));
+  match.name="438.500";
+  UI_VfoRender(8,&match,&matching,1000);
+  for (unsigned y=17;y<34;++y) for(unsigned x=30;x<110;++x)
+    assert(GetPixel(x+18,y)==!!(saved[y/8][x]&(1<<(y%8))));
+  // Scrolling must clip pixels and retain native descenders.
   memset(gFrameBuffer,0,sizeof(gFrameBuffer));
-  UI_LargeBoldTextWindow(30,22,98,"Agjp WWWWWWWWW",1);
+  UI_BodyTextWindow(30,22,98,"Agjp WWWWWWWWW",1);
   bool descender=false;
   for(unsigned y=0;y<64;++y) for(unsigned x=0;x<128;++x) {
     if(x<30 || y<9 || y>25) assert(!GetPixel(x,y));

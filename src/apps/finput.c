@@ -13,8 +13,7 @@
 
 static uint32_t POW[] = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000000};
 
-static const uint8_t BIG_DIGIT_HEIGHT = 11;
-static const uint8_t BIG_DIGIT_WIDTH = 11;
+static const uint8_t BIG_DIGIT_HEIGHT = 12;
 static const uint8_t MAX_FRACTION_DIGITS = 6;
 
 typedef enum { INPUT_FIRST_VALUE, INPUT_SECOND_VALUE } InputStage;
@@ -428,15 +427,16 @@ void FINPUT_render(void) {
   }
 
   // Отображаем текущий ввод
-  PrintBiggestDigitsEx(LCD_WIDTH - 3, BASE_Y, POS_R, C_FILL, "%s", displayStr);
+  UI_BodyTextWindow(0,BASE_Y,LCD_WIDTH-3,displayStr,
+      (int16_t)UI_BodyTextWidth(displayStr)-(LCD_WIDTH-3));
   PrintMediumEx(LCD_WIDTH - 3, BASE_Y + 8, POS_R, C_FILL, "%s", unitSuffix);
 
   // Отображаем курсор
   if (blinkState && cursorPos < currentConfig.max_digits +
                                     (dotEntered ? MAX_FRACTION_DIGITS : 0)) {
     uint8_t cursorX =
-        LCD_WIDTH - 1 - (strlen(displayStr) - cursorPos) * BIG_DIGIT_WIDTH;
-    FillRect(cursorX, BASE_Y - BIG_DIGIT_HEIGHT + 1, 1, BIG_DIGIT_HEIGHT,
+        LCD_WIDTH - 3 - UI_BodyTextWidth(displayStr+cursorPos);
+    FillRect(cursorX, BASE_Y - BIG_DIGIT_HEIGHT, 1, BIG_DIGIT_HEIGHT,
              C_FILL);
   }
 
