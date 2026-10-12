@@ -272,17 +272,90 @@ bool SI47XX_SetSsbBandwidth(SI47XX_SsbFilterBW bw) {
   return SI47XX_SsbSetup(bw, 1, 0, 1, 0, 1);
 }
 
-void SI47XX_Seek(bool up, bool wrap) {
-  uint8_t seekOpt = (up ? FLG_SEEKUP : 0) | (wrap ? FLG_WRAP : 0);
-  uint8_t cmd[6] = {CMD_FM_SEEK_START, seekOpt, 0x00, 0x00, 0x00, 0x00};
+// Forward-only, bounded hardware seek. The application handles the single
+// wrap at the selected band's edge, not the radio's global FM/AM band.
+bool SI47XX_SeekStart(uint32_t lower_hz, uint32_t upper_hz, uint32_t step_hz) {
+  if (!isSi4732On || (si4732mode != SI47XX_FM && si4732mode != SI47XX_AM) ||
+      lower_hz >= upper_hz)
+    return false;
+  const uint32_t unit = si4732mode == SI47XX_FM ? 10000u : 1000u;
+  if (lower_hz % unit || upper_hz % unit || step_hz % unit ||
+      !step_hz || upper_hz / unit > 65535u)
+    return false;
+  if (si4732mode == SI47XX_FM &&
+      step_hz != 50000u && step_hz != 100000u && step_hz != 200000u)
+    return false;
+  const uint16_t lower = lower_hz/unit, upper = upper_hz/unit;
+  const uint16_t spacing = step_hz/unit;
+  const uint16_t bottomProp = si4732mode == SI47XX_FM
+                                  ? PROP_FM_SEEK_BAND_BOTTOM
+                                  : PROP_AM_SEEK_BAND_BOTTOM;
+  const uint16_t topProp = si4732mode == SI47XX_FM
+                               ? PROP_FM_SEEK_BAND_TOP
+                               : PROP_AM_SEEK_BAND_TOP;
+  const uint16_t spacingProp = si4732mode == SI47XX_FM
+                                   ? PROP_FM_SEEK_FREQ_SPACING
+                                   : PROP_AM_SEEK_FREQ_SPACING;
+  const uint16_t rssiProp = si4732mode == SI47XX_FM
+                                ? PROP_FM_SEEK_TUNE_RSSI_THRESHOLD
+                                : PROP_AM_SEEK_TUNE_RSSI_THRESHOLD;
+  const uint16_t snrProp = si4732mode == SI47XX_FM
+                               ? PROP_FM_SEEK_TUNE_SNR_THRESHOLD
+                               : PROP_AM_SEEK_TUNE_SNR_THRESHOLD;
+  if (!SI47XX_SetProperty(bottomProp, lower) ||
+      !SI47XX_SetProperty(topProp, upper) ||
+      !SI47XX_SetProperty(spacingProp, spacing) ||
+      !SI47XX_SetProperty(rssiProp, 16) ||
+      !SI47XX_SetProperty(snrProp, 7))
+    return false;
+  uint8_t cmd[6] = {si4732mode == SI47XX_FM ? CMD_FM_SEEK_START
+                                            : CMD_AM_SEEK_START,
+                    SEEK_START_ARG1_SEEK_UP, 0, 0, 0, 0};
+  if (si4732mode == SI47XX_AM && siCurrentFreq > 1800)
+    cmd[5] = 1; // SW antenna capacitor choice in the existing driver.
+  if (!waitToSend() ||
+      !SI47XX_WriteBuffer(cmd, si4732mode == SI47XX_FM ? 2 : 6))
+    return false;
+  siCurrentFreq = 0; // Hardware SEEK changed the carrier behind tune cache.
+  return true;
+}
 
-  if (si4732mode == SI47XX_AM) {
-    cmd[0] = CMD_AM_SEEK_START;
-    cmd[5] = (siCurrentFreq > 1800) ? 1 : 0;
+SiSeekResult SI47XX_SeekPoll(uint32_t *frequency_hz) {
+  if (!frequency_hz || !isSi4732On ||
+      (si4732mode != SI47XX_FM && si4732mode != SI47XX_AM))
+    return SI_SEEK_ERROR;
+  uint8_t cmd[2] = {si4732mode == SI47XX_FM ? CMD_FM_TUNE_STATUS
+                                             : CMD_AM_TUNE_STATUS, 0};
+  uint8_t status[8] = {0};
+  if (!waitToSend() || !SI47XX_WriteBuffer(cmd, 2) || !waitToSend() ||
+      !SI47XX_ReadBuffer(status, sizeof(status)) ||
+      !(status[0] & STATUS_CTS) || (status[0] & STATUS_ERR))
+    return SI_SEEK_ERROR;
+  if (!(status[0] & STATUS_STCINT))
+    return SI_SEEK_BUSY;
+  uint8_t ack[2] = {cmd[0], TUNE_STATUS_ARG1_CLEAR_INT};
+  if (!waitToSend() || !SI47XX_WriteBuffer(ack, 2) || !waitToSend() ||
+      !SI47XX_ReadBuffer(status, sizeof(status)))
+    return SI_SEEK_ERROR;
+  uint32_t result_hz = ((uint32_t)status[2] << 8 | status[3]) *
+                       (si4732mode == SI47XX_FM ? 10000u : 1000u);
+  *frequency_hz = result_hz;
+  return status[1] & FIELD_TUNE_STATUS_RESP1_SEEK_LIMIT ? SI_SEEK_LIMIT :
+         status[1] & FIELD_TUNE_STATUS_RESP1_VALID ? SI_SEEK_FOUND :
+         SI_SEEK_LIMIT;
+}
+
+void SI47XX_SeekCancel(void) {
+  if (isSi4732On && (si4732mode == SI47XX_FM || si4732mode == SI47XX_AM)) {
+    uint8_t cmd[2] = {si4732mode == SI47XX_FM ? CMD_FM_TUNE_STATUS
+                                               : CMD_AM_TUNE_STATUS,
+                      TUNE_STATUS_ARG1_CANCEL_SEEK |
+                      TUNE_STATUS_ARG1_CLEAR_INT};
+    uint8_t response[8];
+    if (waitToSend() && SI47XX_WriteBuffer(cmd, 2) && waitToSend())
+      (void)SI47XX_ReadBuffer(response, sizeof(response));
   }
-
-  waitToSend();
-  SI47XX_WriteBuffer(cmd, si4732mode == SI47XX_FM ? 2 : 6);
+  siCurrentFreq = 0; // Re-apply always tunes after cancellation.
 }
 
 uint32_t SI47XX_getFrequency(bool *valid) {

@@ -147,3 +147,69 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
   }
   return false;
 }
+
+bool RX_DEVICE_SeekNative(const RxPlan *plan) {
+  if (!plan || plan->device != RX_DEVICE_SI)
+    return false;
+  if (plan->parameters.mode == RX_WFM)
+    return plan->parameters.step_hz == 50000 ||
+           plan->parameters.step_hz == 100000 ||
+           plan->parameters.step_hz == 200000;
+  return plan->parameters.mode == RX_AM &&
+         plan->parameters.step_hz >= 1000 &&
+         plan->parameters.step_hz <= 10000 &&
+         plan->parameters.step_hz % 1000 == 0;
+}
+
+bool RX_DEVICE_SeekStart(const RxPlan *plan, uint32_t lower_hz,
+                         uint32_t upper_hz) {
+  // There is no assumption that a Seek is a completed user tune.
+  if (!RX_DEVICE_SeekNative(plan))
+    return false;
+  uint32_t unit = plan->parameters.mode == RX_WFM ? 10000u : 1000u;
+  uint32_t bottom = ((lower_hz + unit-1)/unit)*unit;
+  uint32_t top = (upper_hz / unit) * unit;
+  if (top <= bottom || top >= 0x10000u * unit)
+    return false;
+  return SI47XX_SeekStart(bottom, top, plan->parameters.step_hz);
+}
+
+RxSeekResult RX_DEVICE_SeekPoll(RxDevice device, uint32_t *frequency_hz) {
+  if (device != RX_DEVICE_SI)
+    return RX_SEEK_ERROR;
+  switch (SI47XX_SeekPoll(frequency_hz)) {
+  case SI_SEEK_BUSY: return RX_SEEK_BUSY;
+  case SI_SEEK_FOUND: return RX_SEEK_FOUND;
+  case SI_SEEK_LIMIT: return RX_SEEK_LIMIT;
+  default: return RX_SEEK_ERROR;
+  }
+}
+
+void RX_DEVICE_SeekCancel(RxDevice device) {
+  if (device == RX_DEVICE_SI)
+    SI47XX_SeekCancel();
+}
+
+bool RX_DEVICE_SeekSignal(RxDevice device, bool *found) {
+  if (!found) return false;
+  switch (device) {
+  case RX_DEVICE_BK:
+    // The caller applies a temporary squelch >= 4 even if monitoring uses 0.
+    *found = BK4819_IsSquelchOpen();
+    return true;
+  case RX_DEVICE_SI:
+    if (!RSQ_GET()) return false;
+    *found = rsqStatus.resp.RSSI >= 16 && rsqStatus.resp.SNR >= 7;
+    return true;
+  case RX_DEVICE_BROADCAST: {
+    // BK1080's 64-76 and 76-108 MHz channel banks are discontinuous.
+    // Frequency stepping handles the split without unsafe native seek wraps.
+    uint16_t rssi = BK1080_ReadRegister(BK1080_REG_10);
+    uint16_t snr = BK1080_ReadRegister(BK1080_REG_07);
+    if (rssi == UINT16_MAX || snr == UINT16_MAX) return false;
+    *found = (rssi & 0xffu) >= 24u && (snr & 0x0fu) >= 5u;
+    return true;
+  }
+  }
+  return false;
+}
