@@ -45,7 +45,7 @@ static const uint8_t *decodeBand(const uint8_t *in, BandState *band) {
   band->frequency_hz = get32(in);
   band->parameters = (RadioParameters){
       .mode = (RxMode)in[12], .step_hz = get32(in+4),
-      .bandwidth_hz = get32(in+8), .squelch = in[13], .tx_enabled = false};
+      .bandwidth_hz = get32(in+8), .squelch = in[13]};
   return in + 14;
 }
 void CONFIG_Default(DeviceConfig *config) {
@@ -141,7 +141,7 @@ bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
   for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i) {
     candidate.radio.presets[i] = (RadioParameters){
         .step_hz = get32(p), .bandwidth_hz = get16(p+4),
-        .mode = (RxMode)p[6], .squelch = p[7], .tx_enabled = false};
+        .mode = (RxMode)p[6], .squelch = p[7]};
     p += 8;
   }
   if (p[0] > 1 || p[1] > TX_POWER_HIGH)

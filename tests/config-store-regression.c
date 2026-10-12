@@ -48,13 +48,13 @@ int main(void) {
   assert(RADIO_STATE_Valid(&original.radio));
   assert(RADIO_STATE_Select(&original.radio, 5));
   assert(RADIO_STATE_Set(&original.radio, 100000000,
-         (RadioParameters){RX_WFM,100000,0,0,false}));
+         (RadioParameters){RX_WFM,100000,0,0}));
   assert(RADIO_STATE_Select(&original.radio, 5));
   assert(original.radio.current.frequency_hz == 145500000);
   assert(RADIO_STATE_Select(&original.radio, 3));
   assert(original.radio.current.frequency_hz == 100000000);
   assert(!RADIO_STATE_Set(&original.radio, 100000000,
-         (RadioParameters){RX_WFM,100000,0,0,true})); // RX-only
+         (RadioParameters){RX_WFM,100000,0,11})); // Invalid squelch
   original.tx = (TxConfig){.enabled = true, .power = TX_POWER_LOW};
   original.preferences.tx_timeout_seconds = 90;
   original.preferences.tx_busy_lockout = 1;
