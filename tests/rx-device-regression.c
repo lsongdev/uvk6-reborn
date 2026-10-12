@@ -62,15 +62,22 @@ int main(void) {
   RxPlan bk = plan(100000000, RX_NFM, RX_DEVICE_BK);
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BK));
   assert(bkTunes == 1 && lastBkHz10 == 10000000u && bkModes == 1);
+  RxPlan bkNext = plan(100012500, RX_NFM, RX_DEVICE_BK);
+  assert(RX_DEVICE_Apply(&bkNext, RX_DEVICE_BK));
+  assert(bkTunes == 2 && bkModes == 1 && lastBkHz10 == 10001250u);
+  gSettings.sqlOpenTime = 2;
+  assert(RX_DEVICE_Apply(&bkNext, RX_DEVICE_BK));
+  assert(bkTunes == 3 && bkModes == 2);
+  gSettings.sqlOpenTime = 0;
   RxPlan wfm = plan(100000000, RX_WFM, RX_DEVICE_SI);
   assert(RX_DEVICE_Apply(&wfm, RX_DEVICE_BK));
   assert(bkIdle == 1 && siTunes == 1);
   RxPlan unsupported = plan(100000000, RX_WFM, RX_DEVICE_BK);
   assert(!RX_DEVICE_Apply(&unsupported, RX_DEVICE_SI));
-  assert(siMuted == 0 && bkTunes == 1); // Validate before power switch.
+  assert(siMuted == 0 && bkTunes == 3); // Validate before power switch.
   siTuneOk = false;
   assert(!RX_DEVICE_Apply(&wfm, RX_DEVICE_SI));
-  assert(siTunes == 2 && bkTunes == 1);
+  assert(siTunes == 2 && bkTunes == 3);
   siTuneOk = true;
   siVolumeOk = false;
   assert(!RX_DEVICE_Apply(&wfm, RX_DEVICE_SI));
@@ -89,9 +96,9 @@ int main(void) {
   assert(RX_DEVICE_Apply(&fmRadio, RX_DEVICE_SI));
   assert(broadcastTunes == 3);
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BROADCAST));
-  assert(bkTunes == 2 && lastBkHz10 == 10000000u);
+  assert(bkTunes == 4 && lastBkHz10 == 10000000u);
   gSettings.si4732PowerOff = true;
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_SI));
-  assert(siPowerDowns == 1 && bkTunes == 3);
+  assert(siPowerDowns == 1 && bkTunes == 5);
   return 0;
 }

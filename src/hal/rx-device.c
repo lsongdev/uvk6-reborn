@@ -5,6 +5,13 @@
 #include "core/settings.h"
 #include <string.h>
 
+// BK4819 has no write acknowledgement. Cache only the last *requested*
+// configuration to skip redundant setup on same-chip frequency stepping.
+// Invalidate before any full reconfiguration, including failed SI handoffs.
+static bool bkCached;
+static RxPlan bkPrevious;
+static uint8_t bkSqlOpenTime, bkSqlCloseTime;
+
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo) {
   SI47XX_RdsStatus status;
   if (!packet || !SI47XX_ReadRDS(&status, clear_fifo)) return false;
@@ -72,24 +79,43 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
     return false;
   }
 
-  // Do not disturb the previous receiver for invalid mode/bandwidth requests.
+  // A frequency-only BK step does not need to repeat AGC/squelch/
+  // bandwidth setup. SQL timing changes invalidate the shortcut.
+  bool fastBk = bkCached && previous == RX_DEVICE_BK &&
+                plan->device == RX_DEVICE_BK &&
+                bkPrevious.parameters.mode == mode &&
+                bkPrevious.parameters.bandwidth_hz == plan->parameters.bandwidth_hz &&
+                bkPrevious.parameters.squelch == plan->parameters.squelch &&
+                bkSqlOpenTime == gSettings.sqlOpenTime &&
+                bkSqlCloseTime == gSettings.sqlCloseTime;
+  uint32_t oldBkFrequency = bkPrevious.frequency_hz;
+  bkCached = false;
   if (previous != plan->device)
     leave(previous);
 
   switch (plan->device) {
   case RX_DEVICE_BK:
-    BK4819_RX_TurnOn();
-    BK4819_SetModulation(mode == RX_NFM ? MOD_FM : MOD_AM);
-    BK4819_SetFilterBandwidth(bandwidth);
-    BK4819_SetAGC(mode == RX_NFM, AUTO_GAIN_INDEX);
-    BK4819_SetAFC(8);
-    BK4819_SetAFCSpeed(63);
-    BK4819_Squelch(plan->parameters.squelch, gSettings.sqlOpenTime,
-                   gSettings.sqlCloseTime);
-    BK4819_SelectFilterEx(frequency < SETTINGS_GetFilterBound()
-                            ? FILTER_VHF : FILTER_UHF);
-    BK4819_TuneTo(frequency, true);
-    return true; // BK serial register writes lack an ACK/failure API.
+    if (!fastBk) {
+      BK4819_RX_TurnOn();
+      BK4819_SetModulation(mode == RX_NFM ? MOD_FM : MOD_AM);
+      BK4819_SetFilterBandwidth(bandwidth);
+      BK4819_SetAGC(mode == RX_NFM, AUTO_GAIN_INDEX);
+      BK4819_SetAFC(8);
+      BK4819_SetAFCSpeed(63);
+      BK4819_Squelch(plan->parameters.squelch, gSettings.sqlOpenTime,
+                     gSettings.sqlCloseTime);
+    }
+    if (!fastBk || ((oldBkFrequency / 10u < SETTINGS_GetFilterBound()) !=
+                    (frequency < SETTINGS_GetFilterBound())))
+      BK4819_SelectFilterEx(frequency < SETTINGS_GetFilterBound()
+                              ? FILTER_VHF : FILTER_UHF);
+    if (!fastBk || oldBkFrequency != plan->frequency_hz)
+      BK4819_TuneTo(frequency, true);
+    bkPrevious = *plan;
+    bkSqlOpenTime = gSettings.sqlOpenTime;
+    bkSqlCloseTime = gSettings.sqlCloseTime;
+    bkCached = true;
+    return true; // BK serial writes have no acknowledgement.
   case RX_DEVICE_SI: {
     SI47XX_MODE siMode = mode == RX_WFM ? SI47XX_FM :
                          mode == RX_AM ? SI47XX_AM :
