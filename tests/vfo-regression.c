@@ -5,7 +5,7 @@
 RadioState state;
 RadioState *gRadioState = &state;
 ExtendedVFOContext *vfo = &state.vfos[0];
-VFOContext *ctx = &state.vfos[0].context;
+RadioReceiver *ctx = &state.vfos[0].context;
 bool gRedrawScreen;
 bool gMonitorMode;
 uint32_t gFInputValue1, gFInputValue2;
@@ -47,11 +47,11 @@ static uint32_t failFrequency;
 
 uint32_t Now(void) { return clockNow; }
 ReceiverCapabilities RADIO_GetReceiverCapabilities(void) { return capabilities; }
-RadioParameters RADIO_ReadParameters(const VFOContext *context) {
+RadioParameters RADIO_ReadParameters(const RadioReceiver *context) {
   (void)context;
   return savedParameters;
 }
-bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan) {
+bool RADIO_ApplyRxPlan(RadioReceiver *context, const RxPlan *plan) {
   if (failApply || (failFrequency && plan->frequency_hz == failFrequency))
     return false;
   ++applied;
@@ -64,7 +64,6 @@ void RADIO_StopReception(void) {
   vfo->is_open = false;
   ++routed;
 }
-void RADIO_ToggleTX(VFOContext *context, bool on) { (void)context; (void)on; }
 void APPS_run(AppType_t app) { (void)app; ++appRuns; }
 bool APPS_key(KEY_Code_t key, Key_State_t keyState) { (void)key; (void)keyState; return true; }
 void FINPUT_setup(uint32_t min, uint32_t max, InputUnit unit, bool range) {
@@ -81,7 +80,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   message = NULL;
   RADIO_STATE_Default(&gDeviceConfig.radio);
   assert(RADIO_STATE_Set(&gDeviceConfig.radio, frequency, values));
-  *ctx = (VFOContext){.frequency = frequency/10};
+  *ctx = (RadioReceiver){.frequency = frequency/10};
   savedParameters = values;
   applied = routed = appRuns = saveRequests = 0;
   failApply = false;

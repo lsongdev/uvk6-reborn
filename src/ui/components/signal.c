@@ -2,13 +2,6 @@
 #include "core/radio.h"
 #include "core/measurements.h"
 
-void UI_TxBar(uint8_t y) {
-  FillRect(0, y, LCD_WIDTH, 8, C_CLEAR);
-  PrintMediumEx(LCD_WIDTH - 1, y + 7, POS_R, C_FILL, "%u%c",
-                ctx->tx_state.power_level,
-                ctx->tx_state.pa_enabled ? '+' : '-');
-}
-
 void UI_RSSIBar(uint8_t y) {
   uint16_t rssi = vfo->msm.rssi;
   uint8_t snr = vfo->msm.snr;

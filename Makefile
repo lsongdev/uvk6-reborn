@@ -20,7 +20,7 @@ BUILD_TAG     := $(shell date -u +'%Y%m%d_%H%M')
 # Compile only reachable applications. Retired scan/spectrum code remains in
 # the tree for reference, but is not part of the single-receiver firmware.
 SRC := $(SRC_DIR)/main.c \
-       $(filter-out $(SRC_DIR)/core/scan.c,$(wildcard $(SRC_DIR)/core/*.c)) \
+       $(filter-out $(addprefix $(SRC_DIR)/core/,scan.c bands.c channels.c lootlist.c),$(wildcard $(SRC_DIR)/core/*.c)) \
        $(wildcard $(SRC_DIR)/hal/*.c) \
        $(wildcard $(SRC_DIR)/drivers/*/*.c) \
        $(filter-out $(SRC_DIR)/ui/spectrum.c $(SRC_DIR)/ui/regs-menu.c,$(wildcard $(SRC_DIR)/ui/*.c)) \

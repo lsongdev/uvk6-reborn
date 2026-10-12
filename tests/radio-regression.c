@@ -50,7 +50,6 @@ void mhzToS(char *out, uint32_t f) { (void)f; out[0] = '\0'; }
 void bkAttToS(char *out, uint8_t gain) { (void)gain; out[0] = '\0'; }
 
 void testFrequencyInput(void);
-void testBandNames(void);
 
 int main(int argc, char **argv) {
   (void)argv;
@@ -81,6 +80,5 @@ int main(int argc, char **argv) {
   RADIO_GetReceiverCapabilities();
   assert(probes == initialProbes);
   testFrequencyInput();
-  testBandNames();
   return 0;
 }
