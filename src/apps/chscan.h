@@ -1,7 +1,7 @@
 #ifndef CHSCAN_H
 #define CHSCAN_H
 
-#include "../driver/keyboard.h"
+#include "hal/keyboard.h"
 #include <stdbool.h>
 #include <stdint.h>
 

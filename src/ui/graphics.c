@@ -1,11 +1,11 @@
-#include "graphics.h"
-#include "../misc.h"
-#include "fonts/NumbersStepanv3.h"
-#include "fonts/NumbersStepanv4.h"
-#include "fonts/TomThumb.h"
-#include "fonts/muHeavy8ptBold.h"
-#include "fonts/muMatrix8ptRegular.h"
-#include "fonts/symbols.h"
+#include "ui/graphics.h"
+#include "core/misc.h"
+#include "ui/fonts/NumbersStepanv3.h"
+#include "ui/fonts/NumbersStepanv4.h"
+#include "ui/fonts/TomThumb.h"
+#include "ui/fonts/muHeavy8ptBold.h"
+#include "ui/fonts/muMatrix8ptRegular.h"
+#include "ui/fonts/symbols.h"
 #include <stdlib.h>
 #include <string.h>
 

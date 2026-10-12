@@ -1,7 +1,7 @@
-#include "textinput.h"
-#include "../driver/st7565.h"
-#include "../ui/graphics.h"
-#include "apps.h"
+#include "apps/textinput.h"
+#include "hal/st7565.h"
+#include "ui/graphics.h"
+#include "apps/apps.h"
 #include <string.h>
 
 char *gTextinputText = "";

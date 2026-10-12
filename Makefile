@@ -19,14 +19,13 @@ BUILD_TAG     := $(shell date -u +'%Y%m%d_%H%M')
 # =============================================================================
 # Compile only reachable applications. Retired scan/spectrum code remains in
 # the tree for reference, but is not part of the single-receiver firmware.
-SRC := $(wildcard $(SRC_DIR)/*.c) \
-       $(wildcard $(SRC_DIR)/driver/*.c) \
-       $(filter-out $(SRC_DIR)/helper/scan.c,$(wildcard $(SRC_DIR)/helper/*.c)) \
+SRC := $(SRC_DIR)/main.c \
+       $(filter-out $(SRC_DIR)/core/scan.c,$(wildcard $(SRC_DIR)/core/*.c)) \
+       $(wildcard $(SRC_DIR)/hal/*.c) \
        $(filter-out $(SRC_DIR)/ui/spectrum.c,$(wildcard $(SRC_DIR)/ui/*.c)) \
-       $(addprefix $(SRC_DIR)/apps/,apps.c vfo1.c finput.c settings.c reset.c)
+       $(addprefix $(SRC_DIR)/apps/,apps.c system.c vfo1.c finput.c settings.c reset.c)
 
-OBJS := $(OBJ_DIR)/start.o \
-        $(OBJ_DIR)/init.o \
+OBJS := $(OBJ_DIR)/hal/start.o \
         $(OBJ_DIR)/external/printf/printf.o \
         $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
@@ -45,6 +44,8 @@ CC       := $(TOOLCHAIN_PREFIX)gcc
 LD       := $(TOOLCHAIN_PREFIX)gcc
 OBJCOPY  := $(TOOLCHAIN_PREFIX)objcopy
 SIZE     := $(TOOLCHAIN_PREFIX)size
+PYTHON   ?= python3
+PORT     ?=
 
 # =============================================================================
 # Compiler Flags
@@ -82,7 +83,7 @@ DEFINES  := -DPRINTF_INCLUDE_CONFIG_H \
             -DARMCM0
 
 # Include paths
-INC_DIRS := -I./src/config \
+INC_DIRS := -I./src -I./src/config \
             -I./src/external/CMSIS_5/CMSIS/Core/Include \
             -I./src/external/CMSIS_5/Device/ARM/ARMCM0/Include
 
@@ -132,15 +133,10 @@ release: clean
 	@echo "Release firmware: $(BIN_DIR)/Hawk5-alfa-by-fagci-$(BUILD_TAG).bin"
 
 # Генерация бинарного файла
-$(TARGET).bin: $(TARGET)
+$(TARGET).bin: $(TARGET) tools/fw-pack.py
 	@echo "Creating binary file..."
 	$(OBJCOPY) -O binary $< $@
-	@if [ -f fw-pack.py ]; then \
-		python3 fw-pack.py $@ $(GIT_HASH) $(TARGET).packed.bin; \
-	else \
-		echo "Warning: fw-pack.py not found, skipping packing"; \
-		cp $@ $(TARGET).packed.bin; \
-	fi
+	$(PYTHON) tools/fw-pack.py $@ $(GIT_HASH) $(TARGET).packed.bin
 
 # Линковка
 $(TARGET): $(OBJS) | $(BIN_DIR)
@@ -178,6 +174,11 @@ $(BIN_DIR) $(OBJ_DIR):
 # Utility Targets
 # =============================================================================
 
+# Flash the raw image through the stock UV-K5/K6 serial bootloader.
+flash: $(TARGET).bin
+	@test -n "$(PORT)" || { echo "Usage: make flash PORT=/dev/cu.usbserial-1420 (Linux: /dev/ttyUSB0)"; exit 1; }
+	$(PYTHON) tools/flash.py --port "$(PORT)" --firmware "$(TARGET).bin"
+
 # Показать информацию о сборке
 info:
 	@echo "Project Information:"
@@ -214,6 +215,7 @@ help:
 	@echo "  clean    - Remove build artifacts"
 	@echo "  distclean- Remove all generated files"
 	@echo "  info     - Show build configuration"
+	@echo "  flash    - Build and flash raw firmware (requires PORT=serial-device)"
 	@echo "  help     - Show this help message"
 	@echo ""
 	@echo "Examples:"
@@ -221,6 +223,7 @@ help:
 	@echo "  make debug        # Build debug version"
 	@echo "  make release      # Build and package release"
 	@echo "  make BUILD_TYPE=debug  # Alternative debug build"
+	@echo "  make flash PORT=/dev/cu.usbserial-1420  # Hold PTT while powering on"
 
 # =============================================================================
 # Dependencies

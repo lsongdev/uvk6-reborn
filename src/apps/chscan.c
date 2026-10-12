@@ -1,15 +1,15 @@
-#include "chscan.h"
+#include "apps/chscan.h"
 
-#include "../driver/system.h"
-#include "../driver/uart.h"
-#include "../helper/channels.h"
-#include "../helper/lootlist.h"
-#include "../helper/scan.h"
-#include "../radio.h"
-#include "../scheduler.h"
-#include "../ui/components.h"
-#include "../ui/graphics.h"
-#include "apps.h"
+#include "hal/system.h"
+#include "hal/uart.h"
+#include "core/channels.h"
+#include "core/lootlist.h"
+#include "core/scan.h"
+#include "core/radio.h"
+#include "hal/scheduler.h"
+#include "ui/components.h"
+#include "ui/graphics.h"
+#include "apps/apps.h"
 
 CH activeCh;
 

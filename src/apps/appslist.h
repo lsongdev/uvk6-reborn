@@ -1,7 +1,7 @@
 #ifndef APPSLIST_H
 #define APPSLIST_H
 
-#include "../driver/keyboard.h"
+#include "hal/keyboard.h"
 #include <stdbool.h>
 #include <stdint.h>
 

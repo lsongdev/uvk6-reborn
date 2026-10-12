@@ -1,8 +1,8 @@
 #ifndef UI_SPECTRUM_H
 #define UI_SPECTRUM_H
 
-#include "../helper/channels.h"
-#include "../helper/lootlist.h"
+#include "core/channels.h"
+#include "core/lootlist.h"
 #include <stdbool.h>
 #include <stdint.h>
 

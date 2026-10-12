@@ -1,15 +1,16 @@
-#include "vfo1.h"
-#include "../driver/st7565.h"
-#include "../helper/menu.h"
-#include "../radio.h"
-#include "../device-config.h"
-#include "../rx-runtime.h"
-#include "../scheduler.h"
-#include "../ui/components.h"
-#include "../ui/graphics.h"
-#include "../ui/statusline.h"
-#include "apps.h"
-#include "finput.h"
+#include "apps/vfo1.h"
+#include "hal/st7565.h"
+#include "external/printf/printf.h"
+#include "ui/menu.h"
+#include "core/radio.h"
+#include "core/device-config.h"
+#include "core/rx-runtime.h"
+#include "hal/scheduler.h"
+#include "ui/components.h"
+#include "ui/graphics.h"
+#include "ui/statusline.h"
+#include "apps/apps.h"
+#include "apps/finput.h"
 
 static bool initialized;
 static RxRuntime runtime;
@@ -21,6 +22,15 @@ static RadioUserState user; // Current UI state, committed only on successful RX
 static RxPlan pending;
 static const char *message;
 static uint32_t messageAt;
+
+static const char *formatFrequency(uint32_t frequency, char text[16]) {
+  if (frequency < 1000000) {
+    snprintf(text, 16, "%u.%02u", frequency/1000, frequency%1000/10);
+    return "kHz";
+  }
+  snprintf(text, 16, "%u.%05u", frequency/1000000, frequency%1000000/10);
+  return "MHz";
+}
 
 static void notify(const char *text) {
   message = text;
@@ -59,7 +69,7 @@ static void apply(const RxPlan *plan) {
   message = NULL;
 }
 
-static void request(uint32_t target, RadioParameters values, bool confirmParameters) {
+static void request(uint32_t target, RadioParameters values) {
   RxPlan plan;
   RxResult result = RADIO_MODEL_Plan(target, values, RADIO_GetReceiverCapabilities(), &plan);
   if (result == RX_OUT_OF_RANGE || result == RX_INVALID_PARAMETERS) {
@@ -80,7 +90,7 @@ static void request(uint32_t target, RadioParameters values, bool confirmParamet
     notify("Band boundary");
     return;
   }
-  if (plan.frequency_hz != target || confirmParameters) {
+  if (plan.frequency_hz != target) {
     pending = plan;
     confirming = true;
     inMenu = false;
@@ -100,7 +110,7 @@ static void tuneTo(uint32_t value, uint32_t unused) {
   }
   RadioParameters values = band == user.active_band ? user.current.parameters
                                                      : user.bands[band].parameters;
-  request(target, values, false);
+  request(target, values);
 }
 
 void VFO1_init(void) {
@@ -110,7 +120,7 @@ void VFO1_init(void) {
   user = gDeviceConfig.radio;
   if (!RADIO_STATE_Valid(&user))
     RADIO_STATE_Default(&user);
-  request(user.current.frequency_hz, user.current.parameters, false);
+  request(user.current.frequency_hz, user.current.parameters);
 }
 
 bool VFO1_isReceiving(void) { return initialized && runtime.active; }
@@ -125,7 +135,7 @@ void VFO1_update(void) {
 static void nextBand(void) {
   uint8_t band = RADIO_MODEL_NextBand(user.active_band);
   const BandState *saved = &user.bands[band];
-  request(saved->frequency_hz, saved->parameters, false);
+  request(saved->frequency_hz, saved->parameters);
 }
 
 static void nextMode(void) {
@@ -149,8 +159,7 @@ static void nextMode(void) {
     }
     if (result != RX_OK)
       continue;
-    request(user.current.frequency_hz, candidate,
-            candidate.bandwidth_hz != user.current.parameters.bandwidth_hz || candidate.step_hz != user.current.parameters.step_hz);
+    request(user.current.frequency_hz, candidate);
     return;
   }
   notify("No other mode");
@@ -198,7 +207,7 @@ static void changeValue(bool up) {
     gMonitorMode = !gMonitorMode;
     return;
   }
-  request(user.current.frequency_hz, candidate, false);
+  request(user.current.frequency_hz, candidate);
 }
 
 bool VFO1_key(KEY_Code_t key, Key_State_t state) {
@@ -243,7 +252,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
     uint8_t band = RADIO_MODEL_BandAt(target);
     if (band != UINT8_MAX)
       request(target, band == user.active_band ? user.current.parameters
-                                               : user.bands[band].parameters, false);
+                                               : user.bands[band].parameters);
     return true;
   }
   if (state != KEY_RELEASED)
@@ -269,11 +278,12 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
 }
 
 void VFO1_render(void) {
+  char frequencyText[16];
   STATUSLINE_SetText("RADIO");
   if (confirming) {
+    const char *unit = formatFrequency(pending.frequency_hz, frequencyText);
     PrintMediumEx(2, 18, POS_L, C_FILL, "Apply %s?", rxModeNames[pending.parameters.mode]);
-    PrintMediumEx(2, 30, POS_L, C_FILL, "%u.%05u MHz", pending.frequency_hz/1000000,
-                  pending.frequency_hz%1000000/10);
+    PrintMediumEx(2, 30, POS_L, C_FILL, "%s %s", frequencyText, unit);
     PrintSmall(2, 40, "BW %u Hz STEP %u Hz", pending.parameters.bandwidth_hz, pending.parameters.step_hz);
     PrintSmall(2, 57, "MENU: apply  EXIT: cancel");
     return;
@@ -302,6 +312,7 @@ void VFO1_render(void) {
     return;
   }
   uint32_t frequency = ctx->tx_state.is_active ? RADIO_GetParam(ctx, PARAM_TX_FREQUENCY_FACT)*10u : user.current.frequency_hz;
+  const char *unit = formatFrequency(frequency, frequencyText);
   PrintMediumEx(2, 18, POS_L, C_FILL, "%.10s%s", radioBands[user.active_band].name, changed ? "*" : "");
   if (ctx->tx_state.is_active)
     PrintSmallEx(127, 18, POS_R, C_FILL, "TX");
@@ -310,11 +321,11 @@ void VFO1_render(void) {
   else if (ctx->tx_state.last_error != TX_UNKNOWN)
     PrintSmallEx(127, 18, POS_R, C_FILL, "TX OFF");
   if (frequency/1000000 < 1000)
-    PrintBiggestDigitsEx(2, 41, POS_L, C_FILL, "%u.%05u", frequency/1000000, frequency%1000000/10);
+    PrintBiggestDigitsEx(2, 41, POS_L, C_FILL, "%s", frequencyText);
   else
-    PrintBigDigitsEx(2, 41, POS_L, C_FILL, "%u.%05u", frequency/1000000, frequency%1000000/10);
+    PrintBigDigitsEx(2, 41, POS_L, C_FILL, "%s", frequencyText);
   PrintMediumEx(127, 34, POS_R, C_FILL, "%s", rxModeNames[user.current.parameters.mode]);
-  PrintSmallEx(127, 41, POS_R, C_FILL, "MHz");
+  PrintSmallEx(127, 41, POS_R, C_FILL, "%s", unit);
   if (message)
     PrintSmall(2, 60, "%s", message);
   else if (ctx->tx_state.is_active)

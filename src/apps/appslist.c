@@ -1,8 +1,8 @@
-#include "appslist.h"
-#include "../helper/channels.h"
-#include "../helper/menu.h"
-#include "apps.h"
-#include "chlist.h"
+#include "apps/appslist.h"
+#include "core/channels.h"
+#include "ui/menu.h"
+#include "apps/apps.h"
+#include "apps/chlist.h"
 #include <sys/types.h>
 
 static MenuItem appsItems[RUN_APPS_COUNT];

@@ -1,16 +1,16 @@
-#include "chscan.h"
+#include "apps/chscan.h"
 
-#include "../driver/uart.h"
-#include "../helper/bands.h"
-#include "../helper/channels.h"
-#include "../helper/lootlist.h"
-#include "../helper/regs-menu.h"
-#include "../helper/scan.h"
-#include "../radio.h"
-#include "../ui/components.h"
-#include "../ui/graphics.h"
-#include "../ui/statusline.h"
-#include "apps.h"
+#include "hal/uart.h"
+#include "core/bands.h"
+#include "core/channels.h"
+#include "core/lootlist.h"
+#include "ui/regs-menu.h"
+#include "core/scan.h"
+#include "core/radio.h"
+#include "ui/components.h"
+#include "ui/graphics.h"
+#include "ui/statusline.h"
+#include "apps/apps.h"
 
 static bool lastListenState;
 static uint32_t timeout = 0;

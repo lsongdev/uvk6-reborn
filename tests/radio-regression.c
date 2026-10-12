@@ -1,5 +1,5 @@
 // Host regression tests exercise production tuning logic with hardware mocked.
-#include "../src/radio.c"
+#include "../src/core/radio.c"
 #include <assert.h>
 
 static bool hasSi = true;

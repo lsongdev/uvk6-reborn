@@ -1,4 +1,4 @@
-#include "../src/config-store.h"
+#include "../src/core/config-store.h"
 #include <assert.h>
 #include <string.h>
 

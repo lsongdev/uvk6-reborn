@@ -1,7 +1,7 @@
 #ifndef FINPUT_H
 #define FINPUT_H
 
-#include "../driver/keyboard.h"
+#include "hal/keyboard.h"
 #include <stdbool.h>
 #include <stdint.h>
 

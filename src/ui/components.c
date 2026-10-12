@@ -1,8 +1,8 @@
-#include "components.h"
-#include "../apps/apps.h"
-#include "../driver/st7565.h"
-#include "../helper/channels.h"
-#include "../helper/measurements.h"
+#include "ui/components.h"
+#include "apps/apps.h"
+#include "hal/st7565.h"
+#include "core/channels.h"
+#include "core/measurements.h"
 #include <stdint.h>
 
 void UI_Battery(uint8_t Level) {

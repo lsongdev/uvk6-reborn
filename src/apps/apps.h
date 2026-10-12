@@ -1,8 +1,8 @@
 #ifndef APPS_H
 #define APPS_H
 
-#include "../driver/keyboard.h"
-#include "../radio.h"
+#include "hal/keyboard.h"
+#include "core/radio.h"
 
 #define RUN_APPS_COUNT 1
 

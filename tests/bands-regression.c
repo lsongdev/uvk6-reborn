@@ -1,4 +1,4 @@
-#include "../src/helper/bands.c"
+#include "../src/core/bands.c"
 #include <assert.h>
 #include <string.h>
 void CHANNELS_Load(int16_t index, CH *channel) {
