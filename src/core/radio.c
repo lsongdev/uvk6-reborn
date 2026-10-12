@@ -299,12 +299,6 @@ bool RADIO_ApplyRxPlan(VFOContext *context, const RxPlan *plan) {
   context->preciseFChange = true;
   context->filter = FILTER_AUTO;
   context->save_to_eeprom = false;
-  // Only legacy diagnostic/readback code still uses this indexed step.
-  for (uint8_t n = 0; n < ARRAY_SIZE(StepFrequencyTable); ++n)
-    if (StepFrequencyTable[n] * 10u == plan->parameters.step_hz) {
-      context->step = n;
-      break;
-    }
   memset(context->dirty, 0, sizeof(context->dirty));
   gRedrawScreen = true;
   return true;
