@@ -28,7 +28,7 @@ void UI_DisplayScanlists(uint32_t y) {
 
 void UI_RenderScanScreen() {
   if (gScanlistSize) {
-    uint32_t f = RADIO_GetParam(ctx, PARAM_FREQUENCY);
+    uint32_t f = ctx ? ctx->frequency : 0;
     PrintMediumEx(LCD_XCENTER, 26, POS_C, C_FILL, "%u.%05u", f / MHZ, f % MHZ);
     if (vfo->is_open)
       UI_RSSIBar(28);
