@@ -2,6 +2,7 @@
 #define RADIO_H
 #include "core/radio-model.h"
 #include "core/channels.h"
+#include "core/lootlist.h" // Measurement until metrics are independently defined.
 #include <stdbool.h>
 #include <stdint.h>
 
