@@ -102,28 +102,16 @@ void STATUSLINE_render(void) {
     icons[idx++] = SYM_EEPROM_W;
   }
 
-  if (LOOT_Size() == LOOT_SIZE_MAX) {
-    icons[idx++] = SYM_LOOT_FULL;
-  }
-
   if (gMonitorMode) {
     icons[idx++] = SYM_MONITOR;
   }
 
-  if (ctx->radio_type == RADIO_BK1080 || isSi4732On) {
+  if (ctx && (ctx->radio_type == RADIO_BK1080 || isSi4732On)) {
     icons[idx++] = SYM_BROADCAST;
-  }
-
-  if (gSettings.upconverter) {
-    icons[idx++] = SYM_CONVERTER;
   }
 
   if (gSettings.keylock) {
     icons[idx++] = SYM_LOCK;
-  }
-
-  if (gCurrentApp == APP_CH_LIST || gCurrentApp == APP_LOOT_LIST) {
-    UI_Scanlists(LCD_XCENTER - 13, 0, gSettings.currentScanlist);
   }
 
   PrintSymbolsEx(LCD_WIDTH - 1 - 22, BASE_Y, POS_R, C_FILL, "%s", icons);
