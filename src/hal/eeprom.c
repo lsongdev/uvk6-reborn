@@ -242,26 +242,18 @@ void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
 } */
 
 EEPROMType EEPROM_DetectType(void) {
-  static uint8_t found_devices = 0;
-  if (!found_devices) {
-    for (uint8_t i = 0; i < 8; i++) {
+  static bool probed;
+  static EEPROMType candidate = EEPROM_UNKNOWN;
+  if (!probed) {
+    uint8_t ackMask = 0;
+    for (uint8_t i = 0; i < 8; ++i)
       if (EEPROM_Detect(0xA0 | (i << 1)))
-        found_devices++;
-    }
+        ackMask |= (uint8_t)(1u << i);
+    // Reject scattered/partial sets instead of guessing from ACK count.
+    candidate = EEPROM_CandidateFromAckMask(ackMask);
+    probed = true;
   }
-
-  switch (found_devices) {
-  case 1:
-    return EEPROM_BL24C64;
-  case 2:
-    return EEPROM_BL24C128;
-  case 4:
-    return EEPROM_M24M02;
-  case 8:
-    return EEPROM_4MBIT;
-  default:
-    return EEPROM_UNKNOWN;
-  }
+  return candidate; // Candidate mapping, not verified chip identification.
 }
 
 uint32_t EEPROM_DetectSize(void) {
@@ -279,8 +271,7 @@ int EEPROM_ReadByte(uint32_t address, uint8_t *value) {
 }
 
 int EEPROM_WriteByte(uint32_t address, uint8_t value) {
-  EEPROM_WriteBuffer(address, &value, 1);
-  return 0;
+  return EEPROM_TryWriteBuffer(address, &value, 1) ? 0 : -1;
 }
 
 bool EEPROM_Detect(uint8_t device_addr) {
@@ -288,17 +279,6 @@ bool EEPROM_Detect(uint8_t device_addr) {
   int result = I2C_Write(device_addr);
   I2C_Stop();
   return (result == 0);
-}
-
-bool EEPROM_Test(uint32_t test_addr) {
-  uint8_t test_data[8] = {0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE};
-  uint8_t read_data[8] = {0};
-
-  EEPROM_WriteBuffer(test_addr, test_data, sizeof(test_data));
-  if (EEPROM_ReadBuffer(test_addr, read_data, sizeof(read_data)) != 0)
-    return false;
-
-  return (memcmp(test_data, read_data, sizeof(test_data)) == 0);
 }
 
 #include "hal/uart.h"

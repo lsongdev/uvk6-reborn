@@ -26,6 +26,12 @@ static bool writeIO(void *ctx, uint32_t at, const void *data, uint16_t n) {
   return true;
 }
 int main(void) {
+  assert(EEPROM_CandidateFromAckMask(0x01) == EEPROM_BL24C64);
+  assert(EEPROM_CandidateFromAckMask(0x03) == EEPROM_BL24C128);
+  assert(EEPROM_CandidateFromAckMask(0x0f) == EEPROM_M24M02);
+  assert(EEPROM_CandidateFromAckMask(0xff) == EEPROM_4MBIT);
+  assert(EEPROM_CandidateFromAckMask(0x05) == EEPROM_UNKNOWN);
+  assert(EEPROM_CandidateFromAckMask(0x07) == EEPROM_UNKNOWN);
   assert(EEPROM_WriteAllowed(0, 256));
   assert(EEPROM_WriteAllowed(256, 256));
   assert(!EEPROM_WriteAllowed(512, 1));
