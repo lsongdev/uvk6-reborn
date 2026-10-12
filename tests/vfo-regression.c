@@ -4,8 +4,8 @@
 
 RadioState state;
 RadioState *gRadioState = &state;
-ExtendedVFOContext *vfo = &state.vfos[0];
-RadioReceiver *ctx = &state.vfos[0].context;
+RadioState *vfo = &state;
+RadioReceiver *ctx = &state.context;
 bool gRedrawScreen;
 bool gMonitorMode;
 uint32_t gFInputValue1, gFInputValue2;
