@@ -111,7 +111,11 @@ int main(void) {
   assert(siCurrentFreq == 7200 && lastBfo == -750);
 
   // A NACK during fine tuning must propagate and not commit a new carrier.
+  // A failed measurement must clear cached RSSI and SNR.
+  memset(&rsqStatus, 0xff, sizeof(rsqStatus));
   ack = false;
+  assert(!RSQ_GET());
+  assert(rsqStatus.resp.RSSI == 0 && rsqStatus.resp.SNR == 0);
   unsigned beforeFail = tuneCommands;
   uint16_t previousCarrier = siCurrentFreq;
   assert(!SI47XX_TuneTo(730050));

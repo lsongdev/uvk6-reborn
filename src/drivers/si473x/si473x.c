@@ -124,15 +124,21 @@ bool SI47XX_SetProperty(uint16_t prop, uint16_t value) {
   return MAKE_WORD(response[2], response[3]);
 } */
 
-void RSQ_GET() {
-  uint8_t cmd[2] = {CMD_FM_RSQ_STATUS, 0x01};
-  if (si4732mode != SI47XX_FM) {
-    cmd[0] = CMD_AM_RSQ_STATUS;
+bool RSQ_GET(void) {
+  uint8_t cmd[2] = {si4732mode == SI47XX_FM ? CMD_FM_RSQ_STATUS
+                                                : CMD_AM_RSQ_STATUS, 0x01};
+  uint8_t response[sizeof(rsqStatus.raw)] = {0};
+  bool ok = waitToSend() && SI47XX_WriteBuffer(cmd, 2) &&
+            waitToSend() &&
+            SI47XX_ReadBuffer(response, si4732mode == SI47XX_FM ? 8 : 6) &&
+            !(response[0] & STATUS_ERR);
+  // Never report a stale RSSI/SNR when the current request NACKs/times out.
+  if (!ok) {
+    memset(&rsqStatus, 0, sizeof(rsqStatus));
+    return false;
   }
-
-  waitToSend();
-  SI47XX_WriteBuffer(cmd, 2);
-  SI47XX_ReadBuffer(rsqStatus.raw, si4732mode == SI47XX_FM ? 8 : 6);
+  memcpy(rsqStatus.raw, response, sizeof(response));
+  return true;
 }
 
 bool SI47XX_SetVolume(uint8_t volume) {
@@ -141,10 +147,9 @@ bool SI47XX_SetVolume(uint8_t volume) {
   return SI47XX_SetProperty(PROP_RX_VOLUME, volume);
 }
 
-void setAvcAmMaxGain(uint8_t gain) {
-  if (gain < 12 || gain > 90)
-    return;
-  SI47XX_SetProperty(PROP_AM_AUTOMATIC_VOLUME_CONTROL_MAX_GAIN, gain * 340);
+bool setAvcAmMaxGain(uint8_t gain) {
+  return gain >= 12 && gain <= 90 &&
+         SI47XX_SetProperty(PROP_AM_AUTOMATIC_VOLUME_CONTROL_MAX_GAIN, gain * 340);
 }
 
 static void enableRDS(void) {
@@ -156,7 +161,7 @@ static void enableRDS(void) {
             FLG_RDSEN);
 }
 
-void SI47XX_SetAutomaticGainControl(uint8_t AGCDIS, uint8_t AGCIDX) {
+bool SI47XX_SetAutomaticGainControl(uint8_t AGCDIS, uint8_t AGCIDX) {
   SI47XX_AgcOverrride agc;
 
   uint8_t cmd;
@@ -170,10 +175,8 @@ void SI47XX_SetAutomaticGainControl(uint8_t AGCDIS, uint8_t AGCIDX) {
   agc.arg.AGCDIS = AGCDIS;
   agc.arg.AGCIDX = AGCIDX;
 
-  waitToSend();
-
   uint8_t cmd2[] = {cmd, agc.raw[0], agc.raw[1]};
-  SI47XX_WriteBuffer(cmd2, 3);
+  return waitToSend() && SI47XX_WriteBuffer(cmd2, 3);
 }
 
 bool SI47XX_PowerUp() {
@@ -195,23 +198,23 @@ bool SI47XX_PowerUp() {
 
   isSi4732On = true;
 
-  SI47XX_SetVolume(63);
-
-  if (si4732mode == SI47XX_FM) {
-    enableRDS();
-  } else if (si4732mode == SI47XX_AM) {
-    Log("set AM settings");
-    SI47XX_SetAutomaticGainControl(1, 0);
-    SI47XX_SetProperty(PROP_AM_SOFT_MUTE_MAX_ATTENUATION, 0);
-    SI47XX_SetProperty(PROP_AM_AGC_RELEASE_RATE, 20);
-    setAvcAmMaxGain(40);
+  bool ready = SI47XX_SetVolume(63);
+  if (ready && si4732mode == SI47XX_FM) {
+    enableRDS(); // RDS is optional; audio RX remains usable if RDS fails.
+  } else if (ready && si4732mode == SI47XX_AM) {
+    ready = SI47XX_SetAutomaticGainControl(1, 0) &&
+            SI47XX_SetProperty(PROP_AM_SOFT_MUTE_MAX_ATTENUATION, 0) &&
+            SI47XX_SetProperty(PROP_AM_AGC_RELEASE_RATE, 20) &&
+            setAvcAmMaxGain(40);
   }
-  if (siCurrentFreq != 0 && !SI47XX_SetFreq(siCurrentFreq)) {
+  if (ready && siCurrentFreq != 0)
+    ready = SI47XX_SetFreq(siCurrentFreq);
+  if (!ready) {
     RST_LOW;
     isSi4732On = false;
-    return false;
+    siCurrentFreq = 0;
   }
-  return isSi4732On;
+  return ready;
 }
 
 bool SI47XX_SsbSetup(SI47XX_SsbFilterBW AUDIOBW, uint8_t SBCUTFLT,
@@ -247,21 +250,21 @@ bool SI47XX_PatchPowerUp() {
   }
   isSi4732On = true;
 
-  if (!SI47XX_SsbSetup(2, 1, 0, 1, 0, 1)) {
+  bool ready = SI47XX_SsbSetup(2, 1, 0, 1, 0, 1) &&
+               setAvcAmMaxGain(42) && SI47XX_SetVolume(63);
+  if (ready && siCurrentFreq)
+    ready = SI47XX_SetFreq(siCurrentFreq);
+  if (ready)
+    ready = SI47XX_SetProperty(PROP_SSB_SOFT_MUTE_MAX_ATTENUATION, 0) &&
+            SI47XX_SetProperty(PROP_AM_AUTOMATIC_VOLUME_CONTROL_MAX_GAIN, 0x7800);
+  if (!ready) {
     RST_LOW;
     isSi4732On = false;
+    siCurrentFreq = 0;
     return false;
   }
-  setAvcAmMaxGain(42);
-
-  SI47XX_SetVolume(63);
-
-  SI47XX_SetFreq(siCurrentFreq);
-  SI47XX_SetProperty(PROP_SSB_SOFT_MUTE_MAX_ATTENUATION, 0);
-  SI47XX_SetProperty(PROP_AM_AUTOMATIC_VOLUME_CONTROL_MAX_GAIN, 0x7800);
-
   si4732mode = SI47XX_USB; // Patch boots in USB; caller restores requested mode.
-  return isSi4732On;
+  return true;
 }
 
 bool SI47XX_SetSsbBandwidth(SI47XX_SsbFilterBW bw) {
