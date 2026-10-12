@@ -55,3 +55,10 @@
 - 新建 `tx-model` 做 TX 意图、NFM/BK4819、同频低功率、硬件能力/白名单的纯校验；`tx-runtime` 实现模拟准备、关闭 PA、TOT 锁存、PTT 释放和 RX 恢复；`hal/tx-device` **暂不驱动硬件 TX**。
 - `UVR2` 格式 4、双 512 B 槽保存独立 TX 设置；格式 3 不迁移，必须显式初始化。配置区仅低 1024 B，不触及校准区和补丁。
 - 未完成：PA/滤波器和校准确认、低电压/温度保护、BK4819 发射真实 HAL 与假负载测量。无硬件发射功能可以对用户开放。
+
+## 单 VFO TX 模型收敛与系统安全检查
+
+- 已彻底移除 `RadioParameters.tx_enabled` 和始终返回 false 的 `RADIO_MODEL_CanTransmit()`：RX 不承担 TX 授权，只有 VFO 的 `TxConfig` 保存用户意图。
+- `TX_MODEL_Plan()` 在失败时清空输出计划，并拒绝非法功率档、异常 RX 栅格及 BK 接收能力之外的频点；真实板级 `TxCapabilities` 仍禁用。
+- PTT 释放和 TOT 检查由系统主循环优先处理，避免只依靠 VFO 画面更新；忙信道锁定不会被 Monitor 状态绕过。
+- 主机模拟 PA 集成测试覆盖 PTT、TOT 超时与释放锁定、准备失败、RX 恢复失败和不写 EEPROM；实际 TX 仍无 RF 输出。

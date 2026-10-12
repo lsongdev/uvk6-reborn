@@ -21,28 +21,25 @@ int main(void) {
   assert(strcmp(rxModeNames[RX_NFM], "NFM") == 0);
   assert(RADIO_MODEL_Plan(100000000, nfm, si, &plan) == RX_OK);
   assert(plan.device == RX_DEVICE_BK && plan.frequency_hz == 100000000);
-  assert(!RADIO_MODEL_CanTransmit(&plan)); // BK RX is not TX authorization.
   assert(RADIO_MODEL_Plan(100000000, wfm, si, &plan) == RX_OK);
-  assert(plan.device == RX_DEVICE_SI && !RADIO_MODEL_CanTransmit(&plan));
+  assert(plan.device == RX_DEVICE_SI);
   assert(RADIO_MODEL_Plan(100000000, wfm, bk1080, &plan) == RX_OK);
-  assert(plan.device == RX_DEVICE_BROADCAST && !RADIO_MODEL_CanTransmit(&plan));
+  assert(plan.device == RX_DEVICE_BROADCAST);
   assert(RADIO_MODEL_Plan(100000000, wfm, none, &plan) == RX_UNSUPPORTED_MODE);
   assert(RADIO_MODEL_Plan(100000000, nfm, none, &plan) == RX_OK);
   assert(plan.device == RX_DEVICE_BK);
 
   // In the 18-26.1 MHz overlap, SI supports AM/SSB, not broadcast WFM.
   assert(RADIO_MODEL_Plan(20000000, nfm, si, &plan) == RX_OK);
-  assert(plan.device == RX_DEVICE_BK && !RADIO_MODEL_CanTransmit(&plan));
+  assert(plan.device == RX_DEVICE_BK);
   assert(RADIO_MODEL_Plan(20000000, wfm, si, &plan) == RX_UNSUPPORTED_MODE);
   assert(RADIO_MODEL_Plan(145500000, wfm, si, &plan) == RX_UNSUPPORTED_MODE);
 
   parameters = radioBands[RADIO_MODEL_BandAt(438500000)].preset;
   assert(RADIO_MODEL_Plan(438500000, parameters, si, &plan) == RX_OK);
   assert(plan.device == RX_DEVICE_BK && plan.frequency_hz == 438500000);
-  assert(!RADIO_MODEL_CanTransmit(&plan));
   parameters.squelch = 11;
   assert(RADIO_MODEL_Plan(438500000, parameters, si, &plan) == RX_INVALID_PARAMETERS);
-  assert(!RADIO_MODEL_CanTransmit(&plan)); // RX planning never grants TX.
 
   parameters = radioBands[RADIO_MODEL_BandAt(20000000)].preset;
   assert(parameters.mode == RX_AM);

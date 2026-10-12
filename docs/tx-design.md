@@ -32,7 +32,7 @@
 - `TxPolicy`：整机经过验证的发射频率白名单、可选区域约束以及保护限制；必须与用户的操作许可相符。用户不能靠修改频段名称、RX 模式或 `TxConfig.enabled` 扩大发射资格。
 - `TxPlan`：本次通过所有校验的运行时发射计划，包含 `frequency_hz`、NFM、发射功率校准档、选定 PA/滤波路径、频偏等。硬件寄存器量由 HAL 根据校准生成，不写进通用用户配置。
 
-下列为设计示例；当前可编译的精简版本见 [tx-model.h](../src/core/tx-model.h)，部分硬件字段仍待验证后加入：
+当前**实际实现**的基础数据类型如下（详见 [tx-model.h](../src/core/tx-model.h)）；PA 路径、频偏等必须等待整机校准后才加入 TxPlan：
 
 ```c
 typedef enum { TX_POWER_LOW, TX_POWER_MEDIUM, TX_POWER_HIGH } TxPower;
@@ -43,13 +43,11 @@ typedef struct {
 } TxConfig;
 
 typedef struct {
-    uint32_t frequency_hz; // 与 RX 分开，首版默认相同
+    uint32_t frequency_hz; // 与 RX 分开；首版必须同频
     TxPower power;
-    uint8_t rf_path;       // 来自受校验的硬件能力表
-    uint16_t deviation_hz; // 来自已校准的模式策略，而非任意 UI 数值
 } TxPlan;
 
-TxResult RADIO_MODEL_PlanTx(const RxPlan *rx,
+TxResult TX_MODEL_Plan(const RxPlan *rx,
                             const TxConfig *request,
                             const TxCapabilities *hardware,
                             const TxPolicy *policy,
@@ -132,7 +130,7 @@ void TX_DEVICE_Disable(void);              // 幂等，任何时候可调用
 | 全局安全设置 | TX timeout（默认 120 秒）、Busy lock（默认 On）、PTT Lock | Settings → TX Safety，另有 Lock PTT |
 | 硬件授权及校准 | PA、滤波路径、已验证 TX 范围、实际功率 | 不可由用户扩大的 TxCapabilities/TxPolicy |
 
-实现位于 `src/core/tx-model.[ch]`、`tx-runtime.[ch]` 和 `src/hal/tx-device.[ch]`。当前 `TxPlan` 仅能表示 **BK4819 + NFM + 同频 + 已标定 Low**；更高功率档允许保留用户选择，但未校准之前不得执行。当前板级 TX HAL 明确返回无有效发射能力，不调用 PA 或 BK TX 寄存器；PTT 只返回诸如 `TX HW locked` 的拒绝原因。
+实现位于 `src/core/tx-model.[ch]`、`tx-runtime.[ch]` 和 `src/hal/tx-device.[ch]`。当前 `TxPlan` 仅能表示 **BK4819 + NFM + 同频 + 已标定 Low**；更高功率档允许保留用户选择，但未校准之前不得执行。当前板级 TX HAL 明确返回无有效发射能力，不调用 PA 或 BK TX 寄存器；PTT 只返回诸如 `TX HW locked` 的拒绝原因。RX 规划不再提供 `RADIO_MODEL_CanTransmit()` 假布尔授权接口，唯一发射规划入口是 `TX_MODEL_Plan()`，且每次拒绝都会清空计划输出。
 
 当前 TX 状态由 VFO1 以 `RxRuntime + TxRuntime` 一起管理，不引入第二个并发收发控制者。PTT release 由系统层优先处理，防止键盘锁和菜单吞掉必要的关断事件。TOT 检查也在系统主循环每次迭代优先运行，不仅依赖 VFO 页面更新；这仍不是独立硬件 watchdog，真实 PA 使能前必须测试最长阻塞时间及硬件关断保障。发射超时、恢复失败和故障锁存已由无 RF 主机模拟测试验证，**并非真实发射验收**。
 
