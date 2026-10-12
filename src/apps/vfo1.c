@@ -5,6 +5,8 @@
 #include "core/radio.h"
 #include "core/device-config.h"
 #include "core/rx-runtime.h"
+#include "core/rds-receiver.h"
+#include "hal/rx-device.h"
 #include "hal/scheduler.h"
 #include "ui/components/signal.h"
 #include "ui/components/frequency.h"
@@ -25,6 +27,7 @@ static const char *shortBandName(const char *name) {
 static bool initialized;
 static UI_VfoState card;
 static RxRuntime runtime;
+static RdsReceiver rds;
 static bool changed;
 static bool inMenu;
 static bool confirming;
@@ -33,6 +36,22 @@ static RadioUserState user; // Current UI state, committed only on successful RX
 static RxPlan pending;
 static const char *message;
 static uint32_t messageAt;
+static bool functionPending;
+static uint32_t functionAt;
+
+void VFO1_cancelShortcut(void) {
+  if (functionPending) {
+    functionPending = false;
+    gRedrawScreen = true;
+  }
+}
+
+void VFO1_deinit(void) { VFO1_cancelShortcut(); }
+
+static void expireShortcut(void) {
+  if (functionPending && Now()-functionAt >= 3000)
+    VFO1_cancelShortcut();
+}
 
 static void notify(const char *text) {
   message = text;
@@ -42,11 +61,13 @@ static void notify(const char *text) {
 
 static bool applyReceiver(void *unused, const RxPlan *plan) {
   (void)unused;
+  RDS_ReceiverReset(&rds, Now());
   return RADIO_ApplyRxPlan(ctx, plan);
 }
 
 static void stopReceiver(void *unused) {
   (void)unused;
+  RDS_ReceiverReset(&rds, Now());
   RADIO_StopReception();
 }
 
@@ -125,6 +146,7 @@ static void tuneTo(uint32_t value, uint32_t unused) {
 }
 
 void VFO1_init(void) {
+  VFO1_cancelShortcut();
   if (initialized)
     return;
   initialized = true;
@@ -136,7 +158,17 @@ void VFO1_init(void) {
 
 bool VFO1_isReceiving(void) { return initialized && runtime.active; }
 
+static bool readRds(void *unused, RdsPacket *packet, bool clear_fifo) {
+  (void)unused;
+  return RX_DEVICE_ReadRDS(packet, clear_fifo);
+}
+
 void VFO1_update(void) {
+  expireShortcut();
+  bool rdsEnabled = runtime.active && runtime.current.device == RX_DEVICE_SI &&
+                    runtime.current.parameters.mode == RX_WFM;
+  if (RDS_ReceiverUpdate(&rds, Now(), rdsEnabled, readRds, NULL))
+    gRedrawScreen = true;
   if (!inMenu && !confirming && UI_VfoUpdate(&card, Now()))
     gRedrawScreen = true;
   if (message && Now()-messageAt >= 2500) {
@@ -178,7 +210,9 @@ static void changeValue(bool up) {
 }
 
 bool VFO1_key(KEY_Code_t key, Key_State_t state) {
+  expireShortcut();
   if (key == KEY_PTT) {
+    VFO1_cancelShortcut();
     if (state == KEY_RELEASED)
       RADIO_ToggleTX(ctx, false);
     else if (!inMenu && !confirming && runtime.active)
@@ -213,6 +247,24 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
     }
     return true;
   }
+  // The function key is a sequential, one-shot prefix on the main screen.
+  // Consume the target so it cannot also enter frequency input or a menu.
+  if (functionPending) {
+    if (key == KEY_MENU && state == KEY_LONG_PRESSED) {
+      VFO1_cancelShortcut();
+      return false; // Keep the global settings shortcut available.
+    }
+    if (state == KEY_RELEASED) {
+      VFO1_cancelShortcut();
+      if (key == KEY_1)
+        nextBand();
+      else if (key == KEY_0)
+        nextMode();
+      else if (key != KEY_F && key != KEY_EXIT)
+        notify("Not supported");
+    }
+    return true;
+  }
   if ((key == KEY_UP || key == KEY_DOWN) &&
       (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT)) {
     uint32_t target = RADIO_MODEL_Step(user.current.frequency_hz, user.current.parameters.step_hz, key == KEY_UP);
@@ -224,7 +276,11 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
   }
   if (state != KEY_RELEASED)
     return false;
-  if (key == KEY_SIDE1)
+  if (key == KEY_F) {
+    functionPending = true;
+    functionAt = Now();
+    gRedrawScreen = true;
+  } else if (key == KEY_SIDE1)
     nextBand();
   else if (key == KEY_SIDE2)
     nextMode();
@@ -246,7 +302,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
 
 void VFO1_render(void) {
   char frequencyText[16];
-  STATUSLINE_SetText("RADIO");
+  STATUSLINE_SetText(functionPending ? "RADIO F" : "RADIO");
   if (confirming) {
     const char *unit = UI_FormatFrequency(pending.frequency_hz, frequencyText);
     PrintMediumEx(2, 18, POS_L, C_FILL, "Apply %s?", rxModeNames[pending.parameters.mode]);
@@ -286,6 +342,7 @@ void VFO1_render(void) {
     .id = 'A', .selected = true,
     .frequency_hz = frequency, .mode = user.current.parameters.mode,
     .band_short = shortBandName(radioBands[user.active_band].name), .changed = changed,
+    .name = rds.decoder.ps, .rds = rds.decoder.text,
     .signal_valid = runtime.active,
     .signal_level = runtime.active ? UI_SMeterLevel() : 0,
     .status = ctx->tx_state.is_active ? "TX" : !runtime.active ? "RX --"

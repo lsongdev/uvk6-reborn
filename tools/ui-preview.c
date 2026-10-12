@@ -1,6 +1,7 @@
 // Render the real firmware UI into host-only framebuffer snapshots.
 #include "ui/components/vfo.h"
 #include "ui/graphics.h"
+#include "core/rds.h"
 #include <stdio.h>
 #include <assert.h>
 uint8_t gFrameBuffer[8][128];
@@ -38,5 +39,19 @@ int main(int argc, char **argv) {
   UI_VfoRender(8,&v,&a,0);snapshot("maxtext.pbm");
   v=(UI_VfoView){.id='A',.selected=true,.frequency_hz=401000,.mode=RX_AM,.band_short="LW",.signal_level=4,.signal_valid=true};
   UI_VfoRender(8,&v,&a,0);snapshot("lw.pbm");
+  // Actual decoder output from synthetic, clean 0A and 2A groups.
+  const uint16_t ps[] = {0x5241,0x4449,0x4f20,0x464d}; // RADIO FM
+  const uint16_t rt[][2] = {{0x4d75,0x7369},{0x6320,0x616e},{0x6420,0x6e65},{0x7773,0x0d20}};
+  RdsDecoder decoder={0};
+  for (unsigned pass=0;pass<2;++pass) for(unsigned i=0;i<4;++i) {
+    RdsGroup g={.blocks={0x40a7,i,0,ps[i]}};
+    RDS_Feed(&decoder,&g);
+    g=(RdsGroup){.blocks={0x40a7,0x2000|i,rt[i][0],rt[i][1]}};
+    RDS_Feed(&decoder,&g);
+  }
+  v=(UI_VfoView){.id='A',.selected=true,.frequency_hz=103900000,.mode=RX_WFM,
+    .band_short="FM",.name=decoder.ps,.rds=decoder.text,.signal_level=8,.signal_valid=true};
+  FillRect(0,8,LCD_WIDTH,LCD_HEIGHT-8,C_CLEAR);
+  UI_VfoRender(8,&v,&a,0);snapshot("rds.pbm");
   return 0;
 }

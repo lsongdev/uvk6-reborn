@@ -572,7 +572,13 @@ bool SI47XX_PowerUp();
 bool SI47XX_PatchPowerUp();
 void SI47XX_PowerDown();
 bool SI47XX_SetFreq(uint16_t freq);
-void SI47XX_ReadRDS(uint8_t buf[13]);
+typedef struct {
+  uint16_t blocks[4];
+  uint8_t errors[4], fifo_used;
+  bool synchronized, overflow;
+} SI47XX_RdsStatus;
+// Removes one FIFO entry, or clears the FIFO. Failure leaves status untouched.
+bool SI47XX_ReadRDS(SI47XX_RdsStatus *status, bool clear_fifo);
 bool SI47XX_SwitchMode(SI47XX_MODE mode);
 bool SI47XX_IsSSB();
 void RSQ_GET();

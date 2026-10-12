@@ -8,11 +8,24 @@ static unsigned tuneCommands;
 static unsigned powerCommands;
 static bool patchPresent = true;
 static bool ack = true;
+static uint8_t rdsResponse[13] = {STATUS_CTS};
+static bool shortRead, busy;
+static unsigned rdsCommands;
+static uint8_t rdsArgument;
 
 void I2C_Start(void) {}
 void I2C_Stop(void) {}
 int I2C_Write(uint8_t byte) { (void)byte; return ack ? 0 : -1; }
 int I2C_WriteBuffer(const uint8_t *buffer, uint16_t size) {
+  if (buffer[0] == CMD_FM_RDS_STATUS) {
+    ++rdsCommands;
+    rdsArgument = buffer[1];
+  }
+  if (buffer[0] == CMD_SET_PROPERTY && size == 6) {
+    uint16_t property = (uint16_t)buffer[2]<<8 | buffer[3];
+    if (property == PROP_FM_RDS_INT_FIFO_COUNT) assert(buffer[5] == 1);
+    if (property == PROP_FM_RDS_CONFIG) assert(buffer[4] == 0x55 && buffer[5] == 1);
+  }
   if (buffer[0] == CMD_FM_TUNE_FREQ || buffer[0] == CMD_AM_TUNE_FREQ) {
     memset(lastTune, 0, sizeof(lastTune));
     memcpy(lastTune, buffer, size);
@@ -26,8 +39,12 @@ int I2C_WriteBuffer(const uint8_t *buffer, uint16_t size) {
   return 0;
 }
 uint16_t I2C_ReadBuffer(void *buffer, uint16_t size) {
+  if (size == sizeof(rdsResponse)) {
+    memcpy(buffer,rdsResponse,size);
+    return shortRead ? size-1 : size;
+  }
   memset(buffer, 0, size);
-  ((uint8_t *)buffer)[0] = STATUS_CTS;
+  ((uint8_t *)buffer)[0] = busy ? 0 : STATUS_CTS;
   return size;
 }
 uint32_t GetUptimeMs(void) { static uint32_t time; return ++time; }
@@ -55,8 +72,32 @@ int main(void) {
   assert(siCurrentFreq == 9593 && lastTune[0] == CMD_FM_TUNE_FREQ);
   assert(lastTune[2] == (9593>>8) && lastTune[3] == (9593&255));
 
+  // Real SI response decoding, including a single remaining FIFO group.
+  const uint8_t response[] = {STATUS_CTS,1,5,1,0x40,0xa7,0x20,0x03,0x52,0x41,0x54,0x45,0x1b};
+  memcpy(rdsResponse,response,sizeof(response));
+  SI47XX_RdsStatus rdsStatus;
+  assert(SI47XX_ReadRDS(&rdsStatus,false));
+  assert(rdsArgument == 1 && rdsStatus.fifo_used == 1);
+  assert(rdsStatus.synchronized && rdsStatus.overflow);
+  assert(rdsStatus.blocks[0]==0x40a7 && rdsStatus.blocks[1]==0x2003 &&
+         rdsStatus.blocks[2]==0x5241 && rdsStatus.blocks[3]==0x5445);
+  for (unsigned i=0;i<4;++i) assert(rdsStatus.errors[i]==i);
+  assert(SI47XX_ReadRDS(&rdsStatus,true) && rdsArgument==3 && !rdsStatus.fifo_used);
+  rdsResponse[3]=0;
+  assert(SI47XX_ReadRDS(&rdsStatus,false) && !rdsStatus.fifo_used);
+  SI47XX_RdsStatus saved=rdsStatus;
+  rdsResponse[0] |= STATUS_ERR;
+  assert(!SI47XX_ReadRDS(&rdsStatus,false) && !memcmp(&saved,&rdsStatus,sizeof(saved)));
+  rdsResponse[0]=STATUS_CTS;
+  shortRead=true;assert(!SI47XX_ReadRDS(&rdsStatus,false));shortRead=false;
+  ack=false;assert(!SI47XX_ReadRDS(&rdsStatus,false));ack=true;
+  busy=true;unsigned previous=rdsCommands;
+  assert(!SI47XX_ReadRDS(&rdsStatus,false) && rdsCommands==previous);busy=false;
+  assert(!memcmp(&saved,&rdsStatus,sizeof(saved)));
+
   SI47XX_SwitchMode(SI47XX_LSB);
   assert(isSi4732On && si4732mode == SI47XX_LSB);
+  assert(!SI47XX_ReadRDS(&rdsStatus,false));
   SI47XX_TuneTo(710005);
   assert(siCurrentFreq == 7100 && lastTune[0] == CMD_AM_TUNE_FREQ);
   assert(lastTune[1] == 0x40 && lastBfo == -50);

@@ -3,6 +3,18 @@
 #include "drivers/bk4819/bk4819.h"
 #include "drivers/si473x/si473x.h"
 #include "core/settings.h"
+#include <string.h>
+
+bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo) {
+  SI47XX_RdsStatus status;
+  if (!packet || !SI47XX_ReadRDS(&status, clear_fifo)) return false;
+  memcpy(packet->group.blocks, status.blocks, sizeof(status.blocks));
+  memcpy(packet->group.errors, status.errors, sizeof(status.errors));
+  packet->fifo_used = status.fifo_used;
+  packet->synchronized = status.synchronized;
+  packet->overflow = status.overflow;
+  return true;
+}
 
 // Silence the previous RF chip when moving to another receiver. The audio
 // output is already muted by RADIO_StopReception() before this entry point.
