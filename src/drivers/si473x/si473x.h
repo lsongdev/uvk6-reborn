@@ -581,8 +581,8 @@ typedef struct {
 bool SI47XX_ReadRDS(SI47XX_RdsStatus *status, bool clear_fifo);
 bool SI47XX_SwitchMode(SI47XX_MODE mode);
 bool SI47XX_IsSSB();
-void RSQ_GET();
-void SI47XX_SetAutomaticGainControl(uint8_t AGCDIS, uint8_t AGCIDX);
+bool RSQ_GET(void);
+bool SI47XX_SetAutomaticGainControl(uint8_t AGCDIS, uint8_t AGCIDX);
 void SI47XX_Seek(bool up, bool wrap);
 uint32_t SI47XX_getFrequency(bool *valid);
 bool SI47XX_SetBandwidth(SI47XX_FilterBW AMCHFLT, bool AMPLFLT);

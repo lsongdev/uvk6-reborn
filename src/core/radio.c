@@ -602,8 +602,7 @@ uint16_t RADIO_GetRSSI(const VFOContext *ctx) {
   case RADIO_BK1080:
     return BK1080_GetRSSI();
   case RADIO_SI4732:
-    RSQ_GET();
-    return rsqStatus.resp.RSSI;
+    return RSQ_GET() ? rsqStatus.resp.RSSI : 0;
   default:
     return 0;
   }
