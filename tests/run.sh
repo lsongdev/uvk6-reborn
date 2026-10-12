@@ -3,6 +3,10 @@
 set -eu
 cd "$(dirname "$0")/.."
 python3 tests/flash-regression.py
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
+  tests/uart-protocol-regression.c src/hal/uart-protocol.c -o /tmp/uvk6-uart-protocol-test
+/tmp/uvk6-uart-protocol-test
+rm -f /tmp/uvk6-uart-protocol-test
 test_binary=$(mktemp -t uvk6-regression.XXXXXX)
 trap 'rm -f "$test_binary"' EXIT HUP INT TERM
 case "$(uname -s)" in
