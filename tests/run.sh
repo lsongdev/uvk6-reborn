@@ -55,4 +55,11 @@ esac
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/band-editor-regression.c src/core/config-store.c src/core/radio-model.c src/core/radio-state.c "$dead_strip" -o "$test_binary"
 "$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
+  -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
+  -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
+  tests/vfo-component-regression.c src/ui/graphics.c src/ui/components/vfo.c \
+  src/ui/components/signal.c src/ui/components/frequency.c src/core/radio-model.c src/external/printf/printf.c "$dead_strip" -o "$test_binary"
+"$test_binary"
 echo 'SI sidebands/BFO, VFO keys, confirmation, unavailable receivers, frequency input, legacy storage, cached detection, receiver plans, precision, band boundaries, band preset drafts, and UVR2 upgrades passed.'

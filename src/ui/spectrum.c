@@ -1,7 +1,7 @@
 #include "ui/spectrum.h"
 #include "hal/uart.h"
 #include "core/measurements.h"
-#include "ui/components.h"
+
 #include "ui/graphics.h"
 #include <stdint.h>
 

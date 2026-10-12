@@ -7,11 +7,25 @@
 - `gains.py`：生成 BK4819 增益表。
 - `map_analyze.py`：分析链接器 map 文件中的空间占用。
 - `hawk5.py`：历史 Hawk5 CHIRP 驱动模块。
+- `ui-preview.py` / `ui-preview.c`：使用固件绘图代码生成 VFO 布局预览。
 
 ```sh
 python3 tools/gains.py
 python3 tools/map_analyze.py obj/output.map 20
 ```
+
+## UI 预览
+
+```sh
+python3 tools/ui-preview.py
+python3 tools/ui-preview.py --output /tmp/vfo-preview.png --scale 4
+python3 tools/ui-preview.py --frames plain single --output /tmp/vfo-name.png
+python3 tools/ui-preview.py --frames max maxtext --output /tmp/vfo-max.png
+```
+
+默认输出 `docs/images/compact-vfo-preview.png`，左侧为单 VFO，右侧为两个组件。`--scale` 支持 1～12 倍，默认 4 倍；`--frames` 可选择左右预览场景：`single`（有名称）、`plain`（无名称）、`dual`、`max`（最长频率）、`maxtext`（最长频率带名称）、`lw`。示例频率、名称、RDS 和信号值在 `tools/ui-preview.c` 中修改。
+
+需要 Python 3 和主机 C 编译器（默认 `cc`，可通过 `CC` 指定），无额外 Python 依赖，也无需 ARM 工具链或连接对讲机。脚本在临时目录编译当前固件的绘图代码，运行后自动清理；预览使用示例数据。
 
 ## 刷机
 

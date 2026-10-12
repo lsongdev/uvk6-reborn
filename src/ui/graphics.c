@@ -10,6 +10,7 @@
 #include <string.h>
 
 static Cursor cursor;
+static int16_t textClipLeft = 0, textClipRight = LCD_WIDTH;
 
 static const GFXfont *const fonts[] = {&TomThumb, &MuMatrix8ptRegular,
                                        &muHeavy8ptBold, &dig_11, &dig_14};
@@ -98,7 +99,7 @@ static void m_putchar(int16_t x, int16_t y, uint8_t c, Color col, uint8_t sx,
     for (uint8_t xx = 0; xx < w; xx++, bits <<= 1) {
       if (!(bit++ & 7))
         bits = *b++;
-      if (bits & 0x80) {
+      if ((bits & 0x80) && x + xo + xx >= textClipLeft && x + xo + xx < textClipRight) {
         (sx == 1 && sy == 1)
             ? PutPixel(x + xo + xx, y + yo + yy, col)
             : FillRect(x + (xo + xx) * sx, y + (yo + yy) * sy, sx, sy, col);
@@ -183,6 +184,24 @@ static void printStr(const GFXfont *f, uint8_t x, uint8_t y, Color col,
     write(*p, 1, 1, 1, col, f);
 }
 
+void UI_CompactFrequencyDigits(uint8_t right, uint8_t baseline, const char *text) {
+  int16_t width = 0;
+  const GFXglyph *last = NULL;
+  for (const char *p = text; *p; ++p) {
+    if (*p < dig_14.first || *p > dig_14.last) continue;
+    last = &dig_14.glyph[*p-dig_14.first];
+    width += last->xAdvance - (*p == '.');
+  }
+  if (!last) return;
+  width -= last->xAdvance - last->xOffset - last->width;
+  int16_t x = right-width;
+  for (const char *p = text; *p; ++p) {
+    if (*p < dig_14.first || *p > dig_14.last) continue;
+    m_putchar(x, baseline, *p, C_FILL, 1, 1, &dig_14);
+    x += dig_14.glyph[*p-dig_14.first].xAdvance - (*p == '.');
+  }
+}
+
 // Макрос для генерации функций - экономит место
 #define P(n, i)                                                                \
   void Print##n(uint8_t x, uint8_t y, const char *f, ...) {                    \
@@ -214,4 +233,40 @@ PX(Small, 0) P(Medium, 1) PX(Medium, 1) P(MediumBold, 2) PX(MediumBold, 2)
 
 void FSmall(uint8_t x, uint8_t y, TextPos a, uint32_t freq) {
   PrintSmallEx(x, y, a, C_FILL, "%u.%05u", freq / MHZ, freq % MHZ);
+}
+
+static uint16_t textWidth(const char *text, const GFXfont *font) {
+  uint16_t width = 0;
+  if (!text) return 0;
+  for (; *text; ++text) {
+    uint8_t c = (uint8_t)*text;
+    if (c < font->first || c > font->last) c = '?';
+    width += font->glyph[c-font->first].xAdvance;
+  }
+  return width;
+}
+
+static void textWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset, const GFXfont *font) {
+  if (!text) return;
+  textClipLeft = x;
+  textClipRight = x+width;
+  int16_t pen = x-offset;
+  for (; *text; ++text) {
+    uint8_t c = (uint8_t)*text;
+    if (c < font->first || c > font->last) c = '?';
+    m_putchar(pen, baseline, c, C_FILL, 1, 1, font);
+    pen += font->glyph[c-font->first].xAdvance;
+    if (pen >= textClipRight) break;
+  }
+  textClipLeft = 0;
+  textClipRight = LCD_WIDTH;
+}
+
+uint16_t UI_SmallTextWidth(const char *text) { return textWidth(text, &TomThumb); }
+uint16_t UI_MediumBoldTextWidth(const char *text) { return textWidth(text, &muHeavy8ptBold); }
+void UI_SmallTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset) {
+  textWindow(x, baseline, width, text, offset, &TomThumb);
+}
+void UI_MediumBoldTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset) {
+  textWindow(x, baseline, width, text, offset, &muHeavy8ptBold);
 }

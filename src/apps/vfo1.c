@@ -6,13 +6,24 @@
 #include "core/device-config.h"
 #include "core/rx-runtime.h"
 #include "hal/scheduler.h"
-#include "ui/components.h"
+#include "ui/components/signal.h"
+#include "ui/components/frequency.h"
+#include "ui/components/vfo.h"
 #include "ui/graphics.h"
 #include "ui/statusline.h"
 #include "apps/apps.h"
 #include "apps/finput.h"
+#include <string.h>
+
+static const char *shortBandName(const char *name) {
+  if (!strcmp(name, "FM Radio")) return "FM";
+  if (!strcmp(name, "Airband")) return "AIR";
+  if (!strcmp(name, "70cm")) return "70c";
+  return name;
+}
 
 static bool initialized;
+static UI_VfoState card;
 static RxRuntime runtime;
 static bool changed;
 static bool inMenu;
@@ -22,15 +33,6 @@ static RadioUserState user; // Current UI state, committed only on successful RX
 static RxPlan pending;
 static const char *message;
 static uint32_t messageAt;
-
-static const char *formatFrequency(uint32_t frequency, char text[16]) {
-  if (frequency < 1000000) {
-    snprintf(text, 16, "%u.%02u", frequency/1000, frequency%1000/10);
-    return "kHz";
-  }
-  snprintf(text, 16, "%u.%05u", frequency/1000000, frequency%1000000/10);
-  return "MHz";
-}
 
 static void notify(const char *text) {
   message = text;
@@ -135,6 +137,8 @@ void VFO1_init(void) {
 bool VFO1_isReceiving(void) { return initialized && runtime.active; }
 
 void VFO1_update(void) {
+  if (!inMenu && !confirming && UI_VfoUpdate(&card, Now()))
+    gRedrawScreen = true;
   if (message && Now()-messageAt >= 2500) {
     message = NULL;
     gRedrawScreen = true;
@@ -244,7 +248,7 @@ void VFO1_render(void) {
   char frequencyText[16];
   STATUSLINE_SetText("RADIO");
   if (confirming) {
-    const char *unit = formatFrequency(pending.frequency_hz, frequencyText);
+    const char *unit = UI_FormatFrequency(pending.frequency_hz, frequencyText);
     PrintMediumEx(2, 18, POS_L, C_FILL, "Apply %s?", rxModeNames[pending.parameters.mode]);
     PrintMediumEx(2, 30, POS_L, C_FILL, "%s %s", frequencyText, unit);
     PrintSmall(2, 40, "BW %u Hz STEP %u Hz", pending.parameters.bandwidth_hz, pending.parameters.step_hz);
@@ -278,24 +282,15 @@ void VFO1_render(void) {
   changed = user.current.parameters.mode != preset->mode || user.current.parameters.step_hz != preset->step_hz ||
             user.current.parameters.bandwidth_hz != preset->bandwidth_hz || user.current.parameters.squelch != preset->squelch;
   uint32_t frequency = ctx->tx_state.is_active ? RADIO_GetParam(ctx, PARAM_TX_FREQUENCY_FACT)*10u : user.current.frequency_hz;
-  const char *unit = formatFrequency(frequency, frequencyText);
-  PrintMediumEx(2, 18, POS_L, C_FILL, "%.10s%s", radioBands[user.active_band].name, changed ? "*" : "");
-  if (ctx->tx_state.is_active)
-    PrintSmallEx(127, 18, POS_R, C_FILL, "TX");
-  else if (!runtime.active)
-    PrintSmallEx(127, 18, POS_R, C_FILL, "RX --");
-  else if (ctx->tx_state.last_error != TX_UNKNOWN)
-    PrintSmallEx(127, 18, POS_R, C_FILL, "TX OFF");
-  if (frequency/1000000 < 1000)
-    PrintBiggestDigitsEx(2, 41, POS_L, C_FILL, "%s", frequencyText);
-  else
-    PrintBigDigitsEx(2, 41, POS_L, C_FILL, "%s", frequencyText);
-  PrintMediumEx(127, 34, POS_R, C_FILL, "%s", rxModeNames[user.current.parameters.mode]);
-  PrintSmallEx(127, 41, POS_R, C_FILL, "%s", unit);
-  if (message)
-    PrintSmall(2, 60, "%s", message);
-  else if (ctx->tx_state.is_active)
-    UI_TxBar(52);
-  else if (runtime.active)
-    UI_SMeter(52);
+  UI_VfoView view = {
+    .id = 'A', .selected = true,
+    .frequency_hz = frequency, .mode = user.current.parameters.mode,
+    .band_short = shortBandName(radioBands[user.active_band].name), .changed = changed,
+    .signal_valid = runtime.active,
+    .signal_level = runtime.active ? UI_SMeterLevel() : 0,
+    .status = ctx->tx_state.is_active ? "TX" : !runtime.active ? "RX --"
+            : ctx->tx_state.last_error != TX_UNKNOWN ? "TX OFF" : NULL,
+  };
+  UI_VfoRender(8, &view, &card, Now());
+  if (message) PrintSmall(0, 43, "%s", message);
 }
