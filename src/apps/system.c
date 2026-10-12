@@ -162,6 +162,9 @@ void SYS_Main() {
 
   for (;;) {
 
+    // Highest-priority half-duplex safety check, even when another app owns
+    // the UI. Physical PA shutoff must not depend on VFO repaint cadence.
+    VFO1_TxSafetyUpdate();
     SETTINGS_UpdateSave();
 
     if (gRadioState && VFO1_isReceiving() && Now()-radioTimer >= SQL_DELAY) {

@@ -375,10 +375,15 @@ static bool readRds(void *unused, RdsPacket *packet, bool clear_fifo) {
   return RX_DEVICE_ReadRDS(packet, clear_fifo);
 }
 
-void VFO1_update(void) {
-  expireShortcut();
+void VFO1_TxSafetyUpdate(void) {
+  // TOT is a system-level safety deadline, not a screen refresh feature.
   if (TX_RuntimeUpdate(&transmitter, Now(), &txOperations))
     notify(transmitter.mode == RADIO_FAULT ? "RX restore error" : "TX timeout");
+}
+
+void VFO1_update(void) {
+  expireShortcut();
+  VFO1_TxSafetyUpdate(); // Also permit deterministic host/UI unit tests.
   if (transmitter.mode != RADIO_RX)
     return;
   seekUpdate();
@@ -458,7 +463,7 @@ bool VFO1_key(KEY_Code_t key, Key_State_t state) {
       notify("TX busy/locked");
       return true;
     }
-    if (gDeviceConfig.preferences.tx_busy_lockout && !gMonitorMode &&
+    if (gDeviceConfig.preferences.tx_busy_lockout &&
         vfo && vfo->is_open) {
       notify("Channel busy");
       return true;
