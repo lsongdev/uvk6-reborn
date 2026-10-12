@@ -21,6 +21,9 @@ esac
   src/core/radio-model.c src/external/printf/printf.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "$test_binary" --bk1080
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
+  tests/seek-regression.c src/core/seek.c src/core/radio-model.c -o "$test_binary"
+"$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/model-regression.c \
   src/core/radio-model.c -o "$test_binary"
 "$test_binary"
