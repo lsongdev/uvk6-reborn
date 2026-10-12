@@ -1,4 +1,4 @@
-#include "../gfxfont.h"
+#include "ui/gfxfont.h"
 // muMatrix8ptRegular.h - created with mufont, the muwerk font compiler
 
 const uint8_t MuMatrix8ptRegularBitmaps[] PROGMEM = {

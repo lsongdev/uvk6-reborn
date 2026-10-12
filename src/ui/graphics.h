@@ -2,9 +2,9 @@
 
 #define GRAPHICS_H
 
-#include "../driver/st7565.h"
-#include "../external/printf/printf.h"
-#include "gfxfont.h"
+#include "hal/st7565.h"
+#include "external/printf/printf.h"
+#include "ui/gfxfont.h"
 #include <stdbool.h>
 #include <stdint.h>
 

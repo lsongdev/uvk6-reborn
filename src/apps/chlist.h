@@ -1,8 +1,8 @@
 #ifndef CHLIST_H
 #define CHLIST_H
 
-#include "../driver/keyboard.h"
-#include "../helper/channels.h"
+#include "hal/keyboard.h"
+#include "core/channels.h"
 #include <stdbool.h>
 #include <stdint.h>
 

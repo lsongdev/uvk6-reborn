@@ -1,9 +1,9 @@
-#include "finput.h"
-#include "../driver/st7565.h"
-#include "../driver/uart.h"
-#include "../scheduler.h"
-#include "../ui/graphics.h"
-#include "apps.h"
+#include "apps/finput.h"
+#include "hal/st7565.h"
+#include "hal/uart.h"
+#include "hal/scheduler.h"
+#include "ui/graphics.h"
+#include "apps/apps.h"
 #include <string.h>
 
 // Константы для преобразования частот

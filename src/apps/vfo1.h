@@ -1,7 +1,7 @@
 #ifndef VFO1_APP_H
 #define VFO1_APP_H
 
-#include "../driver/keyboard.h"
+#include "hal/keyboard.h"
 #include <stdbool.h>
 #include <stdint.h>
 

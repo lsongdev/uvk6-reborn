@@ -1,4 +1,4 @@
-#include "../src/rx-runtime.h"
+#include "../src/core/rx-runtime.h"
 #include <assert.h>
 
 typedef struct {

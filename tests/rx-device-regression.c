@@ -1,5 +1,5 @@
 // Mock concrete RF drivers, not the receive-planning and apply logic.
-#include "../src/rx-device.c"
+#include "../src/hal/rx-device.c"
 #include <assert.h>
 
 Settings gSettings;

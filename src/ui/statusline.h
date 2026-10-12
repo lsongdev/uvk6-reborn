@@ -1,7 +1,7 @@
 #ifndef STATUSLINE_H
 #define STATUSLINE_H
 
-#include "../radio.h"
+#include "core/radio.h"
 
 void STATUSLINE_update();
 void STATUSLINE_render();

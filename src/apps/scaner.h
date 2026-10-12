@@ -1,8 +1,8 @@
 #ifndef SCANER_H
 #define SCANER_H
 
-#include "../driver/keyboard.h"
-#include "../radio.h"
+#include "hal/keyboard.h"
+#include "core/radio.h"
 #include <stdbool.h>
 #include <stdint.h>
 

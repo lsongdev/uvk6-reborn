@@ -1,13 +1,13 @@
-#include "settings.h"
-#include "../driver/backlight.h"
-#include "../driver/uart.h"
-#include "../external/printf/printf.h"
-#include "../helper/battery.h"
-#include "../helper/menu.h"
-#include "../misc.h"
-#include "../settings.h"
-#include "apps.h"
-#include "finput.h"
+#include "apps/settings.h"
+#include "hal/backlight.h"
+#include "hal/uart.h"
+#include "external/printf/printf.h"
+#include "core/battery.h"
+#include "ui/menu.h"
+#include "core/misc.h"
+#include "core/settings.h"
+#include "apps/apps.h"
+#include "apps/finput.h"
 
 static uint8_t DEAD_BUF[] = {0xDE, 0xAD};
 

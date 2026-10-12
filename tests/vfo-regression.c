@@ -89,12 +89,9 @@ int main(void) {
   setup(7100000, (RadioParameters){RX_AM, 5000, 6000, 0, false});
   unsigned before = applied;
   press(KEY_SIDE2);
-  assert(confirming && user.current.parameters.mode == RX_AM && applied == before);
-  press(KEY_EXIT);
-  assert(!confirming && user.current.parameters.mode == RX_AM && applied == before);
-  press(KEY_SIDE2);
-  press(KEY_MENU);
-  assert(user.current.parameters.mode == RX_LSB && user.current.parameters.bandwidth_hz == 3000 && applied == before+1);
+  assert(!confirming && user.current.parameters.mode == RX_LSB);
+  assert(user.current.parameters.bandwidth_hz == 3000 && applied == before+1);
+  assert(user.current.frequency_hz == 7100000);
 
   setup(7100000, (RadioParameters){RX_AM, 5000, 6000, 0, false});
   capabilities.ssb_patch = false;
@@ -111,9 +108,21 @@ int main(void) {
   press(KEY_MENU);
   assert(user.current.frequency_hz == 95930000 && user.current.parameters.mode == RX_WFM && ctx->radio_type == RADIO_SI4732);
   press(KEY_SIDE2);
-  assert(confirming && user.current.parameters.mode == RX_WFM);
-  press(KEY_EXIT);
-  assert(user.current.parameters.mode == RX_WFM);
+  assert(!confirming && user.current.parameters.mode == RX_AM);
+  assert(user.current.frequency_hz == 95930000 && ctx->radio_type == RADIO_BK4819);
+  assert(user.current.parameters.bandwidth_hz == 6000);
+  press(KEY_SIDE2);
+  assert(!confirming && user.current.parameters.mode == RX_NFM);
+  assert(user.current.frequency_hz == 95930000 && ctx->radio_type == RADIO_BK4819);
+
+  // WFM to NFM also applies immediately when SSB modes are unavailable.
+  setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0, false});
+  capabilities.ssb_patch = false;
+  press(KEY_SIDE2);
+  assert(!confirming && user.current.parameters.mode == RX_AM);
+  press(KEY_SIDE2);
+  assert(!confirming && user.current.parameters.mode == RX_NFM);
+  assert(user.current.frequency_hz == 100000000 && ctx->radio_type == RADIO_BK4819);
 
   setup(147987500, fm);
   press(KEY_UP);

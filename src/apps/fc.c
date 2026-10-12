@@ -1,13 +1,13 @@
-#include "fc.h"
-#include "../dcs.h"
-#include "../driver/system.h"
-#include "../driver/uart.h"
-#include "../radio.h"
-#include "../scheduler.h"
-#include "../settings.h"
-#include "../ui/components.h"
-#include "../ui/graphics.h"
-#include "apps.h"
+#include "apps/fc.h"
+#include "core/dcs.h"
+#include "hal/system.h"
+#include "hal/uart.h"
+#include "core/radio.h"
+#include "hal/scheduler.h"
+#include "core/settings.h"
+#include "ui/components.h"
+#include "ui/graphics.h"
+#include "apps/apps.h"
 #include <stdint.h>
 
 static const uint8_t REQUIRED_FREQUENCY_HITS = 2;

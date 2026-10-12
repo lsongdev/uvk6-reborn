@@ -1,10 +1,10 @@
-#include "reset.h"
-#include "../device-config.h"
-#include "../driver/eeprom.h"
-#include "../external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
-#include "../settings.h"
-#include "../ui/graphics.h"
-#include "../ui/statusline.h"
+#include "apps/reset.h"
+#include "core/device-config.h"
+#include "hal/eeprom.h"
+#include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
+#include "core/settings.h"
+#include "ui/graphics.h"
+#include "ui/statusline.h"
 
 static bool confirm;
 static bool failed;

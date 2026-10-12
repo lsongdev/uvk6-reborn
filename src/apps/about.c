@@ -1,5 +1,5 @@
-#include "about.h"
-#include "../ui/graphics.h"
+#include "apps/about.h"
+#include "ui/graphics.h"
 
 void ABOUT_Render() {
   PrintMediumEx(LCD_XCENTER, LCD_YCENTER - 8, POS_C, C_FILL, "hawk5");

@@ -1,8 +1,8 @@
-#include "spectrum.h"
-#include "../driver/uart.h"
-#include "../helper/measurements.h"
-#include "components.h"
-#include "graphics.h"
+#include "ui/spectrum.h"
+#include "hal/uart.h"
+#include "core/measurements.h"
+#include "ui/components.h"
+#include "ui/graphics.h"
 #include <stdint.h>
 
 #define MAX_POINTS 128

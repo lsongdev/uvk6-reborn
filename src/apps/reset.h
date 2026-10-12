@@ -1,7 +1,7 @@
 #ifndef RESET_H
 #define RESET_H
 
-#include "../driver/keyboard.h"
+#include "hal/keyboard.h"
 
 void RESET_Init();
 void RESET_Update();

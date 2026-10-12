@@ -1,7 +1,7 @@
 #ifndef ABOUT_H
 #define ABOUT_H
 
-#include "../driver/keyboard.h"
+#include "hal/keyboard.h"
 
 void ABOUT_Render();
 

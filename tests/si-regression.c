@@ -1,4 +1,4 @@
-#include "../src/driver/si473x.c"
+#include "../src/hal/si473x.c"
 #include <assert.h>
 #include <string.h>
 

@@ -1,13 +1,13 @@
-#include "apps.h"
-#include "../driver/st7565.h"
-#include "../driver/uart.h"
-#include "../helper/menu.h"
-#include "../ui/graphics.h"
-#include "../ui/statusline.h"
-#include "finput.h"
-#include "reset.h"
-#include "settings.h"
-#include "vfo1.h"
+#include "apps/apps.h"
+#include "hal/st7565.h"
+#include "hal/uart.h"
+#include "ui/menu.h"
+#include "ui/graphics.h"
+#include "ui/statusline.h"
+#include "apps/finput.h"
+#include "apps/reset.h"
+#include "apps/settings.h"
+#include "apps/vfo1.h"
 
 #define APPS_STACK_SIZE 8
 

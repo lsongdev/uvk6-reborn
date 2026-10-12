@@ -1,4 +1,4 @@
-#include "../src/radio-model.h"
+#include "../src/core/radio-model.h"
 #include <assert.h>
 #include <string.h>
 
