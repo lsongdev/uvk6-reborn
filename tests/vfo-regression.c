@@ -604,7 +604,8 @@ int main(void) {
   assert(selectedVfo==0 && receivingVfo==0 && runtime.active);
   assert(gDeviceConfig.radio.selected_vfo==0 && saveRequests==oldSaves);
   assert(!strcmp(message,"Tune failed") && ctx->frequency==14550000);
-  VFO_render();assert(!strcmp(statusText,"Tune failed"));
+  VFO_render();assert(!strcmp(statusText,"RADIO"));
+  assert(!strcmp(drawn[0].message,"Tune failed") && !drawn[1].message);
   // Both applies fail: ownership is cleared and no row claims reception.
   failApply=true;press(KEY_F);press(KEY_2);
   assert(selectedVfo==0 && receivingVfo==UINT8_MAX && !runtime.active);
@@ -716,7 +717,8 @@ int main(void) {
   setup(145500000,fm);RADIO_STATE_Set(&gDeviceConfig.radio,1,145500000,fm);
   gDeviceConfig.radio.watch_enabled=true;unsigned noVisits=applied;
   VFO_update();assert(watcher.phase==WATCH_OFF && applied==noVisits);
-  VFO_render();assert(!strcmp(statusText,"DW: same channel"));
+  VFO_render();assert(!strcmp(statusText,"DW A"));
+  assert(!strcmp(drawn[0].message,"DW: same channel") && !drawn[1].message);
   for (unsigned i=0;i<10;++i) { clockNow+=100;VFO_update(); }
   assert(applied==noVisits);
   // Apply/sample errors back off; even primary restore is attempted only once.

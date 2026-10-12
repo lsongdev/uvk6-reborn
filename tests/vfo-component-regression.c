@@ -116,5 +116,19 @@ int main(void) {
   UI_VfoRender(8,&view,&a,UINT32_MAX-500);
   assert(!UI_VfoUpdate(&a,498));
   assert(UI_VfoUpdate(&a,499) && a.show_name);
+  UI_VfoRender(8,&view,&a,500);
+  memcpy(saved,gFrameBuffer,sizeof(saved));
+  char label[128]; strcpy(label,a.label);
+  view.message="TX mode not supported";
+  UI_VfoRender(8,&view,&a,500);
+  sameRows(0,16); sameRows(36,64);
+  assert(!strcmp(a.label,view.message) && a.show_name && a.overflow);
+  assert(UI_VfoUpdate(&a,1850) && a.offset==1);
+  UI_VfoRender(8,&view,&a,1850);
+  for (unsigned y=16;y<36;++y) for(unsigned x=0;x<30;++x)
+    assert(GetPixel(x,y)==!!(saved[y/8][x]&(1<<(y%8))));
+  view.message=NULL; UI_VfoRender(8,&view,&a,1850);
+  assert(!strcmp(a.label,label) && !a.showing_message);
+  sameRows(0,64); // Message removal restores the original name and surrounding rows.
   return 0;
 }
