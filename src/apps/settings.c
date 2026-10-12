@@ -120,8 +120,8 @@ static void setBusyLockout(const MenuItem *item, bool up) {
   DEVICE_RequestSave();
 }
 static const MenuItem txSafetyItems[] = {
-    {"TX timeout", .get = getTXTime, .update = setTXTime},
-    {"Busy lock", .get = getBusyLockout, .update = setBusyLockout},
+    {"TX timeout", .get_value_text = getTXTime, .change_value = setTXTime},
+    {"Busy lock", .get_value_text = getBusyLockout, .change_value = setBusyLockout},
 };
 static Menu txSafetyMenu = {.title = "TX Safety",
                            .items = txSafetyItems,
