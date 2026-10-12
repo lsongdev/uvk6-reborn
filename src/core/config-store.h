@@ -7,7 +7,7 @@
 
 #define CONFIG_STORE_SLOT_SIZE 256u
 #define CONFIG_STORE_SLOTS 2u
-#define CONFIG_STORE_FORMAT 2u
+#define CONFIG_STORE_FORMAT 3u
 
 // Explicit on-disk fields. Never serialize C compiler bitfields or structs.
 typedef struct {
@@ -15,6 +15,7 @@ typedef struct {
   uint8_t backlight, contrast, brightness, battery_type, battery_style;
   uint8_t backlight_on_squelch, keylock, ptt_lock, beep;
   uint8_t si4732_power_off, mic, deviation, bound_240_280;
+  uint8_t brightness_low, sql_open_time, sql_close_time;
 } ConfigPreferences;
 
 typedef struct {

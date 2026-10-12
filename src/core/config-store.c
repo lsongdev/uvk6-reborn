@@ -7,7 +7,7 @@
 #define HEADER_BANDS 5u
 #define HEADER_SEQUENCE 8u
 #define HEADER_CRC 12u
-_Static_assert(PAYLOAD_START + 1 + 14*(RADIO_STATE_BANDS+1) + 15 + 8*RADIO_STATE_BANDS <= RECORD_BYTES,
+_Static_assert(PAYLOAD_START + 1 + 14*(RADIO_STATE_BANDS+1) + 18 + 8*RADIO_STATE_BANDS <= RECORD_BYTES,
                "Band presets must fit in the existing configuration slot");
 
 static void put16(uint8_t *p, uint16_t n) {
@@ -55,7 +55,8 @@ void CONFIG_Default(DeviceConfig *config) {
   config->preferences = (ConfigPreferences){
       .battery_calibration = 2000, .backlight = 3, .contrast = 8,
       .brightness = 8, .battery_type = 0, .battery_style = 1,
-      .backlight_on_squelch = 1, .mic = 0, .deviation = 130};
+      .backlight_on_squelch = 1, .mic = 0, .deviation = 130,
+      .brightness_low = 0, .sql_open_time = 1, .sql_close_time = 1};
 }
 static bool valid(const DeviceConfig *config) {
   const ConfigPreferences *p = &config->preferences;
@@ -65,7 +66,9 @@ static bool valid(const DeviceConfig *config) {
          p->battery_type <= 2 && p->battery_style <= 2 &&
          p->backlight_on_squelch <= 2 && p->keylock <= 1 &&
          p->ptt_lock <= 1 && p->beep <= 1 && p->si4732_power_off <= 1 &&
-         p->mic <= 15 && p->bound_240_280 <= 1;
+         p->mic <= 15 && p->bound_240_280 <= 1 &&
+         p->brightness_low <= 15 && p->sql_open_time <= 7 &&
+         p->sql_close_time <= 3;
 }
 bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
                    uint8_t bytes[RECORD_BYTES]) {
@@ -87,7 +90,8 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
     pref->backlight, pref->contrast, pref->brightness, pref->battery_type,
     pref->battery_style, pref->backlight_on_squelch, pref->keylock,
     pref->ptt_lock, pref->beep, pref->si4732_power_off, pref->mic,
-    pref->deviation, pref->bound_240_280
+    pref->deviation, pref->bound_240_280, pref->brightness_low,
+    pref->sql_open_time, pref->sql_close_time
   };
   memcpy(p, values, sizeof(values));
   p += sizeof(values);
@@ -104,7 +108,7 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
 bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
                    uint32_t *sequence) {
   if (!bytes || !config || memcmp(bytes, "UVR2", 4) != 0 ||
-      (bytes[HEADER_VERSION] != 1 && bytes[HEADER_VERSION] != CONFIG_STORE_FORMAT) ||
+      bytes[HEADER_VERSION] != CONFIG_STORE_FORMAT ||
       bytes[HEADER_BANDS] != RADIO_STATE_BANDS ||
       get32(bytes + HEADER_CRC) != crc32(bytes))
     return false;
@@ -119,19 +123,15 @@ bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
   uint8_t *values[] = {&pref->backlight, &pref->contrast, &pref->brightness,
     &pref->battery_type, &pref->battery_style, &pref->backlight_on_squelch,
     &pref->keylock, &pref->ptt_lock, &pref->beep, &pref->si4732_power_off,
-    &pref->mic, &pref->deviation, &pref->bound_240_280};
+    &pref->mic, &pref->deviation, &pref->bound_240_280,
+    &pref->brightness_low, &pref->sql_open_time, &pref->sql_close_time};
   for (unsigned i = 0; i < sizeof(values)/sizeof(values[0]); ++i)
     *values[i] = *p++;
   for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i) {
-    if (bytes[HEADER_VERSION] == 1) {
-      // Preserve existing per-band choices when upgrading UVR2 format 1.
-      candidate.radio.presets[i] = candidate.radio.bands[i].parameters;
-    } else {
-      candidate.radio.presets[i] = (RadioParameters){
-          .step_hz = get32(p), .bandwidth_hz = get16(p+4),
-          .mode = (RxMode)p[6], .squelch = p[7], .tx_enabled = false};
-      p += 8;
-    }
+    candidate.radio.presets[i] = (RadioParameters){
+        .step_hz = get32(p), .bandwidth_hz = get16(p+4),
+        .mode = (RxMode)p[6], .squelch = p[7], .tx_enabled = false};
+    p += 8;
   }
   if (!valid(&candidate))
     return false;

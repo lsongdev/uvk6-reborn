@@ -52,18 +52,6 @@ static Menu sqlMenu = {.title = "SQL",
                        .num_items = ARRAY_SIZE(sqlMenuItems)};
 
 // Scan submenu
-static const MenuItem scanMenuItems[] = {
-    {"SQL", .submenu = &sqlMenu},
-    {"FC t", SETTING_FCTIME, getValS, updateValS},
-    {"Listen t/o", SETTING_SQOPENEDTIMEOUT, getValS, updateValS},
-    {"Stay t", SETTING_SQCLOSEDTIMEOUT, getValS, updateValS},
-    {"Skip X_X", SETTING_SKIPGARBAGEFREQUENCIES, getValS, updateValS},
-};
-
-static Menu scanMenu = {.title = "Scan",
-                        .items = scanMenuItems,
-                        .num_items = ARRAY_SIZE(scanMenuItems)};
-
 // Display submenu
 static const MenuItem displayMenuItems[] = {
     {"Contrast", SETTING_CONTRAST, getValS, updateValS},
@@ -79,14 +67,8 @@ static Menu displayMenu = {.title = "Display",
 
 // Radio submenu
 static const MenuItem radioMenuItems[] = {
-    {"DTMF decode", SETTING_DTMFDECODE, getValS, updateValS},
     {"Filter bound", SETTING_BOUND240_280, getValS, updateValS},
     {"SI power off", SETTING_SI4732POWEROFF, getValS, updateValS},
-    {"STE", SETTING_STE, getValS, updateValS},
-    {"Tone local", SETTING_TONELOCAL, getValS, updateValS},
-    {"Roger", SETTING_ROGER, getValS, updateValS},
-    {"Mic", SETTING_MIC, getValS, updateValS},
-    {"Freq corr", SETTING_FREQ_CORRECTION, getValS, updateValS},
 };
 
 static Menu radioMenu = {.title = "Radio",

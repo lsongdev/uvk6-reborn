@@ -52,17 +52,19 @@ int main(void) {
   assert(loaded.radio.bands[3].frequency_hz == 100000000);
   assert(loaded.radio.current.parameters.mode == RX_WFM);
 
-  // Upgrade format 1 without erasing choices: independent presets inherit
-  // the old per-band last-used parameters, while the current VFO survives.
-  original.radio.bands[6].parameters.mode = RX_AM;
-  assert(CONFIG_Encode(&original, 9, record));
+  // Development storage is intentionally strict: never decode old layouts.
   record[4] = 1;
-  memset(record+172, 0, sizeof(record)-172);
-  put32(record+12, crc32(record));
+  assert(!CONFIG_Decode(record, &loaded, NULL));
+  record[4] = 2;
+  assert(!CONFIG_Decode(record, &loaded, NULL));
+  original.preferences.brightness_low = 5;
+  original.preferences.sql_open_time = 3;
+  original.preferences.sql_close_time = 2;
+  assert(CONFIG_Encode(&original, 10, record));
   assert(CONFIG_Decode(record, &loaded, NULL));
-  assert(loaded.radio.presets[6].mode == RX_AM);
-  assert(loaded.radio.current.parameters.mode == RX_WFM);
-  assert(CONFIG_Encode(&loaded, 10, record) && record[4] == CONFIG_STORE_FORMAT);
+  assert(loaded.preferences.brightness_low == 5);
+  assert(loaded.preferences.sql_open_time == 3);
+  assert(loaded.preferences.sql_close_time == 2);
   loaded.radio.presets[6].step_hz = 25000;
   loaded.radio.presets[6].squelch = 2;
   assert(CONFIG_Encode(&loaded, 11, record));
