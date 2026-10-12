@@ -69,7 +69,7 @@ bool BK1080_Mute(bool mute) {
 }
 static RxPlan plan(uint32_t hz, RxMode mode, RxDevice device) {
   return (RxPlan){device, hz, {mode, mode == RX_WFM ? 100000 : 12500,
-    mode == RX_WFM ? 0 : mode == RX_NFM ? 12000 : 6000, 0, false}};
+    mode == RX_WFM ? 0 : mode == RX_NFM ? 12000 : 6000, 0}};
 }
 int main(void) {
   RxPlan bk = plan(100000000, RX_NFM, RX_DEVICE_BK);
