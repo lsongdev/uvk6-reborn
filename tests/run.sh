@@ -31,7 +31,7 @@ esac
   -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
   -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/vfo-regression.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c \
+  tests/vfo-regression.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/seek.c \
   src/core/rds.c src/core/rds-receiver.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
