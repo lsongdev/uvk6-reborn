@@ -9,6 +9,10 @@ static unsigned powerCommands;
 static bool patchPresent = true;
 static bool ack = true;
 static uint8_t rdsResponse[13] = {STATUS_CTS};
+static uint8_t seekResponse[8] = {STATUS_CTS};
+static bool seekRead;
+static uint8_t lastSeek[6];
+static uint8_t lastSeekLen;
 static bool shortRead, busy;
 static unsigned rdsCommands;
 static uint8_t rdsArgument;
@@ -17,6 +21,10 @@ void I2C_Start(void) {}
 void I2C_Stop(void) {}
 int I2C_Write(uint8_t byte) { (void)byte; return ack ? 0 : -1; }
 int I2C_WriteBuffer(const uint8_t *buffer, uint16_t size) {
+  if (buffer[0] == CMD_FM_SEEK_START || buffer[0] == CMD_AM_SEEK_START) {
+    lastSeekLen = size;
+    memcpy(lastSeek, buffer, size);
+  }
   if (buffer[0] == CMD_FM_RDS_STATUS) {
     ++rdsCommands;
     rdsArgument = buffer[1];
@@ -39,6 +47,10 @@ int I2C_WriteBuffer(const uint8_t *buffer, uint16_t size) {
   return 0;
 }
 uint16_t I2C_ReadBuffer(void *buffer, uint16_t size) {
+  if (seekRead && size == sizeof(seekResponse)) {
+    memcpy(buffer, seekResponse, size);
+    return shortRead ? size-1 : size;
+  }
   if (size == sizeof(rdsResponse)) {
     memcpy(buffer,rdsResponse,size);
     return shortRead ? size-1 : size;
@@ -72,6 +84,31 @@ int main(void) {
   assert(siCurrentFreq == 9593 && lastTune[0] == CMD_FM_TUNE_FREQ);
   assert(lastTune[2] == (9593>>8) && lastTune[3] == (9593&255));
 
+  // Verify bounded native forward FM search and CTS/STCINT handling.
+  assert(SI47XX_SeekStart(64000000, 108000000, 100000));
+  assert(siCurrentFreq == 0 && lastSeekLen == 2 &&
+         lastSeek[0] == CMD_FM_SEEK_START &&
+         lastSeek[1] == SEEK_START_ARG1_SEEK_UP);
+  seekRead = true;
+  uint32_t foundFrequency = 0;
+  seekResponse[0] = STATUS_CTS;
+  assert(SI47XX_SeekPoll(&foundFrequency) == SI_SEEK_BUSY);
+  seekResponse[0] = STATUS_CTS | STATUS_STCINT;
+  seekResponse[1] = FIELD_TUNE_STATUS_RESP1_VALID;
+  seekResponse[2] = (9620u >> 8); seekResponse[3] = (9620u & 255u);
+  assert(SI47XX_SeekPoll(&foundFrequency) == SI_SEEK_FOUND &&
+         foundFrequency == 96200000u);
+  seekResponse[1] = FIELD_TUNE_STATUS_RESP1_SEEK_LIMIT;
+  assert(SI47XX_SeekPoll(&foundFrequency) == SI_SEEK_LIMIT);
+  ack = false;
+  assert(SI47XX_SeekPoll(&foundFrequency) == SI_SEEK_ERROR);
+  ack = true;
+  SI47XX_SeekCancel();
+  assert(siCurrentFreq == 0);
+  seekRead = false;
+  // A search never implicitly enables a disallowed FM channel spacing.
+  assert(!SI47XX_SeekStart(64000000,108000000,12500));
+
   // Real SI response decoding, including a single remaining FIFO group.
   const uint8_t response[] = {STATUS_CTS,1,5,1,0x40,0xa7,0x20,0x03,0x52,0x41,0x54,0x45,0x1b};
   memcpy(rdsResponse,response,sizeof(response));
@@ -95,6 +132,10 @@ int main(void) {
   assert(!SI47XX_ReadRDS(&rdsStatus,false) && rdsCommands==previous);busy=false;
   assert(!memcmp(&saved,&rdsStatus,sizeof(saved)));
 
+  SI47XX_SwitchMode(SI47XX_AM);
+  assert(SI47XX_SeekStart(1800000,30000000,5000) &&
+         lastSeek[0] == CMD_AM_SEEK_START && lastSeekLen == 6);
+  SI47XX_SeekCancel();
   SI47XX_SwitchMode(SI47XX_LSB);
   assert(isSi4732On && si4732mode == SI47XX_LSB);
   assert(!SI47XX_ReadRDS(&rdsStatus,false));
