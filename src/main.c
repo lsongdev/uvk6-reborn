@@ -6,7 +6,6 @@
 #include "hal/system.h"
 #include "hal/systick.h"
 #include "hal/uart.h"
-#include "external/printf/printf.h"
 #include "drivers/dp32g030/gpio.h"
 #include "apps/system.h"
 #include "core/device-config.h"
@@ -28,7 +27,6 @@ void Main(void) {
   TIMER0_InitAsUptimeCounter();
   TIMER1_InitForDelay();
   EEPROM_Init();
-  printf("UVK6 Reborn\n");
 
   SYS_Main();
 }
