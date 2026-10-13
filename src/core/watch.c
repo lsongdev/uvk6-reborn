@@ -15,7 +15,7 @@ bool WATCH_Start(WatchRuntime *r, const WatchTarget *targets, uint8_t count) {
   if (!r || !targets || count<2 || count>RADIO_WATCH_LIMIT) return false;
   WatchRuntime next={0};
   for (uint8_t i=0; i<count; ++i) {
-    if (targets[i].id>=RADIO_VFO_CAPACITY) return false;
+    if (targets[i].id>=RADIO_SLOT_CAPACITY) return false;
     if (!WATCH_Eligible(&targets[i].plan)) continue;
     bool duplicate=false;
     for (uint8_t j=0; j<next.count; ++j) {
