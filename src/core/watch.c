@@ -56,7 +56,7 @@ static void parallelUpdate(WatchRuntime *r, uint32_t now, const WatchOperations 
   if (r->phase==WATCH_TUNE) r->deadline=now;
   // Configure each chip once; failed chips retry independently with a cooldown.
   for (uint8_t n=0; n<r->count; ++n) {
-    uint8_t i=(r->cursor+n)%r->count, bit=1u<<i;
+    uint8_t i=(unsigned)(r->cursor+n)%r->count, bit=1u<<i;
     if ((r->prepared_mask&bit) || ((r->blocked&bit) &&
         (int32_t)(now-r->blocked_until[i])<0)) continue;
     if (ops->prepare(ops->context,&r->targets[i])) {

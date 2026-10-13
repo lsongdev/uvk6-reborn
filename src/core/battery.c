@@ -115,16 +115,17 @@ void BATTERY_UpdateBatteryInfo() {
   if (batAvgV == 0 || charg != gChargingWithTypeC) {
     batAvgV = batAdcV;
   } else {
-    batAvgV = batAvgV - (batAvgV - batAdcV) / 7;
+    batAvgV = batAvgV >= batAdcV ? batAvgV - (batAvgV - batAdcV) / 7u
+                                 : batAvgV + (batAdcV - batAvgV) / 7u;
   }
 
-  gBatteryVoltage = (batAvgV * 760) / gDeviceConfig.preferences.battery_calibration;
+  gBatteryVoltage = (uint32_t)batAvgV * 760u / gDeviceConfig.preferences.battery_calibration;
   gChargingWithTypeC = charg;
   gBatteryPercent = BATTERY_VoltsToPercent(gBatteryVoltage);
 }
 
 uint32_t BATTERY_GetPreciseVoltage(uint16_t cal) {
-  return batAvgV * 76000 / cal;
+  return (uint32_t)batAvgV * 76000u / cal;
 }
 
 uint16_t BATTERY_GetCal(uint32_t v) {

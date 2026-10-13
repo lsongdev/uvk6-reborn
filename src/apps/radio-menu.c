@@ -137,8 +137,8 @@ bool menuKey(KEY_Code_t key, Key_State_t state) {
     if (key == KEY_EXIT)
       inMenu = false;
     else if (key == KEY_UP || key == KEY_DOWN)
-      menuIndex = key == KEY_DOWN ? (menuIndex+1)%MENU_ITEM_COUNT
-                                 : (menuIndex+MENU_ITEM_COUNT-1)%MENU_ITEM_COUNT;
+      menuIndex = key == KEY_DOWN ? (menuIndex+1u)%MENU_ITEM_COUNT
+                                 : (menuIndex+MENU_ITEM_COUNT-1u)%MENU_ITEM_COUNT;
     else if (key == KEY_STAR || key == KEY_F || key == KEY_MENU)
       changeValue(key != KEY_F);
   }

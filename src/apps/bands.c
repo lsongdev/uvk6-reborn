@@ -54,7 +54,7 @@ bool BANDS_key(KEY_Code_t key, Key_State_t state) {
   if (key == KEY_UP || key == KEY_DOWN) {
     uint8_t count = editing ? FIELD_COUNT : radioBandCount;
     uint8_t *index = editing ? &field : &selected;
-    *index = (*index + (key == KEY_DOWN ? 1 : count-1))%count;
+    *index = (*index + (key == KEY_DOWN ? 1u : count-1u))%count;
     message = NULL;
     return true;
   }
