@@ -10,8 +10,6 @@
 #include "drivers/dp32g030/gpio.h"
 #include "apps/system.h"
 
-static const char *APP_NAME = "hawk5";
-
 void Main(void) {
   SYS_ConfigureClocks();
   SYS_ConfigureSysCon();
@@ -26,21 +24,8 @@ void Main(void) {
 
   TIMER0_InitAsUptimeCounter();
   TIMER1_InitForDelay();
-  /* for (;;) {
-    printf("Tick %u\n", (uint32_t)GetUptimeMs());
-    for (int i = 0; i < 10; ++i)
-      TIMER_DelayUs(1000);
-  } */
-
-  EEPROM_Init(); // Автоматически определит параметры
-  /* EEPROM_TestReadSpeedFast();
-  for (;;) {
-  } */
-  /* EEPROM_ScanBus();
-  for (;;) {
-  } */
-
-  printf("hawk5\n");
+  EEPROM_Init();
+  printf("UVK6 Reborn\n");
 
   SYS_Main();
 }
