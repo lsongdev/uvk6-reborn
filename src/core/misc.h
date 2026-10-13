@@ -16,13 +16,10 @@
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif
 
-char IsPrintable(char ch);
-unsigned int SQRT16(unsigned int value);
 
 #define KHZ 100
 #define MHZ 100000
 
-void ScanlistStr(uint32_t sl, char *buf);
 void mhzToS(char *buf, uint32_t f);
 void bkAttToS(char *buf, uint8_t v);
 

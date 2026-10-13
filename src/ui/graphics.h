@@ -55,26 +55,16 @@ bool GetPixel(uint8_t x, uint8_t y);
 
 void DrawVLine(int16_t x, int16_t y, int16_t h, Color color);
 void DrawHLine(int16_t x, int16_t y, int16_t w, Color color);
-void DrawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, Color color);
 void DrawRect(int16_t x, int16_t y, int16_t w, int16_t h, Color color);
 void FillRect(int16_t x, int16_t y, int16_t w, int16_t h, Color color);
 
 void PrintSmall(uint8_t x, uint8_t y, const char *pattern, ...);
 void PrintMedium(uint8_t x, uint8_t y, const char *pattern, ...);
-void PrintMediumBold(uint8_t x, uint8_t y, const char *pattern, ...);
-void PrintBigDigits(uint8_t x, uint8_t y, const char *pattern, ...);
-void PrintBodyText(uint8_t x, uint8_t y, const char *pattern, ...);
 
 void PrintSmallEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                   const char *pattern, ...);
 void PrintMediumEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                    const char *pattern, ...);
-void PrintMediumBoldEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
-                       const char *pattern, ...);
-void PrintBigDigitsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
-                      const char *pattern, ...);
-void PrintBodyTextEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
-                          const char *pattern, ...);
 void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
                     const char *pattern, ...);
 uint16_t UI_SymbolsTextWidth(const char *text);
@@ -83,6 +73,5 @@ void UI_SmallTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *
 // Native 12 px capitals/digits; printable ASCII fits the 17 px VFO body.
 uint16_t UI_BodyTextWidth(const char *text);
 void UI_BodyTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
-void FSmall(uint8_t x, uint8_t y, TextPos align, uint32_t frequency);
 
 #endif /* end of include guard: GRAPHICS_H */

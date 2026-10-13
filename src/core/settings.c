@@ -151,13 +151,11 @@ bool SETTINGS_Load(void) {
   gSettings.eepromType = EEPROM_DetectType();
   return loaded;
 }
-void SETTINGS_DelayedSave(void) { DEVICE_RequestSave(); }
 void SETTINGS_UpdateSave(void) { DEVICE_Update(); }
 uint32_t SETTINGS_GetFilterBound(void) {
   return gDeviceConfig.preferences.bound_240_280 ? VHF_UHF_BOUND2 : VHF_UHF_BOUND1;
 }
 uint32_t SETTINGS_GetEEPROMSize(void) { return EEPROM_DetectSize(); }
-uint16_t SETTINGS_GetPageSize(void) { return EEPROM_GetPageSize(); }
 bool SETTINGS_IsPatchPresent(void) {
   // A matching prefix does not authenticate the rest of the SSB patch.
   // For an unverified installation, SSB stays unavailable by default.

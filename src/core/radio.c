@@ -15,7 +15,6 @@
 #include "hal/system.h"
 #include "hal/uart.h"
 #include "external/printf/printf.h"
-#include "core/bands.h"
 #include "core/battery.h"
 #include "core/channels.h"
 #include "core/lootlist.h"

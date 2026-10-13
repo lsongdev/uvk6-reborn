@@ -187,9 +187,6 @@ bool EEPROM_SeedPaCalibration(void) {
 }
 #endif
 
-void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
-  (void)EEPROM_TryWriteBuffer(address, pBuffer, size);
-}
 
 
 
@@ -218,13 +215,7 @@ uint16_t EEPROM_GetPageSize(void) {
   return type < EEPROM_UNKNOWN ? PAGE_SIZES[type] : 0;
 }
 
-int EEPROM_ReadByte(uint32_t address, uint8_t *value) {
-  return EEPROM_ReadBuffer(address, value, 1);
-}
 
-int EEPROM_WriteByte(uint32_t address, uint8_t value) {
-  return EEPROM_TryWriteBuffer(address, &value, 1) ? 0 : -1;
-}
 
 bool EEPROM_Detect(uint8_t device_addr) {
   I2C_Start();
@@ -234,33 +225,4 @@ bool EEPROM_Detect(uint8_t device_addr) {
 }
 
 #include "hal/uart.h"
-void EEPROM_TestReadSpeed() {
-  uint8_t buf[256];
-  Log("-- EEPROM TEST START --");
-  for (uint32_t i = 0; i < g_eeprom_size; i += g_eeprom_page_size) {
-    EEPROM_ReadBuffer(i, buf, g_eeprom_page_size);
-  }
-  Log("-- EEPROM TEST END --");
-}
 
-void EEPROM_ScanBus(void) {
-  printf("\nI2C Scan:\n     0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n");
-  for (uint8_t row = 0; row < 8; row++) {
-    printf("%02X: ", row * 16);
-    for (uint8_t col = 0; col < 16; col++) {
-      uint8_t addr = (row * 16 + col) << 1;
-      if (addr < 0x10 || addr > 0xF0) {
-        printf("   ");
-        continue;
-      }
-
-      I2C_Start();
-      int result = I2C_Write(addr);
-      I2C_Stop();
-
-      printf(result == 0 ? "%02X " : "-- ", addr);
-      TIMER_DelayUs(100);
-    }
-    printf("\n");
-  }
-}

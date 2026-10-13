@@ -221,6 +221,3 @@ void BOARD_ADC_GetBatteryInfo(uint16_t *pVoltage, uint16_t *pCurrent) {
   *pCurrent = ADC_GetValue(ADC_CH9);
 }
 
-void BOARD_Init(void) {
-  // Можно добавить инициализацию если нужно
-}

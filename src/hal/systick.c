@@ -40,7 +40,6 @@ uint32_t GetUptimeMs(void) {
   uint32_t sub = acc1 + cnt;
   return ms1 + sub / 1000;
 }
-uint32_t GetUptimeSec(void) { return GetUptimeMs() / 1000; }
 void TIMER1_InitForDelay(void) {
   TIMER1->EN = 0;
   TIMER1->IE = 0;
@@ -73,4 +72,3 @@ void TIMER_DelayTicks(uint32_t ticks) {
   }
 }
 void TIMER_DelayUs(uint32_t us) { TIMER_DelayTicks(us); }
-void TIMER_DelayMs(uint32_t ms) { TIMER_DelayUs(ms * 1000); }

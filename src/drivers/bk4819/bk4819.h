@@ -100,7 +100,6 @@ extern const Gain GAIN_TABLE[32];
 // extern const uint8_t SQ[2][6][11];
 
 bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index);
-uint32_t BK4819_BandwidthToHz(uint16_t index);
 void BK4819_Init(void);
 uint16_t BK4819_ReadRegister(BK4819_REGISTER_t Register);
 void BK4819_WriteRegister(BK4819_REGISTER_t Register, uint16_t Data);
@@ -117,38 +116,21 @@ void BK4819_CssResetDetection(bool digital);
 bool BK4819_CssIsDetected(bool digital);
 void BK4819_SetCDCSSCodeWord(uint32_t CodeWord);
 void BK4819_SetCTCSSFrequency(uint32_t BaudRate);
-void BK4819_SetTailDetection(const uint32_t freq_10Hz);
-void BK4819_EnableVox(uint16_t Vox1Threshold, uint16_t Vox0Threshold);
 void BK4819_SetFilterBandwidth(BK4819_FilterBandwidth_t Bandwidth);
 void BK4819_SetupPowerAmplifier(uint8_t Bias, uint32_t Frequency);
 void BK4819_SetFrequency(uint32_t Frequency);
-uint32_t BK4819_GetFrequency(void);
 void BK4819_SetupSquelch(SQL sq, uint8_t delayO, uint8_t delayC);
 void BK4819_Squelch(uint8_t sql, uint8_t OpenDelay, uint8_t CloseDelay);
-void BK4819_SquelchType(SquelchType t);
 
 void BK4819_SetAF(BK4819_AF_Type_t AF);
 void BK4819_RX_TurnOn(void);
 void BK4819_SelectFilterEx(Filter filter);
 void BK4819_SelectFilter(uint32_t Frequency);
-void BK4819_DisableScramble(void);
-void BK4819_EnableScramble(uint8_t Type);
-void BK4819_SetScrambler(uint8_t type);
-void BK4819_DisableVox(void);
 void BK4819_DisableDTMF(void);
-void BK4819_EnableDTMF(void);
-void BK4819_PlayTone(uint16_t Frequency, bool bTuningGainSwitch);
 void BK4819_EnterTxMute(void);
 void BK4819_ExitTxMute(void);
-void BK4819_Sleep(void);
-void BK4819_TurnsOffTones_TurnsOnRX(void);
 void BK4819_SetupAircopy(void);
-void BK4819_ResetFSK(void);
-void BK4819_FskClearFifo(void);
-void BK4819_FskEnableRx(void);
-void BK4819_FskEnableTx(void);
 void BK4819_Idle(void);
-void BK4819_EnterBypass(void);
 void BK4819_ExitBypass(void);
 void BK4819_PrepareTransmit(void);
 void BK4819_ConfigureMicrophone(uint8_t mic);
@@ -156,74 +138,37 @@ void BK4819_ConfigureVoiceTx(uint32_t frequency, uint8_t mic, uint16_t deviation
 void BK4819_TxOn_Beep(void);
 void BK4819_ExitSubAu(void);
 
-void BK4819_EnterDTMF_TX(bool bLocalLoopback);
-void BK4819_ExitDTMF_TX(bool bKeep);
-void BK4819_EnableTXLink(void);
 
-void BK4819_PlayDTMF(char Code);
-void BK4819_PlayDTMFString(const char *pString, bool bDelayFirst,
-                           uint16_t FirstCodePersistTime,
-                           uint16_t HashCodePersistTime,
-                           uint16_t CodePersistTime, uint16_t CodeInternalTime);
 
-void BK4819_TransmitTone(uint32_t Frequency);
 
-void BK4819_GenTail(uint8_t Tail);
-void BK4819_EnableCDCSS(void);
-void BK4819_EnableCTCSS(void);
 
-uint8_t BK4819_GetAgcRSSI(void);
-uint8_t BK4819_GetLnaPeakRSSI(void);
 uint16_t BK4819_GetRSSI(void);
 uint8_t BK4819_GetNoise(void);
 uint8_t BK4819_GetGlitch(void);
 uint8_t BK4819_GetSNR(void);
-uint16_t BK4819_GetVoiceAmplitude(void);
-uint8_t BK4819_GetAfTxRx(void);
-uint8_t BK4819_GetSignalPower(void);
-int16_t BK4819_GetAFCValue();
 
 bool BK4819_GetFrequencyScanResult(uint32_t *pFrequency);
-BK4819_CssScanResult_t BK4819_GetCxCSSScanResult(uint32_t *pCdcssFreq,
-                                                 uint16_t *pCtcssFreq);
 void BK4819_DisableFrequencyScan(void);
-void BK4819_EnableFrequencyScan(void);
 void BK4819_EnableFrequencyScanEx(FreqScanTime t);
-void BK4819_EnableFrequencyScanEx2(FreqScanTime t, uint16_t hz);
 
 void BK4819_StopScan(void);
 
-uint8_t BK4819_GetDTMF_5TONE_Code(void);
 
-uint8_t BK4819_GetCDCSSCodeType(void);
-uint8_t BK4819_GetCTCType(void);
 
-void BK4819_PlaySequence(const uint16_t *M);
-void BK4819_PlayRogerTiny(void);
 
-void BK4819_Enable_AfDac_DiscMode_TxDsp(void);
 
-void BK4819_GetVoxAmp(uint16_t *pResult);
-void BK4819_PlayDTMFEx(bool bLocalLoopback, char Code);
 
 void BK4819_ToggleAFBit(bool on);
 void BK4819_ToggleAFDAC(bool on);
-uint16_t BK4819_GetRegValue(RegisterSpec s);
 void BK4819_SetRegValue(RegisterSpec s, uint16_t v);
 void BK4819_SetAFC(uint8_t level);
-uint8_t BK4819_GetAFC();
 void BK4819_SetAFCSpeed(uint8_t speed);
-uint8_t BK4819_GetAFCSpeed(void);
 void BK4819_TuneTo(uint32_t f, bool precise);
-void BK4819_SetToneFrequency(uint16_t f);
-void BK4819_SetTone2Frequency(uint16_t f);
 // Production RX modes are NFM and AM; WFM/SSB use other receiver chips.
 void BK4819_SetRxMode(bool am);
 void BK4819_InvalidateRxMode(void);
-ModulationType BK4819_GetModulation();
 bool BK4819_IsSquelchOpen();
 
-XtalMode BK4819_XtalGet();
 void BK4819_XtalSet(XtalMode mode);
 
 #endif

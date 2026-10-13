@@ -67,7 +67,6 @@ bool UART_IsCommandAvailable(void);
 void UART_HandleCommand(void);
 void Log(const char *pattern, ...);
 void LogC(LogColor c, const char *pattern, ...);
-void LogUart(const char *const str);
 void PrintCh(uint16_t chNum, CH *ch);
 
 #endif

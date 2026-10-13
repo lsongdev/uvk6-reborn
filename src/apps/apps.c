@@ -120,7 +120,6 @@ void APPS_run(AppType_t app) {
   APPS_init(app);
 }
 
-void APPS_runManual(AppType_t app) { APPS_run(app); }
 
 bool APPS_exit(void) {
   if (stackIndex == 0) {

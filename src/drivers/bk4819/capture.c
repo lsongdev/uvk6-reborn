@@ -12,17 +12,11 @@ bool BK4819_GetFrequencyScanResult(uint32_t *frequency) {
   return finished;
 }
 
-void BK4819_EnableFrequencyScan(void) {
-  BK4819_WriteRegister(BK4819_REG_32, 0x0245);
-}
 
 void BK4819_EnableFrequencyScanEx(FreqScanTime time) {
   BK4819_WriteRegister(BK4819_REG_32, 0x0245 | (time << 14));
 }
 
-void BK4819_EnableFrequencyScanEx2(FreqScanTime time, uint16_t hz) {
-  BK4819_WriteRegister(BK4819_REG_32, (time << 14) | (hz << 1) | true);
-}
 
 void BK4819_DisableFrequencyScan(void) {
   BK4819_WriteRegister(BK4819_REG_32, 0x0244);

@@ -34,12 +34,10 @@ void TIMER0_InitAsUptimeCounter(void); // Основной uptime
 void TIMER1_InitForDelay(void);        // Только задержки
 
 // Задержки
-void TIMER_DelayMs(uint32_t ms);
 void TIMER_DelayUs(uint32_t us);
 void TIMER_DelayTicks(uint32_t ticks);
 
 // Uptime (время с момента включения)
 uint32_t GetUptimeMs(void);  // миллисекунды
-uint32_t GetUptimeSec(void); // секунды
 
 #endif

@@ -1,7 +1,6 @@
 #include "ui/graphics.h"
 #include "core/misc.h"
 #include "ui/fonts/helvetica12.h"
-#include "ui/fonts/NumbersStepanv4.h"
 #include "ui/fonts/TomThumb.h"
 #include "ui/fonts/muMatrix8ptRegular.h"
 #include "ui/fonts/symbols.h"
@@ -11,8 +10,7 @@
 static Cursor cursor;
 static int16_t textClipLeft = 0, textClipRight = LCD_WIDTH;
 
-static const GFXfont *const fonts[] = {&TomThumb, &MuMatrix8ptRegular,
-                                       &MuMatrix8ptRegular, &dig_11, &uiBodyFont};
+static const GFXfont *const fonts[] = {&TomThumb, &MuMatrix8ptRegular};
 
 void UI_ClearStatus(void) { FillRect(0, 0, LCD_WIDTH, 7, C_CLEAR); }
 void UI_ClearScreen(void) {
@@ -62,18 +60,6 @@ void DrawHLine(int16_t x, int16_t y, int16_t w, Color c) {
     DrawALine(x, y, x + w - 1, y, c);
 }
 
-void DrawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, Color c) {
-  if (x0 == x1) {
-    if (y0 > y1)
-      SWAP(y0, y1);
-    DrawVLine(x0, y0, y1 - y0 + 1, c);
-  } else if (y0 == y1) {
-    if (x0 > x1)
-      SWAP(x0, x1);
-    DrawHLine(x0, y0, x1 - x0 + 1, c);
-  } else
-    DrawALine(x0, y0, x1, y1, c);
-}
 
 void DrawRect(int16_t x, int16_t y, int16_t w, int16_t h, Color c) {
   DrawHLine(x, y, w, c);
@@ -186,7 +172,7 @@ static void printStr(const GFXfont *f, uint8_t x, uint8_t y, Color col,
     write(*p, 1, 1, 1, col, f);
 }
 
-// Макрос для генерации функций - экономит место
+// One generated pair per text font keeps the variadic wrappers identical.
 #define P(n, i)                                                                \
   void Print##n(uint8_t x, uint8_t y, const char *f, ...) {                    \
     va_list a;                                                                 \
@@ -204,20 +190,18 @@ static void printStr(const GFXfont *f, uint8_t x, uint8_t y, Color col,
   }
 
 P(Small, 0)
-PX(Small, 0) P(Medium, 1) PX(Medium, 1) P(MediumBold, 2) PX(MediumBold, 2)
-    P(BigDigits, 3) PX(BigDigits, 3) P(BodyText, 4) PX(BodyText, 4)
+PX(Small, 0)
+P(Medium, 1)
+PX(Medium, 1)
 
-        void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos p, Color c,
-                            const char *f, ...) {
+void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos p, Color c,
+                    const char *f, ...) {
   va_list a;
   va_start(a, f);
   printStr(&Symbols, x, y, c, p, f, a);
   va_end(a);
 }
 
-void FSmall(uint8_t x, uint8_t y, TextPos a, uint32_t freq) {
-  PrintSmallEx(x, y, a, C_FILL, "%u.%05u", freq / MHZ, freq % MHZ);
-}
 
 static uint16_t textWidth(const char *text, const GFXfont *font) {
   uint16_t width = 0;
