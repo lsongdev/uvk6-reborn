@@ -27,6 +27,9 @@ void Main(void) {
   TIMER0_InitAsUptimeCounter();
   TIMER1_InitForDelay();
   EEPROM_Init();
+#if UVK6_SEED_PA_CAL
+  (void)EEPROM_SeedPaCalibration(); // Maintenance image only; result read back over UART.
+#endif
 
   SYS_Main();
 }
