@@ -7,7 +7,7 @@ int main(void) {
   assert(RADIO_STATE_Default(&state));
   RadioSlot stored = state.slots[0], effective;
   stored.current.frequency_hz = 145500000u;
-  stored.current.parameters = (RadioParameters){RX_NFM, 12500, 12000, 4};
+  stored.current.parameters = (RadioParameters){RX_NFM, 12500, 12000, 4, 0};
   stored.active_band = RADIO_MODEL_BandAt(stored.current.frequency_hz);
   assert(TUNING_Resolve(&stored, NULL, &effective));
   assert(!memcmp(&stored, &effective, sizeof(stored)));
@@ -20,7 +20,7 @@ int main(void) {
 
   UserChannel channel = {
     .frequency_hz = 438500000u,
-    .rx = {RX_NFM, 12500, 12000, 4},
+    .rx = {RX_NFM, 12500, 12000, 4, 0},
     .name = "Saved"
   };
   stored.source = RADIO_SOURCE_CHANNEL;
@@ -40,8 +40,8 @@ int main(void) {
   RxPlan plan;
   ReceiverCapabilities caps = {true, true, false};
   assert(TUNING_ExactPlan(145500000u,
-      (RadioParameters){RX_NFM, 12500, 12000, 4}, caps, &plan) == RX_OK);
+      (RadioParameters){RX_NFM, 12500, 12000, 4, 0}, caps, &plan) == RX_OK);
   assert(plan.frequency_hz == 145500000u);
   assert(TUNING_ExactPlan(0u,
-      (RadioParameters){RX_NFM, 12500, 12000, 4}, caps, &plan) != RX_OK);
+      (RadioParameters){RX_NFM, 12500, 12000, 4, 0}, caps, &plan) != RX_OK);
 }
