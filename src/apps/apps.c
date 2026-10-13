@@ -14,7 +14,6 @@
 
 AppType_t gCurrentApp = APP_NONE;
 
-static AppType_t loadedRadioApp = APP_NONE;
 
 static AppType_t appsStack[APPS_STACK_SIZE] = {APP_NONE};
 static int8_t stackIndex = -1;
@@ -98,7 +97,6 @@ void APPS_deinit(void) {
   }
 }
 
-RadioState radioState;
 void APPS_run(AppType_t app) {
   if (app <= APP_NONE || app >= APPS_COUNT || !apps[app].name)
     return;
@@ -109,13 +107,8 @@ void APPS_run(AppType_t app) {
   pushApp(app);
   gCurrentApp = app;
 
-  if (loadedRadioApp != gCurrentApp && apps[gCurrentApp].needsRadioState) {
-    LogC(LOG_C_MAGENTA, "[APP] Load radio state for %s",
-         apps[gCurrentApp].name);
-    RADIO_InitState(&radioState);
-    RADIO_InitHardware(&radioState);
-    loadedRadioApp = gCurrentApp;
-  }
+  if (apps[gCurrentApp].needsRadioState)
+    RECEIVER_Init(); // Once; later runs keep the tuned hardware.
 
   APPS_init(app);
 }

@@ -2,7 +2,8 @@
 #include "hal/display.h"
 #include "external/printf/printf.h"
 #include "ui/menu.h"
-#include "core/radio.h"
+#include "core/receiver.h"
+#include "core/misc.h"
 #include "core/device-config.h"
 #include "core/channel-store.h"
 #include "core/channel-model.h"
@@ -147,7 +148,7 @@ static void finishSeek(bool found, uint32_t frequency_hz, const char *status);
 static void stopReceiver(void *unused);
 static void txMute(void *unused) {
   (void)unused;
-  RADIO_StopReception();
+  RECEIVER_Mute();
   receivingSlot = UINT8_MAX;
   resetRds();
 }
@@ -162,7 +163,7 @@ static void txDisable(void *unused) {
 }
 static bool txRestore(void *unused, const RxPlan *plan) {
   (void)unused;
-  if (!RADIO_ApplyRxPlan(ctx, plan)) {
+  if (!RECEIVER_Apply(plan)) {
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
     return false;
   }
@@ -219,13 +220,13 @@ static void channelSaved(uint8_t id, uint16_t number,
 static bool applyReceiver(void *unused, const RxPlan *plan) {
   (void)unused;
   resetRds();
-  return RADIO_ApplyRxPlan(ctx, plan);
+  return RECEIVER_Apply(plan);
 }
 
 static void stopReceiver(void *unused) {
   (void)unused;
   resetRds();
-  RADIO_StopReception();
+  RECEIVER_Mute();
   receivingSlot = UINT8_MAX;
 }
 
@@ -278,7 +279,7 @@ static void finishSeek(bool found, uint32_t frequency_hz, const char *status) {
   if (found) {
     RxPlan selected;
     if (RADIO_MODEL_Plan(frequency_hz, seekOrigin.parameters,
-                         RADIO_GetReceiverCapabilities(), &selected) == RX_OK &&
+                         RECEIVER_Capabilities(), &selected) == RX_OK &&
         selected.device == seekOrigin.device &&
         SEEK_Accept(&(Seek){.active=true, .origin_hz=seek.origin_hz,
                              .lower_hz=seek.lower_hz,.end_hz=seek.end_hz,
@@ -289,7 +290,7 @@ static void finishSeek(bool found, uint32_t frequency_hz, const char *status) {
     status = "Seek error";
   }
   // Restoring directly does not update RadioUserState or request a save.
-  if (!RADIO_ApplyRxPlan(ctx, &seekOrigin)) {
+  if (!RECEIVER_Apply(&seekOrigin)) {
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
     notify("RX error");
   } else if (status) {
@@ -321,7 +322,7 @@ static void startSeek(void) {
   seekPhase = seekNative ? SEEK_NATIVE_START : SEEK_STEP;
   seekAt = Now();
   seekDeadline = Now() + 15000;
-  RADIO_StopReception();
+  RECEIVER_Mute();
   resetRds();
   message = NULL;
   gRedrawScreen = true;
@@ -340,13 +341,13 @@ static void seekUpdate(void) {
     RadioParameters params = seekOrigin.parameters;
     if (params.squelch < 4 && seekOrigin.device == RX_DEVICE_BK)
       params.squelch = 4; // Monitor/SQ0 must not match every noise carrier.
-    if (RADIO_MODEL_Plan(next, params, RADIO_GetReceiverCapabilities(),
+    if (RADIO_MODEL_Plan(next, params, RECEIVER_Capabilities(),
                          &candidate) != RX_OK ||
         candidate.device != seekOrigin.device ||
         candidate.frequency_hz < seek.lower_hz ||
         candidate.frequency_hz >= seek.end_hz)
       return;
-    if (!RADIO_ApplyRxPlan(ctx, &candidate)) {
+    if (!RECEIVER_Apply(&candidate)) {
       finishSeek(false, 0, "Seek error");
       return;
     }
@@ -408,9 +409,9 @@ static void seekUpdate(void) {
     RX_DEVICE_SeekCancel(seekOrigin.device);
     RxPlan first;
     if (RADIO_MODEL_Plan(seek.lower_hz, seekOrigin.parameters,
-                         RADIO_GetReceiverCapabilities(), &first) != RX_OK ||
+                         RECEIVER_Capabilities(), &first) != RX_OK ||
         first.device != seekOrigin.device ||
-        !RADIO_ApplyRxPlan(ctx, &first)) {
+        !RECEIVER_Apply(&first)) {
       finishSeek(false, 0, "Seek error");
       return;
     }
@@ -424,7 +425,7 @@ static void seekUpdate(void) {
 // Runtime keeps the committed origin throughout detection and temporary preview.
 static bool capturePlan(uint32_t hz, RxPlan *plan) {
   return RADIO_MODEL_Plan(hz, (RadioParameters){RX_NFM,12500,12000,4},
-      RADIO_GetReceiverCapabilities(), plan)==RX_OK &&
+      RECEIVER_Capabilities(), plan)==RX_OK &&
       plan->device==RX_DEVICE_BK && plan->frequency_hz==hz;
 }
 
@@ -446,12 +447,10 @@ static void cancelCapture(const char *status) {
 }
 
 static void captureAttempt(void) {
-  RADIO_StopReception();
+  RECEIVER_Mute();
   receivingSlot=UINT8_MAX;
   resetRds();
-  RxDevice previous=ctx->radio_type==RADIO_BK4819 ? RX_DEVICE_BK :
-    ctx->radio_type==RADIO_SI4732 ? RX_DEVICE_SI : RX_DEVICE_BROADCAST;
-  RX_DEVICE_CaptureStart(capture.range, previous);
+  RX_DEVICE_CaptureStart(capture.range, gReceiver.plan.device);
   capturePhase=FC_DETECT;
   capturePollAt=Now();
   message=NULL;
@@ -502,7 +501,7 @@ static void acceptCapture(void) {
 
 static void request(uint32_t target, RadioParameters values) {
   RxPlan plan;
-  RxResult result = RADIO_MODEL_Plan(target, values, RADIO_GetReceiverCapabilities(), &plan);
+  RxResult result = RADIO_MODEL_Plan(target, values, RECEIVER_Capabilities(), &plan);
   if (result == RX_OUT_OF_RANGE || result == RX_INVALID_PARAMETERS) {
     notify("Invalid params");
     return;
@@ -673,7 +672,7 @@ void RADIO_APP_update(void) {
 static bool restorePrimary(void) {
   RxPlan plan;
   if (TUNING_ExactPlan(activeSlot.current.frequency_hz,activeSlot.current.parameters,
-      RADIO_GetReceiverCapabilities(),&plan)!=RX_OK) {
+      RECEIVER_Capabilities(),&plan)!=RX_OK) {
     RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX unavailable"); return false;
   }
   if (runtime.active && receivingSlot==selectedSlot && WATCH_SameReceiver(&runtime.current,&plan))
@@ -688,7 +687,7 @@ static bool restorePrimary(void) {
 static bool pauseWatch(void) {
   bool wasWatching=watcher.phase!=WATCH_OFF;
   if (watcher.parallel) {
-    RADIO_StopReception();
+    RECEIVER_Mute();
     for (uint8_t i=0; i<watcher.count; ++i)
       RX_DEVICE_StopChip(watcher.targets[i].plan.device);
     runtime.active=false;receivingSlot=UINT8_MAX;
@@ -709,9 +708,8 @@ static bool watchSignal(void *unused, const RxPlan *plan, bool *found) {
 }
 static void watchAudio(void *unused, bool open) {
   (void)unused;
-  if (!vfo || vfo->is_open==open) return;
-  vfo->is_open=open; vfo->msm.open=open;
-  RADIO_SetAudioOpen(open); gRedrawScreen=true;
+  if (gReceiver.open==open) return;
+  RECEIVER_SetOpen(open); gRedrawScreen=true;
 }
 static bool watchPrepare(void *unused, const WatchTarget *target) {
   (void)unused;
@@ -724,8 +722,8 @@ static bool watchSelect(void *unused, const WatchTarget *target, bool open) {
   (void)unused;
   uint8_t devices=0;
   for (uint8_t i=0; i<watcher.count; ++i) devices |= 1u<<watcher.targets[i].plan.device;
-  if (!RADIO_SelectPreparedRxPlan(&target->plan,devices,open)) {
-    vfo->is_open=false;runtime.active=false;receivingSlot=UINT8_MAX;
+  if (!RECEIVER_Select(&target->plan,devices,open)) {
+    gReceiver.open=false;runtime.active=false;receivingSlot=UINT8_MAX;
     gRedrawScreen=true;return false;
   }
   runtime.current=target->plan;runtime.active=true;receivingSlot=target->id;
@@ -762,7 +760,7 @@ static void watchUpdate(void) {
       }
       RxPlan plan;
       RxResult result=TUNING_ExactPlan(effective.current.frequency_hz,effective.current.parameters,
-          RADIO_GetReceiverCapabilities(),&plan);
+          RECEIVER_Capabilities(),&plan);
       if (result!=RX_OK) {
         watchStatus="DW: unavailable"; continue;
       }
@@ -777,10 +775,8 @@ static void watchUpdate(void) {
   watchStatus=NULL;
   bool wasRetrying=watcher.phase==WATCH_RETRY;
   WATCH_Update(&watcher,Now(),&watchOperations);
-  if (watcher.phase==WATCH_HOLD && watcher.signal && vfo) {
-    RADIO_Measure(vfo);
-    vfo->msm.open=vfo->is_open;
-  }
+  // Refresh RSSI for display; Watch, not squelch, owns the audio gate here.
+  if (watcher.phase==WATCH_HOLD && watcher.signal) (void)RECEIVER_Measure();
   // If all candidates fail, listen to the primary during bounded retry delay.
   if (watcher.phase==WATCH_RETRY && !wasRetrying) (void)restorePrimary();
 }
@@ -803,7 +799,7 @@ bool RADIO_APP_ApplyRxSettings(void) {
   RxPlan plan;
   if (runtime.active) plan = runtime.current;
   else if (RADIO_MODEL_Plan(activeSlot.current.frequency_hz, activeSlot.current.parameters,
-      RADIO_GetReceiverCapabilities(), &plan) != RX_OK) return false;
+      RECEIVER_Capabilities(), &plan) != RX_OK) return false;
   if (!tuneDirect(&plan)) return false;
   receivingSlot = selectedSlot;
   return true;
@@ -817,7 +813,7 @@ static void tuneChannel(uint16_t number, bool enterMode) {
   }
   RxPlan plan;
   RxResult result = TUNING_ExactPlan(channel.frequency_hz, channel.rx,
-      RADIO_GetReceiverCapabilities(), &plan);
+      RECEIVER_Capabilities(), &plan);
   if (result != RX_OK) {
     notify(result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
     return;
@@ -861,7 +857,7 @@ static void switchSource(void) {
   if (stored->source == RADIO_SOURCE_CHANNEL) {
     RxPlan plan;
     RxResult result = TUNING_ExactPlan(stored->current.frequency_hz,
-        stored->current.parameters, RADIO_GetReceiverCapabilities(), &plan);
+        stored->current.parameters, RECEIVER_Capabilities(), &plan);
     if (result != RX_OK) {
       notify(result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
       return;
@@ -898,7 +894,7 @@ static void switchSlot(void) {
   }
   RxPlan plan;
   RxResult planned = TUNING_ExactPlan(next.current.frequency_hz,
-      next.current.parameters, RADIO_GetReceiverCapabilities(), &plan);
+      next.current.parameters, RECEIVER_Capabilities(), &plan);
   if (planned != RX_OK) {
     notify(planned == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
     return;
@@ -933,7 +929,7 @@ static void nextMode(void) {
   if (!requireVfoSource()) return;
   RadioParameters candidate = activeSlot.current.parameters;
   if (RADIO_MODEL_Adjust(activeSlot.current.frequency_hz, &candidate,
-                         RADIO_GetReceiverCapabilities(), RADIO_FIELD_MODE, true))
+                         RECEIVER_Capabilities(), RADIO_FIELD_MODE, true))
     request(activeSlot.current.frequency_hz, candidate);
   else
     notify("No other mode");
@@ -1026,7 +1022,7 @@ static void changeValue(bool up) {
   }
   RadioParameters candidate = activeSlot.current.parameters;
   if (RADIO_MODEL_Adjust(activeSlot.current.frequency_hz, &candidate,
-                         RADIO_GetReceiverCapabilities(), (RadioParameterField)menuIndex, up))
+                         RECEIVER_Capabilities(), (RadioParameterField)menuIndex, up))
     request(activeSlot.current.frequency_hz, candidate);
   else if (menuIndex == MENU_RX_BANDWIDTH && candidate.mode == RX_WFM)
     notify("Fixed bandwidth");
@@ -1235,7 +1231,7 @@ bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
   else if (key == KEY_MENU)
     inMenu = true;
   else if (key == KEY_EXIT)
-    gMonitorMode = false;
+    ; // Consumed: the main screen has nothing to close.
   else if (key <= KEY_9) {
     if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
       notify("Switch to VFO first");
@@ -1343,7 +1339,7 @@ static void buildCardView(uint8_t id, const char *inputText,
       selected && transmitter.mode==RADIO_FAULT ? UI_RADIO_CARD_FAULT :
       selected && seek.active ? UI_RADIO_CARD_SEEKING :
       receivingSlot==id && WATCH_IsProbing(&watcher) ? UI_RADIO_CARD_WATCHING :
-      receiving && vfo->is_open ? UI_RADIO_CARD_RECEIVING :
+      receiving && gReceiver.open ? UI_RADIO_CARD_RECEIVING :
       (channelMode && !effectiveOk) || (selected && !runtime.active) ? UI_RADIO_CARD_UNAVAILABLE : UI_RADIO_CARD_IDLE,
     .power_label = tx->power == TX_POWER_HIGH ? "HIGH" :
                    tx->power == TX_POWER_MEDIUM ? "MID" : "LOW",

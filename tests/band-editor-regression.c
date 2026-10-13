@@ -8,7 +8,7 @@ static bool saveWorks = true;
 static unsigned saves, exits;
 static ReceiverCapabilities capabilities = {true, false, true};
 bool DEVICE_SaveNow(void) { ++saves; return saveWorks; }
-ReceiverCapabilities RADIO_GetReceiverCapabilities(void) { return capabilities; }
+ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
 bool APPS_exit(void) { ++exits; return true; }
 static void press(KEY_Code_t key) { assert(BANDS_key(key, KEY_RELEASED)); }
 

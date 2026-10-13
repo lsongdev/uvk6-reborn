@@ -6,7 +6,7 @@
 #include "core/battery.h"
 #include "core/misc.h"
 #include "core/measurements.h"
-#include "core/radio.h"
+#include "core/receiver.h"
 #include "hal/tx-device.h"
 #include "ui/menu.h"
 #include "ui/graphics.h"
@@ -18,14 +18,14 @@ static bool resetConfirm;
 static uint8_t oldOpen, oldClose, oldBoundary;
 
 static void getValue(const MenuItem *item, char *out, uint8_t size) {
-  if (item->setting == SETTING_SI4732POWEROFF && !RADIO_GetReceiverCapabilities().si) {
+  if (item->setting == SETTING_SI4732POWEROFF && !RECEIVER_Capabilities().si) {
     snprintf(out,size,"No SI"); return;
   }
   SETTINGS_GetValueText(item->setting,out,size);
 }
 static void changeValue(const MenuItem *item, bool up) {
   notice = NULL;
-  if (item->setting == SETTING_SI4732POWEROFF && !RADIO_GetReceiverCapabilities().si) {
+  if (item->setting == SETTING_SI4732POWEROFF && !RECEIVER_Capabilities().si) {
     notice = "SI4732 missing"; return;
   }
   SETTINGS_IncDecValue(item->setting,up);
@@ -121,7 +121,7 @@ static bool resetPreferences(const MenuItem *item, KEY_Code_t key, Key_State_t s
   resetConfirm = true; notice = NULL; return true;
 }
 static void getInfo(const MenuItem *item, char *out, uint8_t size) {
-  ReceiverCapabilities capabilities = RADIO_GetReceiverCapabilities();
+  ReceiverCapabilities capabilities = RECEIVER_Capabilities();
   switch (item->setting) {
   case 0:
 #ifdef GIT_HASH

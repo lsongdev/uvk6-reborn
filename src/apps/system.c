@@ -10,7 +10,7 @@
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
 #include "core/battery.h"
 #include "ui/menu.h"
-#include "core/radio.h"
+#include "core/receiver.h"
 #include "hal/scheduler.h"
 #include "core/settings.h"
 #include "ui/graphics.h"
@@ -164,8 +164,8 @@ void SYS_Main() {
     RADIO_APP_TxSafetyUpdate();
     SETTINGS_UpdateSave();
 
-    if (gRadioState && RADIO_APP_isReceiving() && !RADIO_APP_isWatching() && Now()-radioTimer >= SQL_DELAY) {
-      RADIO_UpdateSquelch(gRadioState);
+    if (RADIO_APP_isReceiving() && !RADIO_APP_isWatching() && Now()-radioTimer >= SQL_DELAY) {
+      RECEIVER_UpdateSquelch();
       radioTimer = Now();
     }
 

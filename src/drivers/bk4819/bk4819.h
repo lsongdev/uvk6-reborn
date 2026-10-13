@@ -34,16 +34,6 @@ enum BK4819_AF_Type_t {
 };
 
 typedef enum {
-  MOD_FM,
-  MOD_AM,
-  MOD_LSB,
-  MOD_USB,
-  MOD_BYP,
-  MOD_RAW,
-  MOD_WFM,
-} ModulationType;
-
-typedef enum {
   XTAL_0_13M,
   XTAL_1_19_2M,
   XTAL_2_26M,

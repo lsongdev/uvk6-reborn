@@ -1,6 +1,7 @@
 #include "core/device-config.h"
 #include "hal/rx-device.h"
 #include "hal/audio.h"
+#include "hal/system.h"
 #include "drivers/bk1080/bk1080.h"
 #include "drivers/bk4819/bk4819.h"
 #include "drivers/si473x/si473x.h"
@@ -27,7 +28,7 @@ bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo) {
 }
 
 // Silence the previous RF chip when moving to another receiver. The audio
-// output is already muted by RADIO_StopReception() before this entry point.
+// output is already muted by RECEIVER_Mute() before this entry point.
 static void leave(RxDevice device) {
   switch (device) {
   case RX_DEVICE_BK:
@@ -216,6 +217,53 @@ void RX_DEVICE_StopChip(RxDevice device) {
   if (device==RX_DEVICE_BK) RX_DEVICE_InvalidateBk();
   leave(device);
 }
+void RX_DEVICE_SetAudio(RxDevice device, bool open) {
+  bool bk = device == RX_DEVICE_BK;
+  if (open) {
+    if (bk) {
+      BK4819_ToggleAFDAC(true);
+      BK4819_ToggleAFBit(true);
+    }
+    SYS_DelayMs(8);
+    AUDIO_ToggleSpeaker(true);
+  } else {
+    AUDIO_ToggleSpeaker(false);
+    SYS_DelayMs(8);
+    if (bk) {
+      BK4819_ToggleAFDAC(false);
+      BK4819_ToggleAFBit(false);
+    }
+  }
+}
+
+bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open) {
+  *rssi = 0;
+  *open = false;
+  uint8_t snr;
+  switch (plan->device) {
+  case RX_DEVICE_BK: {
+    *rssi = BK4819_GetRSSI();
+    RadioTone tone = plan->parameters.rx_tone;
+    *open = BK4819_IsSquelchOpen() &&
+            (!tone || BK4819_CssIsDetected(TONE_Type(tone) != CODE_TYPE_CONTINUOUS_TONE));
+    return true;
+  }
+  case RX_DEVICE_SI:
+    if (!RSQ_GET()) return false;
+    *rssi = rsqStatus.resp.RSSI;
+    snr = rsqStatus.resp.SNR;
+    break;
+  case RX_DEVICE_BROADCAST:
+    *rssi = BK1080_GetRSSI();
+    snr = BK1080_GetSNR();
+    break;
+  default:
+    return false;
+  }
+  *open = !plan->parameters.squelch || snr > plan->parameters.squelch;
+  return true;
+}
+
 bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open) {
   // Break before make: never mix audio from two chips. Receiver DSP stays on.
   AUDIO_ToggleSpeaker(false);

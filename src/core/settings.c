@@ -13,7 +13,6 @@
 
 // Only retired driver-local controls remain here. Persisted preferences have
 // exactly one runtime owner: gDeviceConfig.preferences.
-Settings gSettings = {0};
 uint8_t BL_TIME_VALUES[7] = {0, 5, 10, 20, 60, 120, 255};
 const char *BL_SQL_MODE_NAMES[3] = {"Off", "Timed", "Receiving"};
 const char *EEPROM_TYPE_NAMES[7] = {"64 ?", "128", "256", "512", "1024", "M02?", "4Mb?"};
@@ -147,9 +146,7 @@ bool SETTINGS_ResetPreferences(void) {
 }
 void SETTINGS_Save(void) { (void)DEVICE_SaveNow(); }
 bool SETTINGS_Load(void) {
-  bool loaded = DEVICE_Load();
-  gSettings.eepromType = EEPROM_DetectType();
-  return loaded;
+  return DEVICE_Load();
 }
 void SETTINGS_UpdateSave(void) { DEVICE_Update(); }
 uint32_t SETTINGS_GetFilterBound(void) {

@@ -10,6 +10,11 @@
 bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous);
 bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan); // Configure muted, keep other chip alive.
 bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open);
+// Speaker gate for the tuned chip: break-before-make with a settle delay.
+void RX_DEVICE_SetAudio(RxDevice device, bool open);
+// One RSSI/squelch sample of the tuned chip. Squelch includes the NFM tone.
+// Returns false when the chip did not answer (then *open is false).
+bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open);
 void RX_DEVICE_StopChip(RxDevice device);
 bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found);
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo);

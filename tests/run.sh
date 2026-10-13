@@ -17,7 +17,7 @@ esac
   -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
   -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/radio-regression.c tests/number-input-regression.c src/ui/number-input.c \
+  tests/receiver-regression.c tests/number-input-regression.c src/ui/number-input.c \
   src/core/radio-model.c src/external/printf/printf.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "$test_binary" --bk1080

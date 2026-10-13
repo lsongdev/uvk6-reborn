@@ -2,7 +2,7 @@
 #define APPS_H
 
 #include "hal/keyboard.h"
-#include "core/radio.h"
+#include "core/receiver.h"
 
 #define RUN_APPS_COUNT 2
 

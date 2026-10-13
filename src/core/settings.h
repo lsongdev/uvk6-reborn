@@ -4,10 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define getsize(V) char (*__ #V)(void)[sizeof(V)] = 1;
-
-#define SCANLIST_ALL 0
-
 typedef enum {
   SETTING_BACKLIGHT,
   SETTING_BRIGHTNESS_H,
@@ -36,19 +32,6 @@ typedef enum {
 } BacklightOnSquelchMode;
 
 typedef enum {
-  CH_DISPLAY_MODE_NF,
-  CH_DISPLAY_MODE_F,
-  CH_DISPLAY_MODE_N,
-} CHDisplayMode;
-
-typedef enum {
-  MW_OFF,
-  MW_ON,
-  MW_SWITCH,
-  MW_EXTRA,
-} MultiwatchType;
-
-typedef enum {
   BAT_1600,
   BAT_2200,
   BAT_3500,
@@ -61,22 +44,6 @@ typedef enum {
 } BatteryStyle;
 
 typedef enum {
-  SCAN_TO_0,
-  SCAN_TO_100ms,
-  SCAN_TO_250ms,
-  SCAN_TO_500ms,
-  SCAN_TO_1s,
-  SCAN_TO_2s,
-  SCAN_TO_5s,
-  SCAN_TO_10s,
-  SCAN_TO_30s,
-  SCAN_TO_1min,
-  SCAN_TO_2min,
-  SCAN_TO_5min,
-  SCAN_TO_NONE,
-} ScanTimeout;
-
-typedef enum {
   EEPROM_BL24C64,   //
   EEPROM_BL24C128,  //
   EEPROM_BL24C256,  //
@@ -87,81 +54,14 @@ typedef enum {
   EEPROM_UNKNOWN,
 } EEPROMType;
 
-extern uint32_t SCAN_TIMEOUTS[15];
-extern char *SCAN_TIMEOUT_NAMES[15];
 extern const char *EEPROM_TYPE_NAMES[7];
 extern const uint32_t EEPROM_SIZES[7];
 extern const uint16_t PAGE_SIZES[7];
-extern const char *MW_NAMES[4];
 
-typedef struct {
-  uint32_t upconverter : 27;
-  uint8_t checkbyte : 5;
+#define PATCH_SIZE 8840 // Hawk5 SSB patch, verified by CRC before use.
 
-  uint16_t currentScanlist;
-  uint8_t mainApp : 8;
-
-  uint8_t reserved3 : 4;
-  uint8_t batsave : 4;
-
-  uint8_t vox : 4;
-  uint8_t txTime : 4;
-
-  uint8_t fcTime : 2;
-  uint8_t reserved5 : 2;
-  uint8_t iAmPro : 1;
-  uint8_t roger : 3;
-
-  uint8_t scanmode : 2;
-  CHDisplayMode chDisplayMode : 2;
-  bool showLevelInVFO : 1;
-
-  uint8_t busyChannelTxLock : 1;
-  uint8_t ste : 1;
-  uint8_t repeaterSte : 1;
-  uint8_t dtmfdecode : 1;
-
-  EEPROMType eepromType : 3;
-
-  ScanTimeout sqClosedTimeout : 4;
-  ScanTimeout sqOpenedTimeout : 4;
-
-  bool noListen : 1;
-  uint8_t mWatch : 2;
-
-  uint8_t freqCorrection;
-
-  bool toneLocal : 1;
-
-  uint8_t activeVFO : 2;
-  bool skipGarbageFrequencies : 1;
-
-} __attribute__((packed)) Settings;
-// getsize(Settings)
-
-#define SETTINGS_MAGIC_OFFSET (0)
-#define SETTINGS_OFFSET (4)
-#define SETTINGS_SIZE sizeof(Settings)
-
-#define CH_SIZE sizeof(CH)
-#define CHANNELS_OFFSET (SETTINGS_OFFSET + SETTINGS_SIZE)
-
-#define PATCH1_SIZE 15832
-#define PATCH3_SIZE 8840
-
-#define PATCH_SIZE PATCH3_SIZE
-
-// settings
-// VFOs
-// channel 1
-// channel 2
-
-extern Settings gSettings;
 extern uint8_t BL_TIME_VALUES[7];
 extern const char *BL_SQL_MODE_NAMES[3];
-extern const char *CH_DISPLAY_MODE_NAMES[3];
-extern const char *rogerNames[2];
-extern const char *FC_TIME_NAMES[4];
 
 void SETTINGS_Save();
 bool SETTINGS_Load(void);
