@@ -136,7 +136,7 @@ bool RADIO_CheckSquelch(RadioReceiver *ctx) {
   return ctx->squelch == 0 || RADIO_GetSNR(ctx) > ctx->squelch;
 }
 
-static void RADIO_UpdateMeasurement(RadioState *state) {
+void RADIO_Measure(RadioState *state) {
   RadioReceiver *receiver = &state->context;
   state->msm.f = receiver->frequency;
   bool valid = true;
@@ -154,7 +154,7 @@ static void RADIO_UpdateMeasurement(RadioState *state) {
 }
 void RADIO_UpdateSquelch(RadioState *state) {
   if (!state) return;
-  RADIO_UpdateMeasurement(state);
+  RADIO_Measure(state);
   if (state->msm.open != state->is_open) {
     state->is_open = state->msm.open;
     RADIO_SetAudioOpen(state->is_open);
@@ -182,6 +182,36 @@ ReceiverCapabilities RADIO_GetReceiverCapabilities(void) {
   return capabilities;
 }
 
+static void adoptReceiver(const RxPlan *plan, uint16_t bandwidth) {
+  static const ModulationType modes[RX_MODE_COUNT] = {
+      MOD_FM, MOD_WFM, MOD_AM, MOD_LSB, MOD_USB
+  };
+  ctx->radio_type = plan->device==RX_DEVICE_BK ? RADIO_BK4819 :
+                    plan->device==RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
+  ctx->modulation = modes[plan->parameters.mode];
+  ctx->frequency = plan->frequency_hz / 10u;
+  ctx->bandwidth = bandwidth;
+  ctx->squelch = plan->parameters.squelch;
+  ctx->rx_tone = plan->parameters.rx_tone;
+  // Samples belong to a tuned RF plan; never carry RSSI across VFO handoffs.
+  gRadioState->msm = (Measurement){0};
+  gRedrawScreen = true;
+}
+
+bool RADIO_SelectPreparedRxPlan(const RxPlan *plan, uint8_t devices, bool open) {
+  if (!plan || !gRadioState || (unsigned)plan->parameters.mode>=RX_MODE_COUNT) return false;
+  uint16_t bandwidth=0;
+  bool ssb=plan->parameters.mode==RX_LSB || plan->parameters.mode==RX_USB;
+  if (plan->parameters.mode!=RX_WFM &&
+      !(plan->device==RX_DEVICE_BK ? BK4819_BandwidthFromHz(plan->parameters.bandwidth_hz,&bandwidth) :
+        SI47XX_BandwidthFromHz(plan->parameters.bandwidth_hz,ssb,&bandwidth))) return false;
+  if (!RX_DEVICE_SelectAudio(devices,plan->device,open)) return false;
+  adoptReceiver(plan,bandwidth);
+  vfo->is_open=vfo->msm.open=open;
+  LED_SetGreen(open);BACKLIGHT_SetReception(open);
+  return true;
+}
+
 // Hardware is configured only through RX_DEVICE_Apply. The temporary
 // RadioReceiver mirrors successfully applied plans for measurements and UI.
 bool RADIO_ApplyRxPlan(RadioReceiver *context, const RxPlan *plan) {
@@ -196,8 +226,6 @@ bool RADIO_ApplyRxPlan(RadioReceiver *context, const RxPlan *plan) {
       resolved.frequency_hz != plan->frequency_hz)
     return false;
 
-  Radio next = plan->device == RX_DEVICE_BK ? RADIO_BK4819 :
-               plan->device == RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
   RxDevice old = context->radio_type == RADIO_BK4819 ? RX_DEVICE_BK :
                  context->radio_type == RADIO_SI4732 ? RX_DEVICE_SI :
                  RX_DEVICE_BROADCAST;
@@ -216,17 +244,6 @@ bool RADIO_ApplyRxPlan(RadioReceiver *context, const RxPlan *plan) {
   if (!RX_DEVICE_Apply(plan, old))
     return false;
 
-  static const ModulationType modes[RX_MODE_COUNT] = {
-      MOD_FM, MOD_WFM, MOD_AM, MOD_LSB, MOD_USB
-  };
-  context->radio_type = next;
-  context->modulation = modes[plan->parameters.mode];
-  context->frequency = plan->frequency_hz / 10u;
-  context->bandwidth = bandwidth;
-  context->squelch = plan->parameters.squelch;
-  context->rx_tone = plan->parameters.rx_tone;
-  // Samples belong to a tuned RF plan; never carry RSSI across VFO handoffs.
-  gRadioState->msm = (Measurement){0};
-  gRedrawScreen = true;
+  adoptReceiver(plan,bandwidth);
   return true;
 }

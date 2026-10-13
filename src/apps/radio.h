@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 bool RADIO_APP_isReceiving(void);
+bool RADIO_APP_isWatching(void);
 bool RADIO_APP_ApplyRxSettings(void);
 void RADIO_APP_init();
 void RADIO_APP_deinit(void);

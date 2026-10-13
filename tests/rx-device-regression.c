@@ -14,6 +14,12 @@ static unsigned scanStarts, scanStops, modeInvalidations;
 static uint32_t scanRaw;
 static bool scanReady;
 static bool rxPinEnabled;
+static bool speakerOn, bkDac;
+static uint8_t siVolume;
+void AUDIO_ToggleSpeaker(bool on) { speakerOn=on; }
+void BK4819_SetAF(BK4819_AF_Type_t af) { (void)af; }
+void BK4819_ToggleAFDAC(bool on) { bkDac=on; }
+
 void BK4819_StopScan(void) { ++scanStops; BK4819_Idle(); }
 void BK4819_InvalidateRxMode(void) { ++modeInvalidations; }
 void BK4819_EnableFrequencyScanEx(FreqScanTime time) {
@@ -74,7 +80,7 @@ SiSeekResult SI47XX_SeekPoll(uint32_t *frequency_hz) {
 void SI47XX_SeekCancel(void) {}
 void SI47XX_PowerDown(void) { ++siPowerDowns; }
 bool SI47XX_SetVolume(uint8_t v) {
-  if (!v) ++siMuted; return siVolumeOk;
+  if (!v) ++siMuted; siVolume=v;return siVolumeOk;
 }
 uint16_t BK1080_ReadRegister(BK1080_Register_t reg) {
   (void)reg; return 0x003f;
@@ -206,6 +212,25 @@ int main(void) {
   RX_DEVICE_CaptureStop();RX_DEVICE_CaptureStop();
   assert(RX_DEVICE_Apply(&watch,RX_DEVICE_BK));
   assert(bkModes==modesBefore+1 && bkTunes==tunesBefore+1 && scanStops>=4);
+  // Concurrent prepare must not idle the other receiver; routing must not tune.
+  siVolumeOk=true;rsqOK=true;
+  unsigned beforeBkIdle=bkIdle;
+  native.parameters.squelch=0;
+  assert(RX_DEVICE_ApplyConcurrent(&native) && siVolume==0 && bkIdle==beforeBkIdle);
+  unsigned beforeSiMuted=siMuted;
+  assert(RX_DEVICE_ApplyConcurrent(&watch) && !bkDac && siMuted==beforeSiMuted);
+  unsigned beforeBkTunes=bkTunes,beforeSiTunes=siTunes;
+  uint8_t devices=(1u<<RX_DEVICE_BK)|(1u<<RX_DEVICE_SI);
+  assert(RX_DEVICE_SelectAudio(devices,RX_DEVICE_SI,true));
+  assert(speakerOn && siVolume==63 && !bkDac);
+  assert(RX_DEVICE_SelectAudio(devices,RX_DEVICE_BK,true));
+  assert(speakerOn && siVolume==0 && bkDac);
+  assert(bkTunes==beforeBkTunes && siTunes==beforeSiTunes);
+  assert(RX_DEVICE_SelectAudio(devices,RX_DEVICE_BK,false));
+  assert(!speakerOn && !bkDac && !siVolume);
+  siVolumeOk=false;
+  assert(!RX_DEVICE_SelectAudio(devices,RX_DEVICE_BK,true) && !speakerOn && !bkDac);
+  siVolumeOk=true;
   rxPinEnabled=false;
   modesBefore=bkModes;tunesBefore=bkTunes;
   RX_DEVICE_InvalidateBk();

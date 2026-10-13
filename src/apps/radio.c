@@ -566,6 +566,8 @@ void RADIO_APP_init(void) {
   if (invalidSavedChannel) notify("Channel unavailable");
 }
 
+bool RADIO_APP_isWatching(void) { return watcher.phase!=WATCH_OFF; }
+
 bool RADIO_APP_isReceiving(void) {
   return initialized && receivingSlot != UINT8_MAX && !WATCH_IsProbing(&watcher) && runtime.active && !seek.active && capturePhase!=FC_DETECT &&
          transmitter.mode == RADIO_RX;
@@ -630,14 +632,24 @@ void RADIO_APP_update(void) {
   if (capturePhase!=FC_OFF) { captureUpdate(); return; }
   seekUpdate();
   watchUpdate();
-  bool rdsEnabled = RADIO_APP_isReceiving() && runtime.active && runtime.current.device == RX_DEVICE_SI &&
-                    runtime.current.parameters.mode == RX_WFM;
+  uint8_t rdsSlot=receivingSlot;
+  const RxPlan *rdsPlan=&runtime.current;
+  bool rdsEnabled=RADIO_APP_isReceiving() && runtime.active &&
+    rdsPlan->device==RX_DEVICE_SI && rdsPlan->parameters.mode==RX_WFM;
+  if (watcher.parallel && watcher.phase!=WATCH_OFF) {
+    rdsEnabled=false;
+    for (uint8_t i=0; i<watcher.count; ++i)
+      if ((watcher.prepared_mask&(1u<<i)) && watcher.targets[i].plan.device==RX_DEVICE_SI &&
+          watcher.targets[i].plan.parameters.mode==RX_WFM) {
+        rdsSlot=watcher.targets[i].id;rdsPlan=&watcher.targets[i].plan;rdsEnabled=true;
+      }
+  }
   bool textExpired = rdsEnabled && now-rds.last_group >= 15000u;
   if (RDS_ReceiverUpdate(&rds, now, rdsEnabled, readRds, NULL) || textExpired) {
-    if (receivingSlot < RADIO_SLOT_CAPACITY && rdsEnabled) {
-      labels[receivingSlot].frequency_hz = runtime.current.frequency_hz;
-      memcpy(labels[receivingSlot].ps, rds.decoder.ps, sizeof(rds.decoder.ps));
-      memcpy(labels[receivingSlot].text, rds.decoder.text, sizeof(rds.decoder.text));
+    if (rdsSlot < RADIO_SLOT_CAPACITY && rdsEnabled) {
+      labels[rdsSlot].frequency_hz = rdsPlan->frequency_hz;
+      memcpy(labels[rdsSlot].ps, rds.decoder.ps, sizeof(rds.decoder.ps));
+      memcpy(labels[rdsSlot].text, rds.decoder.text, sizeof(rds.decoder.text));
     }
     gRedrawScreen = true;
   }
@@ -660,6 +672,12 @@ static bool restorePrimary(void) {
 }
 static bool pauseWatch(void) {
   bool wasWatching=watcher.phase!=WATCH_OFF;
+  if (watcher.parallel) {
+    RADIO_StopReception();
+    for (uint8_t i=0; i<watcher.count; ++i)
+      RX_DEVICE_StopChip(watcher.targets[i].plan.device);
+    runtime.active=false;receivingSlot=UINT8_MAX;
+  }
   WATCH_Stop(&watcher);
   delayWatch();
   return !wasWatching || restorePrimary();
@@ -680,9 +698,28 @@ static void watchAudio(void *unused, bool open) {
   vfo->is_open=open; vfo->msm.open=open;
   RADIO_SetAudioOpen(open); gRedrawScreen=true;
 }
+static bool watchPrepare(void *unused, const WatchTarget *target) {
+  (void)unused;
+  if (!watcher.blocked && runtime.active && WATCH_SameReceiver(&runtime.current,&target->plan)) return true;
+  if (!RX_DEVICE_ApplyConcurrent(&target->plan)) return false;
+  if (target->plan.device==RX_DEVICE_SI) resetRds();
+  return true;
+}
+static bool watchSelect(void *unused, const WatchTarget *target, bool open) {
+  (void)unused;
+  uint8_t devices=0;
+  for (uint8_t i=0; i<watcher.count; ++i) devices |= 1u<<watcher.targets[i].plan.device;
+  if (!RADIO_SelectPreparedRxPlan(&target->plan,devices,open)) {
+    vfo->is_open=false;runtime.active=false;receivingSlot=UINT8_MAX;
+    gRedrawScreen=true;return false;
+  }
+  runtime.current=target->plan;runtime.active=true;receivingSlot=target->id;
+  gRedrawScreen=true;return true;
+}
 static uint32_t watchNow(void *unused) { (void)unused; return Now(); }
 static const WatchOperations watchOperations={
-  .tune=watchTune,.signal=watchSignal,.audio=watchAudio,.now=watchNow
+  .tune=watchTune,.signal=watchSignal,.audio=watchAudio,
+  .prepare=watchPrepare,.select=watchSelect,.now=watchNow
 };
 static void watchUpdate(void) {
   if (capturePhase!=FC_OFF || number.active || CHANNEL_MANAGER_Active() || inMenu || confirming || seek.active || functionPending ||
@@ -717,7 +754,7 @@ static void watchUpdate(void) {
       if (!WATCH_Eligible(&plan)) { watchStatus="DW: SSB off"; continue; }
       targets[count++]=(WatchTarget){id,plan};
     }
-    if (!WATCH_Start(&watcher,targets,count)) {
+    if (!WATCH_Start(&watcher,targets,count,selectedSlot)) {
       if (count==2) watchStatus="DW: same channel";
       watchDelay=true; watchResumeAt=Now()+WATCH_RETRY_MS; return;
     }
@@ -725,6 +762,10 @@ static void watchUpdate(void) {
   watchStatus=NULL;
   bool wasRetrying=watcher.phase==WATCH_RETRY;
   WATCH_Update(&watcher,Now(),&watchOperations);
+  if (watcher.phase==WATCH_HOLD && watcher.signal && vfo) {
+    RADIO_Measure(vfo);
+    vfo->msm.open=vfo->is_open;
+  }
   // If all candidates fail, listen to the primary during bounded retry delay.
   if (watcher.phase==WATCH_RETRY && !wasRetrying) (void)restorePrimary();
 }

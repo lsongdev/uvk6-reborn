@@ -30,6 +30,8 @@ void RADIO_InitState(RadioState *state);
 void RADIO_InitHardware(RadioState *state);
 ReceiverCapabilities RADIO_GetReceiverCapabilities(void);
 bool RADIO_ApplyRxPlan(RadioReceiver *receiver, const RxPlan *plan);
+bool RADIO_SelectPreparedRxPlan(const RxPlan *plan, uint8_t devices, bool open);
+void RADIO_Measure(RadioState *state);
 void RADIO_SetAudioOpen(bool open);
 void RADIO_StopReception(void);
 void RADIO_UpdateSquelch(RadioState *state);

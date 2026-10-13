@@ -138,10 +138,26 @@ bool RADIO_ApplyRxPlan(RadioReceiver *context, const RxPlan *plan) {
                       : plan->device == RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
   return true;
 }
+static unsigned concurrentPrepares, audioSelects, chipStops;
+bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan) {
+  ++concurrentPrepares;
+  return !failApply && (!failFrequency || plan->frequency_hz!=failFrequency);
+}
+void RX_DEVICE_StopChip(RxDevice device) { (void)device;++chipStops; }
+bool RADIO_SelectPreparedRxPlan(const RxPlan *plan, uint8_t devices, bool open) {
+  assert(devices & (1u<<plan->device));++audioSelects;
+  ctx->frequency=plan->frequency_hz/10;
+  ctx->radio_type=plan->device==RX_DEVICE_BK ? RADIO_BK4819 :
+                  plan->device==RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
+  vfo->is_open=vfo->msm.open=open;
+  return true;
+}
+void RADIO_Measure(RadioState *state) { (void)state; }
 static uint32_t watchSignalFrequency;
 static bool watchSignalOK=true;
+static uint32_t watchSecondSignalFrequency;
 bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found) {
-  *found=plan->frequency_hz==watchSignalFrequency; return watchSignalOK;
+  *found=plan->frequency_hz==watchSignalFrequency || plan->frequency_hz==watchSecondSignalFrequency; return watchSignalOK;
 }
 void RADIO_SetAudioOpen(bool open) { (void)open; }
 void RADIO_StopReception(void) {
@@ -190,7 +206,8 @@ static void setup(uint32_t frequency, RadioParameters values) {
   clockNow=100;
   rdsReads=rdsClears=rdsIndex=0;
   rdsAvailable=false;
-  watchSignalFrequency=0;watchSignalOK=true;
+  watchSignalFrequency=watchSecondSignalFrequency=0;watchSignalOK=true;
+  concurrentPrepares=audioSelects=chipStops=0;
   initialized = inMenu = confirming = false;
   menuIndex = 0;
   WATCH_Stop(&watcher); watchDelay=false; watchResumeAt=0;
@@ -794,6 +811,53 @@ int main(void) {
   setup(145500000,fm);menuIndex=MENU_RX_WATCH;press(KEY_MENU);press(KEY_MENU);
   assert(!gDeviceConfig.radio.slots[0].watch);press(KEY_EXIT);press(KEY_UP);
   assert(!gDeviceConfig.radio.slots[0].watch);
+  // Separate chips keep receiving; audio selection never retunes either chip.
+  setup(95900000,(RadioParameters){RX_WFM,100000,0,0,0});
+  gDeviceConfig.radio.watch_enabled=true;watchSignalFrequency=95900000;
+  watchSecondSignalFrequency=438500000;
+  unsigned broadcastSaves=saveRequests;
+  for(unsigned i=0;i<15;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(watcher.parallel && watcher.phase==WATCH_HOLD && receivingSlot==0 && vfo->is_open);
+  assert(concurrentPrepares==1); // SI already tuned; only BK needs preparation.
+  unsigned broadcastApplies=applied, broadcastSelects=audioSelects;
+  for(unsigned i=0;i<5;++i) { clockNow+=3000;RADIO_APP_update(); }
+  assert(receivingSlot==0 && vfo->is_open && applied==broadcastApplies);
+  assert(audioSelects==broadcastSelects && concurrentPrepares==1);
+  assert(selectedSlot==0 && saveRequests==broadcastSaves);
+  // Select B: idle B permits A playback; B's signal then takes audio only.
+  watchSecondSignalFrequency=0;
+  press(KEY_F);press(KEY_2);assert(selectedSlot==1 && chipStops==2);
+  clockNow+=2000;
+  for(unsigned i=0;i<15;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(watcher.phase==WATCH_HOLD && receivingSlot==0 && vfo->is_open);
+  unsigned parallelApplies=applied, parallelPrepares=concurrentPrepares;
+  watchSecondSignalFrequency=438500000;
+  for(unsigned i=0;i<4;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(receivingSlot==1 && vfo->is_open && selectedSlot==1);
+  assert(applied==parallelApplies && concurrentPrepares==parallelPrepares);
+  clockNow+=10000;RADIO_APP_update();assert(receivingSlot==1 && vfo->is_open);
+  // End of B signal: a silent one-second gap, then resume A without retuning.
+  watchSecondSignalFrequency=0;clockNow+=50;RADIO_APP_update();assert(!vfo->is_open);
+  clockNow+=WATCH_HANG_MS;RADIO_APP_update();assert(receivingSlot==0 && vfo->is_open);
+  assert(applied==parallelApplies && concurrentPrepares==parallelPrepares);
+
+  // RDS remains live on SI while selected BK owns the speaker.
+  setup(438500000,fm);
+  assert(RADIO_STATE_Set(&gDeviceConfig.radio,1,100000000,
+      (RadioParameters){RX_WFM,100000,0,0,0}));
+  gDeviceConfig.radio.watch_enabled=true;watchSignalFrequency=438500000;
+  watchSecondSignalFrequency=100000000;rdsAvailable=true;
+  unsigned parallelSaves=saveRequests;
+  for(unsigned i=0;i<40;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(receivingSlot==0 && vfo->is_open && labels[1].ps[0] && !labels[0].ps[0]);
+  assert(rdsReads && rdsClears);
+  assert(saveRequests==parallelSaves && concurrentPrepares==1);
+  // PTT stops both background receivers and restores the selected RX plan.
+  txFakeVerified=true;activeSlot.tx.enabled=gDeviceConfig.radio.slots[0].tx.enabled=true;
+  assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED) && transmitter.mode==RADIO_TX);
+  assert(chipStops==2 && watcher.phase==WATCH_OFF && transmitter.previous_rx.frequency_hz==438500000);
+  RADIO_APP_PttRelease();assert(receivingSlot==0 && runtime.current.frequency_hz==438500000);
+
   // Watch RF visits never commit RX frequencies, selected index or EEPROM saves.
   setup(145500000,fm);gDeviceConfig.radio.watch_enabled=true;
   watchSignalFrequency=438500000;unsigned watchSaves=saveRequests;

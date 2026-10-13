@@ -8,6 +8,9 @@
 // Apply an already validated receive plan once. This is the sole hardware
 // tuning path; callers own the user state and failed-plan recovery.
 bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous);
+bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan); // Configure muted, keep other chip alive.
+bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open);
+void RX_DEVICE_StopChip(RxDevice device);
 bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found);
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo);
 

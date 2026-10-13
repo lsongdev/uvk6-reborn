@@ -168,7 +168,7 @@ void SYS_Main() {
     RADIO_APP_TxSafetyUpdate();
     SETTINGS_UpdateSave();
 
-    if (gRadioState && RADIO_APP_isReceiving() && Now()-radioTimer >= SQL_DELAY) {
+    if (gRadioState && RADIO_APP_isReceiving() && !RADIO_APP_isWatching() && Now()-radioTimer >= SQL_DELAY) {
       RADIO_UpdateSquelch(gRadioState);
       radioTimer = Now();
     }

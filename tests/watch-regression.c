@@ -19,22 +19,22 @@ static uint32_t clockNow(void *unused) { (void)unused; return now; }
 static const WatchOperations ops={.tune=tune,.signal=signal,.audio=audio,.now=clockNow};
 static WatchTarget pair[]={
   {0,{RX_DEVICE_BK,145500000,{RX_NFM,12500,12000,4,0}}},
-  {1,{RX_DEVICE_SI,100000000,{RX_WFM,100000,0,0,0}}}
+  {1,{RX_DEVICE_BK,438500000,{RX_NFM,12500,12000,4,0}}}
 };
 static void tick(WatchRuntime *r, uint32_t elapsed) { now+=elapsed; WATCH_Update(r,now,&ops); }
 int main(void) {
   WatchRuntime r={0};
-  assert(!WATCH_Start(&r,pair,0) && !WATCH_Start(&r,pair,1));
-  assert(!WATCH_Start(&r,pair,RADIO_WATCH_LIMIT+1));
+  assert(!WATCH_Start(&r,pair,0,UINT8_MAX) && !WATCH_Start(&r,pair,1,UINT8_MAX));
+  assert(!WATCH_Start(&r,pair,RADIO_WATCH_LIMIT+1,UINT8_MAX));
   WatchTarget duplicate[]={pair[0],pair[0]};duplicate[1].id=1;
-  assert(!WATCH_Start(&r,duplicate,2));
+  assert(!WATCH_Start(&r,duplicate,2,UINT8_MAX));
   duplicate[1].plan.parameters.step_hz=25000;
-  assert(!WATCH_Start(&r,duplicate,2)); // Step is not a distinct RF receive path.
+  assert(!WATCH_Start(&r,duplicate,2,UINT8_MAX)); // Step is not a distinct RF receive path.
   duplicate[1].plan.parameters.rx_tone=1;
-  assert(WATCH_Start(&r,duplicate,2)); // Different tone is a real discriminator.
+  assert(WATCH_Start(&r,duplicate,2,UINT8_MAX)); // Different tone is a real discriminator.
   duplicate[1].plan.parameters.mode=RX_USB;
-  assert(!WATCH_Start(&r,duplicate,2));
-  assert(WATCH_Start(&r,pair,2));
+  assert(!WATCH_Start(&r,duplicate,2,UINT8_MAX));
+  assert(WATCH_Start(&r,pair,2,UINT8_MAX));
   tuneLatency=200; tick(&r,0);
   assert(tunes==1 && tunedId==0 && r.phase==WATCH_SETTLE && !audible);
   tick(&r,179);assert(!samples); // Wait starts after the blocking tune.
@@ -46,14 +46,14 @@ int main(void) {
   // A continuous broadcaster cannot starve the other frequency indefinitely.
   tick(&r,WATCH_MAX_HOLD_MS);assert(r.phase==WATCH_TUNE && !audible);
   tick(&r,0);assert(tunedId==1 && tunes==2);
-  unsigned before=samples;tick(&r,349);assert(samples==before);
+  unsigned before=samples;tick(&r,179);assert(samples==before);
   tick(&r,1);assert(r.phase==WATCH_VERIFY);
   found=false;tick(&r,WATCH_VERIFY_MS);assert(r.phase==WATCH_TUNE && !audible);
   tuneLatency=0;tick(&r,0);found=true;tick(&r,180);tick(&r,80);
   found=false;tick(&r,50);tick(&r,WATCH_HANG_MS-1);assert(r.phase==WATCH_HANG);
   tick(&r,50);assert(r.phase==WATCH_TUNE);
   // Failure retries are bounded, and no sample happens after a failed apply.
-  WATCH_Stop(&r);assert(WATCH_Start(&r,pair,2));tuneOK=false;
+  WATCH_Stop(&r);assert(WATCH_Start(&r,pair,2,UINT8_MAX));tuneOK=false;
   unsigned beforeSamples=samples;tick(&r,0);tick(&r,0);tick(&r,0);
   assert(r.phase==WATCH_RETRY && samples==beforeSamples);
   unsigned beforeTunes=tunes;tick(&r,WATCH_RETRY_MS-1);assert(tunes==beforeTunes);
@@ -62,9 +62,34 @@ int main(void) {
   assert(r.phase==WATCH_TUNE && !audible);
   // Timer rollover: stable/verify deadlines and hold duration remain valid.
   WATCH_Stop(&r);signalOK=true;now=UINT32_MAX-100;found=true;
-  assert(WATCH_Start(&r,pair,2));tick(&r,0);tick(&r,179);assert(r.phase==WATCH_SETTLE);
+  assert(WATCH_Start(&r,pair,2,UINT8_MAX));tick(&r,0);tick(&r,179);assert(r.phase==WATCH_SETTLE);
   tick(&r,1);assert(r.phase==WATCH_VERIFY);tick(&r,80);assert(r.phase==WATCH_HOLD);
   tick(&r,WATCH_MAX_HOLD_MS);assert(r.phase==WATCH_TUNE);
+  // The selected participant holds audio indefinitely, even for broadcast.
+  WATCH_Stop(&r);now=0;found=true;
+  assert(WATCH_Start(&r,pair,2,1));
+  tick(&r,0);assert(tunedId==1);
+  tick(&r,180);tick(&r,WATCH_VERIFY_MS);
+  assert(r.phase==WATCH_HOLD && audible);
+  beforeTunes=tunes;
+  for(unsigned i=0;i<10;++i) tick(&r,WATCH_MAX_HOLD_MS);
+  assert(tunes==beforeTunes && tunedId==1 && audible && r.phase==WATCH_HOLD);
+  // Signal gaps are silent; recovery within the hang interval keeps priority.
+  found=false;tick(&r,WATCH_SAMPLE_MS);assert(r.phase==WATCH_HANG && !audible);
+  found=true;tick(&r,WATCH_SAMPLE_MS);assert(r.phase==WATCH_HOLD && audible);
+  found=false;tick(&r,WATCH_SAMPLE_MS);tick(&r,WATCH_HANG_MS);
+  assert(r.phase==WATCH_TUNE && !audible);
+  tick(&r,0);assert(tunedId==0);
+  found=true;tick(&r,180);tick(&r,WATCH_VERIFY_MS);
+  assert(r.phase==WATCH_HOLD && audible);
+  // Background audio must yield periodically to check the selected participant.
+  tick(&r,WATCH_MAX_HOLD_MS);tick(&r,0);assert(tunedId==1 && !audible);
+  tick(&r,180);tick(&r,WATCH_VERIFY_MS);assert(r.phase==WATCH_HOLD && audible);
+  beforeTunes=tunes;tick(&r,10000);assert(tunes==beforeTunes && audible);
+  // Changing the selected participant changes the startup probe and priority.
+  WATCH_Stop(&r);assert(WATCH_Start(&r,pair,2,0));tick(&r,0);assert(tunedId==0);
+  tick(&r,180);tick(&r,WATCH_VERIFY_MS);tick(&r,10000);
+  assert(r.phase==WATCH_HOLD && audible && tunedId==0);
   WATCH_Stop(&r);beforeTunes=tunes;tick(&r,10000);assert(tunes==beforeTunes);
   assert(!WATCH_IsProbing(&r) && r.phase==WATCH_OFF && audioChanges>0);
   return 0;

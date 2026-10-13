@@ -1,5 +1,6 @@
 #include "core/device-config.h"
 #include "hal/rx-device.h"
+#include "hal/audio.h"
 #include "drivers/bk1080/bk1080.h"
 #include "drivers/bk4819/bk4819.h"
 #include "drivers/si473x/si473x.h"
@@ -77,7 +78,7 @@ CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
   return CAPTURE_SAMPLE;
 }
 
-bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
+static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
   if (!plan || plan->frequency_hz < RADIO_MIN_HZ ||
       plan->frequency_hz > RADIO_MAX_HZ ||
       plan->frequency_hz % 10u ||
@@ -168,6 +169,10 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
     bkSqlOpenTime = gDeviceConfig.preferences.sql_open_time;
     bkSqlCloseTime = gDeviceConfig.preferences.sql_close_time;
     bkCached = true;
+    if (!audible) {
+      BK4819_SetAF(BK4819_AF_MUTE);
+      BK4819_ToggleAFDAC(false);
+    }
     return true; // BK serial writes have no acknowledgement.
   case RX_DEVICE_SI: {
     SI47XX_MODE siMode = mode == RX_WFM ? SI47XX_FM :
@@ -179,7 +184,7 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
                   ? SI47XX_SetSsbBandwidth(bandwidth)
                   : SI47XX_SetBandwidth(bandwidth, true);
     if (ready)
-      ready = SI47XX_SetVolume(63);
+      ready = SI47XX_SetVolume(audible ? 63 : 0);
     // Previous plan may be restored by rx-runtime; don't leave an aborted
     // SI plan audible while the other receiver is being configured.
     if (!ready)
@@ -192,13 +197,46 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
       return false;
     }
     // An I2C NACK on unmute is not a successful reception.
-    if (!BK1080_Mute(false)) {
+    if (!BK1080_Mute(!audible)) {
       (void)BK1080_Mute(true);
       return false;
     }
     return true;
   }
   return false;
+}
+
+bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
+  return applyPlan(plan,previous,true);
+}
+bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan) {
+  return plan && applyPlan(plan,plan->device,false);
+}
+void RX_DEVICE_StopChip(RxDevice device) {
+  if (device==RX_DEVICE_BK) RX_DEVICE_InvalidateBk();
+  leave(device);
+}
+bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open) {
+  // Break before make: never mix audio from two chips. Receiver DSP stays on.
+  AUDIO_ToggleSpeaker(false);
+  bool ok=true;
+  if (devices&(1u<<RX_DEVICE_BK)) {
+    BK4819_SetAF(BK4819_AF_MUTE);
+    BK4819_ToggleAFDAC(false);
+  }
+  if (devices&(1u<<RX_DEVICE_SI)) ok=SI47XX_SetVolume(0) && ok;
+  if (devices&(1u<<RX_DEVICE_BROADCAST)) ok=BK1080_Mute(true) && ok;
+  if (!ok || !open) return ok;
+  if (!(devices&(1u<<selected))) return false;
+  switch(selected) {
+  case RX_DEVICE_BK:
+    BK4819_SetAF(BK4819_AF_FM);BK4819_ToggleAFDAC(true);break;
+  case RX_DEVICE_SI: ok=SI47XX_SetVolume(63);break;
+  case RX_DEVICE_BROADCAST: ok=BK1080_Mute(false);break;
+  default: return false;
+  }
+  if (ok) AUDIO_ToggleSpeaker(true);
+  return ok;
 }
 
 bool RX_DEVICE_SeekNative(const RxPlan *plan) {
