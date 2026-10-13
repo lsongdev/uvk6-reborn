@@ -57,7 +57,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='uvk6-ui-preview-') as temp:
             directory = Path(temp)
             binary = directory / 'preview'
-            sources = ['tools/ui-preview.c', 'src/ui/graphics.c', 'src/ui/components/vfo.c',
+            sources = ['tools/ui-preview.c', 'src/ui/graphics.c', 'src/ui/components/radio-card.c',
                        'src/ui/components/frequency.c',
                        'src/core/rds.c',
                        'src/ui/components/signal.c', 'src/core/radio-model.c', 'src/external/printf/printf.c']
