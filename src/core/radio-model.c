@@ -34,7 +34,7 @@ uint8_t RADIO_MODEL_BandAt(uint32_t frequency_hz) {
 
 uint8_t RADIO_MODEL_NextBand(uint8_t current) {
   for (uint8_t offset = 1; offset <= radioBandCount; ++offset) {
-    uint8_t i = (current + offset) % radioBandCount;
+    uint8_t i = (unsigned)(current + offset) % radioBandCount;
     if (radioBands[i].shortcut)
       return i;
   }
@@ -159,7 +159,7 @@ bool RADIO_MODEL_Adjust(uint32_t frequency, RadioParameters *parameters,
   if (field == RADIO_FIELD_MODE) {
     for (uint8_t offset = 1; offset < RX_MODE_COUNT; ++offset) {
       candidate = *parameters;
-      candidate.mode = (parameters->mode + (up ? offset : RX_MODE_COUNT-offset))%RX_MODE_COUNT;
+      candidate.mode = (parameters->mode + (up ? offset : RX_MODE_COUNT-offset+0u))%RX_MODE_COUNT;
       if (candidate.mode != RX_NFM) candidate.rx_tone = 0;
       uint32_t minimum = candidate.mode == RX_WFM ? (capabilities.si ? 10000 : 100000)
                        : candidate.mode == RX_AM && frequency <= 30000000 && capabilities.si ? 1000 : 10;
@@ -184,7 +184,7 @@ bool RADIO_MODEL_Adjust(uint32_t frequency, RadioParameters *parameters,
     return true;
   }
   if (field == RADIO_FIELD_SQUELCH) {
-    candidate.squelch = (candidate.squelch + (up ? 1 : 10))%11;
+    candidate.squelch = (candidate.squelch + (up ? 1u : 10u))%11u;
     *parameters = candidate;
     return true;
   }
@@ -200,7 +200,7 @@ bool RADIO_MODEL_Adjust(uint32_t frequency, RadioParameters *parameters,
   uint8_t index = 0;
   for (uint8_t i = 0; i < count; ++i) if (values[i] == current) index = i;
   for (uint8_t offset = 1; offset < count; ++offset) {
-    uint8_t i = (index + (up ? offset : count-offset))%count;
+    uint8_t i = (index + (up ? offset+0u : count-offset+0u))%count;
     if (field == RADIO_FIELD_STEP) candidate.step_hz = values[i];
     else candidate.bandwidth_hz = values[i];
     if (RADIO_MODEL_Plan(frequency, candidate, capabilities, &plan) == RX_OK) {

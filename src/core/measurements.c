@@ -6,10 +6,14 @@ long long Clamp(long long v, long long min, long long max) {
 }
 
 int ConvertDomain(int aValue, int aMin, int aMax, int bMin, int bMax) {
-  const int aRange = aMax - aMin;
-  const int bRange = bMax - bMin;
-  aValue = Clamp(aValue, aMin, aMax);
-  return ((aValue - aMin) * bRange + aRange / 2) / aRange + bMin;
+  // Unsigned math only (no signed-division helper on Cortex-M0); descending
+  // ranges reproduce the former round-half-up/truncate-toward-zero result.
+  const unsigned aRange = (unsigned)(aMax - aMin), half = aRange / 2u;
+  const unsigned pos = (unsigned)(Clamp(aValue, aMin, aMax) - aMin);
+  if (bMax >= bMin)
+    return bMin + (int)((pos * (unsigned)(bMax - bMin) + half) / aRange);
+  const unsigned down = pos * (unsigned)(bMin - bMax);
+  return bMin - (int)(down > half ? (down - half) / aRange : 0u);
 }
 
 uint8_t DBm2S(int dbm, bool isUHF) {

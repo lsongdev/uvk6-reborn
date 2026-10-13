@@ -88,8 +88,8 @@ static uint8_t interpolate(uint8_t a, uint8_t b, uint32_t hz,
                            uint32_t low, uint32_t high) {
   if (hz <= low) return a;
   if (hz >= high) return b;
-  return (int32_t)a + ((int32_t)b-a) * (int32_t)((hz-low)/10u) /
-                     (int32_t)((high-low)/10u);
+  uint32_t k = (hz-low)/10u, n = (high-low)/10u; // Descending curves allowed.
+  return b >= a ? a + (b-a)*k/n : a - (a-b)*k/n;
 }
 bool TX_DEVICE_Prepare(const TxPlan *plan) {
   TX_DEVICE_Disable();
