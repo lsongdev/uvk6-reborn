@@ -191,7 +191,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   rdsReads=rdsClears=rdsIndex=0;
   rdsAvailable=false;
   watchSignalFrequency=0;watchSignalOK=true;
-  initialized = changed = inMenu = confirming = false;
+  initialized = inMenu = confirming = false;
   menuIndex = 0;
   WATCH_Stop(&watcher); watchDelay=false; watchResumeAt=0;
   functionPending = false;
@@ -389,7 +389,8 @@ int main(void) {
   setup(438500000, fm);
   press(KEY_SIDE2);
   assert(runtime.active && !confirming && user.current.parameters.mode == RX_AM);
-  assert(user.current.frequency_hz == 438500000 && changed);
+  assert(user.current.frequency_hz == 438500000);
+  VFO_render(); assert(drawn[0].changed); // Assert the visible preset-delta marker.
   press(KEY_SIDE2);
   assert(user.current.parameters.mode == RX_NFM && user.current.frequency_hz == 438500000);
 
