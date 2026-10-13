@@ -2,8 +2,6 @@
 #include "hal/systick.h"
 #include "drivers/dp32g030/timer.h"
 
-static uint32_t elapsedMilliseconds = 0;
-
 uint32_t Now(void) { return GetUptimeMs(); }
 
 void SetTimeout(uint32_t *v, uint32_t t) {

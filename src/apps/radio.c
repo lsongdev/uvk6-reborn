@@ -52,7 +52,22 @@ static UserChannel channelCache[RADIO_SLOT_CAPACITY];
 static bool channelCacheValid[RADIO_SLOT_CAPACITY];
 static uint8_t channelCacheNumber[RADIO_SLOT_CAPACITY];
 static uint8_t menuIndex;
-enum { MENU_RX_WATCH = 9, MENU_CHANNEL_NAME, MENU_CHANNEL_SAVE, MENU_ITEM_COUNT };
+// RX items share RadioParameterField order; changeValue passes them through.
+enum {
+  MENU_RX_MODE = RADIO_FIELD_MODE,
+  MENU_RX_STEP = RADIO_FIELD_STEP,
+  MENU_RX_BANDWIDTH = RADIO_FIELD_BANDWIDTH,
+  MENU_RX_SQUELCH = RADIO_FIELD_SQUELCH,
+  MENU_RX_TONE = RADIO_FIELD_RX_TONE,
+  MENU_RX_WATCH,
+  MENU_TX_ENABLE,
+  MENU_TX_POWER,
+  MENU_TX_FREQUENCY,
+  MENU_TX_TONE,
+  MENU_CHANNEL_NAME,
+  MENU_CHANNEL_SAVE,
+  MENU_ITEM_COUNT
+};
 static RadioSlot activeSlot; // Selected slot's effective source; MR never writes VFO memories.
 static RxPlan pending;
 static const char *message;
@@ -724,7 +739,7 @@ static const WatchOperations watchOperations={
 static void watchUpdate(void) {
   if (capturePhase!=FC_OFF || number.active || CHANNEL_MANAGER_Active() || inMenu || confirming || seek.active || functionPending ||
       transmitter.mode!=RADIO_RX || transmitter.wait_release || pttPending) return;
-  if (!gDeviceConfig.radio.watch_enabled) {
+  if (!gDeviceConfig.radio.watch_enabled || gDeviceConfig.radio.slot_count < 2) {
     watchStatus=NULL;
     if (watcher.phase!=WATCH_OFF) (void)pauseWatch();
     return;
@@ -975,11 +990,11 @@ static void changeValue(bool up) {
     else DEVICE_RequestSave();
     return;
   }
-  if (menuIndex == 0) {
+  if (menuIndex == MENU_RX_MODE) {
     nextMode();
     return;
   }
-  if (menuIndex == 7) {
+  if (menuIndex == MENU_TX_FREQUENCY) {
     if (!up) {
       gDeviceConfig.radio.slots[selectedSlot].tx.frequency_hz = 0;
       activeSlot.tx.frequency_hz = 0;
@@ -989,23 +1004,23 @@ static void changeValue(bool up) {
     }
     return;
   }
-  if (menuIndex == 8) {
+  if (menuIndex == MENU_TX_TONE) {
     gDeviceConfig.radio.slots[selectedSlot].tx.tone = TONE_Next(gDeviceConfig.radio.slots[selectedSlot].tx.tone, up);
     activeSlot.tx.tone = gDeviceConfig.radio.slots[selectedSlot].tx.tone;
     DEVICE_RequestSave();
     return;
   }
-  if (menuIndex == 4 && activeSlot.current.parameters.mode != RX_NFM) {
+  if (menuIndex == MENU_RX_TONE && activeSlot.current.parameters.mode != RX_NFM) {
     notify("Tone: NFM only");
     return;
   }
-  if (menuIndex == 5) {
+  if (menuIndex == MENU_TX_ENABLE) {
     gDeviceConfig.radio.slots[selectedSlot].tx.enabled = !gDeviceConfig.radio.slots[selectedSlot].tx.enabled;
     activeSlot.tx.enabled = gDeviceConfig.radio.slots[selectedSlot].tx.enabled;
     DEVICE_RequestSave();
     return;
   }
-  if (menuIndex == 6) {
+  if (menuIndex == MENU_TX_POWER) {
     changeTxPower(up);
     return;
   }
@@ -1013,7 +1028,7 @@ static void changeValue(bool up) {
   if (RADIO_MODEL_Adjust(activeSlot.current.frequency_hz, &candidate,
                          RADIO_GetReceiverCapabilities(), (RadioParameterField)menuIndex, up))
     request(activeSlot.current.frequency_hz, candidate);
-  else if (menuIndex == 2 && candidate.mode == RX_WFM)
+  else if (menuIndex == MENU_RX_BANDWIDTH && candidate.mode == RX_WFM)
     notify("Fixed bandwidth");
 }
 
@@ -1240,26 +1255,26 @@ static const char *menuValue(uint8_t item, char out[24]) {
   char frequency[16];
   uint32_t hz;
   switch (item) {
-  case 0: return rxModeNames[rx->mode];
-  case 1: hz = rx->step_hz; break;
-  case 2:
+  case MENU_RX_MODE: return rxModeNames[rx->mode];
+  case MENU_RX_STEP: hz = rx->step_hz; break;
+  case MENU_RX_BANDWIDTH:
     if (rx->mode == RX_WFM) return "Fixed";
     hz = rx->bandwidth_hz; break;
-  case 3: snprintf(out,24,"%u",rx->squelch); return out;
-  case 4:
+  case MENU_RX_SQUELCH: snprintf(out,24,"%u",rx->squelch); return out;
+  case MENU_RX_TONE:
     if (rx->mode != RX_NFM) return "NFM only";
     TONE_Format(rx->rx_tone,out); return out;
-  case 5: return activeSlot.tx.enabled ? "On" : "Off";
-  case 6: {
+  case MENU_RX_WATCH: return gDeviceConfig.radio.slots[selectedSlot].watch ? "On" : "Off";
+  case MENU_TX_ENABLE: return activeSlot.tx.enabled ? "On" : "Off";
+  case MENU_TX_POWER: {
     static const char *const powers[] = {"Low", "Medium", "High"};
     return powers[activeSlot.tx.power <= TX_POWER_HIGH ? activeSlot.tx.power : 0];
   }
-  case 7:
+  case MENU_TX_FREQUENCY:
     if (number.active && inputTx) { NUMBER_Text(&number,out); return out; }
     if (!activeSlot.tx.frequency_hz) return "Same";
     hz = activeSlot.tx.frequency_hz; break;
-  case 8: TONE_Format(activeSlot.tx.tone,out); return out;
-  case MENU_RX_WATCH: return gDeviceConfig.radio.slots[selectedSlot].watch ? "On" : "Off";
+  case MENU_TX_TONE: TONE_Format(activeSlot.tx.tone,out); return out;
   case MENU_CHANNEL_NAME:
     return CHANNEL_MANAGER_Name(selectedSlot)[0] ? CHANNEL_MANAGER_Name(selectedSlot) : "(none)";
   case MENU_CHANNEL_SAVE: return "Choose CH";
@@ -1350,9 +1365,10 @@ static void renderTitle(void) {
       capturePhase==FC_PREVIEW ? "MENU:Use" : capture.range==CAPTURE_RANGE_VHF ? "VHF" : "UHF");
   else if (number.active) STATUSLINE_SetText(number.invalid ? "Invalid value" : inputTx ? "TX Frequency" : "RX Frequency");
   else if (inMenu || confirming || activeSlot.source == RADIO_SOURCE_CHANNEL ||
-           gDeviceConfig.radio.watch_enabled) {
+           (gDeviceConfig.radio.watch_enabled && gDeviceConfig.radio.slot_count > 1)) {
     bool watchTitle = !inMenu && !confirming &&
-                      activeSlot.source != RADIO_SOURCE_CHANNEL;
+                      activeSlot.source != RADIO_SOURCE_CHANNEL &&
+                      gDeviceConfig.radio.slot_count > 1;
     const char *mode = inMenu || confirming ? "VFO" :
         activeSlot.source == RADIO_SOURCE_CHANNEL ? "MR" : "DW";
     char id = watchTitle ? (receivingSlot<RADIO_SLOT_CAPACITY ?
@@ -1372,14 +1388,14 @@ static void renderConfirmation(void) {
 
 static void renderMenu(void) {
   static const char *const names[] = {
-    "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone", "TX Enable", "TX Power", "TX Frequency", "TX Tone", "RX Watch", "Name", "Save"
+    "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone", "RX Watch", "TX Enable", "TX Power", "TX Frequency", "TX Tone", "Name", "Save"
   };
   _Static_assert(sizeof(names)/sizeof(names[0]) == MENU_ITEM_COUNT,
                  "Every VFO menu item needs a label");
   uint8_t first = menuIndex < 5 ? 0 : menuIndex-4;
   for (uint8_t i = first; i < MENU_ITEM_COUNT && i < first+5; ++i) {
     uint8_t y = 17+(i-first)*11;
-    if (i == 7 && number.active) PrintSmallEx(2, y, POS_L, C_FILL, "TX Freq");
+    if (i == MENU_TX_FREQUENCY && number.active) PrintSmallEx(2, y, POS_L, C_FILL, "TX Freq");
     else PrintMediumEx(2, y, POS_L, C_FILL, "%s", names[i]);
     char value[24];
     PrintSmallEx(124, y, POS_R, C_FILL, "%s", menuValue(i, value));
@@ -1402,7 +1418,8 @@ void RADIO_APP_render(void) {
   if (number.active && !inputTx) NUMBER_Text(&number, inputText);
   uint8_t first = RADIO_STATE_VisibleFirst(&gDeviceConfig.radio);
   uint32_t now = Now();
-  for (uint8_t row = 0; row < RADIO_SLOT_VISIBLE; ++row) {
+  uint8_t visible = MIN(gDeviceConfig.radio.slot_count, RADIO_SLOT_VISIBLE);
+  for (uint8_t row = 0; row < visible; ++row) {
     uint8_t id = first + row;
     RadioViewStorage storage;
     UI_RadioCardView view;

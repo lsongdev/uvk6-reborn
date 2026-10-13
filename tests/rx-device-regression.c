@@ -45,7 +45,7 @@ void BK4819_SetRxMode(bool am) {
   (void)am; ++bkModes;
 }
 void BK4819_SetFilterBandwidth(BK4819_FilterBandwidth_t bw) { (void)bw; }
-void BK4819_SetAGC(bool b, uint8_t i) { (void)b; (void)i; }
+void BK4819_SetAGC(uint8_t i) { (void)i; }
 void BK4819_SetAFC(uint8_t n) { (void)n; }
 void BK4819_SetAFCSpeed(uint8_t n) { (void)n; }
 void BK4819_Squelch(uint8_t v, uint8_t a, uint8_t b) { (void)v; (void)a; (void)b; }

@@ -68,7 +68,7 @@ int main(void) {
   TxPlan plan={.frequency_hz=438500000,.power=TX_POWER_MEDIUM,.tone=1};
   assert(TX_DEVICE_Prepare(&plan) && !paOn && !dspOn && prepared);
   assert(tuned==43850000 && filterFrequency==tuned && paBias==82);
-  assert(registers[BK4819_REG_7D]==0xE940 && registers[0x74]==0xAF1F && writeCount);
+  assert(registers[BK4819_REG_7D]==(0xE940|gDeviceConfig.preferences.mic) && gDeviceConfig.preferences.mic==16 && registers[0x74]==0xAF1F && writeCount);
   assert(TX_DEVICE_Enable() && paOn && paStarts==1 && dspOn);
   TX_DEVICE_Disable();assert(!paOn && !prepared && !dspOn && registers[BK4819_REG_36]==0);
   TX_DEVICE_Disable();assert(!paOn && invalidations>=2);

@@ -5,10 +5,11 @@ DP32G030-based Quansheng UV-K6, including radios modified with SI4732.
 
 The Radio main screen supports up to four independent A/B/C/D slots (two visible at once). Each slot can tune directly (VFO) or use a saved channel (MR), without discarding its VFO memories. The receiver supports
 NFM/WFM/AM/SSB modes, band presets, dual watch, user channels, UVR2
-persistence and receiver selection. **Production builds disable TX at compile
-time.** The experimental PA path is tested with `UVK6_ENABLE_TX=1` in host
-tests only. Do not enable RF transmission before verifying the board,
-calibration, filtering, PA shutdown timing and applicable frequency limits. See the
+persistence and receiver selection. **The default build enables BK4819 NFM
+TX and the PA** (136–174 / 400–470 MHz, factory calibration, per-slot
+`TX Enable` defaults Off); `make ENABLE_TX=0` builds a receive-only image.
+Verify output power, deviation and PA shutdown into a dummy load, and only
+transmit where you are licensed to. See the
 [user manual](docs/user-manual.md) for current controls and the
 [implementation status](docs/refactor-progress.md) before testing.
 

@@ -4,9 +4,9 @@
 
 ## 当前功能范围
 
-默认启用 A/B 两个 Radio Slot，可在 Settings → Receive → Slot count 启用 2／3／4 项，每页显示两个。主屏幕不区分 VFO 或 MR；`F → 2(A/B)` 在 Slot 间循环选择，`F → 3(VFO/MR)` 切换所选 Slot 的频率来源（直接调频或存储频道）。切到 MR 不覆盖原先的 VFO 频率和频段记忆，切回时恢复；可选双守听按每个 Slot 当前来源轮询。Slot 的 TX 设置和 Watch 资格独立，频段预设共享。首次初始化 A 为 145.500 MHz NFM、B 为 438.500 MHz NFM。固件根据频率、模式及探测到的芯片能力选择接收路径，无需手动选择芯片。模式为 `NFM / WFM / AM / LSB / USB`，没有 `Auto`。
+默认启用 A/B 两个 Radio Slot，可在 Settings → Receive → Slot count 设置 1／2／3／4 项，每页显示两个。主屏幕不区分 VFO 或 MR；`F → 2(A/B)` 在启用的 Slot 间循环选择，`F → 3(VFO/MR)` 切换所选 Slot 的频率来源（直接调频或存储频道）。切到 MR 不覆盖原先的 VFO 频率和频段记忆，切回时恢复；可选双守听按每个 Slot 当前来源轮询，至少启用两个 Slot 才会运行。Slot 的 TX 设置和 Watch 资格独立，频段预设共享。首次初始化 A 为 145.500 MHz NFM、B 为 438.500 MHz NFM。固件根据频率、模式及探测到的芯片能力选择接收路径，无需手动选择芯片。模式为 `NFM / WFM / AM / LSB / USB`，没有 `Auto`。
 
-默认的生产编译 **TX 在编译期禁用**：可保存各 VFO 的 TX 意图、Tone、功率和独立频率以及 TOT/Busy Lock 参数，但这些设置不构成实际射频授权，按 PTT 不会开启 PA。实验性 TX 路径仅供具备假负载和仪表的受控硬件验收使用。已支持命名频道和频道模式；`F → 4` 可启动 FC 频率捕获、`F → *` 可启动向前 Seek。旧扫描 / Loot 应用目前没有入口。
+默认编译 **已开放 BK4819 NFM 发射与功放**：在当前 Slot 菜单把 `TX Enable` 设为 On 后按住 PTT 发射（初始均为 Off）。首次发射请接假负载核对功率与频偏，并只在有执照许可的频率发射；`make ENABLE_TX=0` 可生成仅接收固件。已支持命名频道和频道模式；`F → 4` 可启动 FC 频率捕获、`F → *` 可启动向前 Seek。旧扫描 / Loot 应用目前没有入口。
 
 ## 刷写固件
 
@@ -145,7 +145,7 @@ NFM 是对讲机窄带 FM，WFM 是广播宽带 FM。95.925 MHz 上从 WFM 切�
 
 短按 `MENU` 打开菜单；`▲ / ▼` 选择项目，`*` 增加 / 向后切换，`#` 减少 / 向前切换，`MENU` 与 `*` 相同。`RX Mode` 项的三个修改键均向后循环。`EXIT` 返回主界面；修改成功后立即生效，返回不会撤销。
 
-菜单不设分组标题，直接使用 RX／TX 项目前缀：RX Mode、RX Step、RX Bandwidth、RX Squelch、RX Tone、TX Enable、TX Power、TX Frequency、TX Tone、RX Watch。项目统一左对齐、数值右对齐，当前选中项整行反白。每屏最多五项，超出后滚动；Monitor 已移除，列表末尾为 `Name` 与 `Save`。Name 编辑最多 10 个字符的频道名称草稿；Save 选择频道编号，空槽直接保存，已有频道需再次按 MENU 确认覆盖。
+菜单不设分组标题，直接使用 RX／TX 项目前缀，并将同类项连续排列：RX Mode、RX Step、RX Bandwidth、RX Squelch、RX Tone、RX Watch、TX Enable、TX Power、TX Frequency、TX Tone。项目统一左对齐、数值右对齐，当前选中项整行反白。每屏最多五项，超出后滚动；Monitor 已移除，列表末尾为 `Name` 与 `Save`。Name 编辑最多 10 个字符的频道名称草稿；Save 选择频道编号，空槽直接保存，已有频道需再次按 MENU 确认覆盖。
 
 | 项目 | 含义 |
 | --- | --- |
@@ -170,13 +170,13 @@ NFM 是对讲机窄带 FM，WFM 是广播宽带 FM。95.925 MHz 上从 WFM 切�
 
 `F → 3(VFO/MR)` 只切换当前选中 VFO。进入频道模式时恢复该 VFO 记住的频道编号；编号失效时尝试第一个已保存频道，没有频道则保持 VFO 模式并提示。频道模式顶部显示 `CH nnn`、频道名称和解调模式；`▲ / ▼` 在已保存频道间循环。频道参数只读，Name 可修改名称草稿，Save 可确认覆盖当前频道。退出频道模式恢复该 VFO 原有频率和参数。数字频率输入、频段快捷键、模式快捷键和 Seek 仅在 VFO 模式使用；先按 `F → 3` 切回 VFO。
 
-频道编号为 1–128，固定编号不因覆盖而移动。当前名称限制为 10 个 ASCII 字符。频道记录保存 RX 频率、模式、步进、带宽、静噪、RX Tone、名称和 TX 用户配置；保存 TX 配置不会解锁真实发射。频道记录使用独立 EEPROM 区与双副本校验；旧频道表不导入。
+频道编号为 1–128，固定编号不因覆盖而移动。当前名称限制为 10 个 ASCII 字符。频道记录保存 RX 频率、模式、步进、带宽、静噪、RX Tone、名称和 TX 用户配置；频道的 TX 设置同样受 TX Enable 与板级范围约束。频道记录使用独立 EEPROM 区与双副本校验；旧频道表不导入。
 
 主界面修改形成当前 VFO 的临时覆盖，并随成功调谐保存以供重启恢复；不会自动改写频段预设。需要保存为预设时，在 `Settings → Band presets` 选择当前频段，使用 `Use current` 后执行 `Save`。RX Tone 随当前 VFO／频段状态保存，也可用 `Use current` 保存到频段预设；切换至非 NFM 模式时清除当前 RX Tone。TX Tone 和 TX Frequency 分别属于各 VFO 的发射设置，切换频段时不自动改写。
 
 RX Tone 的 Off 只使用 Squelch 门限；启用亚音时须同时满足门限和匹配亚音才打开音频（Squelch=0 也不绕过亚音）。CTCSS 显示如 `67.0 Hz`，DCS 显示如 `D023N`／`D023I`。*/# 顺序增减并循环所有选项，MENU 与 * 相同；没有自动亚音扫描。切频、切芯片或重新设置亚音会清除旧匹配状态。
 
-TX Frequency 在菜单当前行原地编辑，进入时显示当前值，首个数字替换整个草稿。* 为小数点，MENU 确认，短按 EXIT 删除、长按 EXIT 取消；输入 0 也恢复 Same。独立频率须为 BK 支持范围内的 10 Hz 整数倍，不接受 660～840 MHz 间的接收空隙。输入不支持的频率时保留旧设置和草稿，并提示 `Invalid value`。保存异频不会重新调谐 RX，也不会自动允许发射；PTT 仍按实际 TX 频率、模式、设备能力及授权检查。TX Tone 已进入发射方案，当前设备不会产生真实射频或发射亚音。
+TX Frequency 在菜单当前行原地编辑，进入时显示当前值，首个数字替换整个草稿。* 为小数点，MENU 确认，短按 EXIT 删除、长按 EXIT 取消；输入 0 也恢复 Same。独立频率须为 BK 支持范围内的 10 Hz 整数倍，不接受 660～840 MHz 间的接收空隙。输入不支持的频率时保留旧设置和草稿，并提示 `Invalid value`。保存异频不会重新调谐 RX，也不会自动允许发射；PTT 仍按实际 TX 频率、模式、设备能力及授权检查。TX Tone 在发射时随载波输出 CTCSS／DCS。
 
 ## 全局设置
 
@@ -198,6 +198,7 @@ TX Frequency 在菜单当前行原地编辑，进入时显示当前值，首个�
 | Receive → Filter split | 240／280 MHz，BK 接收滤波切换频率；属于硬件工程设置 |
 | Transmit → Time limit | 单次发射时限，30／60／120／180／300／600 秒，默认 120 秒 |
 | Transmit → Block if busy | 忙信道发射保护，默认 On |
+| Transmit → Mic gain | 麦克风增益 0–31（约 0.5 dB／级），默认 16；下次 PTT 生效。旧配置保留原值（可能为 0，声音很小） |
 | Lock PTT too | 锁键时同时锁定 PTT；默认 Off，未锁键时不会禁止 PTT |
 | Battery → Show charge | Icon／Percent／Voltage，选择电量显示方式 |
 | Battery → Charge curve | 1600／2200／3500 电压百分比估算曲线，不是电池容量检测 |
@@ -212,7 +213,7 @@ TX Frequency 在菜单当前行原地编辑，进入时显示当前值，首个�
 
 全局偏好统一以 `gDeviceConfig.preferences` 为运行态来源，沿用 UVR2 格式 8 和双槽保存。最后一次实际修改后 1500 ms 合并写入，离开设置时也会尝试提前保存；持续失败按 5 秒间隔重试。Pending 期间突然掉电可能丢失最近修改。电压校准与 Reset prefs 保存失败时原值保留。
 
-Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mic／Deviation 保存字段，以及全部 VFO／频道／频段预设和守听状态；它不初始化 EEPROM。Beep 暂无可用按键音路径，已从菜单移除；自动锁键尚未开放。真实 PA 输出仍禁用，任何偏好均不能解除硬件限制。
+Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mic／Deviation 保存字段，以及全部 VFO／频道／频段预设和守听状态；它不初始化 EEPROM。Beep 暂无可用按键音路径，已从菜单移除；自动锁键尚未开放。发射仍受 TX Enable、板级频率范围、功率校准和供电检查约束。
 
 ## 提示与排查
 
@@ -279,6 +280,6 @@ FC 不识别解调模式或亚音，也可能捕获谐波／强信号误报；NF
 
 发射被拒绝时（例如 TX disabled、TX mode not supported、TX HW locked），提示临时显示在选中 VFO 的黑底横条中，替换频段文案，保留 A–D 标识和模式；长文案滚动，提示结束恢复原横条。频率／名称正文保持显示，FC timeout、调谐错误、Seek 状态、频道保存反馈和守听提示也使用同一状态条。
 
-PTT 发射已接入 BK4819 NFM 实际 HAL；初始化默认 TX Enable 仍为 Off，需在当前 VFO 菜单启用。Same／独立 TX 频率及 TX Tone 均进入发射方案，F→6 选择功率档。松开 PTT、超时或供电异常先关闭功放，再恢复原 RX；本轮尚未刷机测量射频输出。实现与校准布局见[PTT 发射链路](tx-design.md)。
+PTT 发射已接入 BK4819 NFM 实际 HAL；初始化默认 TX Enable 仍为 Off，需在当前 VFO 菜单启用。Same／独立 TX 频率及 TX Tone 均进入发射方案，F→6 选择功率档。松开 PTT、超时或供电异常先关闭功放，再恢复原 RX；默认构建已开放，尚未用仪表测量射频输出。实现与校准布局见[PTT 发射链路](tx-design.md)。
 
 双守听自动按芯片分流：SI4732 广播和 BK4819 对讲分别保持接收，信号检测不反复调谐或打断广播，只切换扬声器音频。选中 A 且 A 有信号时，B 不插入；选中 B 时，B 的有效信号抢占后台 A，B 信号结束后静音等待 1 秒再返回 A。两个频率使用同一芯片时仍需轮询；当前选中项有效接收不按 3 秒强制切走。并行 SI 静音期间继续更新自己的 RDS。该路径已通过主机模拟，尚未在设备上验收。

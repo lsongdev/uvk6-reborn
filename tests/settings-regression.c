@@ -40,6 +40,7 @@ int main(void) {
   assert(!SETTINGS_SetValue(SETTING_BATTERYCALIBRATION,1899));
   assert(!SETTINGS_SetValue(SETTING_BATTERYCALIBRATION,2155));
   assert(!SETTINGS_SetValue(SETTING_COUNT,1));
+  assert(!SETTINGS_SetValue(SETTING_MIC,32)); // BK4819 REG_7D mic field is 5 bits.
   assert(!requests && !lights && !contrasts);
   assert(SETTINGS_SetValue(SETTING_BACKLIGHT,3) && !requests);
   assert(SETTINGS_SetValue(SETTING_BACKLIGHT,6));

@@ -42,6 +42,7 @@ static const Preference preferences[SETTING_COUNT] = {
     PREF(SETTING_BOUND240_280, bound_240_280, 0, 1),
     PREF(SETTING_TX_TIMEOUT, tx_timeout_seconds, 15, 600),
     PREF(SETTING_TX_BUSY_LOCK, tx_busy_lockout, 0, 1),
+    PREF(SETTING_MIC, mic, 0, 31),
 };
 #undef PREF
 static const Preference *preference(Setting id) {

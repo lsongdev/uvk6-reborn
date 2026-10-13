@@ -65,7 +65,7 @@ static void getRadioValue(const MenuItem *item, char *out, uint8_t size) {
 static void changeRadioValue(const MenuItem *item, bool up) {
   notice = NULL;
   if (!item->setting) {
-    uint8_t count=IncDecU(gDeviceConfig.radio.slot_count,2,RADIO_SLOT_CAPACITY+1u,up);
+    uint8_t count=IncDecU(gDeviceConfig.radio.slot_count,1,RADIO_SLOT_CAPACITY+1u,up);
     if (!RADIO_STATE_SetCount(&gDeviceConfig.radio,count)) return;
   } else gDeviceConfig.radio.watch_enabled ^= 1u;
   DEVICE_RequestSave();
@@ -82,6 +82,7 @@ MENU_DEF(receiveMenu,"Receive",receiveItems);
 static const MenuItem transmitItems[] = {
     VALUE("Time limit",SETTING_TX_TIMEOUT),
     VALUE("Block if busy",SETTING_TX_BUSY_LOCK),
+    VALUE("Mic gain",SETTING_MIC),
 };
 MENU_DEF(transmitMenu,"Transmit",transmitItems);
 static const MenuItem batteryItems[] = {

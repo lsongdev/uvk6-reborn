@@ -1,4 +1,4 @@
-// Production builds must never authorize TX or turn on the PA.
+// ENABLE_TX=0 builds must never authorize TX or turn on the PA.
 #include "../src/hal/tx-device.c"
 #include <assert.h>
 DeviceConfig gDeviceConfig = {.preferences=CONFIG_DEFAULT_PREFERENCES};

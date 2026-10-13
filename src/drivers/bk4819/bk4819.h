@@ -107,7 +107,7 @@ void BK4819_WriteRegister(BK4819_REGISTER_t Register, uint16_t Data);
 void BK4819_WriteU8(uint8_t Data);
 void BK4819_WriteU16(uint16_t Data);
 
-void BK4819_SetAGC(bool useDefault, uint8_t gainIndex);
+void BK4819_SetAGC(uint8_t gainIndex);
 int8_t BK4819_GetAgcIndex();
 uint8_t BK4819_GetAttenuation();
 

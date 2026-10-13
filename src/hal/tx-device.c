@@ -11,7 +11,7 @@
 #include "core/battery.h"
 #include "core/dcs.h"
 
-// TX hardware is experimental. Never authorize it from EEPROM data alone.
+// Set by the Makefile (ENABLE_TX); host tests and bare compiles stay RX-only.
 #ifndef UVK6_ENABLE_TX
 #define UVK6_ENABLE_TX 0
 #endif

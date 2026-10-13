@@ -74,7 +74,6 @@ const uint16_t Voltage2PercentageTable[][11][2] = {
 
 uint8_t BATTERY_VoltsToPercent(const unsigned int voltage_10mV) {
   const uint16_t(*crv)[2] = Voltage2PercentageTable[gDeviceConfig.preferences.battery_type];
-  const uint32_t mulipl = 1000;
 
   // Предполагаем, что таблица отсортирована от ВЫСОКОГО напряжения к НИЗКОМУ.
   // Пример: {420, 100}, {410, 90}, ... {300, 0}
@@ -101,9 +100,7 @@ uint8_t BATTERY_VoltsToPercent(const unsigned int voltage_10mV) {
       // (voltage - v2) ~ 100 (1 вольт в единицах 10мВ)
       // (p1 - p2) ~ 10-20 (процентов)
       // 100 * 20 = 2000. Влезает в uint32_t со свистом.
-      // Даже mulipl не нужен!
-
-      // Упрощенная и точная формула без float и mulipl:
+      // Упрощенная и точная формула без float:
       uint32_t percents = p2 + ((voltage_10mV - v2) * (p1 - p2)) / (v1 - v2);
 
       return (percents > 100) ? 100 : (uint8_t)percents;

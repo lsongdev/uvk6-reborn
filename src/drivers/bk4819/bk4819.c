@@ -79,7 +79,6 @@ typedef struct {
 } AgcConfig;
 
 static const AgcConfig AGC_DEFAULT = {0, 56, 84};
-static const AgcConfig AGC_FAST = {0, 20, 50};
 
 // ============================================================================
 // State Variables
@@ -303,7 +302,7 @@ uint8_t BK4819_GetAttenuation() {
   case 3:
     reg = BK4819_REG_13;
     break;
-  case -1:
+  default: // Indexes -1..-4 share the lowest gain-table register.
     reg = BK4819_REG_14;
     break;
   }
@@ -314,7 +313,7 @@ uint8_t BK4819_GetAttenuation() {
          (uint8_t[]){33, 27, 21, 15, 9, 6, 3, 0}[v & 7];
 }
 
-void BK4819_SetAGC(bool useDefault, uint8_t gainIndex) {
+void BK4819_SetAGC(uint8_t gainIndex) {
   const bool enableAgc = (gainIndex == AUTO_GAIN_INDEX);
   uint16_t regVal = BK4819_ReadRegister(BK4819_REG_7E);
 
@@ -333,7 +332,6 @@ void BK4819_SetAGC(bool useDefault, uint8_t gainIndex) {
 
   configure_agc_registers();
 
-  // const AgcConfig *config = useDefault ? &AGC_DEFAULT : &AGC_FAST;
   const AgcConfig *config = &AGC_DEFAULT;
   BK4819_WriteRegister(BK4819_REG_49, (config->lo << 14) | (config->high << 7) |
                                           (config->low << 0));
@@ -407,9 +405,6 @@ void BK4819_SetFilterBandwidth(BK4819_FilterBandwidth_t bw) {
 void BK4819_SetFrequency(uint32_t freq) {
   static uint16_t prev_low = 0;
   static uint16_t prev_high = 0;
-
-  freq += (gSettings.freqCorrection - 127);
-  // printf("f=%u\n", freq);
 
   uint16_t low = freq & 0xFFFF;
   uint16_t high = (freq >> 16) & 0xFFFF;
@@ -1135,7 +1130,7 @@ static void initialize_registers(void) {
   BK4819_WriteRegister(BK4819_REG_1E, 0x4c58); // for some revisions
   BK4819_WriteRegister(BK4819_REG_1F, 0x5454); // VCO, PLL
 
-  BK4819_SetAGC(true, AUTO_GAIN_INDEX);
+  BK4819_SetAGC(AUTO_GAIN_INDEX);
 
   BK4819_WriteRegister(BK4819_REG_3F, 0); // interrupts
 

@@ -28,7 +28,7 @@ typedef struct {
 #define CONFIG_DEFAULT_PREFERENCES { \
     .battery_calibration = 2000, .backlight = 3, .contrast = 8, \
     .brightness = 8, .battery_type = 0, .battery_style = 1, \
-    .backlight_on_squelch = 1, .mic = 0, .deviation = 130, \
+    .backlight_on_squelch = 1, .mic = 16, .deviation = 130, \
     .brightness_low = 0, .sql_open_time = 1, .sql_close_time = 1, \
     .tx_timeout_seconds = 120, .tx_busy_lockout = 1 }
 
