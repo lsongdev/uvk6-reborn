@@ -1,5 +1,5 @@
 #ifndef UI_COMPONENT_RADIO_CARD_H
-#define UI_COMPONENT_VFO_H
+#define UI_COMPONENT_RADIO_CARD_H
 #include "core/radio-model.h"
 #define UI_RADIO_CARD_HEIGHT 28
 #define UI_RADIO_CARD_NAME_DELAY_MS 1000u

@@ -23,3 +23,5 @@ MR 模式的频道数据仅解析为临时的有效状态，不覆盖槽内 VFO 
 `main.c` 负责硬件初始化，`apps/system.c` 维护整个系统的最高优先级 PTT 安全检查和按键调度。生产 TX 默认禁用，不能因为 Radio 应用退到 Settings 而停止 PA 安全释放。
 
 详细边界和迁移说明见 [Radio 架构](../docs/radio-architecture.md)。完整回归运行 `sh tests/run.sh`；ARM 构建运行 `make -B -j4 all`。
+
+双守听由 `core/watch.*` 按芯片决定：同芯片时分轮询，不同芯片并行接收。`hal/rx-device.*` 分开配置接收芯片与选择音频出口；`core/radio.*` 的前台镜像用于当前播放／测量，不表示后台芯片已关闭。并行 SI WFM 的 RDS 独立归属其接收目标。
