@@ -53,7 +53,7 @@ static bool channelCacheValid[RADIO_SLOT_CAPACITY];
 static uint8_t channelCacheNumber[RADIO_SLOT_CAPACITY];
 static uint8_t menuIndex;
 enum { MENU_RX_WATCH = 9, MENU_CHANNEL_NAME, MENU_CHANNEL_SAVE, MENU_ITEM_COUNT };
-static RadioSlot user; // Current UI state, committed only on successful RX.
+static RadioSlot activeSlot; // Selected slot's effective source; MR never writes VFO memories.
 static RxPlan pending;
 static const char *message;
 static uint32_t messageAt;
@@ -92,7 +92,7 @@ static bool effectiveSlot(uint8_t id, RadioSlot *effective,
   return true;
 }
 
-// Search never mutates user/EEPROM until one final station is accepted.
+// Search never mutates activeSlot/EEPROM until one final station is accepted.
 typedef enum { SEEK_STEP, SEEK_SETTLE, SEEK_VERIFY,
                SEEK_NATIVE_START, SEEK_NATIVE_POLL, SEEK_WRAP_SETTLE } SeekPhase;
 static Seek seek;
@@ -190,7 +190,7 @@ static void channelSaved(uint8_t id, uint16_t number,
                          const UserChannel *channel) {
   if (id >= RADIO_SLOT_CAPACITY || !channel) return;
   gDeviceConfig.radio.slots[id].channel_number = (uint8_t)number;
-  if (id == selectedSlot) user.channel_number = (uint8_t)number;
+  if (id == selectedSlot) activeSlot.channel_number = (uint8_t)number;
   for (uint8_t i = 0; i < RADIO_SLOT_CAPACITY; ++i) {
     if (gDeviceConfig.radio.slots[i].channel_number == number) {
       channelCache[i] = *channel;
@@ -229,17 +229,17 @@ static bool apply(const RxPlan *plan) {
     notify(result == RX_RESTORED ? "Tune failed" : "RX error");
     return false;
   }
-  if (user.source == RADIO_SOURCE_VFO &&
-      !RADIO_SLOT_SetVfo(&user, plan->frequency_hz, plan->parameters)) {
+  if (activeSlot.source == RADIO_SOURCE_VFO &&
+      !RADIO_SLOT_SetVfo(&activeSlot, plan->frequency_hz, plan->parameters)) {
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
     notify("State error");
     return false;
   }
-  if (user.source == RADIO_SOURCE_VFO) {
+  if (activeSlot.source == RADIO_SOURCE_VFO) {
     // TX edits are committed independently from the receive draft.
-    user.tx = gDeviceConfig.radio.slots[selectedSlot].tx;
-    user.watch = gDeviceConfig.radio.slots[selectedSlot].watch;
-    gDeviceConfig.radio.slots[selectedSlot] = user;
+    activeSlot.tx = gDeviceConfig.radio.slots[selectedSlot].tx;
+    activeSlot.watch = gDeviceConfig.radio.slots[selectedSlot].watch;
+    gDeviceConfig.radio.slots[selectedSlot] = activeSlot;
   }
   receivingSlot = selectedSlot;
   memset(&labels[selectedSlot], 0, sizeof(labels[selectedSlot]));
@@ -283,21 +283,21 @@ static void finishSeek(bool found, uint32_t frequency_hz, const char *status) {
 }
 
 static void startSeek(void) {
-  if (user.source == RADIO_SOURCE_CHANNEL) {
+  if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
     notify("Seek is VFO only");
     return;
   }
-  if (!runtime.active || user.active_band >= radioBandCount) {
+  if (!runtime.active || activeSlot.active_band >= radioBandCount) {
     notify("RX unavailable");
     return;
   }
-  if (user.current.parameters.mode == RX_LSB ||
-      user.current.parameters.mode == RX_USB) {
+  if (activeSlot.current.parameters.mode == RX_LSB ||
+      activeSlot.current.parameters.mode == RX_USB) {
     notify("SSB seek off");
     return;
   }
   seekOrigin = runtime.current;
-  if (!SEEK_Start(&seek, &radioBands[user.active_band],
+  if (!SEEK_Start(&seek, &radioBands[activeSlot.active_band],
                   seekOrigin.frequency_hz, seekOrigin.parameters.step_hz)) {
     notify("Seek unavailable");
     return;
@@ -444,7 +444,7 @@ static void captureAttempt(void) {
 }
 
 static void startCapture(void) {
-  if (user.source!=RADIO_SOURCE_VFO) { notify("FC: VFO only"); return; }
+  if (activeSlot.source!=RADIO_SOURCE_VFO) { notify("FC: VFO only"); return; }
   if (!runtime.active || !pauseWatch()) return;
   CAPTURE_Start(&capture, CAPTURE_AUTO, Now());
   captureAttempt();
@@ -478,9 +478,9 @@ static void acceptCapture(void) {
     cancelCapture("Tune failed"); return;
   }
   // apply has queued a deferred save; include these changes in that one save.
-  user.tx.enabled=false;
-  user.channel_number=0;
-  gDeviceConfig.radio.slots[selectedSlot]=user;
+  activeSlot.tx.enabled=false;
+  activeSlot.channel_number=0;
+  gDeviceConfig.radio.slots[selectedSlot]=activeSlot;
   CHANNEL_MANAGER_LoadName(selectedSlot, 0);
   delayWatch();
 }
@@ -495,9 +495,9 @@ static void request(uint32_t target, RadioParameters values) {
   if (result != RX_OK) {
     // A gap has no receiver. Stop the old audio and retain a navigable target,
     // without storing the unsupported target as an applied EEPROM frequency.
-    user.current.frequency_hz = target;
-    user.current.parameters = values;
-    user.active_band = RADIO_MODEL_BandAt(target);
+    activeSlot.current.frequency_hz = target;
+    activeSlot.current.parameters = values;
+    activeSlot.active_band = RADIO_MODEL_BandAt(target);
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
     notify(result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
     return;
@@ -523,7 +523,7 @@ static void tuneTo(uint32_t target) {
     notify("Out of range");
     return;
   }
-  RadioParameters values = band == user.active_band ? user.current.parameters
+  RadioParameters values = band == activeSlot.active_band ? activeSlot.current.parameters
                                                      : gDeviceConfig.radio.presets[band];
   request(target, values);
 }
@@ -533,8 +533,8 @@ static void beginFrequencyInput(bool tx) {
   inputSlot = selectedSlot;
   inputTx = tx;
   message = NULL;
-  uint32_t initial = tx ? (user.tx.frequency_hz
-      ? user.tx.frequency_hz : user.current.frequency_hz) : 0;
+  uint32_t initial = tx ? (activeSlot.tx.frequency_hz
+      ? activeSlot.tx.frequency_hz : activeSlot.current.frequency_hz) : 0;
   NUMBER_Begin(&number, tx ? 0u : RADIO_MIN_HZ,
                tx ? 1300000000u : RADIO_MAX_HZ, 1000000u, initial, tx);
 }
@@ -555,14 +555,14 @@ void RADIO_APP_init(void) {
     channelCacheValid[id] = false;
     CHANNEL_MANAGER_LoadName(id, gDeviceConfig.radio.slots[id].channel_number);
   }
-  if (!effectiveSlot(selectedSlot, &user, NULL)) {
+  if (!effectiveSlot(selectedSlot, &activeSlot, NULL)) {
     gDeviceConfig.radio.slots[selectedSlot].source = RADIO_SOURCE_VFO;
-    user = gDeviceConfig.radio.slots[selectedSlot];
+    activeSlot = gDeviceConfig.radio.slots[selectedSlot];
     DEVICE_RequestSave();
     invalidSavedChannel = true;
   }
   receivingSlot = UINT8_MAX;
-  request(user.current.frequency_hz, user.current.parameters);
+  request(activeSlot.current.frequency_hz, activeSlot.current.parameters);
   if (invalidSavedChannel) notify("Channel unavailable");
 }
 
@@ -645,7 +645,7 @@ void RADIO_APP_update(void) {
 
 static bool restorePrimary(void) {
   RxPlan plan;
-  if (TUNING_ExactPlan(user.current.frequency_hz,user.current.parameters,
+  if (TUNING_ExactPlan(activeSlot.current.frequency_hz,activeSlot.current.parameters,
       RADIO_GetReceiverCapabilities(),&plan)!=RX_OK) {
     RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX unavailable"); return false;
   }
@@ -746,7 +746,7 @@ bool RADIO_APP_ApplyRxSettings(void) {
   if (!initialized) return true;
   RxPlan plan;
   if (runtime.active) plan = runtime.current;
-  else if (RADIO_MODEL_Plan(user.current.frequency_hz, user.current.parameters,
+  else if (RADIO_MODEL_Plan(activeSlot.current.frequency_hz, activeSlot.current.parameters,
       RADIO_GetReceiverCapabilities(), &plan) != RX_OK) return false;
   if (!tuneDirect(&plan)) return false;
   receivingSlot = selectedSlot;
@@ -776,10 +776,10 @@ static void tuneChannel(uint16_t number, bool enterMode) {
   if (enterMode) {
     stored->source = RADIO_SOURCE_CHANNEL;
   }
-  user = *stored;
-  user.active_band = RADIO_MODEL_BandAt(channel.frequency_hz);
-  user.current = (BandState){channel.frequency_hz, channel.rx};
-  user.tx = channel.tx;
+  activeSlot = *stored;
+  activeSlot.active_band = RADIO_MODEL_BandAt(channel.frequency_hz);
+  activeSlot.current = (BandState){channel.frequency_hz, channel.rx};
+  activeSlot.tx = channel.tx;
   receivingSlot = selectedSlot;
   memset(&labels[selectedSlot], 0, sizeof(labels[selectedSlot]));
   labels[selectedSlot].frequency_hz = channel.frequency_hz;
@@ -812,7 +812,7 @@ static void switchSource(void) {
     }
     if (!tuneDirect(&plan)) return;
     stored->source = RADIO_SOURCE_VFO;
-    user = *stored;
+    activeSlot = *stored;
     receivingSlot = selectedSlot;
     DEVICE_RequestSave();
     message = NULL;
@@ -850,8 +850,8 @@ static void switchSlot(void) {
   if (!tuneDirect(&plan)) return;
   selectedSlot = target;
   receivingSlot = target;
-  user = next;
-  CHANNEL_MANAGER_LoadName(selectedSlot, user.channel_number);
+  activeSlot = next;
+  CHANNEL_MANAGER_LoadName(selectedSlot, activeSlot.channel_number);
   gDeviceConfig.radio.selected_slot = target;
   DEVICE_RequestSave();
   message = NULL;
@@ -861,24 +861,24 @@ static void switchSlot(void) {
 
 // F-prefix and side-key shortcuts must enforce the same VFO-only rule.
 static bool requireVfoSource(void) {
-  if (user.source == RADIO_SOURCE_VFO) return true;
+  if (activeSlot.source == RADIO_SOURCE_VFO) return true;
   notify("Channel mode");
   return false;
 }
 
 static void nextBand(void) {
   if (!requireVfoSource()) return;
-  uint8_t band = RADIO_MODEL_NextBand(user.active_band);
-  const BandState *saved = &user.bands[band];
+  uint8_t band = RADIO_MODEL_NextBand(activeSlot.active_band);
+  const BandState *saved = &activeSlot.bands[band];
   request(saved->frequency_hz, gDeviceConfig.radio.presets[band]);
 }
 
 static void nextMode(void) {
   if (!requireVfoSource()) return;
-  RadioParameters candidate = user.current.parameters;
-  if (RADIO_MODEL_Adjust(user.current.frequency_hz, &candidate,
+  RadioParameters candidate = activeSlot.current.parameters;
+  if (RADIO_MODEL_Adjust(activeSlot.current.frequency_hz, &candidate,
                          RADIO_GetReceiverCapabilities(), RADIO_FIELD_MODE, true))
-    request(user.current.frequency_hz, candidate);
+    request(activeSlot.current.frequency_hz, candidate);
   else
     notify("No other mode");
 }
@@ -886,20 +886,20 @@ static void nextMode(void) {
 static bool setTxFrequency(uint32_t value) {
   if (inputSlot != selectedSlot || !TX_MODEL_FrequencyValid(value)) return false;
   gDeviceConfig.radio.slots[selectedSlot].tx.frequency_hz = value;
-  user.tx.frequency_hz = value;
+  activeSlot.tx.frequency_hz = value;
   DEVICE_RequestSave();
   notify("TX freq saved");
   return true;
 }
 
 static bool changeTxPower(bool up) {
-  if (user.source == RADIO_SOURCE_CHANNEL) {
+  if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
     notify("Channel is read only");
     return false;
   }
   TxConfig *tx = &gDeviceConfig.radio.slots[selectedSlot].tx;
   tx->power = (tx->power + (up ? 1u : 2u)) % 3u;
-  user.tx.power = tx->power;
+  activeSlot.tx.power = tx->power;
   DEVICE_RequestSave();
   return true;
 }
@@ -912,9 +912,9 @@ static void changeValue(bool up) {
   }
   if (menuIndex == MENU_CHANNEL_SAVE) {
     UserChannel channel = {
-      .frequency_hz = user.current.frequency_hz,
-      .rx = user.current.parameters,
-      .tx = user.tx,
+      .frequency_hz = activeSlot.current.frequency_hz,
+      .rx = activeSlot.current.parameters,
+      .tx = activeSlot.tx,
     };
     CHANNEL_MANAGER_StartSave(selectedSlot,
         gDeviceConfig.radio.slots[selectedSlot].source == RADIO_SOURCE_CHANNEL
@@ -941,7 +941,7 @@ static void changeValue(bool up) {
   if (menuIndex == 7) {
     if (!up) {
       gDeviceConfig.radio.slots[selectedSlot].tx.frequency_hz = 0;
-      user.tx.frequency_hz = 0;
+      activeSlot.tx.frequency_hz = 0;
       DEVICE_RequestSave();
     } else {
       beginFrequencyInput(true);
@@ -950,17 +950,17 @@ static void changeValue(bool up) {
   }
   if (menuIndex == 8) {
     gDeviceConfig.radio.slots[selectedSlot].tx.tone = TONE_Next(gDeviceConfig.radio.slots[selectedSlot].tx.tone, up);
-    user.tx.tone = gDeviceConfig.radio.slots[selectedSlot].tx.tone;
+    activeSlot.tx.tone = gDeviceConfig.radio.slots[selectedSlot].tx.tone;
     DEVICE_RequestSave();
     return;
   }
-  if (menuIndex == 4 && user.current.parameters.mode != RX_NFM) {
+  if (menuIndex == 4 && activeSlot.current.parameters.mode != RX_NFM) {
     notify("Tone: NFM only");
     return;
   }
   if (menuIndex == 5) {
     gDeviceConfig.radio.slots[selectedSlot].tx.enabled = !gDeviceConfig.radio.slots[selectedSlot].tx.enabled;
-    user.tx.enabled = gDeviceConfig.radio.slots[selectedSlot].tx.enabled;
+    activeSlot.tx.enabled = gDeviceConfig.radio.slots[selectedSlot].tx.enabled;
     DEVICE_RequestSave();
     return;
   }
@@ -968,10 +968,10 @@ static void changeValue(bool up) {
     changeTxPower(up);
     return;
   }
-  RadioParameters candidate = user.current.parameters;
-  if (RADIO_MODEL_Adjust(user.current.frequency_hz, &candidate,
+  RadioParameters candidate = activeSlot.current.parameters;
+  if (RADIO_MODEL_Adjust(activeSlot.current.frequency_hz, &candidate,
                          RADIO_GetReceiverCapabilities(), (RadioParameterField)menuIndex, up))
-    request(user.current.frequency_hz, candidate);
+    request(activeSlot.current.frequency_hz, candidate);
   else if (menuIndex == 2 && candidate.mode == RX_WFM)
     notify("Fixed bandwidth");
 }
@@ -986,10 +986,10 @@ static void startTransmit(void) {
     notify("TX busy/locked");
     return;
   }
-  TxCapabilities capability = TX_DEVICE_Capabilities(user.tx.frequency_hz ? user.tx.frequency_hz : runtime.current.frequency_hz);
+  TxCapabilities capability = TX_DEVICE_Capabilities(activeSlot.tx.frequency_hz ? activeSlot.tx.frequency_hz : runtime.current.frequency_hz);
   TxPolicy policy = TX_DEVICE_Policy();
   TxPlan planned;
-  TxResult result = TX_MODEL_Plan(&runtime.current, &user.tx,
+  TxResult result = TX_MODEL_Plan(&runtime.current, &activeSlot.tx,
                                  &capability, &policy, &planned);
   // The board policy and target-frequency calibration authorize TX independently of RX.
   if (result == TX_OK && !TX_DEVICE_VoltageValid()) {
@@ -1058,7 +1058,7 @@ static void shortcutKey(KEY_Code_t key) {
     static const char *const messages[] = {
       "TX Power: Low", "TX Power: Medium", "TX Power: High"
     };
-    if (changeTxPower(true)) notify(messages[user.tx.power]);
+    if (changeTxPower(true)) notify(messages[activeSlot.tx.power]);
     break;
   }
   case KEY_STAR: startSeek(); break;
@@ -1154,13 +1154,13 @@ bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
   }
   if ((key == KEY_UP || key == KEY_DOWN) &&
       (state == KEY_RELEASED || state == KEY_LONG_PRESSED_CONT)) {
-    if (user.source == RADIO_SOURCE_CHANNEL) {
+    if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
       nextChannel(key == KEY_UP);
       return true;
     }
     uint32_t target;
     RadioParameters params;
-    if (TUNING_StepVfo(&user, gDeviceConfig.radio.presets, key == KEY_UP,
+    if (TUNING_StepVfo(&activeSlot, gDeviceConfig.radio.presets, key == KEY_UP,
                        &target, &params))
       request(target, params);
     return true;
@@ -1181,7 +1181,7 @@ bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
   else if (key == KEY_EXIT)
     gMonitorMode = false;
   else if (key <= KEY_9) {
-    if (user.source == RADIO_SOURCE_CHANNEL) {
+    if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
       notify("Switch to VFO first");
       return true;
     }
@@ -1195,7 +1195,7 @@ bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
 }
 
 static const char *menuValue(uint8_t item, char out[24]) {
-  const RadioParameters *rx = &user.current.parameters;
+  const RadioParameters *rx = &activeSlot.current.parameters;
   char frequency[16];
   uint32_t hz;
   switch (item) {
@@ -1208,16 +1208,16 @@ static const char *menuValue(uint8_t item, char out[24]) {
   case 4:
     if (rx->mode != RX_NFM) return "NFM only";
     TONE_Format(rx->rx_tone,out); return out;
-  case 5: return user.tx.enabled ? "On" : "Off";
+  case 5: return activeSlot.tx.enabled ? "On" : "Off";
   case 6: {
     static const char *const powers[] = {"Low", "Medium", "High"};
-    return powers[user.tx.power <= TX_POWER_HIGH ? user.tx.power : 0];
+    return powers[activeSlot.tx.power <= TX_POWER_HIGH ? activeSlot.tx.power : 0];
   }
   case 7:
     if (number.active && inputTx) { NUMBER_Text(&number,out); return out; }
-    if (!user.tx.frequency_hz) return "Same";
-    hz = user.tx.frequency_hz; break;
-  case 8: TONE_Format(user.tx.tone,out); return out;
+    if (!activeSlot.tx.frequency_hz) return "Same";
+    hz = activeSlot.tx.frequency_hz; break;
+  case 8: TONE_Format(activeSlot.tx.tone,out); return out;
   case MENU_RX_WATCH: return gDeviceConfig.radio.slots[selectedSlot].watch ? "On" : "Off";
   case MENU_CHANNEL_NAME:
     return CHANNEL_MANAGER_Name(selectedSlot)[0] ? CHANNEL_MANAGER_Name(selectedSlot) : "(none)";
@@ -1245,8 +1245,8 @@ static void buildCardView(uint8_t id, const char *inputText,
   *channel = (UserChannel){0};
   bool effectiveOk;
   if (selected) {
-    effective = user;
-    effectiveOk = user.source != RADIO_SOURCE_CHANNEL ||
+    effective = activeSlot;
+    effectiveOk = activeSlot.source != RADIO_SOURCE_CHANNEL ||
                   loadChannelForSlot(id, channel);
   } else {
     effectiveOk = effectiveSlot(id, &effective, channel);
@@ -1308,12 +1308,12 @@ static void renderTitle(void) {
       capture.scope==CAPTURE_AUTO ? "Auto" : capture.scope==CAPTURE_VHF ? "VHF" : "UHF",
       capturePhase==FC_PREVIEW ? "MENU:Use" : capture.range==CAPTURE_RANGE_VHF ? "VHF" : "UHF");
   else if (number.active) STATUSLINE_SetText(number.invalid ? "Invalid value" : inputTx ? "TX Frequency" : "RX Frequency");
-  else if (inMenu || confirming || user.source == RADIO_SOURCE_CHANNEL ||
+  else if (inMenu || confirming || activeSlot.source == RADIO_SOURCE_CHANNEL ||
            gDeviceConfig.radio.watch_enabled) {
     bool watchTitle = !inMenu && !confirming &&
-                      user.source != RADIO_SOURCE_CHANNEL;
+                      activeSlot.source != RADIO_SOURCE_CHANNEL;
     const char *mode = inMenu || confirming ? "VFO" :
-        user.source == RADIO_SOURCE_CHANNEL ? "MR" : "DW";
+        activeSlot.source == RADIO_SOURCE_CHANNEL ? "MR" : "DW";
     char id = watchTitle ? (receivingSlot<RADIO_SLOT_CAPACITY ?
               'A'+receivingSlot : '-') : 'A'+selectedSlot;
     STATUSLINE_SetText("%s %c", mode, id);

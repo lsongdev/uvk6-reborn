@@ -1,5 +1,13 @@
 # UVK6 Reborn 重构进度
 
+## 2026-10-13 Radio / Slot / Tuning 架构迁移
+
+- 主应用更名为 `apps/radio.c`，`APP_RADIO` 与 `APP_SETTINGS` 同时加入已启用应用列表；辅助的频段、输入、首次初始化仍保持可达。
+- A/B/C/D 不再称作 VFO 实例，而是 `RadioSlot`；VFO/MR 仅表示调谐来源，和接收解调模式区分。主屏幕通用组件更名为 `radio-card`，频道命名与保存交互改在 `apps/channel-manager`。
+- 新增独立纯逻辑 `core/tuning` 以及主机回归，确保 MR 不覆盖 VFO 频段记忆，VFO 步进不在 MR 下执行，已存频道/其他槽只接受精确接收方案。
+- EEPROM 格式 8 的序列化顺序、TX 安全检查及接收失败回滚不变。架构说明见 [Radio 架构](radio-architecture.md)；实机验证仍待完成。
+
+
 ## 2026-10-13 VFO 输入／渲染／更新去重
 
 - 抽离 FC/数字输入/F 前缀的按键分派，RX/TX 频率输入共用初始化；修正 MR 模式下 F→1、F→0 与侧键规则不一致的问题。

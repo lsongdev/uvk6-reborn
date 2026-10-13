@@ -11,7 +11,7 @@
 #include <string.h>
 
 static char names[RADIO_SLOT_CAPACITY][USER_CHANNEL_NAME_BYTES];
-static uint8_t nameVfo, saveVfo;
+static uint8_t nameSlot, saveSlot;
 static bool active, overwriteConfirm;
 static uint16_t target;
 static UserChannel draft;
@@ -19,7 +19,7 @@ static ChannelManagerNotify notify;
 static ChannelManagerSaved saved;
 
 static void nameAccepted(void) {
-  names[nameVfo][USER_CHANNEL_NAME_MAX] = '\0';
+  names[nameSlot][USER_CHANNEL_NAME_MAX] = '\0';
   gTextInputSize = 15;
   if (notify) notify("Channel name ready");
 }
@@ -30,40 +30,40 @@ void CHANNEL_MANAGER_Init(ChannelManagerNotify onNotify,
   saved = onSaved;
 }
 
-void CHANNEL_MANAGER_LoadName(uint8_t vfo, uint16_t number) {
-  if (vfo >= RADIO_SLOT_CAPACITY) return;
-  names[vfo][0] = '\0';
+void CHANNEL_MANAGER_LoadName(uint8_t slot, uint16_t number) {
+  if (slot >= RADIO_SLOT_CAPACITY) return;
+  names[slot][0] = '\0';
   UserChannel channel;
   if (number && CHANNEL_STORE_Load(number, &channel))
-    memcpy(names[vfo], channel.name, sizeof(names[vfo]));
+    memcpy(names[slot], channel.name, sizeof(names[slot]));
 }
 
-const char *CHANNEL_MANAGER_Name(uint8_t vfo) {
-  return vfo < RADIO_SLOT_CAPACITY ? names[vfo] : "";
+const char *CHANNEL_MANAGER_Name(uint8_t slot) {
+  return slot < RADIO_SLOT_CAPACITY ? names[slot] : "";
 }
 
-void CHANNEL_MANAGER_StartName(uint8_t vfo, uint16_t current_number) {
-  if (vfo >= RADIO_SLOT_CAPACITY) return;
-  if (!names[vfo][0] && current_number)
-    CHANNEL_MANAGER_LoadName(vfo, current_number);
-  nameVfo = vfo;
-  gTextinputText = names[vfo];
+void CHANNEL_MANAGER_StartName(uint8_t slot, uint16_t current_number) {
+  if (slot >= RADIO_SLOT_CAPACITY) return;
+  if (!names[slot][0] && current_number)
+    CHANNEL_MANAGER_LoadName(slot, current_number);
+  nameSlot = slot;
+  gTextinputText = names[slot];
   gTextInputSize = USER_CHANNEL_NAME_MAX;
   gTextInputCallback = nameAccepted;
   APPS_run(APP_TEXTINPUT);
 }
 
-void CHANNEL_MANAGER_StartSave(uint8_t vfo, uint16_t current_number,
+void CHANNEL_MANAGER_StartSave(uint8_t slot, uint16_t current_number,
                                const UserChannel *channel) {
-  if (vfo >= RADIO_SLOT_CAPACITY || !channel) return;
+  if (slot >= RADIO_SLOT_CAPACITY || !channel) return;
   if (!CHANNEL_STORE_Available()) {
     if (notify) notify("Channel store unavailable");
     return;
   }
-  saveVfo = vfo;
+  saveSlot = slot;
   draft = *channel;
-  if (names[vfo][0])
-    memcpy(draft.name, names[vfo], sizeof(draft.name));
+  if (names[slot][0])
+    memcpy(draft.name, names[slot], sizeof(draft.name));
   else
     draft.name[0] = '\0';
   target = CHANNEL_STORE_IsOccupied(current_number)
@@ -90,10 +90,10 @@ static void save(void) {
     if (notify) notify("Channel save failed");
     return;
   }
-  memcpy(names[saveVfo], draft.name, sizeof(names[saveVfo]));
+  memcpy(names[saveSlot], draft.name, sizeof(names[saveSlot]));
   active = false;
   overwriteConfirm = false;
-  if (saved) saved(saveVfo, target, &draft);
+  if (saved) saved(saveSlot, target, &draft);
   if (notify) notify("Channel saved");
 }
 

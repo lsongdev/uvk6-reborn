@@ -1,29 +1,25 @@
 # 源码结构
 
-按职责组织文件。项目头文件统一从 `src/` 开始引用，例如 `core/radio-model.h`、`drivers/bk4819/bk4819.h`，避免依赖调用文件所在目录的层数。
+主屏幕是 **Radio 应用**，与频率来源无关。A/B/C/D 是 `RadioSlot`；每个 Slot 可在 VFO（直接调频）与 MR（存储频道）之间切换。两种来源都转成 `RxPlan`，接收器仍由 `rx-runtime` 和 HAL 驱动。
 
-| 目录 | 职责 | 主要内容 |
-| --- | --- | --- |
-| `drivers/<芯片>/` | 芯片操作与协议 | SI473x、BK1080、BK4819、ST7565 的命令、寄存器定义、初始化与调谐 / 显示传输 |
-| `hal/` | 整机硬件资源接口 | 按键、屏幕、LED、背光、音频、EEPROM、总线、时钟、板级初始化与接收设备适配器 |
-| `drivers/dp32g030/` | MCU 寄存器定义 | GPIO、UART、DMA、定时器等寄存器地址与位定义 |
-| `core/` | 无线电和设备逻辑 | Hz 单位模型、频段匹配、VFO 状态、调谐与恢复流程、设置与配置存储、测量换算、电池状态、RDS 数据组解析与轮询 |
-| `vfo/` | 主无线电操作流程 | VFO 运行时、频率输入、调谐／守听／PTT 协调、卡片视图数据构造、参数菜单、频道命名与保存 |
-| `apps/` | 应用调度和其他界面 | 主循环、按键分发、应用注册、频段预设编辑器、设置、文本输入和初始化界面 |
-| `ui/` | 显示与交互组件 | 绘图、字体、状态栏、`components/` 下独立的 VFO / 信号条 / 电池 / 扫描组件、菜单和数字导航 |
-| `config/` | 第三方库编译配置 | printf 等配置头文件 |
-| `external/` | 第三方源码 | CMSIS、printf 子模块 |
+| 目录 | 职责 |
+| --- | --- |
+| `apps/radio.c` / `apps/radio.h` | Radio 主屏幕生命周期、按键、菜单、临时 Seek/FC/Watch、PTT 协调及显示状态组装 |
+| `apps/settings.c` | 全局设置应用；与 Radio 均在 `appsAvailableToRun` 中启用 |
+| `apps/channel-manager.*` | MR 频道命名、保存与覆盖确认的交互界面 |
+| `core/radio-state.*` | `RadioSlot` 和各槽 VFO 记忆、来源、选中项及 Watch 配置 |
+| `core/tuning.*` | 纯逻辑：解析槽的 VFO/MR 来源、保存频率的精确接收规划、VFO 步进 |
+| `core/radio-model.*` | 频率、解调模式和设备能力到 `RxPlan` 的规划 |
+| `core/rx-runtime.*` / `core/tx-runtime.*` | 接收失败回滚及半双工 TX 生命周期 |
+| `ui/components/radio-card.*` | A/B/C/D 通用卡片绘制、名称/RDS/频率滚动，不访问频道存储 |
+| `hal/` | 整机设备资源及芯片驱动适配 |
+| `drivers/` | 具体射频、屏幕芯片及 MCU 访问 |
+| `tests/` | 主机回归；Radio、调谐、存储及屏幕组件测试分开维护 |
 
-`main.c` 是固件入口：初始化板级设施，再进入应用主循环。链接脚本 `firmware.ld` 和构建入口 `Makefile` 保留在仓库根目录。主机工具集中在 `tools/`，回归测试集中在 `tests/`。
+VFO/MR 是 **来源（`RadioSource`）**，NFM/WFM/AM/LSB/USB 是 **解调模式（`RxMode`）**。主屏幕同时呈现用户选中槽与物理接收槽：选中槽负责输入、菜单及调谐意图；接收槽表示当前 RX/Watch 的硬件归属。两者不能混用。
 
-接收规划与恢复逻辑放在 `core/`；芯片寄存器、命令及带宽索引转换放在各自 `drivers/<芯片>/`；整机资源与跨芯片协调放在 `hal/`。例如 `core/radio-model.c` 生成接收方案，`hal/rx-device.c` 调用三个接收驱动应用方案。
+MR 模式的频道数据仅解析为临时的有效状态，不覆盖槽内 VFO 最后频率、各频段记忆；切回 VFO 应恢复原状态。频道选择、Slot 切换、接收失败回滚、频率捕获与 Seek 的保存时机在 Radio 应用中协调，纯 `tuning` 层不访问 EEPROM、显示、时钟或 HAL。EEPROM UVR2 格式 8 的字段顺序没有改变。
 
-应用和绘图通过 `hal/display.h` 使用屏幕，HAL 持有帧缓冲及重绘标记，再调用 `drivers/st7565/` 传输画面。对比度显式传入屏幕初始化接口，ST7565 驱动不读取应用设置。`hal/led.h` 表示整机红灯、绿灯和辅助 LED 资源；红绿灯使用 BK4819 GPIO，原手电筒位置的辅助 LED 使用 PC3，不向调用方暴露芯片管脚编号。按键、背光和音频沿用各自 HAL 接口。
+`main.c` 负责硬件初始化，`apps/system.c` 维护整个系统的最高优先级 PTT 安全检查和按键调度。生产 TX 默认禁用，不能因为 Radio 应用退到 Settings 而停止 PA 安全释放。
 
-HAL 的 MCU 外设实现与芯片驱动都可使用 `drivers/dp32g030/` 寄存器定义；本阶段没有将所有 GPIO / 总线代码改造成跨 MCU 的可移植接口。
-
-纯逻辑模块 `radio-model`、`radio-state`、`rx-runtime`、`rds`、`rds-receiver` 和 `config-store` 可独立在主机上验证。SI473x 的补丁加载等待提示已归回应用界面；ST7565 驱动只接收画面和对比度参数。SI473x 补丁来源、BK4819 设置读取，以及现有 `radio`、`settings` 仍有历史交叉依赖；目录整理并不代表已经完成所有接口解耦。后续修改应继续收敛这些依赖，避免将新的硬件协议细节放进纯逻辑模块。
-
-Makefile 显式列出当前启用的应用。历史扫描、频谱及 `memview` 参考代码仍保留在对应目录中，但不进入当前多 VFO 固件构建。
-
-VFO 入口为 `vfo/vfo.h`，由应用表注册。`vfo/vfo.c` 中的 `buildCardView()` 负责把业务状态整理为 `UI_VfoView`，`VFO_render()` 负责页面选择和可见项绘制；标题、参数菜单、确认页各有独立函数。卡片布局、频率／名称切换和滚动保留在 `ui/components/vfo.*`，不读取 VFO 运行时。`vfo/channel-manager.*` 负责频道 Name／Save 流程。
+详细边界和迁移说明见 [Radio 架构](../docs/radio-architecture.md)。完整回归运行 `sh tests/run.sh`；ARM 构建运行 `make -B -j4 all`。
