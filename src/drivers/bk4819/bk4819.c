@@ -1151,11 +1151,14 @@ static void initialize_audio(void) {
   );
 }
 
-static void wait_for_crystal_stabilization(void) {
-  while (BK4819_ReadRegister(BK4819_REG_0C) & 1U) {
+// A disconnected/malfunctioning BK4819 must not hang the entire boot.
+static bool wait_for_crystal_stabilization(void) {
+  for (unsigned elapsed = 0; elapsed < 100; ++elapsed) {
+    if (!(BK4819_ReadRegister(BK4819_REG_0C) & 1U)) return true;
     BK4819_WriteRegister(BK4819_REG_02, 0);
     SYS_DelayMs(1);
   }
+  return false;
 }
 
 static void configure_receiver(void) {
@@ -1175,7 +1178,10 @@ void BK4819_Init(void) {
   initialize_registers();
   initialize_dtmf_coefficients();
   initialize_audio();
-  wait_for_crystal_stabilization();
+  if (!wait_for_crystal_stabilization()) {
+    BK4819_Idle();
+    return;
+  }
   BK4819_ConfigureMicrophone(gDeviceConfig.preferences.mic);
   configure_receiver();
 

@@ -6,6 +6,9 @@
 #include "hal/gpio.h"
 #include "hal/systick.h"
 
+// Clock-stretch timeout is sticky until the next START.
+static bool bus_error;
+
 static inline void i2c_delay_short(void) {
   __asm volatile("nop\n nop\n nop\n nop\n nop\n"
                  "nop\n nop\n nop\n nop\n nop\n"
@@ -111,8 +114,13 @@ void I2C_Init(void) {
 }
 
 void I2C_Start(void) {
+  bus_error = false;
   sda_out();
   sda_hi();
+  if (!scl_hi_wait()) {
+    bus_error = true;
+    return;
+  }
   i2c_delay_short(); // Setup time для START (600 нс)
   sda_lo();          // SDA падает при SCL=HIGH
   i2c_delay_short(); // Hold time для START (600 нс)
@@ -136,7 +144,10 @@ void I2C_RepStart(void) {
   i2c_delay_long();
   sda_hi(); // SDA поднимается при LOW SCL
   i2c_delay_short();
-  scl_hi(); // SCL поднимается
+  if (!scl_hi_wait()) {
+    bus_error = true;
+    return;
+  }
   i2c_delay_short();
   sda_lo(); // SDA падает при HIGH SCL = Repeated START
   i2c_delay_short();
@@ -146,6 +157,7 @@ void I2C_RepStart(void) {
 
 int I2C_Write(uint8_t Data) {
   int ret = -1;
+  if (bus_error) return -1;
   sda_out();
   scl_lo();
   i2c_delay_long(); // Добавить задержку LOW периода
@@ -155,7 +167,11 @@ int I2C_Write(uint8_t Data) {
     Data <<= 1;
 
     i2c_delay_short(); // Setup time для данных (100 нс минимум)
-    scl_hi(); // Данные считываются на подъёме SCL
+    if (!scl_hi_wait()) {
+      bus_error = true;
+      scl_lo();
+      return -1;
+    }
     i2c_delay_short(); // HIGH период SCL
     scl_lo();
     i2c_delay_long(); // LOW период SCL
@@ -163,7 +179,11 @@ int I2C_Write(uint8_t Data) {
 
   // Читаем ACK
   sda_in();
-  scl_hi_wait();
+  if (!scl_hi_wait()) {
+    bus_error = true;
+    scl_lo();
+    return -1;
+  }
   i2c_delay_short();
 
   if (!sda_read()) {
@@ -178,12 +198,17 @@ int I2C_Write(uint8_t Data) {
 
 uint8_t I2C_Read(bool bFinal) {
   uint8_t Data = 0;
+  if (bus_error) return 0;
   sda_in();
 
   for (uint8_t i = 0; i < 8; i++) {
     Data <<= 1;
 
-    scl_hi();
+    if (!scl_hi_wait()) {
+      bus_error = true;
+      scl_lo();
+      return 0;
+    }
     i2c_delay_short();
 
     if (sda_read()) {
@@ -199,8 +224,7 @@ uint8_t I2C_Read(bool bFinal) {
   sda_out();
   (bFinal ? sda_hi : sda_lo)();
 
-  scl_hi_wait();
-
+  if (!scl_hi_wait()) bus_error = true;
   i2c_delay_short();
   scl_lo();
 
@@ -215,12 +239,10 @@ uint16_t I2C_ReadBuffer(void *pBuffer, uint16_t Size) {
   if (Size == 0)
     return 0;
 
-  for (uint16_t i = 0; i < Size - 1; i++) {
-    pData[i] = I2C_Read(false); // ACK
+  for (uint16_t i = 0; i < Size; ++i) {
+    pData[i] = I2C_Read(i + 1u == Size);
+    if (bus_error) return i;
   }
-
-  pData[Size - 1] = I2C_Read(true); // NACK на последнем байте
-
   return Size;
 }
 
