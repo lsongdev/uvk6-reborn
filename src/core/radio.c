@@ -33,30 +33,24 @@ RadioState *gRadioState;
 RadioState *vfo;
 RadioReceiver *ctx;
 
-static void toggleBK4819(bool on) {
-  Log("[RADIO] BK4819 audio=%u", on);
+// Both receiver families share the speaker mute/settle sequence.
+// The BK4819 additionally gates its DAC and audio path.
+static void toggleAudio(bool on, bool bk) {
+  Log("[RADIO] audio=%u bk=%u", on, bk);
   if (on) {
-    BK4819_ToggleAFDAC(true);
-    BK4819_ToggleAFBit(true);
+    if (bk) {
+      BK4819_ToggleAFDAC(true);
+      BK4819_ToggleAFBit(true);
+    }
     SYS_DelayMs(8);
     AUDIO_ToggleSpeaker(true);
   } else {
     AUDIO_ToggleSpeaker(false);
     SYS_DelayMs(8);
-    BK4819_ToggleAFDAC(false);
-    BK4819_ToggleAFBit(false);
-  }
-}
-
-
-static void toggleBK1080SI4732(bool on) {
-  Log("[RADIO] BK1080/SI audio=%u", on);
-  if (on) {
-    SYS_DelayMs(8);
-    AUDIO_ToggleSpeaker(true);
-  } else {
-    AUDIO_ToggleSpeaker(false);
-    SYS_DelayMs(8);
+    if (bk) {
+      BK4819_ToggleAFDAC(false);
+      BK4819_ToggleAFBit(false);
+    }
   }
 }
 
@@ -64,10 +58,7 @@ static void toggleBK1080SI4732(bool on) {
 void RADIO_SetAudioOpen(bool open) {
   if (!vfo || !ctx)
     return;
-  if (ctx->radio_type == RADIO_BK4819)
-    toggleBK4819(open);
-  else
-    toggleBK1080SI4732(open);
+  toggleAudio(open, ctx->radio_type == RADIO_BK4819);
 
   LED_SetGreen(open);
   BACKLIGHT_SetReception(open);
