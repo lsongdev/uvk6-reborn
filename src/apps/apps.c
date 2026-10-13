@@ -6,7 +6,7 @@
 #include "ui/statusline.h"
 #include "apps/reset.h"
 #include "apps/settings.h"
-#include "vfo/vfo.h"
+#include "apps/radio.h"
 #include "apps/bands.h"
 #include "apps/textinput.h"
 
@@ -14,7 +14,7 @@
 
 AppType_t gCurrentApp = APP_NONE;
 
-static AppType_t loadedVfoApp = APP_NONE;
+static AppType_t loadedRadioApp = APP_NONE;
 
 static AppType_t appsStack[APPS_STACK_SIZE] = {APP_NONE};
 static int8_t stackIndex = -1;
@@ -45,7 +45,7 @@ AppType_t APPS_Peek(void) {
   return APP_NONE;
 }
 
-const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {APP_VFO};
+const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {APP_RADIO, APP_SETTINGS};
 
 // Only the minimal radio, input, settings and explicit reset remain reachable.
 const App apps[APPS_COUNT] = {
@@ -56,7 +56,7 @@ const App apps[APPS_COUNT] = {
     [APP_RESET] = {"Reset", RESET_Init, RESET_Update, RESET_Render, RESET_key, NULL},
     [APP_TEXTINPUT] = {"Text input", TEXTINPUT_init, TEXTINPUT_update,
                        TEXTINPUT_render, TEXTINPUT_key, TEXTINPUT_deinit},
-    [APP_VFO] = {"Radio", VFO_init, VFO_update, VFO_render, VFO_key, VFO_deinit, true},
+    [APP_RADIO] = {"Radio", RADIO_APP_init, RADIO_APP_update, RADIO_APP_render, RADIO_APP_key, RADIO_APP_deinit, true},
 };
 
 bool APPS_key(KEY_Code_t Key, Key_State_t state) {

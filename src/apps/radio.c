@@ -1,4 +1,4 @@
-#include "vfo/vfo.h"
+#include "apps/radio.h"
 #include "hal/display.h"
 #include "external/printf/printf.h"
 #include "ui/menu.h"
@@ -106,9 +106,9 @@ static uint32_t capturePollAt;
 static void cancelCapture(const char *status);
 static void captureUpdate(void);
 static uint32_t seekAt, seekDeadline;
-bool VFO_isShortcutPending(void) { return functionPending; }
+bool RADIO_APP_isShortcutPending(void) { return functionPending; }
 
-void VFO_cancelShortcut(void) {
+void RADIO_APP_cancelShortcut(void) {
   if (functionPending) {
     functionPending = false;
     gRedrawScreen = true;
@@ -161,16 +161,16 @@ static const TxOperations txOperations = {
   .disable = txDisable, .restore_rx = txRestore
 };
 
-void VFO_PttRelease(void) {
+void RADIO_APP_PttRelease(void) {
   pttPending = false;
   TX_RuntimeRelease(&transmitter, &txOperations);
 }
 
-void VFO_deinit(void) {
+void RADIO_APP_deinit(void) {
   number.active = false;
   if (capturePhase!=FC_OFF) cancelCapture(NULL);
-  VFO_PttRelease();
-  VFO_cancelShortcut();
+  RADIO_APP_PttRelease();
+  RADIO_APP_cancelShortcut();
   if (seek.active)
     finishSeek(false, 0, NULL);
   (void)pauseWatch();
@@ -178,7 +178,7 @@ void VFO_deinit(void) {
 
 static void expireShortcut(uint32_t now) {
   if (functionPending && now-functionAt >= 3000u)
-    VFO_cancelShortcut();
+    RADIO_APP_cancelShortcut();
 }
 
 static void notify(const char *text) {
@@ -221,7 +221,7 @@ static bool apply(const RxPlan *plan) {
                                   runtime.current.parameters.mode == RX_USB);
   if (needsSsb && !wasSsb) {
     notify("WAIT...");
-    VFO_render();
+    RADIO_APP_render();
     DISPLAY_Blit();
   }
   RxTuneResult result = RX_RuntimeTune(&runtime, plan,
@@ -540,8 +540,8 @@ static void beginFrequencyInput(bool tx) {
                tx ? 1300000000u : RADIO_MAX_HZ, 1000000u, initial, tx);
 }
 
-void VFO_init(void) {
-  VFO_cancelShortcut();
+void RADIO_APP_init(void) {
+  RADIO_APP_cancelShortcut();
   if (initialized && selectedVfo==gDeviceConfig.radio.selected_vfo &&
       selectedVfo<gDeviceConfig.radio.vfo_count) return;
   initialized = true;
@@ -567,7 +567,7 @@ void VFO_init(void) {
   if (invalidSavedChannel) notify("Channel unavailable");
 }
 
-bool VFO_isReceiving(void) {
+bool RADIO_APP_isReceiving(void) {
   return initialized && receivingVfo != UINT8_MAX && !WATCH_IsProbing(&watcher) && runtime.active && !seek.active && capturePhase!=FC_DETECT &&
          transmitter.mode == RADIO_RX;
 }
@@ -577,15 +577,15 @@ static bool readRds(void *unused, RdsPacket *packet, bool clear_fifo) {
   return RX_DEVICE_ReadRDS(packet, clear_fifo);
 }
 
-void VFO_TxSafetyUpdate(void) {
+void RADIO_APP_TxSafetyUpdate(void) {
   // Check the physical button, not just the queued keyboard release event.
   if ((pttPending || transmitter.mode == RADIO_TX) && !TX_DEVICE_PttPressed()) {
-    VFO_PttRelease();
+    RADIO_APP_PttRelease();
     gRedrawScreen = true;
     return;
   }
   if (transmitter.mode == RADIO_TX && !TX_DEVICE_VoltageValid()) {
-    VFO_PttRelease();
+    RADIO_APP_PttRelease();
     transmitter.wait_release = true;
     notify("TX battery voltage");
     return;
@@ -610,10 +610,10 @@ void VFO_TxSafetyUpdate(void) {
     notify(transmitter.mode == RADIO_FAULT ? "RX restore error" : "TX timeout");
 }
 
-void VFO_update(void) {
+void RADIO_APP_update(void) {
   uint32_t now = Now();
   expireShortcut(now);
-  VFO_TxSafetyUpdate(); // Also permit deterministic host/UI unit tests.
+  RADIO_APP_TxSafetyUpdate(); // Also permit deterministic host/UI unit tests.
   if (message || (!inMenu && !confirming))
     for (uint8_t id=0; id<RADIO_VFO_CAPACITY; ++id)
       if (UI_VfoUpdate(&cards[id], now)) gRedrawScreen = true;
@@ -631,7 +631,7 @@ void VFO_update(void) {
   if (capturePhase!=FC_OFF) { captureUpdate(); return; }
   seekUpdate();
   watchUpdate();
-  bool rdsEnabled = VFO_isReceiving() && runtime.active && runtime.current.device == RX_DEVICE_SI &&
+  bool rdsEnabled = RADIO_APP_isReceiving() && runtime.active && runtime.current.device == RX_DEVICE_SI &&
                     runtime.current.parameters.mode == RX_WFM;
   bool textExpired = rdsEnabled && now-rds.last_group >= 15000u;
   if (RDS_ReceiverUpdate(&rds, now, rdsEnabled, readRds, NULL) || textExpired) {
@@ -743,7 +743,7 @@ static bool tuneDirect(const RxPlan *plan) {
 
 // Reapply only the active receive plan. Global settings never rewrite VFOs
 // or presets, and the receive runtime remains responsible for recovery.
-bool VFO_ApplyRxSettings(void) {
+bool RADIO_APP_ApplyRxSettings(void) {
   if (capturePhase!=FC_OFF) cancelCapture(NULL);
   if (!initialized) return true;
   RxPlan plan;
@@ -1020,7 +1020,7 @@ static void startTransmit(void) {
 // While FC or numeric editing owns the keyboard, keep all other actions
 // blocked; especially never allow an input digit to become a global shortcut.
 static void captureKey(KEY_Code_t key, Key_State_t state) {
-  if (key==KEY_PTT && state==KEY_RELEASED) VFO_PttRelease();
+  if (key==KEY_PTT && state==KEY_RELEASED) RADIO_APP_PttRelease();
   if (state != KEY_RELEASED) return;
   if (key==KEY_EXIT || (key==KEY_MENU && capturePhase==FC_DETECT))
     cancelCapture(NULL);
@@ -1049,7 +1049,7 @@ static void frequencyInputKey(KEY_Code_t key, Key_State_t state) {
 }
 
 static void shortcutKey(KEY_Code_t key) {
-  VFO_cancelShortcut();
+  RADIO_APP_cancelShortcut();
   switch (key) {
   case KEY_1: nextBand(); break;
   case KEY_0: nextMode(); break;
@@ -1070,7 +1070,7 @@ static void shortcutKey(KEY_Code_t key) {
   }
 }
 
-bool VFO_key(KEY_Code_t key, Key_State_t state) {
+bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
   expireShortcut(Now());
   if (capturePhase!=FC_OFF) {
     captureKey(key, state);
@@ -1086,9 +1086,9 @@ bool VFO_key(KEY_Code_t key, Key_State_t state) {
     return true; // Search temporarily owns all controls except cancel.
   }
   if (key == KEY_PTT) {
-    VFO_cancelShortcut();
+    RADIO_APP_cancelShortcut();
     if (state == KEY_RELEASED) {
-      VFO_PttRelease();
+      RADIO_APP_PttRelease();
       return true;
     }
     if (state != KEY_PRESSED || pttPending || transmitter.wait_release ||
@@ -1148,7 +1148,7 @@ bool VFO_key(KEY_Code_t key, Key_State_t state) {
   // Consume the target so it cannot also enter frequency input or a menu.
   if (functionPending) {
     if (key == KEY_MENU && state == KEY_LONG_PRESSED) {
-      VFO_cancelShortcut();
+      RADIO_APP_cancelShortcut();
       return false; // Keep the global settings shortcut available.
     }
     if (state == KEY_RELEASED) shortcutKey(key);
@@ -1263,7 +1263,7 @@ static void buildCardView(uint8_t id, const char *inputText,
   bool modified = !channelMode && (p->mode != preset->mode || p->step_hz != preset->step_hz ||
     p->bandwidth_hz != preset->bandwidth_hz || p->squelch != preset->squelch ||
     p->rx_tone != preset->rx_tone);
-  bool receiving = receivingVfo==id && VFO_isReceiving();
+  bool receiving = receivingVfo==id && RADIO_APP_isReceiving();
   bool textValid = labels[id].frequency_hz == current->frequency_hz;
   char *channelHeader = storage->header;
   const char *header = radioBands[config->active_band].name;
@@ -1349,7 +1349,7 @@ static void renderMenu(void) {
   }
 }
 
-void VFO_render(void) {
+void RADIO_APP_render(void) {
   renderTitle();
   if (CHANNEL_MANAGER_Render()) return;
   if (!message && (confirming || inMenu)) {

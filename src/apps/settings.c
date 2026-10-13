@@ -1,6 +1,6 @@
 #include "apps/settings.h"
 #include "apps/apps.h"
-#include "vfo/vfo.h"
+#include "apps/radio.h"
 #include "core/settings.h"
 #include "core/device-config.h"
 #include "core/battery.h"
@@ -165,9 +165,9 @@ void SETTINGS_init(void) {
 void SETTINGS_deinit(void) {
   ConfigPreferences *p = &gDeviceConfig.preferences;
   if (oldOpen!=p->sql_open_time || oldClose!=p->sql_close_time || oldBoundary!=p->bound_240_280) {
-    if (!VFO_ApplyRxSettings()) {
+    if (!RADIO_APP_ApplyRxSettings()) {
       p->sql_open_time=oldOpen; p->sql_close_time=oldClose; p->bound_240_280=oldBoundary;
-      (void)VFO_ApplyRxSettings();
+      (void)RADIO_APP_ApplyRxSettings();
       DEVICE_RequestSave();
     }
   }
