@@ -5,6 +5,7 @@
 #include "hal/board.h"
 #include "core/dcs.h"
 #include "hal/audio.h"
+#include "hal/tx-device.h"
 #include "hal/backlight.h"
 #include "drivers/bk1080/bk1080.h"
 #include "drivers/bk4819/bk4819-regs.h"
@@ -172,6 +173,7 @@ void RADIO_UpdateSquelch(RadioState *state) {
 void RADIO_InitHardware(RadioState *state) {
   if (!state || state != gRadioState) return;
   BK4819_Init();
+  TX_DEVICE_Disable(); // Explicitly keep PA off on startup.
   BK4819_RX_TurnOn();
   (void)BK1080_Init(0, false);
 }
