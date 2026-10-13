@@ -31,7 +31,7 @@ esac
   -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
   -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/radio-app-regression.c src/vfo/channel-manager.c src/ui/number-input.c src/core/dcs.c src/external/printf/printf.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/watch.c src/core/tx-model.c src/core/tx-runtime.c src/core/seek.c src/core/capture.c \
+  tests/radio-app-regression.c src/apps/channel-manager.c src/ui/number-input.c src/core/dcs.c src/external/printf/printf.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/watch.c src/core/tx-model.c src/core/tx-runtime.c src/core/seek.c src/core/capture.c \
   src/core/rds.c src/core/rds-receiver.c src/ui/components/frequency.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
@@ -85,7 +85,7 @@ esac
   -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
   -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/vfo-component-regression.c src/ui/graphics.c src/ui/components/vfo.c \
+  tests/radio-card-regression.c src/ui/graphics.c src/ui/components/radio-card.c \
   src/ui/components/signal.c src/ui/components/frequency.c src/core/radio-model.c src/external/printf/printf.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/rds-regression.c \

@@ -1,4 +1,4 @@
-#include "vfo/channel-manager.h"
+#include "apps/channel-manager.h"
 #include "apps/apps.h"
 #include "apps/textinput.h"
 #include "hal/display.h"
