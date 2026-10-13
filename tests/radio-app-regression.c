@@ -13,11 +13,11 @@ void STATUSLINE_SetText(const char *pattern, ...) {
   va_list args; va_start(args, pattern);
   vsnprintf(statusText, sizeof(statusText), pattern, args); va_end(args);
 }
-static UI_VfoView drawn[RADIO_VFO_CAPACITY];
+static UI_RadioCardView drawn[RADIO_VFO_CAPACITY];
 static unsigned drawCount;
-void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_t now) {
+void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view, UI_RadioCardState *state, uint32_t now) {
   unsigned id = view->id-'A';
-  assert(id<RADIO_VFO_CAPACITY && y==8+(id-RADIO_STATE_VisibleFirst(&gDeviceConfig.radio))*UI_VFO_HEIGHT && state==&cards[id]);
+  assert(id<RADIO_VFO_CAPACITY && y==8+(id-RADIO_STATE_VisibleFirst(&gDeviceConfig.radio))*UI_RADIO_CARD_HEIGHT && state==&cards[id]);
   (void)now; drawn[id]=*view; ++drawCount;
 }
 uint8_t UI_SMeterLevel(void) { return 8; }
@@ -98,8 +98,8 @@ void RX_DEVICE_SeekCancel(RxDevice dev) { (void)dev; ++nativeCancels; }
 bool RX_DEVICE_SeekSignal(RxDevice dev, bool *found) {
   (void)dev; *found = ctx->frequency*10u == soughtFrequency; return true;
 }
-void UI_VfoShowFrequency(UI_VfoState *state, uint32_t now) { state->tuned_at = now; }
-bool UI_VfoUpdate(UI_VfoState *state, uint32_t now) { (void)state; (void)now; return false; }
+void UI_RadioCardShowFrequency(UI_RadioCardState *state, uint32_t now) { state->tuned_at = now; }
+bool UI_RadioCardUpdate(UI_RadioCardState *state, uint32_t now) { (void)state; (void)now; return false; }
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear) {
   ++rdsReads;
   *packet=(RdsPacket){0};
@@ -683,7 +683,7 @@ int main(void) {
   assert(selectedVfo==0 && receivingVfo==0);
   RADIO_APP_render();
   assert(drawn[0].selected && !drawn[1].selected && !drawn[1].signal_valid);
-  assert(drawn[1].frequency_hz==438500000 && drawn[1].activity==UI_VFO_IDLE);
+  assert(drawn[1].frequency_hz==438500000 && drawn[1].activity==UI_RADIO_CARD_IDLE);
   VfoConfig originalA=gDeviceConfig.radio.vfos[0];
   press(KEY_F); press(KEY_2);
   assert(selectedVfo==1 && receivingVfo==1 && !functionPending);
@@ -694,8 +694,8 @@ int main(void) {
   press(KEY_MENU);menuIndex=8;press(KEY_MENU);press(KEY_EXIT);
   assert(gDeviceConfig.radio.vfos[1].tx.tone==1 && !gDeviceConfig.radio.vfos[0].tx.tone);
   vfo->is_open=true;
-  RADIO_APP_render();assert(drawn[1].selected && drawn[1].activity==UI_VFO_RECEIVING);
-  assert(!drawn[0].signal_valid && drawn[0].activity==UI_VFO_IDLE);
+  RADIO_APP_render();assert(drawn[1].selected && drawn[1].activity==UI_RADIO_CARD_RECEIVING);
+  assert(!drawn[0].signal_valid && drawn[0].activity==UI_RADIO_CARD_IDLE);
   press(KEY_F);press(KEY_2);
   assert(selectedVfo==0 && user.current.frequency_hz==145500000);
   press(KEY_F);press(KEY_2);
@@ -723,7 +723,7 @@ int main(void) {
   failApply=true;press(KEY_F);press(KEY_2);
   assert(selectedVfo==0 && receivingVfo==UINT8_MAX && !runtime.active);
   RADIO_APP_render();assert(!drawn[0].signal_valid && !drawn[1].signal_valid);
-  assert(drawn[0].activity==UI_VFO_UNAVAILABLE);
+  assert(drawn[0].activity==UI_RADIO_CARD_UNAVAILABLE);
   setup(145500000,fm);
   assert(RADIO_STATE_Set(&gDeviceConfig.radio,1,7100000,
       (RadioParameters){RX_LSB,1000,3000,0,0}));
@@ -802,7 +802,7 @@ int main(void) {
   RADIO_APP_update();assert(receivingVfo==1 && selectedVfo==0);
   clockNow+=180;RADIO_APP_update();assert(watcher.phase==WATCH_VERIFY);
   clockNow+=80;RADIO_APP_update();assert(watcher.phase==WATCH_HOLD && RADIO_APP_isReceiving());
-  assert(vfo->is_open);RADIO_APP_render();assert(drawn[1].activity==UI_VFO_RECEIVING && !drawn[1].selected);
+  assert(vfo->is_open);RADIO_APP_render();assert(drawn[1].activity==UI_RADIO_CARD_RECEIVING && !drawn[1].selected);
   assert(drawn[0].selected && !drawn[0].signal_valid);
   assert(saveRequests==watchSaves && user.current.frequency_hz==145500000);
   assert(gDeviceConfig.radio.vfos[1].current.frequency_hz==438500000 && !gDeviceConfig.radio.selected_vfo);

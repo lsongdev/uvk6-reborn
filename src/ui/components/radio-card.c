@@ -1,4 +1,4 @@
-#include "ui/components/vfo.h"
+#include "ui/components/radio-card.h"
 #include "ui/components/signal.h"
 #include "ui/components/frequency.h"
 #include "ui/graphics.h"
@@ -6,7 +6,7 @@
 
 enum { BODY_X = 30, FREQUENCY_RIGHT = 110, BAND_X = 14 };
 
-void UI_VfoShowFrequency(UI_VfoState *state, uint32_t now) {
+void UI_RadioCardShowFrequency(UI_RadioCardState *state, uint32_t now) {
   state->tuned_at = now;
   state->show_name = false;
   state->offset = 0;
@@ -14,15 +14,15 @@ void UI_VfoShowFrequency(UI_VfoState *state, uint32_t now) {
 
 static uint16_t scrollOffset(uint32_t now, uint32_t started, uint16_t overflow) {
   if (!overflow) return 0;
-  uint32_t phase = (now-started)%(2u*UI_VFO_SCROLL_PAUSE_MS+overflow*UI_VFO_SCROLL_PIXEL_MS);
-  return phase < UI_VFO_SCROLL_PAUSE_MS ? 0 : phase < UI_VFO_SCROLL_PAUSE_MS+overflow*UI_VFO_SCROLL_PIXEL_MS
-                              ? (phase-UI_VFO_SCROLL_PAUSE_MS)/UI_VFO_SCROLL_PIXEL_MS : overflow;
+  uint32_t phase = (now-started)%(2u*UI_RADIO_CARD_SCROLL_PAUSE_MS+overflow*UI_RADIO_CARD_SCROLL_PIXEL_MS);
+  return phase < UI_RADIO_CARD_SCROLL_PAUSE_MS ? 0 : phase < UI_RADIO_CARD_SCROLL_PAUSE_MS+overflow*UI_RADIO_CARD_SCROLL_PIXEL_MS
+                              ? (phase-UI_RADIO_CARD_SCROLL_PAUSE_MS)/UI_RADIO_CARD_SCROLL_PIXEL_MS : overflow;
 }
 
-bool UI_VfoUpdate(UI_VfoState *state, uint32_t now) {
+bool UI_RadioCardUpdate(UI_RadioCardState *state, uint32_t now) {
   if (!state->initialized) return false;
   bool show = state->label[0] && !state->tuning &&
-              now-state->tuned_at >= UI_VFO_NAME_DELAY_MS;
+              now-state->tuned_at >= UI_RADIO_CARD_NAME_DELAY_MS;
   bool changed = show != state->show_name;
   if (show && !state->show_name) state->label_started = now;
   state->show_name = show;
@@ -49,24 +49,24 @@ static void formatStep(uint32_t hz, char text[24]) {
   snprintf(text, 24, "%s%c", value, unit[0] == 'M' ? 'M' : 'k');
 }
 
-static void renderActivity(uint8_t y, const UI_VfoView *view) {
+static void renderActivity(uint8_t y, const UI_RadioCardView *view) {
   const char *upper, *lower;
   char step[24];
   switch (view->activity) {
-  case UI_VFO_RECEIVING:
+  case UI_RADIO_CARD_RECEIVING:
     PrintSmall(2, y+14, "RX");
     if (view->signal_valid) UI_SignalIcon(2, y+25, view->signal_level);
     else PrintSmall(2, y+24, "--");
     return;
-  case UI_VFO_TRANSMITTING:
+  case UI_RADIO_CARD_TRANSMITTING:
     upper = "TX"; lower = view->power_label ? view->power_label : "--"; break;
-  case UI_VFO_SEEKING:
+  case UI_RADIO_CARD_SEEKING:
     upper = "SEEK"; lower = ">"; break;
-  case UI_VFO_WATCHING:
+  case UI_RADIO_CARD_WATCHING:
     upper = "DW"; lower = "--"; break;
-  case UI_VFO_UNAVAILABLE:
+  case UI_RADIO_CARD_UNAVAILABLE:
     upper = "RX"; lower = "--"; break;
-  case UI_VFO_FAULT:
+  case UI_RADIO_CARD_FAULT:
     upper = "FAULT"; lower = "RX"; break;
   default:
     formatStep(view->step_hz, step);
@@ -76,17 +76,17 @@ static void renderActivity(uint8_t y, const UI_VfoView *view) {
   UI_SmallTextWindow(2, y+24, 26, lower, 0);
 }
 
-void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_t now) {
-  if (!view || !state || y+UI_VFO_HEIGHT > LCD_HEIGHT) return;
+void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view, UI_RadioCardState *state, uint32_t now) {
+  if (!view || !state || y+UI_RADIO_CARD_HEIGHT > LCD_HEIGHT) return;
   if (!state->initialized || state->frequency_hz != view->frequency_hz) {
-    UI_VfoShowFrequency(state, now);
+    UI_RadioCardShowFrequency(state, now);
     state->initialized = true;
     state->frequency_hz = view->frequency_hz;
   }
   bool wasTuning = state->tuning;
-  state->tuning = view->edit_text || view->activity == UI_VFO_SEEKING;
-  if (wasTuning && !state->tuning) UI_VfoShowFrequency(state, now);
-  if (state->tuning) UI_VfoShowFrequency(state, now);
+  state->tuning = view->edit_text || view->activity == UI_RADIO_CARD_SEEKING;
+  if (wasTuning && !state->tuning) UI_RadioCardShowFrequency(state, now);
+  if (state->tuning) UI_RadioCardShowFrequency(state, now);
   char label[128], frequency[16];
   const char *name = view->name ? view->name : "";
   const char *rds = view->rds ? view->rds : "";
@@ -98,7 +98,7 @@ void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_
   }
   uint16_t textWidth = UI_BodyTextWidth(state->label);
   state->overflow = textWidth > LCD_WIDTH-BODY_X ? textWidth-(LCD_WIDTH-BODY_X) : 0;
-  UI_VfoUpdate(state, now);
+  UI_RadioCardUpdate(state, now);
   const char *unit = UI_FormatFrequency(view->frequency_hz, frequency);
   if (view->edit_text) {
     snprintf(frequency, sizeof(frequency), "%s", view->edit_text);
@@ -124,7 +124,7 @@ void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_
   state->band_overflow = bandTextWidth > bandWidth ? bandTextWidth-bandWidth : 0;
   state->band_offset = scrollOffset(now, state->band_started, state->band_overflow);
 
-  FillRect(0, y, LCD_WIDTH, UI_VFO_HEIGHT, C_CLEAR);
+  FillRect(0, y, LCD_WIDTH, UI_RADIO_CARD_HEIGHT, C_CLEAR);
   if (view->selected) {
     DrawVLine(1, y+1, 5, C_FILL);
     DrawVLine(2, y+2, 3, C_FILL);

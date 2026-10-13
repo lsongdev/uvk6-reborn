@@ -19,16 +19,16 @@
 #include "hal/scheduler.h"
 #include "ui/components/signal.h"
 #include "ui/components/frequency.h"
-#include "ui/components/vfo.h"
+#include "ui/components/radio-card.h"
 #include "ui/graphics.h"
 #include "ui/statusline.h"
 #include "apps/apps.h"
 #include "ui/number-input.h"
-#include "vfo/channel-manager.h"
+#include "apps/channel-manager.h"
 #include <string.h>
 
 static bool initialized;
-static UI_VfoState cards[RADIO_VFO_CAPACITY];
+static UI_RadioCardState cards[RADIO_VFO_CAPACITY];
 static uint8_t selectedVfo, receivingVfo = UINT8_MAX, inputVfo;
 static NumberInput number;
 static bool inputTx;
@@ -125,7 +125,7 @@ static void __attribute__((noinline)) delayWatch(void) {
   watchResumeAt = Now() + 2000u;
 }
 static void __attribute__((noinline)) showFrequency(void) {
-  UI_VfoShowFrequency(&cards[selectedVfo], Now());
+  UI_RadioCardShowFrequency(&cards[selectedVfo], Now());
 }
 
 static void finishSeek(bool found, uint32_t frequency_hz, const char *status);
@@ -616,12 +616,12 @@ void RADIO_APP_update(void) {
   RADIO_APP_TxSafetyUpdate(); // Also permit deterministic host/UI unit tests.
   if (message || (!inMenu && !confirming))
     for (uint8_t id=0; id<RADIO_VFO_CAPACITY; ++id)
-      if (UI_VfoUpdate(&cards[id], now)) gRedrawScreen = true;
-  const UI_VfoState *card=&cards[selectedVfo];
+      if (UI_RadioCardUpdate(&cards[id], now)) gRedrawScreen = true;
+  const UI_RadioCardState *card=&cards[selectedVfo];
   uint32_t duration=2500u;
   uint16_t overflow = card->band_overflow;
   if (overflow)
-    duration=2u*UI_VFO_SCROLL_PAUSE_MS+overflow*UI_VFO_SCROLL_PIXEL_MS;
+    duration=2u*UI_RADIO_CARD_SCROLL_PAUSE_MS+overflow*UI_RADIO_CARD_SCROLL_PIXEL_MS;
   if (message && now-messageAt >= duration) {
     message = NULL;
     gRedrawScreen = true;
@@ -1239,7 +1239,7 @@ typedef struct {
 
 // Resolve application state here; the UI component only consumes display data.
 static void buildCardView(uint8_t id, const char *inputText,
-                          UI_VfoView *view, VfoViewStorage *storage) {
+                          UI_RadioCardView *view, VfoViewStorage *storage) {
   bool selected = id == selectedVfo;
   const VfoConfig *stored = &gDeviceConfig.radio.vfos[id];
   VfoConfig effective;
@@ -1274,7 +1274,7 @@ static void buildCardView(uint8_t id, const char *inputText,
     channelName = effectiveOk && channel->name[0] ? channel->name : channelHeader;
     if (!effectiveOk) { channelName = NULL; header = "Channel unavailable"; }
   }
-  *view = (UI_VfoView){
+  *view = (UI_RadioCardView){
     .id = 'A'+id, .selected = selected,
     .edit_text = selected && number.active && !inputTx ? inputText : NULL,
     .frequency_hz = selected && seek.active ? seek.cursor_hz : current->frequency_hz,
@@ -1285,12 +1285,12 @@ static void buildCardView(uint8_t id, const char *inputText,
     .header_message = selected && !number.active ? (message ? message :
         gDeviceConfig.radio.watch_enabled ? watchStatus : NULL) : NULL,
     .signal_valid = receiving, .signal_level = receiving ? UI_SMeterLevel() : 0,
-    .activity = selected && transmitter.mode==RADIO_TX ? UI_VFO_TRANSMITTING :
-      selected && transmitter.mode==RADIO_FAULT ? UI_VFO_FAULT :
-      selected && seek.active ? UI_VFO_SEEKING :
-      receivingVfo==id && WATCH_IsProbing(&watcher) ? UI_VFO_WATCHING :
-      receiving && vfo->is_open ? UI_VFO_RECEIVING :
-      (channelMode && !effectiveOk) || (selected && !runtime.active) ? UI_VFO_UNAVAILABLE : UI_VFO_IDLE,
+    .activity = selected && transmitter.mode==RADIO_TX ? UI_RADIO_CARD_TRANSMITTING :
+      selected && transmitter.mode==RADIO_FAULT ? UI_RADIO_CARD_FAULT :
+      selected && seek.active ? UI_RADIO_CARD_SEEKING :
+      receivingVfo==id && WATCH_IsProbing(&watcher) ? UI_RADIO_CARD_WATCHING :
+      receiving && vfo->is_open ? UI_RADIO_CARD_RECEIVING :
+      (channelMode && !effectiveOk) || (selected && !runtime.active) ? UI_RADIO_CARD_UNAVAILABLE : UI_RADIO_CARD_IDLE,
     .power_label = tx->power == TX_POWER_HIGH ? "HIGH" :
                    tx->power == TX_POWER_MEDIUM ? "MID" : "LOW",
   };
@@ -1366,8 +1366,8 @@ void RADIO_APP_render(void) {
   for (uint8_t row = 0; row < RADIO_VFO_VISIBLE; ++row) {
     uint8_t id = first + row;
     VfoViewStorage storage;
-    UI_VfoView view;
+    UI_RadioCardView view;
     buildCardView(id, inputText, &view, &storage);
-    UI_VfoRender(8 + row * UI_VFO_HEIGHT, &view, &cards[id], now);
+    UI_RadioCardRender(8 + row * UI_RADIO_CARD_HEIGHT, &view, &cards[id], now);
   }
 }
