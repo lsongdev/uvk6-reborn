@@ -68,7 +68,7 @@ int main(void) {
   gDeviceConfig.preferences.battery_type=2;
   gDeviceConfig.preferences.bound_240_280=1;
   gDeviceConfig.preferences.contrast=15;
-  gDeviceConfig.radio.vfo_count=4;
+  gDeviceConfig.radio.slot_count=4;
   RadioUserState radio=gDeviceConfig.radio;
   ConfigPreferences before=gDeviceConfig.preferences;
   saveWorks=false; assert(!SETTINGS_ResetPreferences());

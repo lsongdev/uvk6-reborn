@@ -59,13 +59,13 @@ static const MenuItem displayItems[] = {
 MENU_DEF(displayMenu,"Display",displayItems);
 
 static void getRadioValue(const MenuItem *item, char *out, uint8_t size) {
-  if (!item->setting) snprintf(out,size,"%u",gDeviceConfig.radio.vfo_count);
+  if (!item->setting) snprintf(out,size,"%u",gDeviceConfig.radio.slot_count);
   else snprintf(out,size,"%s",gDeviceConfig.radio.watch_enabled ? "On" : "Off");
 }
 static void changeRadioValue(const MenuItem *item, bool up) {
   notice = NULL;
   if (!item->setting) {
-    uint8_t count=IncDecU(gDeviceConfig.radio.vfo_count,2,RADIO_VFO_CAPACITY+1u,up);
+    uint8_t count=IncDecU(gDeviceConfig.radio.slot_count,2,RADIO_SLOT_CAPACITY+1u,up);
     if (!RADIO_STATE_SetCount(&gDeviceConfig.radio,count)) return;
   } else gDeviceConfig.radio.watch_enabled ^= 1u;
   DEVICE_RequestSave();
@@ -107,7 +107,7 @@ static bool saveNow(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
 }
 static void getTxStatus(const MenuItem *item, char *out, uint8_t size) {
   (void)item;
-  const VfoConfig *vfo = &gDeviceConfig.radio.vfos[gDeviceConfig.radio.selected_vfo];
+  const RadioSlot *vfo = &gDeviceConfig.radio.slots[gDeviceConfig.radio.selected_slot];
   TxCapabilities capability = TX_DEVICE_Capabilities(vfo->tx.frequency_hz ? vfo->tx.frequency_hz : vfo->current.frequency_hz);
   TxPolicy policy = TX_DEVICE_Policy();
   const char *status = !capability.available ? "HW locked" :

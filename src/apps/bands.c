@@ -12,12 +12,12 @@ static const char *message;
 
 enum { FIELD_CURRENT = 5, FIELD_DEFAULTS, FIELD_SAVE, FIELD_COUNT };
 
-static const VfoConfig *selectedVfo(void) {
-  return &gDeviceConfig.radio.vfos[gDeviceConfig.radio.selected_vfo];
+static const RadioSlot *selectedSlot(void) {
+  return &gDeviceConfig.radio.slots[gDeviceConfig.radio.selected_slot];
 }
 
 void BANDS_init(void) {
-  selected = selectedVfo()->active_band;
+  selected = selectedSlot()->active_band;
   field = 0;
   editing = false;
   message = NULL;
@@ -29,7 +29,7 @@ static void save(void) {
     return;
   }
   RxPlan plan;
-  RxResult result = RADIO_MODEL_Plan(selectedVfo()->bands[selected].frequency_hz,
+  RxResult result = RADIO_MODEL_Plan(selectedSlot()->bands[selected].frequency_hz,
                                     draft, RADIO_GetReceiverCapabilities(), &plan);
   if (result != RX_OK) {
     message = result == RX_PATCH_MISSING ? "SSB patch missing"
@@ -82,14 +82,14 @@ bool BANDS_key(KEY_Code_t key, Key_State_t state) {
     return true;
   message = NULL;
   if (field < FIELD_CURRENT) {
-    if (!RADIO_MODEL_Adjust(selectedVfo()->bands[selected].frequency_hz,
+    if (!RADIO_MODEL_Adjust(selectedSlot()->bands[selected].frequency_hz,
                             &draft, RADIO_GetReceiverCapabilities(),
                             (RadioParameterField)field, key != KEY_F))
       message = field == RADIO_FIELD_BANDWIDTH && draft.mode == RX_WFM ? "Fixed bandwidth" : "No valid option";
   } else if (key == KEY_MENU) {
     if (field == FIELD_CURRENT) {
-      if (selected == selectedVfo()->active_band)
-        draft = selectedVfo()->current.parameters;
+      if (selected == selectedSlot()->active_band)
+        draft = selectedSlot()->current.parameters;
       else
         message = "Select current band";
     } else if (field == FIELD_DEFAULTS) {

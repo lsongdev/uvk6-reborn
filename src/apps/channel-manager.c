@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static char names[RADIO_VFO_CAPACITY][USER_CHANNEL_NAME_BYTES];
+static char names[RADIO_SLOT_CAPACITY][USER_CHANNEL_NAME_BYTES];
 static uint8_t nameVfo, saveVfo;
 static bool active, overwriteConfirm;
 static uint16_t target;
@@ -31,7 +31,7 @@ void CHANNEL_MANAGER_Init(ChannelManagerNotify onNotify,
 }
 
 void CHANNEL_MANAGER_LoadName(uint8_t vfo, uint16_t number) {
-  if (vfo >= RADIO_VFO_CAPACITY) return;
+  if (vfo >= RADIO_SLOT_CAPACITY) return;
   names[vfo][0] = '\0';
   UserChannel channel;
   if (number && CHANNEL_STORE_Load(number, &channel))
@@ -39,11 +39,11 @@ void CHANNEL_MANAGER_LoadName(uint8_t vfo, uint16_t number) {
 }
 
 const char *CHANNEL_MANAGER_Name(uint8_t vfo) {
-  return vfo < RADIO_VFO_CAPACITY ? names[vfo] : "";
+  return vfo < RADIO_SLOT_CAPACITY ? names[vfo] : "";
 }
 
 void CHANNEL_MANAGER_StartName(uint8_t vfo, uint16_t current_number) {
-  if (vfo >= RADIO_VFO_CAPACITY) return;
+  if (vfo >= RADIO_SLOT_CAPACITY) return;
   if (!names[vfo][0] && current_number)
     CHANNEL_MANAGER_LoadName(vfo, current_number);
   nameVfo = vfo;
@@ -55,7 +55,7 @@ void CHANNEL_MANAGER_StartName(uint8_t vfo, uint16_t current_number) {
 
 void CHANNEL_MANAGER_StartSave(uint8_t vfo, uint16_t current_number,
                                const UserChannel *channel) {
-  if (vfo >= RADIO_VFO_CAPACITY || !channel) return;
+  if (vfo >= RADIO_SLOT_CAPACITY || !channel) return;
   if (!CHANNEL_STORE_Available()) {
     if (notify) notify("Channel store unavailable");
     return;
