@@ -62,7 +62,7 @@ void RX_DEVICE_CaptureStart(CaptureRange range, RxDevice previous) {
   BK4819_RX_TurnOn();
   BK4819_SetRxMode(false);
   BK4819_ExitSubAu();
-  BK4819_SetAGC(true, AUTO_GAIN_INDEX);
+  BK4819_SetAGC(AUTO_GAIN_INDEX);
   BK4819_SelectFilterEx(range==CAPTURE_RANGE_VHF ? FILTER_VHF : FILTER_UHF);
   BK4819_EnableFrequencyScanEx(F_SC_T_0_2s);
 }
@@ -139,7 +139,7 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
       BK4819_RX_TurnOn();
       BK4819_SetRxMode(mode == RX_AM);
       BK4819_SetFilterBandwidth(bandwidth);
-      BK4819_SetAGC(mode == RX_NFM, AUTO_GAIN_INDEX);
+      BK4819_SetAGC(AUTO_GAIN_INDEX);
       BK4819_SetAFC(8);
       BK4819_SetAFCSpeed(63);
       BK4819_Squelch(plan->parameters.squelch, gDeviceConfig.preferences.sql_open_time,

@@ -65,13 +65,14 @@ CFLAGS   := $(COMMON_FLAGS) $(OPTIMIZATION) \
             -std=c2x \
             -Wall -Wextra -Wpedantic \
             -Wno-missing-field-initializers \
-            -Wno-incompatible-pointer-types \
-            -Wno-unused-function -Wno-unused-variable \
             -fno-builtin -fshort-enums \
             -fno-delete-null-pointer-checks \
             -fsingle-precision-constant \
             -finline-functions-called-once \
             -MMD -MP
+
+# BK4819 NFM transmit and PA control. ENABLE_TX=0 builds a receive-only image.
+ENABLE_TX ?= 1
 
 # Debug/Release specific flags
 DEBUG_FLAGS   := -g3 -DDEBUG -Og
@@ -82,7 +83,8 @@ DEFINES  := -DPRINTF_INCLUDE_CONFIG_H \
             -DGIT_HASH=\"$(GIT_HASH)\" \
             -DTIME_STAMP=\"$(BUILD_TIME)\" \
             -DCMSIS_device_header=\"ARMCM0.h\" \
-            -DARMCM0
+            -DARMCM0 \
+            -DUVK6_ENABLE_TX=$(ENABLE_TX)
 
 # Include paths
 INC_DIRS := -I./src -I./src/config \

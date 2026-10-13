@@ -127,13 +127,12 @@ bool APPS_exit(void) {
     return false;
   }
   APPS_deinit();
-  AppType_t app = popApp();
+  popApp();
   gCurrentApp = APPS_Peek();
 
   APPS_init(gCurrentApp);
 
   STATUSLINE_SetText("%s", apps[gCurrentApp].name);
   gRedrawScreen = true;
-  // }
   return true;
 }

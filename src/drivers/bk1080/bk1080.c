@@ -88,7 +88,7 @@ bool BK1080_WriteRegister(BK1080_Register_t Register, uint16_t Value) {
             I2C_Write((Register << 1) | I2C_WRITE) == 0;
   Value = ((Value >> 8) & 0xFF) | ((Value & 0xFF) << 8);
   if (ok)
-    ok = I2C_WriteBuffer(&Value, sizeof(Value)) == 0;
+    ok = I2C_WriteBuffer((const uint8_t *)&Value, sizeof(Value)) == 0;
   I2C_Stop();
   return ok;
 }

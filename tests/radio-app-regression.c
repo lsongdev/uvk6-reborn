@@ -566,8 +566,8 @@ int main(void) {
   assert(drawn[0].header_message && !strcmp(drawn[0].header_message,"TX disabled"));
   assert(!drawn[1].header_message);
   press(KEY_MENU);
-  for (unsigned i=0;i<5;++i) press(KEY_DOWN);
-  assert(menuIndex == 5);
+  for (unsigned i=0;i<MENU_TX_ENABLE;++i) press(KEY_DOWN);
+  assert(menuIndex == MENU_TX_ENABLE);
   unsigned savedBeforeTX = saveRequests;
   press(KEY_MENU);
   assert(gDeviceConfig.radio.slots[0].tx.enabled && saveRequests == savedBeforeTX+1);
@@ -663,14 +663,14 @@ int main(void) {
   assert(!seek.active && !strcmp(message,"SSB seek off"));
   // Tone controls replace Monitor without changing its runtime flag.
   setup(438500000,fm);menuIndex=0;press(KEY_MENU);
-  for(unsigned i=0;i<4;++i) press(KEY_DOWN);
-  assert(menuIndex==4);
+  for(unsigned i=0;i<MENU_RX_TONE;++i) press(KEY_DOWN);
+  assert(menuIndex==MENU_RX_TONE);
   press(KEY_MENU);
   assert(activeSlot.current.parameters.rx_tone==1 && runtime.current.parameters.rx_tone==1);
   assert(!gMonitorMode);
   press(KEY_F);assert(activeSlot.current.parameters.rx_tone==0);
-  for(unsigned i=0;i<3;++i) press(KEY_DOWN);
-  assert(menuIndex==7);
+  for(unsigned i=MENU_RX_TONE;i<MENU_TX_FREQUENCY;++i) press(KEY_DOWN);
+  assert(menuIndex==MENU_TX_FREQUENCY);
   unsigned appliesBefore=applied;
   press(KEY_MENU);
   assert(appRuns==0 && number.active && inputTx);
@@ -682,19 +682,18 @@ int main(void) {
   assert(number.active && number.invalid && gDeviceConfig.radio.slots[0].tx.frequency_hz==438600000);
   assert(RADIO_APP_key(KEY_EXIT,KEY_LONG_PRESSED));
   inMenu=true;press(KEY_F);assert(!gDeviceConfig.radio.slots[0].tx.frequency_hz);
-  press(KEY_DOWN);assert(menuIndex==8);
+  press(KEY_DOWN);assert(menuIndex==MENU_TX_TONE);
   press(KEY_MENU);assert(gDeviceConfig.radio.slots[0].tx.tone==1);
   press(KEY_F);assert(gDeviceConfig.radio.slots[0].tx.tone==0);
   unsigned savesBeforePlaceholder=saveRequests;
   appliesBefore=applied;
-  press(KEY_DOWN);assert(menuIndex==MENU_RX_WATCH);
   press(KEY_DOWN);assert(menuIndex==MENU_CHANNEL_NAME);
   press(KEY_MENU);assert(gTextinputText==CHANNEL_MANAGER_Name(selectedSlot));
   press(KEY_DOWN);assert(menuIndex==MENU_CHANNEL_SAVE);
   press(KEY_MENU);assert(CHANNEL_MANAGER_Active());press(KEY_EXIT);assert(!CHANNEL_MANAGER_Active());
   assert(saveRequests==savesBeforePlaceholder && applied==appliesBefore);
   assert(inMenu && !confirming);
-  press(KEY_DOWN);assert(menuIndex==0); // Menu cycles through RX/TX settings and channel actions.
+  press(KEY_DOWN);assert(menuIndex==MENU_RX_MODE); // Menu cycles through RX/TX settings and channel actions.
   // Dual VFO: selection is a receive transaction, not an alias to one state.
   setup(145500000, fm);
   assert(selectedSlot==0 && receivingSlot==0);
@@ -708,7 +707,7 @@ int main(void) {
   assert(!memcmp(&originalA,&gDeviceConfig.radio.slots[0],sizeof(originalA)));
   press(KEY_UP);
   assert(activeSlot.current.frequency_hz==438512500 && gDeviceConfig.radio.slots[0].current.frequency_hz==145500000);
-  press(KEY_MENU);menuIndex=8;press(KEY_MENU);press(KEY_EXIT);
+  press(KEY_MENU);menuIndex=MENU_TX_TONE;press(KEY_MENU);press(KEY_EXIT);
   assert(gDeviceConfig.radio.slots[1].tx.tone==1 && !gDeviceConfig.radio.slots[0].tx.tone);
   vfo->is_open=true;
   RADIO_APP_render();assert(drawn[1].selected && drawn[1].activity==UI_RADIO_CARD_RECEIVING);
@@ -800,7 +799,10 @@ int main(void) {
   assert(selectedSlot==2 && RADIO_STATE_VisibleFirst(&gDeviceConfig.radio)==1);
   RADIO_APP_render();assert(drawn[1].id=='B' && drawn[2].selected);
   press(KEY_F);press(KEY_2);assert(selectedSlot==0);
-  assert(!RADIO_STATE_SetCount(&gDeviceConfig.radio,1));
+  assert(RADIO_STATE_SetCount(&gDeviceConfig.radio,1));
+  assert(gDeviceConfig.radio.slot_count==1);
+  assert(RADIO_STATE_SetCount(&gDeviceConfig.radio,3));
+  assert(RADIO_STATE_SetWatch(&gDeviceConfig.radio,1,true));
   assert(!RADIO_STATE_SetWatch(&gDeviceConfig.radio,2,true));
   assert(RADIO_STATE_SetWatch(&gDeviceConfig.radio,0,false));
   assert(RADIO_STATE_SetWatch(&gDeviceConfig.radio,2,true));

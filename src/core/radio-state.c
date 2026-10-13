@@ -24,7 +24,7 @@ bool RADIO_SLOT_Valid(const RadioSlot *slot) {
 }
 bool RADIO_STATE_Valid(const RadioUserState *state) {
   if (!state || radioBandCount != RADIO_STATE_BANDS ||
-      state->slot_count < 2 || state->slot_count > RADIO_SLOT_CAPACITY ||
+      state->slot_count < 1 || state->slot_count > RADIO_SLOT_CAPACITY ||
       state->selected_slot >= state->slot_count) return false;
   uint8_t watchers = 0;
   for (uint8_t id = 0; id < RADIO_SLOT_CAPACITY; ++id) {
@@ -79,7 +79,7 @@ bool RADIO_STATE_SelectBand(RadioUserState *state, uint8_t id, uint8_t band) {
 }
 
 bool RADIO_STATE_SetCount(RadioUserState *state, uint8_t count) {
-  if (!state || count<2 || count>RADIO_SLOT_CAPACITY) return false;
+  if (!state || count<1 || count>RADIO_SLOT_CAPACITY) return false;
   uint8_t watchers=0;
   for (uint8_t id=0; id<count; ++id) if (state->slots[id].watch) ++watchers;
   if (watchers>RADIO_WATCH_LIMIT) return false;

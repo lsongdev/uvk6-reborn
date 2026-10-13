@@ -32,7 +32,7 @@
 
 ## 3. 用户界面与操作
 
-VFO 参数菜单取消分组标题，直接使用项目前缀：RX Mode、RX Step、RX Bandwidth、RX Squelch、RX Tone、TX Enable、TX Power、TX Frequency、TX Tone。项目统一左对齐、值右对齐，选中项整行反白，每屏最多五项并滚动。Monitor 从参数菜单移除。步进与带宽用可读单位，例如 `12.5 kHz`。RX Tone 仅 NFM 可用，Off 或 CTCSS／DCS 正反码，匹配结果与静噪共同控制音频；TX Tone 独立保存并进入 TX 方案。TX Frequency 为 Same 跟随 RX 或独立 TX Hz，独立校验，不改变 RX。列表末尾保留无前缀的 Name、Save 项，用于编辑频道名称草稿并将当前 VFO 保存到选定频道，与频段预设保存分开。频道来源、写入边界、覆盖流程与 F→3 操作见[VFO 保存频道与频道模式](channel-mode-design.md)。
+VFO 参数菜单取消分组标题，直接使用项目前缀并按方向连续排列：RX Mode、RX Step、RX Bandwidth、RX Squelch、RX Tone、RX Watch，然后是 TX Enable、TX Power、TX Frequency、TX Tone。项目统一左对齐、值右对齐，选中项整行反白，每屏最多五项并滚动。Monitor 从参数菜单移除。步进与带宽用可读单位，例如 `12.5 kHz`。RX Tone 仅 NFM 可用，Off 或 CTCSS／DCS 正反码，匹配结果与静噪共同控制音频；TX Tone 独立保存并进入 TX 方案。TX Frequency 为 Same 跟随 RX 或独立 TX Hz，独立校验，不改变 RX。列表末尾保留无前缀的 Name、Save 项，用于编辑频道名称草稿并将当前 VFO 保存到选定频道，与频段预设保存分开。频道来源、写入边界、覆盖流程与 F→3 操作见[VFO 保存频道与频道模式](channel-mode-design.md)。
 
 ### 3.1 主界面
 

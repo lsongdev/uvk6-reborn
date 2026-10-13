@@ -23,7 +23,6 @@
 #define itemSize sizeof(SystemMessages)
 
 static char notificationMessage[16] = "";
-static uint32_t notificationTimeoutAt;
 
 static uint32_t gLastRender;
 static uint32_t secondTimer;
