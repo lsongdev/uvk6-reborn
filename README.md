@@ -17,6 +17,7 @@ calibration, filtering, PA shutdown timing and applicable frequency limits. See 
 - [重构进度](docs/refactor-progress.md)
 - [用户手册](docs/user-manual.md)
 - [硬件事实](docs/hardware.md)
+- [硬件验收清单](docs/hardware-validation.md)
 - [设计文档](docs/design.md)
 
 ## Build

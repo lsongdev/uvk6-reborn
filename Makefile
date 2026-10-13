@@ -132,8 +132,8 @@ debug:
 # Release сборка с копированием
 release: clean
 	@$(MAKE) BUILD_TYPE=release all
-	@cp $(TARGET).packed.bin $(BIN_DIR)/Hawk5-alfa-by-fagci-$(BUILD_TAG).bin
-	@echo "Release firmware: $(BIN_DIR)/Hawk5-alfa-by-fagci-$(BUILD_TAG).bin"
+	@cp $(TARGET).packed.bin $(BIN_DIR)/UVK6-Reborn-$(BUILD_TAG).bin
+	@echo "Release firmware: $(BIN_DIR)/UVK6-Reborn-$(BUILD_TAG).bin"
 
 # Генерация бинарного файла
 $(TARGET).bin: $(TARGET) tools/fw-pack.py

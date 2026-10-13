@@ -35,8 +35,8 @@ bool EEPROM_WaitReady(uint8_t device_addr, uint32_t timeout_ms) {
   return false;
 }
 
-// Оптимизированное чтение с Sequential Read
-// Автоматически определяет границы чипов и читает максимальными блоками
+// Sequential reads split at 64-KiB bank boundaries.
+// Keep the transaction within a single bank.
 int EEPROM_ReadBufferSequential(uint32_t address, void *pBuffer,
                                 uint16_t size) {
   if (size == 0)
@@ -97,37 +97,7 @@ int EEPROM_ReadBuffer(uint32_t address, void *pBuffer, uint16_t size) {
   return EEPROM_ReadBufferSequential(address, pBuffer, size);
 }
 
-/* int EEPROM_ReadBuffer(uint32_t address, void *pBuffer, uint16_t size) {
-  if (size == 0)
-    return 0;
 
-  address &= 0x3FFFF;
-  uint8_t IIC_ADD = 0xA0 | ((address >> 15) & 0x0E);
-
-  I2C_Start();
-  if (I2C_Write(IIC_ADD) != 0) {
-    I2C_Stop();
-    return -1;
-  }
-  if (I2C_Write((address >> 8) & 0xFF) != 0) {
-    I2C_Stop();
-    return -1;
-  }
-  if (I2C_Write(address & 0xFF) != 0) {
-    I2C_Stop();
-    return -1;
-  }
-
-  I2C_RepStart();
-  if (I2C_Write(IIC_ADD | 0x01) != 0) {
-    I2C_Stop();
-    return -1;
-  }
-
-  I2C_ReadBuffer(pBuffer, size);
-  I2C_Stop();
-  return 0;
-} */
 
 bool EEPROM_TryWriteBuffer(uint32_t address, const uint8_t *pBuffer, uint16_t size) {
   if (!writes_enabled || pBuffer == NULL ||
@@ -190,56 +160,7 @@ void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
   (void)EEPROM_TryWriteBuffer(address, pBuffer, size);
 }
 
-/* void EEPROM_WriteBuffer(uint32_t address, uint8_t *pBuffer, uint16_t size) {
-  if (pBuffer == NULL || size == 0)
-    return;
 
-  uint16_t PAGE_SIZE = EEPROM_GetPageSize();
-  address &= 0x3FFFF;
-
-  while (size > 0) {
-    uint16_t page_offset = address % PAGE_SIZE;
-    uint16_t chunk_size =
-        (size < (PAGE_SIZE - page_offset)) ? size : (PAGE_SIZE - page_offset);
-    uint8_t IIC_ADD = 0xA0 | ((address >> 15) & 0x0E);
-
-    if (!EEPROM_WaitReady(IIC_ADD, 10))
-      return;
-    TIMER_DelayUs(100);
-
-    I2C_Start();
-    if (I2C_Write(IIC_ADD) != 0) {
-      I2C_Stop();
-      return;
-    }
-    if (I2C_Write((address >> 8) & 0xFF) != 0) {
-      I2C_Stop();
-      return;
-    }
-    if (I2C_Write(address & 0xFF) != 0) {
-      I2C_Stop();
-      return;
-    }
-
-    for (uint16_t i = 0; i < chunk_size; i++) {
-      if (I2C_Write(pBuffer[i]) != 0) {
-        I2C_Stop();
-        return;
-      }
-    }
-
-    I2C_Stop();
-    SYS_DelayMs(15);
-
-    if (!EEPROM_WaitReady(IIC_ADD, 50))
-      return;
-
-    pBuffer += chunk_size;
-    address += chunk_size;
-    size -= chunk_size;
-    gEepromWrite = true;
-  }
-} */
 
 EEPROMType EEPROM_DetectType(void) {
   static bool probed;
