@@ -158,9 +158,27 @@ uint32_t SETTINGS_GetFilterBound(void) {
 uint32_t SETTINGS_GetEEPROMSize(void) { return EEPROM_DetectSize(); }
 uint16_t SETTINGS_GetPageSize(void) { return EEPROM_GetPageSize(); }
 bool SETTINGS_IsPatchPresent(void) {
+  // A matching prefix does not authenticate the rest of the SSB patch.
+  // For an unverified installation, SSB stays unavailable by default.
+#ifndef UVK6_SSB_PATCH_CRC32
+  return false;
+#else
   static const uint8_t preamble[] = {0x15,0x00,0x03,0x74,0x0b,0xd4,0x84,0x60};
   uint32_t size = SETTINGS_GetEEPROMSize();
-  uint8_t data[sizeof(preamble)];
-  return size >= 32768 && EEPROM_ReadBuffer(size-PATCH_SIZE,data,sizeof(data)) == 0 &&
-      memcmp(data,preamble,sizeof(data)) == 0;
+  if (size < 32768 || size < PATCH_SIZE) return false;
+  uint8_t buf[32];
+  uint32_t crc = 0xffffffffu;
+  for (uint32_t offset=0;offset<PATCH_SIZE;offset+=sizeof(buf)) {
+    uint16_t count = PATCH_SIZE-offset > sizeof(buf)
+        ? sizeof(buf) : (uint16_t)(PATCH_SIZE-offset);
+    if (EEPROM_ReadBuffer(size-PATCH_SIZE+offset,buf,count)!=0) return false;
+    if (!offset && memcmp(buf,preamble,sizeof(preamble))!=0) return false;
+    for (uint16_t i=0;i<count;++i) {
+      crc ^= buf[i];
+      for (unsigned bit=0;bit<8;++bit)
+        crc = (crc>>1) ^ (0xedb88320u & (0u-(crc&1u)));
+    }
+  }
+  return (~crc) == (uint32_t)UVK6_SSB_PATCH_CRC32;
+#endif
 }

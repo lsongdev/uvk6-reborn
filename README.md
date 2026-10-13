@@ -67,8 +67,10 @@ automatically migrate EEPROM content.
 - The original Hawk5 SSB patch loader expects an 8840-byte patch at the end
   of the selected EEPROM. LOSEHU HF places its SSB patch differently, so
   **SSB will not work without additional patch migration and verification**.
-  The driver now refuses a missing/invalid Hawk5 patch instead of sending
-  arbitrary EEPROM data to the SI4732.
+  A valid-looking patch header is insufficient: production SSB is disabled
+  until a trusted CRC32 of the entire installed image is supplied at build
+  time using `-DUVK6_SSB_PATCH_CRC32=0x...` (only after independent image
+  verification). A missing or mismatching patch is rejected.
 - A successful compilation is not evidence of hardware compatibility. See
   the implementation status for outstanding hardware acceptance checks.
 

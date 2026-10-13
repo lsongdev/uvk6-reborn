@@ -81,10 +81,10 @@ void UART_Send(const void *pBuffer, uint32_t Size) {
   uint32_t i;
 
   for (i = 0; i < Size; i++) {
-    UART1->TDR = pData[i];
     while ((UART1->IF & UART_IF_TXFIFO_FULL_MASK) !=
            UART_IF_TXFIFO_FULL_BITS_NOT_SET) {
     }
+    UART1->TDR = pData[i];
   }
 }
 
@@ -367,14 +367,11 @@ bool UART_IsCommandAvailable(void) {
 
   gUART_WriteIndex = TailIndex;
 
-  if (UART_Command.Header.ID == 0x0514) {
-    bIsEncrypted = false;
-  }
-  if (UART_Command.Header.ID == 0x6902) {
-    bIsEncrypted = true;
-  }
-
-  if (bIsEncrypted) {
+  // Candidate framing must not alter connection state until CRC validation.
+  bool encrypted = bIsEncrypted;
+  if (UART_Command.Header.ID == 0x0514) encrypted = false;
+  if (UART_Command.Header.ID == 0x6902) encrypted = true;
+  if (encrypted) {
     for (i = 0; i < Size + 2; i++) {
       UART_Command.Buffer[i] ^= Obfuscation[i % 16];
     }
@@ -385,6 +382,7 @@ bool UART_IsCommandAvailable(void) {
       !UART_CommandValid(UART_Command.Buffer, Size))
     return false;
 
+  bIsEncrypted = encrypted;
   return true;
 }
 
@@ -418,8 +416,12 @@ void UART_printf(const char *str, ...) {
   char text[128];
   va_list va;
   va_start(va, str);
-  UART_Send(text, vsnprintf(text, sizeof(text), str, va));
+  int length = vsnprintf(text, sizeof(text), str, va);
   va_end(va);
+  if (length <= 0) return;
+  uint32_t written = (uint32_t)length < sizeof(text)
+      ? (uint32_t)length : sizeof(text) - 1u;
+  UART_Send(text, written);
 }
 
 // #define DEBUG 1
