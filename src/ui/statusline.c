@@ -5,13 +5,11 @@
 #include "hal/eeprom.h"
 #include "drivers/si473x/si473x.h"
 #include "hal/display.h"
-#include "core/bands.h"
 #include "core/battery.h"
 #include "core/channels.h"
 #include "ui/numnav.h"
 #include "hal/scheduler.h"
 #include "ui/components/battery.h"
-#include "ui/components/scan.h"
 #include "ui/graphics.h"
 #include <string.h>
 
@@ -133,10 +131,3 @@ void STATUSLINE_render(void) {
   UI_SmallTextWindow(0, BASE_Y, textWidth, text, 0);
 }
 
-// Current receiver settings come from the Hz-based radio user state.
-void STATUSLINE_RenderRadioSettings(void) {
-  const RadioParameters *p = &gDeviceConfig.radio.slots[gDeviceConfig.radio.selected_slot].current.parameters;
-  STATUSLINE_SetText("%s %u Hz SQ%u",
-                     rxModeNames[p->mode], (unsigned)p->bandwidth_hz,
-                     (unsigned)p->squelch);
-}

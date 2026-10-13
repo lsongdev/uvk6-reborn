@@ -8,15 +8,12 @@
 #include "hal/display.h"
 #include "hal/uart.h"
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
-#include "core/bands.h"
 #include "core/battery.h"
 #include "ui/menu.h"
-#include "core/scan.h"
 #include "core/radio.h"
 #include "hal/scheduler.h"
 #include "core/settings.h"
 #include "ui/graphics.h"
-#include "ui/spectrum.h"
 #include "ui/statusline.h"
 
 #define queueLen 20

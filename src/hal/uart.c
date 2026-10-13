@@ -414,7 +414,6 @@ void UART_HandleCommand(void) {
   }
 }
 
-void LogUart(const char *const str) { UART_Send(str, strlen(str)); }
 
 void UART_printf(const char *str, ...) {
   char text[128];

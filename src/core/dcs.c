@@ -61,45 +61,7 @@ uint32_t DCS_GetGolayCodeWord(DCS_CodeType_t CodeType, uint8_t Option) {
   return Code;
 }
 
-uint8_t DCS_GetCdcssCode(uint32_t Code) {
-  unsigned int i;
-  for (i = 0; i < 23; i++) {
-    uint32_t Shift;
 
-    if (((Code >> 9) & 0x7U) == 4) {
-      unsigned int j;
-      for (j = 0; j < ARRAY_SIZE(DCS_Options); j++)
-        if (DCS_Options[j] == (Code & 0x1FF))
-          if (DCS_GetGolayCodeWord(2, j) == Code)
-            return j;
-    }
-
-    Shift = Code >> 1;
-    if (Code & 1U)
-      Shift |= 0x400000U;
-    Code = Shift;
-  }
-
-  return 0xFF;
-}
-
-uint8_t DCS_GetCtcssCode(uint16_t Code) {
-  unsigned int i;
-  uint8_t Result = 0xFF;
-  int Smallest = ARRAY_SIZE(CTCSS_Options);
-
-  for (i = 0; i < ARRAY_SIZE(CTCSS_Options); i++) {
-    int Delta = Code - CTCSS_Options[i];
-    if (Delta < 0)
-      Delta = -(Code - CTCSS_Options[i]);
-    if (Smallest > Delta) {
-      Smallest = Delta;
-      Result = i;
-    }
-  }
-
-  return Result;
-}
 
 void PrintRTXCode(char *Output, uint8_t codeType, uint8_t code) {
   if (codeType == CODE_TYPE_CONTINUOUS_TONE) {

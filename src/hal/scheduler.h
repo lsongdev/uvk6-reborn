@@ -7,7 +7,5 @@
 
 uint32_t Now(void);
 
-void SetTimeout(uint32_t *v, uint32_t t);
-bool CheckTimeout(uint32_t *v);
 
 #endif /* end of include guard: SCHEDULER_H */

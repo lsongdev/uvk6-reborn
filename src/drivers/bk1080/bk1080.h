@@ -27,7 +27,6 @@ uint16_t BK1080_ReadRegister(BK1080_Register_t Register);
 bool BK1080_WriteRegister(BK1080_Register_t Register, uint16_t Value);
 bool BK1080_Mute(bool Mute);
 bool BK1080_SetFrequency(uint32_t Frequency);
-uint16_t BK1080_GetFrequencyDeviation();
 uint16_t BK1080_GetRSSI();
 uint8_t BK1080_GetSNR();
 

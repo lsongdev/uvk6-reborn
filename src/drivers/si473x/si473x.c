@@ -358,24 +358,6 @@ void SI47XX_SeekCancel(void) {
   siCurrentFreq = 0; // Re-apply always tunes after cancellation.
 }
 
-uint32_t SI47XX_getFrequency(bool *valid) {
-  uint8_t response[4] = {0};
-  uint8_t cmd[1] = {CMD_FM_TUNE_STATUS};
-
-  if (si4732mode == SI47XX_AM) {
-    cmd[0] = CMD_AM_TUNE_STATUS;
-  }
-
-  waitToSend();
-  SI47XX_WriteBuffer(cmd, 1);
-  SI47XX_ReadBuffer(response, 4);
-
-  if (valid) {
-    *valid = (response[1] & STATUS_VALID);
-  }
-
-  return ((response[2] << 8) | response[3]) * fDiv();
-}
 
 void SI47XX_PowerDown() {
   rdsReady = false;
@@ -449,10 +431,6 @@ bool SI47XX_SetFreq(uint16_t freq) {
   return true;
 }
 
-void SI47XX_SetAMFrontendAGC(uint8_t minGainIdx, uint8_t attnBackup) {
-  SI47XX_SetProperty(PROP_AM_FRONTEND_AGC_CONTROL,
-                     minGainIdx << 8 | attnBackup);
-}
 
 bool SI47XX_SetBandwidth(SI47XX_FilterBW AMCHFLT, bool AMPLFLT) {
   SI47XX_BW_Config cfg = {0};
@@ -484,39 +462,11 @@ bool SI47XX_ReadRDS(SI47XX_RdsStatus *status, bool clear_fifo) {
   return true;
 }
 
-void SI47XX_SetSeekFmLimits(uint32_t bottom, uint32_t top) {
-  uint16_t divider = fDiv();
-  bottom /= divider;
-  top /= divider;
-  SI47XX_SetProperty(PROP_FM_SEEK_BAND_BOTTOM, bottom);
-  SI47XX_SetProperty(PROP_FM_SEEK_BAND_TOP, top);
-}
 
-void SI47XX_SetSeekAmLimits(uint32_t bottom, uint32_t top) {
-  uint16_t divider = fDiv();
-  bottom /= divider;
-  top /= divider;
-  SI47XX_SetProperty(PROP_AM_SEEK_BAND_BOTTOM, bottom);
-  SI47XX_SetProperty(PROP_AM_SEEK_BAND_TOP, top);
-}
 
-void SI47XX_SetSeekFmSpacing(uint32_t spacing) {
-  spacing /= fDiv();
-  SI47XX_SetProperty(PROP_FM_SEEK_FREQ_SPACING, spacing);
-}
 
-void SI47XX_SetSeekAmSpacing(uint32_t spacing) {
-  spacing /= fDiv();
-  SI47XX_SetProperty(PROP_AM_SEEK_FREQ_SPACING, spacing);
-}
 
-void SI47XX_SetSeekFmRssiThreshold(uint16_t value) {
-  SI47XX_SetProperty(PROP_FM_SEEK_TUNE_RSSI_THRESHOLD, value);
-}
 
-void SI47XX_SetSeekAmRssiThreshold(uint16_t value) {
-  SI47XX_SetProperty(PROP_AM_SEEK_TUNE_RSSI_THRESHOLD, value);
-}
 
 bool SI47XX_SetBFO(int16_t bfo) {
   return SI47XX_SetProperty(PROP_SSB_BFO, bfo);
@@ -537,31 +487,6 @@ bool SI47XX_TuneTo(uint32_t f) {
   return SI47XX_SetFreq(f / fDiv());
 }
 
-void SI47xx_GetStatus(uint8_t intack, uint8_t cancel) {
-  SI47XX_TuneStatus status;
-
-  uint8_t cmd = CMD_FM_TUNE_STATUS;
-
-  if (si4732mode == SI47XX_AM) {
-    cmd = CMD_AM_TUNE_STATUS;
-  }
-
-  status.arg.INTACK = intack;
-  status.arg.CANCEL = cancel;
-  status.arg.RESERVED2 = 0;
-
-  uint8_t cmdA[2] = {cmd, status.raw};
-
-  uint8_t response[4] = {0};
-
-  waitToSend();
-  SI47XX_WriteBuffer(cmdA, 2);
-  SI47XX_ReadBuffer(response, 4);
-
-  /* if (valid) {
-    *valid = !(response[0] & STATUS_ERR);
-  } */
-}
 
 static const uint16_t amBandwidthHz[] = {6000,4000,3000,2000,1000,1800,2500};
 static const uint16_t ssbBandwidthHz[] = {1200,2200,3000,4000,500,1000};
@@ -575,11 +500,6 @@ bool SI47XX_BandwidthFromHz(uint32_t hz, bool ssb, uint16_t *index) {
     }
   }
   return false;
-}
-uint32_t SI47XX_BandwidthToHz(uint16_t index, bool ssb) {
-  const uint16_t *values = ssb ? ssbBandwidthHz : amBandwidthHz;
-  uint8_t count = ssb ? ARRAY_SIZE(ssbBandwidthHz) : ARRAY_SIZE(amBandwidthHz);
-  return index < count ? values[index] : 0;
 }
 
 bool SI47XX_Detect(void) {

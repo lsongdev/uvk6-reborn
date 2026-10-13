@@ -98,9 +98,6 @@ bool BK1080_Mute(bool mute) {
                               mute ? 0x4201 : 0x0201);
 }
 
-uint16_t BK1080_GetFrequencyDeviation() {
-  return BK1080_ReadRegister(BK1080_REG_07) >> 4;
-}
 
 uint8_t BK1080_GetSNR() { return BK1080_ReadRegister(BK1080_REG_07) & 0b1111; }
 

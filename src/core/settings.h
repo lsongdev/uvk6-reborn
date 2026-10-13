@@ -165,10 +165,8 @@ extern const char *FC_TIME_NAMES[4];
 
 void SETTINGS_Save();
 bool SETTINGS_Load(void);
-void SETTINGS_DelayedSave();
 uint32_t SETTINGS_GetFilterBound();
 uint32_t SETTINGS_GetEEPROMSize();
-uint16_t SETTINGS_GetPageSize();
 bool SETTINGS_IsPatchPresent();
 
 uint32_t SETTINGS_GetValue(Setting s);

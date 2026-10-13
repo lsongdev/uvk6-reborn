@@ -587,22 +587,13 @@ typedef enum { SI_SEEK_BUSY, SI_SEEK_FOUND, SI_SEEK_LIMIT, SI_SEEK_ERROR } SiSee
 bool SI47XX_SeekStart(uint32_t lower_hz, uint32_t upper_hz, uint32_t step_hz);
 SiSeekResult SI47XX_SeekPoll(uint32_t *frequency_hz);
 void SI47XX_SeekCancel(void);
-uint32_t SI47XX_getFrequency(bool *valid);
 bool SI47XX_SetBandwidth(SI47XX_FilterBW AMCHFLT, bool AMPLFLT);
 bool SI47XX_SetSsbBandwidth(SI47XX_SsbFilterBW bw);
-void SI47XX_SetSeekFmLimits(uint32_t bottom, uint32_t top);
-void SI47XX_SetSeekAmLimits(uint32_t bottom, uint32_t top);
-void SI47XX_SetSeekFmSpacing(uint32_t spacing);
-void SI47XX_SetSeekAmSpacing(uint32_t spacing);
-void SI47XX_SetSeekFmRssiThreshold(uint16_t value);
-void SI47XX_SetSeekAmRssiThreshold(uint16_t value);
 bool SI47XX_SetBFO(int16_t bfo);
 void SI47XX_SetSsbCapacitor(uint16_t v);
 bool SI47XX_BandwidthFromHz(uint32_t hz, bool ssb, uint16_t *index);
-uint32_t SI47XX_BandwidthToHz(uint16_t index, bool ssb);
 bool SI47XX_TuneTo(uint32_t f);
 bool SI47XX_SetVolume(uint8_t volume);
-void SI47xx_GetStatus(uint8_t intack, uint8_t cancel);
 bool SI47XX_SetProperty(uint16_t prop, uint16_t value);
 
 extern SI47XX_MODE si4732mode;
