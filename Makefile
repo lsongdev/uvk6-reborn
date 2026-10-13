@@ -71,7 +71,7 @@ CFLAGS   := $(COMMON_FLAGS) $(OPTIMIZATION) \
             -fno-builtin -fshort-enums \
             -fno-delete-null-pointer-checks \
             -fsingle-precision-constant \
-            -finline-functions-called-once \
+            -fno-inline-functions-called-once \
             -MMD -MP
 
 # Debug/Release specific flags
