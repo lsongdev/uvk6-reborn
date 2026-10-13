@@ -1,629 +1,166 @@
 #include "core/settings.h"
-#include "apps/apps.h"
-#include "hal/backlight.h"
-#include "drivers/bk4819/bk4819.h"
-#include "hal/eeprom.h"
 #include "core/device-config.h"
-#include "hal/display.h"
-#include "hal/uart.h"
-#include "external/printf/printf.h"
 #include "core/battery.h"
-#include "core/measurements.h"
 #include "core/misc.h"
-#include "core/radio.h"
-#include "hal/scheduler.h"
+#include "core/measurements.h"
+#include "drivers/bk4819/bk4819.h"
+#include "hal/backlight.h"
+#include "hal/display.h"
+#include "hal/eeprom.h"
+#include "external/printf/printf.h"
+#include <stddef.h>
 #include <string.h>
 
-static uint32_t saveTime;
-
-static const uint16_t BAT_CAL_MIN = 1900;
-// The only surviving RF switch boundary choices are display settings.
-const char *FLT_BOUND_NAMES[2] = {"240MHz", "280MHz"};
-
-static const char *YES_NO[] = {"No", "Yes"};
-static const char *ON_OFF[] = {"Off", "On"};
-
+// Only retired driver-local controls remain here. Persisted preferences have
+// exactly one runtime owner: gDeviceConfig.preferences.
+Settings gSettings = {0};
 uint8_t BL_TIME_VALUES[7] = {0, 5, 10, 20, 60, 120, 255};
+const char *BL_SQL_MODE_NAMES[3] = {"Off", "Timed", "Receiving"};
+const char *EEPROM_TYPE_NAMES[7] = {"64 ?", "128", "256", "512", "1024", "M02?", "4Mb?"};
+const uint32_t EEPROM_SIZES[7] = {8192,16384,32768,65536,131072,262144,524288};
+const uint16_t PAGE_SIZES[7] = {32,64,64,128,128,256,128};
 
-const char *BL_SQL_MODE_NAMES[3] = {"Off", "On", "Open"};
-const char *CH_DISPLAY_MODE_NAMES[3] = {"Name+F", "F", "Name"};
-const char *rogerNames[2] = {"None", "Tiny"};
-const char *FC_TIME_NAMES[4] = {"0.2s", "0.4s", "0.8s", "1.6s"};
-const char *MW_NAMES[4] = {
-    [MW_OFF] = "Off",
-    [MW_ON] = "On",
-    [MW_SWITCH] = "Switch",
-    [MW_EXTRA] = "Extra",
+// Small descriptors avoid duplicated enum/boolean handlers. Bounds are
+// checked before writing the native field or invoking a hardware effect.
+typedef struct { uint8_t offset, width; uint16_t min, max; } Preference;
+#define PREF(id, member, lo, hi) [id] = {offsetof(ConfigPreferences, member), \
+    sizeof(((ConfigPreferences *)0)->member), lo, hi}
+static const Preference preferences[SETTING_COUNT] = {
+    PREF(SETTING_BACKLIGHT, backlight, 0, 6),
+    PREF(SETTING_BRIGHTNESS_H, brightness, 0, 15),
+    PREF(SETTING_BRIGHTNESS_L, brightness_low, 0, 15),
+    PREF(SETTING_CONTRAST, contrast, 0, 15),
+    PREF(SETTING_BACKLIGHTONSQUELCH, backlight_on_squelch, 0, 2),
+    PREF(SETTING_BATTERYCALIBRATION, battery_calibration, 1900, 2154),
+    PREF(SETTING_BATTERYTYPE, battery_type, 0, 2),
+    PREF(SETTING_BATTERYSTYLE, battery_style, 0, 2),
+    PREF(SETTING_KEYLOCK, keylock, 0, 1),
+    PREF(SETTING_PTT_LOCK, ptt_lock, 0, 1),
+    PREF(SETTING_SI4732POWEROFF, si4732_power_off, 0, 1),
+    PREF(SETTING_SQLOPENTIME, sql_open_time, 0, 7),
+    PREF(SETTING_SQLCLOSETIME, sql_close_time, 0, 3),
+    PREF(SETTING_BOUND240_280, bound_240_280, 0, 1),
+    PREF(SETTING_TX_TIMEOUT, tx_timeout_seconds, 15, 600),
+    PREF(SETTING_TX_BUSY_LOCK, tx_busy_lockout, 0, 1),
 };
-const char *EEPROM_TYPE_NAMES[7] = {
-    [EEPROM_BL24C64] = "64 ?",   //
-    [EEPROM_BL24C128] = "128",   //
-    [EEPROM_BL24C256] = "256",   //
-    [EEPROM_BL24C512] = "512",   //
-    [EEPROM_BL24C1024] = "1024", //
-    [EEPROM_M24M02] = "M02?",     //
-    [EEPROM_4MBIT] = "4Mb?",  //
-};
-uint32_t SCAN_TIMEOUTS[15] = {
-    0,         100,       200,           300,           400,
-    500,       1000 * 1,  1000 * 3,      1000 * 5,      1000 * 10,
-    1000 * 30, 1000 * 60, 1000 * 60 * 2, 1000 * 60 * 5, UINT32_MAX,
-};
-
-char *SCAN_TIMEOUT_NAMES[15] = {
-    "0",  "100ms", "200ms", "300ms", "400ms", "500ms", "1s",   "3s",
-    "5s", "10s",   "30s",   "1m",    "2m",    "5m",    "None",
-};
-
-static const uint8_t PATCH3_PREAMBLE[] = {0x15, 0x00, 0x03, 0x74,
-                                          0x0b, 0xd4, 0x84, 0x60};
-
-Settings gSettings = {
-    .eepromType = EEPROM_UNKNOWN,
-    .batsave = 4,
-    // .vox = 0,
-    .backlight = 3,
-    // .txTime = 0,
-    .currentScanlist = SCANLIST_ALL,
-    /* .roger = 0,
-    .scanmode = 0,
-    .chDisplayMode = 0,
-    .beep = false,
-    .keylock = false,
-    .busyChannelTxLock = false, */
-    .ste = true,
-    .repeaterSte = true,
-    // .dtmfdecode = false,
-    .brightness = 8,
-    .contrast = 8,
-    .mainApp = APP_VFO,
-    .sqOpenedTimeout = SCAN_TO_NONE,
-    .sqClosedTimeout = SCAN_TO_2s,
-    .sqlOpenTime = 1,
-    .sqlCloseTime = 1,
-    .skipGarbageFrequencies = true,
-    // .activeVFO = 0,
-    .backlightOnSquelch = BL_SQL_ON,
-    .batteryCalibration = 2000,
-    .batteryType = BAT_1600,
-    .batteryStyle = BAT_PERCENT,
-    // .upconverter = 0,
-    .deviation = 130, // 1300
-};
-
-const uint32_t EEPROM_SIZES[7] = {
-    [EEPROM_BL24C64] = 8192,     //
-    [EEPROM_BL24C128] = 16384,   //
-    [EEPROM_BL24C256] = 32768,   //
-    [EEPROM_BL24C512] = 65536,   //
-    [EEPROM_BL24C1024] = 131072, //
-    [EEPROM_M24M02] = 262144,    //
-    [EEPROM_4MBIT] = 524288,   //
-};
-
-const uint16_t PAGE_SIZES[7] = {
-    [EEPROM_BL24C64] = 32,    //
-    [EEPROM_BL24C128] = 64,   //
-    [EEPROM_BL24C256] = 64,   //
-    [EEPROM_BL24C512] = 128,  //
-    [EEPROM_BL24C1024] = 128, //
-    [EEPROM_M24M02] = 256,    //
-    [EEPROM_4MBIT] = 128,   // conservative chunk size; verify actual chip
-};
-
-// All persisted settings now use explicit, versioned UVR2 bytes.
-void SETTINGS_Save(void) { (void)DEVICE_SaveNow(); }
-
-bool SETTINGS_Load(void) {
-  if (!DEVICE_Load())
-    return false;
-  const ConfigPreferences *p = &gDeviceConfig.preferences;
-  gSettings.eepromType = EEPROM_DetectType();
-  gSettings.batteryCalibration = p->battery_calibration;
-  gSettings.backlight = p->backlight;
-  gSettings.contrast = p->contrast;
-  gSettings.brightness = p->brightness;
-  gSettings.batteryType = p->battery_type;
-  gSettings.batteryStyle = p->battery_style;
-  gSettings.backlightOnSquelch = p->backlight_on_squelch;
-  gSettings.keylock = p->keylock;
-  gSettings.pttLock = p->ptt_lock;
-  gSettings.beep = p->beep;
-  gSettings.si4732PowerOff = p->si4732_power_off;
-  gSettings.mic = p->mic;
-  gSettings.deviation = p->deviation;
-  gSettings.bound_240_280 = p->bound_240_280;
-  gSettings.brightnessLow = p->brightness_low;
-  gSettings.sqlOpenTime = p->sql_open_time;
-  gSettings.sqlCloseTime = p->sql_close_time;
+#undef PREF
+static const Preference *preference(Setting id) {
+  return (unsigned)id < SETTING_COUNT && preferences[id].width ? &preferences[id] : NULL;
+}
+uint32_t SETTINGS_GetValue(Setting id) {
+  const Preference *field = preference(id);
+  if (!field) return 0;
+  const uint8_t *address = (const uint8_t *)&gDeviceConfig.preferences + field->offset;
+  if (field->width == 1) return *address;
+  uint16_t value; memcpy(&value, address, sizeof(value)); return value;
+}
+static void writeValue(const Preference *field, uint32_t value) {
+  uint8_t *address = (uint8_t *)&gDeviceConfig.preferences + field->offset;
+  if (field->width == 1) *address = value;
+  else { uint16_t v = value; memcpy(address, &v, sizeof(v)); }
+}
+bool SETTINGS_SetValue(Setting id, uint32_t value) {
+  const Preference *field = preference(id);
+  if (!field || value < field->min || value > field->max) return false;
+  ConfigPreferences *p = &gDeviceConfig.preferences;
+  if (id == SETTING_BRIGHTNESS_L && value > p->brightness) return false;
+  if (SETTINGS_GetValue(id) == value) return true;
+  writeValue(field, value);
+  if (id == SETTING_BRIGHTNESS_H && p->brightness_low > value)
+    p->brightness_low = value;
+  switch (id) {
+  case SETTING_BACKLIGHT:
+  case SETTING_BRIGHTNESS_H:
+  case SETTING_BRIGHTNESS_L:
+    BACKLIGHT_ApplySettings(); break;
+  case SETTING_CONTRAST: DISPLAY_Init(false, p->contrast); break;
+  default: break;
+  }
+  DEVICE_RequestSave();
   return true;
 }
-
-void SETTINGS_DelayedSave(void) { DEVICE_RequestSave(); }
-
-uint32_t SETTINGS_GetFilterBound(void) {
-  return gSettings.bound_240_280 ? VHF_UHF_BOUND2 : VHF_UHF_BOUND1;
+void SETTINGS_IncDecValue(Setting id, bool up) {
+  const Preference *field = preference(id);
+  if (!field || id == SETTING_BATTERYCALIBRATION) return;
+  uint32_t value = SETTINGS_GetValue(id), max = field->max;
+  if (id == SETTING_BRIGHTNESS_L) max = gDeviceConfig.preferences.brightness;
+  if (id == SETTING_TX_TIMEOUT) {
+    static const uint16_t options[] = {30,60,120,180,300,600};
+    unsigned i = 0;
+    while (i < ARRAY_SIZE(options) && options[i] != value) ++i;
+    if (i == ARRAY_SIZE(options)) i = 2;
+    else i = (i + (up ? 1u : ARRAY_SIZE(options)-1u)) % ARRAY_SIZE(options);
+    value = options[i];
+  } else value = IncDecU(value, field->min, max+1u, up);
+  (void)SETTINGS_SetValue(id, value);
 }
-
-uint32_t SETTINGS_GetEEPROMSize(void) {
-  return gSettings.eepromType < EEPROM_UNKNOWN
-             ? EEPROM_SIZES[gSettings.eepromType]
-             : 0;
-}
-
-uint16_t SETTINGS_GetPageSize(void) {
-  return gSettings.eepromType < EEPROM_UNKNOWN
-             ? PAGE_SIZES[gSettings.eepromType]
-             : 0;
-}
-
-bool SETTINGS_IsPatchPresent() {
-  if (SETTINGS_GetEEPROMSize() < 32768) {
-    return false;
-  }
-  uint8_t buf[8];
-  return EEPROM_ReadBuffer(SETTINGS_GetEEPROMSize() - PATCH_SIZE, buf, 8) == 0 &&
-         memcmp(buf, PATCH3_PREAMBLE, 8) == 0;
-}
-
-bool dirty[SETTING_COUNT];
-
-uint32_t SETTINGS_GetValue(Setting s) {
-  switch (s) {
-  case SETTING_FCTIME:
-    return gSettings.fcTime;
-  case SETTING_FREQ_CORRECTION:
-    return gSettings.freqCorrection;
-  case SETTING_EEPROMTYPE:
-    return gSettings.eepromType;
-  case SETTING_BATSAVE:
-    return gSettings.batsave;
-  case SETTING_VOX:
-    return gSettings.vox;
+void SETTINGS_GetValueText(Setting id, char *out, uint8_t size) {
+  uint32_t value = SETTINGS_GetValue(id);
+  const char *text = NULL;
+  switch (id) {
   case SETTING_BACKLIGHT:
-    return gSettings.backlight;
-  case SETTING_TXTIME:
-    return gSettings.txTime;
-  case SETTING_CURRENTSCANLIST:
-    return gSettings.currentScanlist;
-  case SETTING_ROGER:
-    return gSettings.roger;
-  case SETTING_SCANMODE:
-    return gSettings.scanmode;
-  case SETTING_CHDISPLAYMODE:
-    return gSettings.chDisplayMode;
-  case SETTING_BEEP:
-    return gSettings.beep;
+    if (!value) text = "Off";
+    else if (value == 6) text = "Always";
+    else { snprintf(out,size,"%u s",BL_TIME_VALUES[value]); return; }
+    break;
+  case SETTING_SI4732POWEROFF: text = value ? "Power off" : "Mute"; break;
+  case SETTING_BOUND240_280: text = value ? "280 MHz" : "240 MHz"; break;
+  case SETTING_BACKLIGHTONSQUELCH: text = BL_SQL_MODE_NAMES[value]; break;
+  case SETTING_BATTERYTYPE: {
+    static const char *names[] = {"1600", "2200", "3500"}; text = names[value]; break;
+  }
+  case SETTING_BATTERYSTYLE: {
+    static const char *names[] = {"Icon", "Percent", "Voltage"}; text = names[value]; break;
+  }
   case SETTING_PTT_LOCK:
-    return gSettings.pttLock;
   case SETTING_KEYLOCK:
-    return gSettings.keylock;
-  case SETTING_MULTIWATCH:
-    return gSettings.mWatch;
-  case SETTING_BUSYCHANNELTXLOCK:
-    return gSettings.busyChannelTxLock;
-  case SETTING_STE:
-    return gSettings.ste;
-  case SETTING_REPEATERSTE:
-    return gSettings.repeaterSte;
-  case SETTING_DTMFDECODE:
-    return gSettings.dtmfdecode;
-  case SETTING_BRIGHTNESS_H:
-    return gSettings.brightness;
-  case SETTING_BRIGHTNESS_L:
-    return gSettings.brightnessLow;
-  case SETTING_CONTRAST:
-    return gSettings.contrast;
-  case SETTING_MAINAPP:
-    return gSettings.mainApp;
-  case SETTING_SQOPENEDTIMEOUT:
-    return gSettings.sqOpenedTimeout;
-  case SETTING_SQCLOSEDTIMEOUT:
-    return gSettings.sqClosedTimeout;
+  case SETTING_TX_BUSY_LOCK: text = value ? "On" : "Off"; break;
   case SETTING_SQLOPENTIME:
-    return gSettings.sqlOpenTime;
-  case SETTING_SQLCLOSETIME:
-    return gSettings.sqlCloseTime;
-  case SETTING_SKIPGARBAGEFREQUENCIES:
-    return gSettings.skipGarbageFrequencies;
-  case SETTING_ACTIVEVFO:
-    return gSettings.activeVFO;
-  case SETTING_BACKLIGHTONSQUELCH:
-    return gSettings.backlightOnSquelch;
-  case SETTING_BATTERYCALIBRATION:
-    return gSettings.batteryCalibration;
-  case SETTING_BATTERYTYPE:
-    return gSettings.batteryType;
-  case SETTING_BATTERYSTYLE:
-    return gSettings.batteryStyle;
-  case SETTING_UPCONVERTER:
-    return gSettings.upconverter;
-  case SETTING_DEVIATION:
-    return gSettings.deviation;
-  case SETTING_MIC:
-    return gSettings.mic;
-  case SETTING_COUNT:
-    return SETTING_COUNT;
-  case SETTING_SHOWLEVELINVFO:
-    return gSettings.showLevelInVFO;
-  case SETTING_BOUND240_280:
-    return gSettings.bound_240_280;
-  case SETTING_NOLISTEN:
-    return gSettings.noListen;
-  case SETTING_SI4732POWEROFF:
-    return gSettings.si4732PowerOff;
-  case SETTING_TONELOCAL:
-    return gSettings.toneLocal;
-  }
-  return 0;
-}
-
-void SETTINGS_SetValue(Setting s, uint32_t v) {
-  uint32_t ov = SETTINGS_GetValue(s);
-
-  switch (s) {
-  case SETTING_FCTIME:
-    gSettings.fcTime = v;
-    break;
-  case SETTING_FREQ_CORRECTION:
-    gSettings.freqCorrection = v;
-    break;
-  case SETTING_EEPROMTYPE:
-    gSettings.eepromType = v;
-    break;
-  case SETTING_BATSAVE:
-    gSettings.batsave = v;
-    break;
-  case SETTING_VOX:
-    gSettings.vox = v;
-    break;
-  case SETTING_BACKLIGHT:
-    gSettings.backlight = v;
-    BACKLIGHT_Init();
-    break;
-  case SETTING_TXTIME:
-    gSettings.txTime = v;
-    break;
-  case SETTING_CURRENTSCANLIST:
-    gSettings.currentScanlist = v;
-    break;
-  case SETTING_ROGER:
-    gSettings.roger = v;
-    break;
-  case SETTING_SCANMODE:
-    gSettings.scanmode = v;
-    break;
-  case SETTING_CHDISPLAYMODE:
-    gSettings.chDisplayMode = v;
-    break;
-  case SETTING_BEEP:
-    gSettings.beep = v;
-    break;
-  case SETTING_KEYLOCK:
-    gSettings.keylock = v;
-    break;
-  case SETTING_MULTIWATCH:
-    gSettings.mWatch = v;
-    break;
-  case SETTING_PTT_LOCK:
-    gSettings.pttLock = v;
-    break;
-  case SETTING_BUSYCHANNELTXLOCK:
-    gSettings.busyChannelTxLock = v;
-    break;
-  case SETTING_STE:
-    gSettings.ste = v;
-    break;
-  case SETTING_REPEATERSTE:
-    gSettings.repeaterSte = v;
-    break;
-  case SETTING_DTMFDECODE:
-    gSettings.dtmfdecode = v;
-    break;
-  case SETTING_BRIGHTNESS_H:
-    gSettings.brightness = v;
-    BACKLIGHT_Init();
-    break;
-  case SETTING_BRIGHTNESS_L:
-    gSettings.brightnessLow = v;
-    break;
-  case SETTING_CONTRAST:
-    gSettings.contrast = v;
-    DISPLAY_Init(false, gSettings.contrast);
-    break;
-  case SETTING_MAINAPP:
-    gSettings.mainApp = v;
-    break;
-  case SETTING_SQOPENEDTIMEOUT:
-    gSettings.sqOpenedTimeout = v;
-    break;
-  case SETTING_SQCLOSEDTIMEOUT:
-    gSettings.sqClosedTimeout = v;
-    break;
-  case SETTING_SQLOPENTIME:
-    gSettings.sqlOpenTime = v;
-    break;
-  case SETTING_SQLCLOSETIME:
-    gSettings.sqlCloseTime = v;
-    break;
-  case SETTING_SKIPGARBAGEFREQUENCIES:
-    gSettings.skipGarbageFrequencies = v;
-    break;
-  case SETTING_ACTIVEVFO:
-    gSettings.activeVFO = v;
-    break;
-  case SETTING_BACKLIGHTONSQUELCH:
-    gSettings.backlightOnSquelch = v;
-    break;
-  case SETTING_BATTERYCALIBRATION:
-    gSettings.batteryCalibration = v;
-    break;
-  case SETTING_BATTERYTYPE:
-    gSettings.batteryType = v;
-    break;
-  case SETTING_BATTERYSTYLE:
-    gSettings.batteryStyle = v;
-    break;
-  case SETTING_UPCONVERTER:
-    gSettings.upconverter = v;
-    break;
-  case SETTING_DEVIATION:
-    gSettings.deviation = v;
-    break;
-  case SETTING_MIC:
-    gSettings.mic = v;
-    break;
-  case SETTING_SHOWLEVELINVFO:
-    gSettings.showLevelInVFO = v;
-    break;
-  case SETTING_BOUND240_280:
-    gSettings.bound_240_280 = v;
-    // Filter setting is independent of tuning; never invoke legacy replay.
-    if (ctx && ctx->radio_type == RADIO_BK4819)
-      BK4819_SelectFilterEx(ctx->frequency < SETTINGS_GetFilterBound()
-                               ? FILTER_VHF : FILTER_UHF);
-    break;
-  case SETTING_NOLISTEN:
-    gSettings.noListen = v;
-    break;
-  case SETTING_SI4732POWEROFF:
-    gSettings.si4732PowerOff = v;
-    break;
-  case SETTING_TONELOCAL:
-    gSettings.toneLocal = v;
-    break;
-  case SETTING_COUNT:
-    return;
-  }
-
-  if (v != ov) {
-    dirty[s] = true;
-    saveTime = Now() + 1000;
-  }
-}
-
-const char *SETTINGS_GetValueString(Setting s) {
-  static char buf[16] = "unk";
-  uint32_t v = SETTINGS_GetValue(s);
-
-  switch (s) {
-  case SETTING_SHOWLEVELINVFO:
-  case SETTING_NOLISTEN:
-  case SETTING_SI4732POWEROFF:
-  case SETTING_TONELOCAL:
-  case SETTING_SKIPGARBAGEFREQUENCIES:
-  case SETTING_DTMFDECODE:
-  case SETTING_PTT_LOCK:
-    return YES_NO[v];
-
-  case SETTING_BEEP:
-  case SETTING_REPEATERSTE:
-  case SETTING_KEYLOCK:
-  case SETTING_STE:
-    return ON_OFF[v];
-  case SETTING_MULTIWATCH:
-    return MW_NAMES[v];
-
-  case SETTING_EEPROMTYPE:
-    return EEPROM_TYPE_NAMES[v];
-  case SETTING_BOUND240_280:
-    return FLT_BOUND_NAMES[v];
-  case SETTING_ROGER:
-    return rogerNames[v];
-  case SETTING_CHDISPLAYMODE:
-    return CH_DISPLAY_MODE_NAMES[v];
-  case SETTING_MAINAPP:
-    return apps[v].name;
-  case SETTING_SQOPENEDTIMEOUT:
-  case SETTING_SQCLOSEDTIMEOUT:
-    return SCAN_TIMEOUT_NAMES[v];
-  case SETTING_BACKLIGHTONSQUELCH:
-    return BL_SQL_MODE_NAMES[v];
-  case SETTING_BATTERYTYPE:
-    return BATTERY_TYPE_NAMES[v];
-  case SETTING_BATTERYSTYLE:
-    return BATTERY_STYLE_NAMES[v];
-  case SETTING_FCTIME:
-    return FC_TIME_NAMES[v];
-  case SETTING_BACKLIGHT:
-    if (BL_TIME_VALUES[v] == 0) {
-      return ON_OFF[0];
-    } else if (BL_TIME_VALUES[v] == 255) {
-      return ON_OFF[1];
-    }
-    sprintf(buf, "%us", BL_TIME_VALUES[v]);
-    break;
-
+  case SETTING_SQLCLOSETIME: snprintf(out,size,"Level %u",(unsigned)value); return;
+  case SETTING_CONTRAST: snprintf(out,size,"%d",(int)value-8); return;
+  case SETTING_TX_TIMEOUT: snprintf(out,size,"%u s",(unsigned)value); return;
   case SETTING_BATTERYCALIBRATION: {
-    uint32_t vol = BATTERY_GetPreciseVoltage(v);
-    sprintf(buf, "%u.%04u (%u)", vol / 10000, vol % 10000, v);
-  } break;
-  case SETTING_UPCONVERTER:
-    mhzToS(buf, v);
-    break;
-
-  case SETTING_SQLOPENTIME:
-  case SETTING_SQLCLOSETIME:
-    sprintf(buf, "%ums", v * 5);
-    break;
-  case SETTING_DEVIATION:
-    sprintf(buf, "%u", v * 10);
-    break;
-  case SETTING_CONTRAST:
-    sprintf(buf, "%d", v - 8);
-    break;
-  case SETTING_FREQ_CORRECTION:
-    sprintf(buf, "%+dHz", (v - 127) * 10);
-    break;
-
-  case SETTING_MIC:
-  case SETTING_COUNT:
-  case SETTING_ACTIVEVFO:
-  case SETTING_BRIGHTNESS_L:
-  case SETTING_BRIGHTNESS_H:
-    sprintf(buf, "%u", v);
-    break;
-
-  case SETTING_CURRENTSCANLIST:
-    ScanlistStr(v, buf);
-    break;
-
-  case SETTING_BATSAVE:
-  case SETTING_VOX:
-  case SETTING_TXTIME:
-  case SETTING_SCANMODE:
-  case SETTING_BUSYCHANNELTXLOCK:
-    return "N/a";
+    uint32_t voltage = BATTERY_GetPreciseVoltage(value);
+    snprintf(out,size,"%u.%02u V",(unsigned)(voltage/10000u),(unsigned)((voltage/100u)%100u)); return;
   }
-  return buf;
+  default: snprintf(out,size,"%u",(unsigned)value); return;
+  }
+  snprintf(out,size,"%s",text);
 }
-
-void SETTINGS_IncDecValue(Setting s, bool inc) {
-  uint32_t mi = 0;
-  uint32_t ma = UINT32_MAX;
-  uint32_t v = SETTINGS_GetValue(s);
-  switch (s) {
-  case SETTING_SHOWLEVELINVFO:
-  case SETTING_NOLISTEN:
-  case SETTING_SI4732POWEROFF:
-  case SETTING_TONELOCAL:
-  case SETTING_SKIPGARBAGEFREQUENCIES:
-  case SETTING_DTMFDECODE:
-  case SETTING_BEEP:
-  case SETTING_REPEATERSTE:
-  case SETTING_KEYLOCK:
-  case SETTING_PTT_LOCK:
-  case SETTING_STE:
-    ma = 2;
-    break;
-  case SETTING_MULTIWATCH:
-    ma = ARRAY_SIZE(MW_NAMES);
-    break;
-
-  case SETTING_EEPROMTYPE:
-    ma = ARRAY_SIZE(EEPROM_TYPE_NAMES);
-    break;
-  case SETTING_BOUND240_280:
-    ma = ARRAY_SIZE(FLT_BOUND_NAMES);
-    break;
-  case SETTING_ROGER:
-    ma = ARRAY_SIZE(rogerNames);
-    break;
-  case SETTING_CHDISPLAYMODE:
-    ma = ARRAY_SIZE(CH_DISPLAY_MODE_NAMES);
-    break;
-  case SETTING_MAINAPP: {
-    int8_t found_index = -1;
-    for (uint8_t i = 0; i < RUN_APPS_COUNT; i++) {
-      if (appsAvailableToRun[i] == v) {
-        found_index = i;
-        break;
-      }
-    }
-
-    if (found_index == -1) {
-      v = appsAvailableToRun[0];
-    }
-
-    uint8_t next_index = IncDecU(found_index, 0, RUN_APPS_COUNT, inc);
-    v = appsAvailableToRun[next_index];
-    SETTINGS_SetValue(s, v);
-    return;
-  }
-  case SETTING_SQOPENEDTIMEOUT:
-  case SETTING_SQCLOSEDTIMEOUT:
-    ma = ARRAY_SIZE(SCAN_TIMEOUT_NAMES);
-    break;
-  case SETTING_BACKLIGHTONSQUELCH:
-    ma = ARRAY_SIZE(BL_SQL_MODE_NAMES);
-    break;
-  case SETTING_BATTERYTYPE:
-    ma = ARRAY_SIZE(BATTERY_TYPE_NAMES);
-    break;
-  case SETTING_BATTERYSTYLE:
-    ma = ARRAY_SIZE(BATTERY_STYLE_NAMES);
-    break;
-  case SETTING_FCTIME:
-    ma = ARRAY_SIZE(FC_TIME_NAMES);
-    break;
-  case SETTING_FREQ_CORRECTION:
-    ma = 256;
-    break;
-
-  case SETTING_BATTERYCALIBRATION:
-    break;
-  case SETTING_UPCONVERTER:
-    break;
-  case SETTING_BACKLIGHT:
-    break;
-  case SETTING_CURRENTSCANLIST:
-    break;
-  case SETTING_BRIGHTNESS_L:
-    break;
-  case SETTING_BRIGHTNESS_H:
-    break;
-  case SETTING_CONTRAST:
-    break;
-
-  case SETTING_SQLOPENTIME:
-  case SETTING_SQLCLOSETIME:
-    // TODO: see datasheet
-    break;
-  case SETTING_DEVIATION:
-    ma = 256;
-    break;
-  case SETTING_MIC:
-    ma = 16;
-    break;
-
-  case SETTING_COUNT:
-    ma = SETTING_COUNT;
-    break;
-  case SETTING_ACTIVEVFO:
-    // TODO: radio get vfo count
-    break;
-
-  case SETTING_BATSAVE:
-  case SETTING_VOX:
-  case SETTING_TXTIME:
-  case SETTING_SCANMODE:
-  case SETTING_BUSYCHANNELTXLOCK:
-    break;
-  }
-
-  SETTINGS_SetValue(s, IncDecU(v, mi, ma, inc));
+bool SETTINGS_ResetPreferences(void) {
+  ConfigPreferences next = CONFIG_DEFAULT_PREFERENCES;
+  const ConfigPreferences *p = &gDeviceConfig.preferences;
+  next.battery_calibration = p->battery_calibration;
+  next.battery_type = p->battery_type;
+  next.bound_240_280 = p->bound_240_280;
+  next.sql_open_time = p->sql_open_time;
+  next.sql_close_time = p->sql_close_time;
+  next.si4732_power_off = p->si4732_power_off;
+  next.mic = p->mic;
+  next.deviation = p->deviation;
+  next.keylock = p->keylock;
+  if (!DEVICE_SavePreferences(&next)) return false;
+  DISPLAY_Init(false, next.contrast);
+  BACKLIGHT_ApplySettings();
+  return true;
 }
-
-void SETTINGS_UpdateSave() {
-  if (saveTime && (int32_t)(Now() - saveTime) >= 0) {
-    if (DEVICE_SaveNow()) {
-      saveTime = 0;
-      for (uint8_t i = 0; i < SETTING_COUNT; ++i)
-        dirty[i] = false;
-    } else {
-      // A NACK or interrupted write must not silently clear pending settings.
-      saveTime = Now() + 1500u;
-    }
-  }
-  DEVICE_Update();
+void SETTINGS_Save(void) { (void)DEVICE_SaveNow(); }
+bool SETTINGS_Load(void) {
+  bool loaded = DEVICE_Load();
+  gSettings.eepromType = EEPROM_DetectType();
+  return loaded;
+}
+void SETTINGS_DelayedSave(void) { DEVICE_RequestSave(); }
+void SETTINGS_UpdateSave(void) { DEVICE_Update(); }
+uint32_t SETTINGS_GetFilterBound(void) {
+  return gDeviceConfig.preferences.bound_240_280 ? VHF_UHF_BOUND2 : VHF_UHF_BOUND1;
+}
+uint32_t SETTINGS_GetEEPROMSize(void) { return EEPROM_DetectSize(); }
+uint16_t SETTINGS_GetPageSize(void) { return EEPROM_GetPageSize(); }
+bool SETTINGS_IsPatchPresent(void) {
+  static const uint8_t preamble[] = {0x15,0x00,0x03,0x74,0x0b,0xd4,0x84,0x60};
+  uint32_t size = SETTINGS_GetEEPROMSize();
+  uint8_t data[sizeof(preamble)];
+  return size >= 32768 && EEPROM_ReadBuffer(size-PATCH_SIZE,data,sizeof(data)) == 0 &&
+      memcmp(data,preamble,sizeof(data)) == 0;
 }

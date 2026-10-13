@@ -1,12 +1,14 @@
 #include "core/device-config.h"
+#include "core/channel-store.h"
 #include "hal/eeprom.h"
 #include "hal/scheduler.h"
 #include "core/settings.h"
 
-DeviceConfig gDeviceConfig;
+DeviceConfig gDeviceConfig = {.preferences = CONFIG_DEFAULT_PREFERENCES};
 bool gDeviceConfigReady;
 static uint32_t committedSequence;
 static uint32_t saveAt;
+static bool dirty, saveFailed;
 
 static bool readStorage(void *context, uint32_t address, void *data, uint16_t size) {
   (void)context;
@@ -22,30 +24,9 @@ static ConfigStore storage(void) {
   return (ConfigStore){.read = readStorage, .write = writeStorage,
       .capacity = size, .reserved_tail = size >= 32768 ? PATCH_SIZE : 0};
 }
-static void exportPreferences(void) {
-  ConfigPreferences *p = &gDeviceConfig.preferences;
-  p->battery_calibration = gSettings.batteryCalibration;
-  p->backlight = gSettings.backlight;
-  p->contrast = gSettings.contrast;
-  p->brightness = gSettings.brightness;
-  p->battery_type = gSettings.batteryType;
-  p->battery_style = gSettings.batteryStyle;
-  p->backlight_on_squelch = gSettings.backlightOnSquelch;
-  p->keylock = gSettings.keylock;
-  p->ptt_lock = gSettings.pttLock;
-  p->beep = gSettings.beep;
-  p->si4732_power_off = gSettings.si4732PowerOff;
-  p->mic = gSettings.mic;
-  p->deviation = gSettings.deviation;
-  p->bound_240_280 = gSettings.bound_240_280;
-  p->brightness_low = gSettings.brightnessLow;
-  p->sql_open_time = gSettings.sqlOpenTime;
-  p->sql_close_time = gSettings.sqlCloseTime;
-  // TX runtime safety preferences live in the native configuration model;
-  // they have no legacy Settings bitfield counterpart.
-}
 bool DEVICE_Load(void) {
   gDeviceConfigReady = false;
+  dirty = saveFailed = false;
   CONFIG_Default(&gDeviceConfig);
   if (EEPROM_DetectType() == EEPROM_UNKNOWN)
     return false;
@@ -53,36 +34,66 @@ bool DEVICE_Load(void) {
   if (!CONFIG_Load(&io, &gDeviceConfig, &committedSequence))
     return false;
   gDeviceConfigReady = true;
+  (void)CHANNEL_STORE_Init();
   saveAt = 0;
+  dirty = saveFailed = false;
+  // Older format-8 preferences allowed an idle level above active brightness.
+  // Normalize that relationship without rejecting an otherwise valid config.
+  if (gDeviceConfig.preferences.brightness_low > gDeviceConfig.preferences.brightness) {
+    gDeviceConfig.preferences.brightness_low = gDeviceConfig.preferences.brightness;
+    DEVICE_RequestSave();
+  }
   return true;
 }
 bool DEVICE_Initialize(void) {
   if (EEPROM_DetectType() == EEPROM_UNKNOWN)
     return false;
   CONFIG_Default(&gDeviceConfig);
-  exportPreferences();
   ConfigStore io = storage();
-  if (!CONFIG_Save(&io, &gDeviceConfig, &committedSequence))
+  if (!CONFIG_Save(&io, &gDeviceConfig, &committedSequence)) {
+    dirty = saveFailed = true;
+    saveAt = Now() + 5000u;
     return false;
+  }
   gDeviceConfigReady = true;
+  (void)CHANNEL_STORE_Init();
   saveAt = 0;
+  dirty = saveFailed = false;
   return true;
 }
 void DEVICE_RequestSave(void) {
-  if (gDeviceConfigReady)
+  if (gDeviceConfigReady) {
+    dirty = true;
     saveAt = Now() + 1500u;
+  }
 }
 bool DEVICE_SaveNow(void) {
   if (!gDeviceConfigReady)
     return false;
-  exportPreferences();
   ConfigStore io = storage();
-  if (!CONFIG_Save(&io, &gDeviceConfig, &committedSequence))
+  if (!CONFIG_Save(&io, &gDeviceConfig, &committedSequence)) {
+    dirty = saveFailed = true;
+    saveAt = Now() + 5000u;
     return false;
+  }
   saveAt = 0;
+  dirty = saveFailed = false;
   return true;
 }
 void DEVICE_Update(void) {
-  if (saveAt && (int32_t)(Now() - saveAt) >= 0 && !DEVICE_SaveNow())
-    saveAt = Now() + 1500u;
+  if (gDeviceConfigReady && dirty && (int32_t)(Now() - saveAt) >= 0)
+    (void)DEVICE_SaveNow();
+}
+
+DeviceSaveStatus DEVICE_GetSaveStatus(void) {
+  if (!gDeviceConfigReady) return DEVICE_UNAVAILABLE;
+  if (saveFailed) return DEVICE_SAVE_FAILED;
+  return dirty ? DEVICE_PENDING : DEVICE_SAVED;
+}
+bool DEVICE_SavePreferences(const ConfigPreferences *preferences) {
+  ConfigPreferences previous = gDeviceConfig.preferences;
+  gDeviceConfig.preferences = *preferences;
+  if (DEVICE_SaveNow()) return true;
+  gDeviceConfig.preferences = previous;
+  return false;
 }

@@ -10,7 +10,6 @@
 #include "hal/scheduler.h"
 #include "apps/apps.h"
 #include "apps/chlist.h"
-#include "apps/finput.h"
 #include "apps/textinput.h"
 #include <string.h>
 
@@ -100,9 +99,7 @@ static void setTXFValue(uint32_t f, uint32_t _) {
 static bool setRXF(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
   if (state == KEY_RELEASED && key == KEY_MENU) {
-    FINPUT_setup(0, BK4819_F_MAX, UNIT_MHZ, false);
-    gFInputCallback = setRXFValue;
-    APPS_run(APP_FINPUT);
+    MENU_EditNumber(0, BK4819_F_MAX, 100000, gChEd.rxF, 0, false, "MHz", setRXFValue);
     return true;
   }
   return false;
@@ -111,9 +108,7 @@ static bool setRXF(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
 static bool setTXF(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
   if (state == KEY_RELEASED && key == KEY_MENU) {
-    FINPUT_setup(0, BK4819_F_MAX, UNIT_MHZ, false);
-    gFInputCallback = setTXFValue;
-    APPS_run(APP_FINPUT);
+    MENU_EditNumber(0, BK4819_F_MAX, 100000, gChEd.txF, 0, false, "MHz", setTXFValue);
     return true;
   }
   return false;
@@ -122,9 +117,7 @@ static bool setTXF(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
 static bool setBounds(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
   if (state == KEY_RELEASED && key == KEY_MENU) {
-    FINPUT_setup(0, BK4819_F_MAX, UNIT_MHZ, true);
-    gFInputCallback = applyBounds;
-    APPS_run(APP_FINPUT);
+    MENU_EditNumber(0, BK4819_F_MAX, 100000, gChEd.rxF, gChEd.txF, true, "MHz", applyBounds);
     return true;
   }
   return false;
@@ -582,7 +575,7 @@ static void updVal(const MenuItem *item, bool inc) {
   case MEM_F_TX:
   case MEM_LAST_F:
   case MEM_TX_OFFSET:
-    // Эти параметры устанавливаются через FINPUT или другие специальные методы
+    // Эти параметры устанавливаются через inline editors или другие специальные методы
     break;
   default:
     break;

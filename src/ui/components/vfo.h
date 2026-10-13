@@ -16,6 +16,7 @@ typedef struct {
   RxMode mode;
   UI_VfoActivity activity;
   const char *band_name, *name, *rds, *power_label;
+  const char *edit_text; // Native MHz draft; owns the body while editing.
   const char *message; // Temporarily replaces frequency/name, using the same scrolling text renderer.
   char id;
   bool selected, changed, signal_valid;

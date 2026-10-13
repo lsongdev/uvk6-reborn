@@ -4,11 +4,11 @@
 #include "ui/menu.h"
 #include "ui/graphics.h"
 #include "ui/statusline.h"
-#include "apps/finput.h"
 #include "apps/reset.h"
 #include "apps/settings.h"
 #include "apps/vfo.h"
 #include "apps/bands.h"
+#include "apps/textinput.h"
 
 #define APPS_STACK_SIZE 8
 
@@ -51,11 +51,11 @@ const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {APP_VFO};
 const App apps[APPS_COUNT] = {
     [APP_BANDS] = {"Bands", BANDS_init, NULL, BANDS_render, BANDS_key, NULL},
     [APP_NONE] = {"None", NULL, NULL, NULL, NULL, NULL},
-    [APP_FINPUT] = {"Freq input", FINPUT_init, FINPUT_update, FINPUT_render,
-                    FINPUT_key, FINPUT_deinit},
     [APP_SETTINGS] = {"Settings", SETTINGS_init, NULL, SETTINGS_render,
                       SETTINGS_key, SETTINGS_deinit},
     [APP_RESET] = {"Reset", RESET_Init, RESET_Update, RESET_Render, RESET_key, NULL},
+    [APP_TEXTINPUT] = {"Text input", TEXTINPUT_init, TEXTINPUT_update,
+                       TEXTINPUT_render, TEXTINPUT_key, TEXTINPUT_deinit},
     [APP_VFO] = {"Radio", VFO_init, VFO_update, VFO_render, VFO_key, VFO_deinit, true},
 };
 

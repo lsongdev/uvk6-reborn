@@ -13,6 +13,21 @@ static Menu *menu_stack[MENU_STACK_DEPTH];
 static uint8_t menu_stack_top = 0;
 
 static Menu *active_menu = NULL;
+static NumberInput number;
+static uint32_t numberFirst, numberSecond;
+static bool numberRange, numberEnd;
+static const char *numberUnit;
+static void (*numberAccept)(uint32_t, uint32_t);
+
+void MENU_EditNumber(uint32_t min, uint32_t max, uint32_t scale,
+                     uint32_t first, uint32_t second, bool range,
+                     const char *unit, void (*accept)(uint32_t, uint32_t)) {
+  NUMNAV_Deinit();
+  NUMBER_Begin(&number, min, max, scale, first, true);
+  numberRange = range; numberEnd = false; numberSecond = second;
+  numberUnit = unit; numberAccept = accept;
+}
+
 
 static void (*renderFn)(uint8_t x, uint8_t y, const char *pattern, ...);
 
@@ -66,6 +81,8 @@ static void init() {
 
 void MENU_Init(Menu *main_menu) {
   // Log("[MENU] Init");
+  NUMNAV_Deinit();
+  number.active = false;
   active_menu = main_menu;
   menu_stack_top = 0;
 
@@ -76,11 +93,14 @@ void MENU_Init(Menu *main_menu) {
   init();
 }
 
-void MENU_Deinit() { active_menu = NULL; }
+void MENU_Deinit() { NUMNAV_Deinit(); number.active = false; active_menu = NULL; }
 
 void MENU_Render(void) {
-  if (!active_menu)
+  if (!active_menu || !active_menu->num_items)
     return;
+  STATUSLINE_SetText("%s", active_menu->title);
+
+  STATUSLINE_SetText(number.active && number.invalid ? "Invalid value" : active_menu->title);
 
   uint8_t itemsShow = active_menu->height / active_menu->itemHeight;
 
@@ -102,6 +122,14 @@ void MENU_Render(void) {
     const uint8_t y = active_menu->y + i * active_menu->itemHeight;
 
     active_menu->render_item(idx, i);
+    if (isActive && number.active) {
+      char draft[18]; NUMBER_Text(&number, draft);
+      FillRect(active_menu->x, y, ex-4, active_menu->itemHeight, C_CLEAR);
+      PrintSmallEx(3, y+active_menu->itemHeight-3, POS_L, C_FILL, "%s",
+                   numberRange ? (numberEnd ? "End" : "Start") :
+                   active_menu->items ? active_menu->items[idx].name : "Value");
+      PrintSmallEx(ex-7, y+active_menu->itemHeight-3, POS_R, C_FILL, "%s %s", draft, numberUnit);
+    }
 
     if (isActive) {
       FillRect(active_menu->x, y, ex - 4, active_menu->itemHeight, C_INVERT);
@@ -109,7 +137,8 @@ void MENU_Render(void) {
   }
 
   // scrollbar
-  const uint8_t y = ConvertDomain(active_menu->i, 0, active_menu->num_items - 1,
+  const uint8_t y = active_menu->num_items == 1 ? active_menu->y :
+      ConvertDomain(active_menu->i, 0, active_menu->num_items - 1,
                                   active_menu->y, ey - 3);
 
   DrawVLine(ex - 2, active_menu->y, active_menu->height, C_FILL);
@@ -117,7 +146,10 @@ void MENU_Render(void) {
   FillRect(ex - 3, y, 3, 3, C_FILL);
 }
 
-static void setMenuIndex(uint16_t i) { active_menu->i = i - 1; }
+static void setMenuIndex(uint16_t i) {
+  if (active_menu && i >= 1 && i <= active_menu->num_items)
+    active_menu->i = i - 1;
+}
 
 static bool handleNumNav(KEY_Code_t key, Key_State_t state) {
   if (gIsNumNavInput && key == KEY_EXIT) {
@@ -127,13 +159,14 @@ static bool handleNumNav(KEY_Code_t key, Key_State_t state) {
   if (!gIsNumNavInput &&
       ((state == KEY_LONG_PRESSED && key == KEY_STAR) ||
        (state == KEY_RELEASED && key <= KEY_9))) {
-    NUMNAV_Init(active_menu->i, 0, active_menu->num_items - 1);
+    NUMNAV_Init(active_menu->i + 1, 1, active_menu->num_items);
     gNumNavCallback = setMenuIndex;
+    if (state == KEY_RELEASED) NUMNAV_Input(key);
     return true;
   }
   if (state == KEY_RELEASED) {
     if (gIsNumNavInput) {
-      active_menu->i = NUMNAV_Input(key) - 1;
+      setMenuIndex(NUMNAV_Input(key));
       return true;
     }
   }
@@ -159,9 +192,28 @@ static bool handleUpDownNavigation(KEY_Code_t key, bool hasItems) {
 bool MENU_IsActive() { return active_menu; }
 
 bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
-  if (!active_menu) {
+  if (!active_menu || !active_menu->num_items) {
     return false;
   }
+
+  if (number.active) {
+    uint32_t value;
+    NumberInputResult result = NUMBER_Key(&number, key, state, &value);
+    if (result == NUMBER_ACCEPTED) {
+      if (numberRange && !numberEnd) {
+        numberFirst = value; numberEnd = true;
+        NUMBER_Begin(&number, number.min, number.max, number.scale, numberSecond, true);
+      } else {
+        uint32_t first = numberRange ? numberFirst : value;
+        uint32_t second = numberRange ? value : 0;
+        if (numberRange && first > second) { uint32_t tmp=first; first=second; second=tmp; }
+        if (numberAccept) numberAccept(first, second);
+      }
+    }
+    return true;
+  }
+  // Numeric input owns MENU/PTT until accepted, before item actions.
+  if (gIsNumNavInput && handleNumNav(key, state)) return true;
 
   // Log("[MENU] Key");
 

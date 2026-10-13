@@ -8,8 +8,11 @@
 #define HEADER_SEQUENCE 8u
 #define HEADER_CRC 12u
 #define FORMAT7_BYTES (PAYLOAD_START + 3u + RADIO_VFO_CAPACITY*(2u + 16u*(RADIO_STATE_BANDS+1u) + 8u) + 10u*RADIO_STATE_BANDS + 21u)
+#define FORMAT8_BYTES (FORMAT7_BYTES + 2u*RADIO_VFO_CAPACITY)
 _Static_assert(FORMAT7_BYTES == 810u && FORMAT7_BYTES <= RECORD_BYTES,
                "Multi VFO configuration must fit in a slot");
+_Static_assert(FORMAT8_BYTES == 818u && FORMAT8_BYTES <= RECORD_BYTES,
+               "VFO channel-source state must fit in a slot");
 _Static_assert(CONFIG_STORE_END <= 0x1e00u, "Never overlap RF calibration");
 
 static void put16(uint8_t *p, uint16_t n) {
@@ -54,12 +57,7 @@ void CONFIG_Default(DeviceConfig *config) {
     return;
   *config = (DeviceConfig){0};
   RADIO_STATE_Default(&config->radio);
-  config->preferences = (ConfigPreferences){
-      .battery_calibration = 2000, .backlight = 3, .contrast = 8,
-      .brightness = 8, .battery_type = 0, .battery_style = 1,
-      .backlight_on_squelch = 1, .mic = 0, .deviation = 130,
-      .brightness_low = 0, .sql_open_time = 1, .sql_close_time = 1,
-      .tx_timeout_seconds = 120, .tx_busy_lockout = 1};
+  config->preferences = (ConfigPreferences)CONFIG_DEFAULT_PREFERENCES;
 }
 static bool valid(const DeviceConfig *config) {
   const ConfigPreferences *p = &config->preferences;
@@ -109,6 +107,8 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
     *p++ = vfo->tx.power;
     put32(p, vfo->tx.frequency_hz); p+=4;
     put16(p, vfo->tx.tone); p+=2;
+    *p++ = (uint8_t)vfo->source;
+    *p++ = vfo->channel_number;
   }
   for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
     const RadioParameters *preset = &config->radio.presets[i];
@@ -129,7 +129,7 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
   p += sizeof(values);
   put16(p, pref->tx_timeout_seconds); p+=2;
   *p++ = pref->tx_busy_lockout;
-  if (p != bytes+FORMAT7_BYTES) return false;
+  if (p != bytes+FORMAT8_BYTES) return false;
   put32(bytes + HEADER_CRC, crc32(bytes, RECORD_BYTES));
   return true;
 }
@@ -149,27 +149,28 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
   if (!bytes || !config || size < CONFIG_LEGACY_SLOT_SIZE || memcmp(bytes, "UVR2", 4) != 0 ||
       (bytes[HEADER_VERSION] < 4u || bytes[HEADER_VERSION] > CONFIG_STORE_FORMAT) ||
       bytes[HEADER_BANDS] != RADIO_STATE_BANDS ||
-      size != (bytes[HEADER_VERSION] == CONFIG_STORE_FORMAT ? RECORD_BYTES : CONFIG_LEGACY_SLOT_SIZE) ||
+      size != (bytes[HEADER_VERSION] >= 7u ? RECORD_BYTES : CONFIG_LEGACY_SLOT_SIZE) ||
       get32(bytes + HEADER_CRC) != crc32(bytes, size))
     return false;
   DeviceConfig candidate;
   CONFIG_Default(&candidate);
   const uint8_t *p = bytes + PAYLOAD_START;
   if (bytes[HEADER_VERSION] >= 6u) {
-    bool native = bytes[HEADER_VERSION] == CONFIG_STORE_FORMAT;
-    uint8_t records = native ? RADIO_VFO_CAPACITY : 2;
-    if (native && bytes[6] != RADIO_VFO_CAPACITY) return false;
+    bool fourVfos = bytes[HEADER_VERSION] >= 7u;
+    bool channelSources = bytes[HEADER_VERSION] >= 8u;
+    uint8_t records = fourVfos ? RADIO_VFO_CAPACITY : 2;
+    if (fourVfos && bytes[6] != RADIO_VFO_CAPACITY) return false;
     candidate.radio.vfo_count = *p++;
-    if (!native && candidate.radio.vfo_count != 2) return false;
+    if (!fourVfos && candidate.radio.vfo_count != 2) return false;
     candidate.radio.selected_vfo = *p++;
-    if (native) {
+    if (fourVfos) {
       if (*p>1) return false;
       candidate.radio.watch_enabled = *p++;
     }
     for (uint8_t id=0; id<records; ++id) {
       VfoConfig *vfo = &candidate.radio.vfos[id];
       vfo->active_band = *p++;
-      if (native) {
+      if (fourVfos) {
         if (*p>1) return false;
         vfo->watch = *p++;
       }
@@ -181,6 +182,10 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
       vfo->tx.power = *p++;
       vfo->tx.frequency_hz = get32(p); p+=4;
       vfo->tx.tone = get16(p); p+=2;
+      if (channelSources) {
+        vfo->source = (RadioSource)*p++;
+        vfo->channel_number = *p++;
+      }
     }
     for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
       candidate.radio.presets[i] = (RadioParameters){
@@ -191,8 +196,8 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
     p = decodePreferences(p, &candidate.preferences);
     candidate.preferences.tx_timeout_seconds = get16(p); p+=2;
     candidate.preferences.tx_busy_lockout = *p++;
-    if (p != bytes+(native ? FORMAT7_BYTES : 467u)) return false;
-    if (!native)
+    if (p != bytes+(channelSources ? FORMAT8_BYTES : fourVfos ? FORMAT7_BYTES : 467u)) return false;
+    if (!fourVfos)
       for (uint8_t id=2; id<RADIO_VFO_CAPACITY; ++id)
         RADIO_STATE_InitVfo(&candidate.radio, id, id%2 ? 6 : 5);
   } else {

@@ -13,7 +13,6 @@ typedef enum {
   APP_BAND_SCAN,
   APP_FC,
   APP_CH_LIST,
-  APP_FINPUT,
   APP_APPS_LIST,
   APP_LOOT_LIST,
   APP_RESET,

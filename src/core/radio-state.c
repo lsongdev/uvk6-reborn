@@ -9,6 +9,9 @@ bool RADIO_VFO_Valid(const VfoConfig *vfo) {
   if (!vfo || vfo->active_band >= radioBandCount ||
       RADIO_MODEL_BandAt(vfo->current.frequency_hz) != vfo->active_band ||
       !parametersValid(&vfo->current.parameters) ||
+      (unsigned)vfo->source > RADIO_SOURCE_CHANNEL ||
+      vfo->channel_number > 128 ||
+      (vfo->source == RADIO_SOURCE_CHANNEL && !vfo->channel_number) ||
       (unsigned)vfo->tx.power > TX_POWER_HIGH || !TONE_Valid(vfo->tx.tone) ||
       !TX_MODEL_FrequencyValid(vfo->tx.frequency_hz)) return false;
   for (uint8_t i = 0; i < radioBandCount; ++i) {

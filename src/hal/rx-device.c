@@ -1,3 +1,4 @@
+#include "core/device-config.h"
 #include "hal/rx-device.h"
 #include "drivers/bk1080/bk1080.h"
 #include "drivers/bk4819/bk4819.h"
@@ -32,7 +33,7 @@ static void leave(RxDevice device) {
     BK4819_Idle();
     break;
   case RX_DEVICE_SI:
-    if (gSettings.si4732PowerOff)
+    if (gDeviceConfig.preferences.si4732_power_off)
       SI47XX_PowerDown();
     else
       (void)SI47XX_SetVolume(0);
@@ -90,8 +91,8 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
                 bkPrevious.parameters.bandwidth_hz == plan->parameters.bandwidth_hz &&
                 bkPrevious.parameters.squelch == plan->parameters.squelch &&
                 bkPrevious.parameters.rx_tone == plan->parameters.rx_tone &&
-                bkSqlOpenTime == gSettings.sqlOpenTime &&
-                bkSqlCloseTime == gSettings.sqlCloseTime;
+                bkSqlOpenTime == gDeviceConfig.preferences.sql_open_time &&
+                bkSqlCloseTime == gDeviceConfig.preferences.sql_close_time;
   uint32_t oldBkFrequency = bkPrevious.frequency_hz;
   bkCached = false;
   if (previous != plan->device)
@@ -101,13 +102,13 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
   case RX_DEVICE_BK:
     if (!fastBk) {
       BK4819_RX_TurnOn();
-      BK4819_SetModulation(mode == RX_NFM ? MOD_FM : MOD_AM);
+      BK4819_SetRxMode(mode == RX_AM);
       BK4819_SetFilterBandwidth(bandwidth);
       BK4819_SetAGC(mode == RX_NFM, AUTO_GAIN_INDEX);
       BK4819_SetAFC(8);
       BK4819_SetAFCSpeed(63);
-      BK4819_Squelch(plan->parameters.squelch, gSettings.sqlOpenTime,
-                     gSettings.sqlCloseTime);
+      BK4819_Squelch(plan->parameters.squelch, gDeviceConfig.preferences.sql_open_time,
+                     gDeviceConfig.preferences.sql_close_time);
     }
     if (!fastBk || ((oldBkFrequency / 10u < SETTINGS_GetFilterBound()) !=
                     (frequency < SETTINGS_GetFilterBound())))
@@ -130,8 +131,8 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
     if (!fastBk || oldBkFrequency != plan->frequency_hz)
       BK4819_TuneTo(frequency, true);
     bkPrevious = *plan;
-    bkSqlOpenTime = gSettings.sqlOpenTime;
-    bkSqlCloseTime = gSettings.sqlCloseTime;
+    bkSqlOpenTime = gDeviceConfig.preferences.sql_open_time;
+    bkSqlCloseTime = gDeviceConfig.preferences.sql_close_time;
     bkCached = true;
     return true; // BK serial writes have no acknowledgement.
   case RX_DEVICE_SI: {

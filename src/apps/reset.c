@@ -11,7 +11,7 @@ static bool failed;
 
 void RESET_Init(void) {
   confirm = failed = false;
-  gSettings.keylock = false;
+  gDeviceConfig.preferences.keylock = false;
   gSettings.eepromType = EEPROM_DetectType();
   STATUSLINE_SetText("%s", gSettings.eepromType < EEPROM_UNKNOWN
                                  ? EEPROM_TYPE_NAMES[gSettings.eepromType]

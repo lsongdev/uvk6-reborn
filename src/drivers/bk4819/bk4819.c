@@ -1,3 +1,4 @@
+#include "core/device-config.h"
 #include "drivers/bk4819/bk4819.h"
 #include "hal/gpio.h"
 #include "hal/system.h"
@@ -87,7 +88,6 @@ static const AgcConfig AGC_FAST = {0, 20, 50};
 static uint16_t gGpioOutState = 0x9000;
 static uint8_t gSelectedFilter = 255;
 static uint32_t gLastFrequency = 0;
-static ModulationType gLastModulation = 255;
 
 // ============================================================================
 // Low-Level GPIO and SPI Operations
@@ -463,56 +463,6 @@ ModulationType BK4819_GetModulation(void) {
 
 void BK4819_SetAF(BK4819_AF_Type_t af) {
   BK4819_WriteRegister(BK4819_REG_47, 0x6040 | (af << 8));
-}
-
-void BK4819_SetModulation(ModulationType type) {
-  if (gLastModulation == type) {
-    return;
-  }
-
-  if (type == MOD_BYP) {
-    BK4819_EnterBypass();
-  } else if (gLastModulation == MOD_BYP) {
-    BK4819_ExitBypass();
-  }
-
-  gLastModulation = type;
-
-  const bool isSsb = (type == MOD_LSB || type == MOD_USB);
-  // const bool isFm = (type == MOD_FM || type == MOD_WFM);
-
-  BK4819_SetAF(MOD_TYPE_REG47_VALUES[type]);
-  BK4819_SetRegValue(RS_AFC_DIS, isSsb);
-
-  if (type == MOD_WFM) {
-    BK4819_SetRegValue(RS_RF_FILT_BW, 7);
-    BK4819_SetRegValue(RS_RF_FILT_BW_WEAK, 7);
-    BK4819_SetRegValue(RS_BW_MODE, 3);
-    BK4819_XtalSet(XTAL_0_13M);
-  } else if (isSsb) {
-    BK4819_XtalSet(XTAL_3_38_4M);
-    BK4819_SetRegValue(RS_IF_F, 0);
-  } else {
-    BK4819_XtalSet(XTAL_2_26M);
-  }
-
-  // https://github.com/armel/uv-k1-k5v3-firmware-custom/pull/15
-  uint16_t uVar1 = BK4819_ReadRegister(0x31);
-  if (type == MOD_AM) {
-    BK4819_WriteRegister(0x31, uVar1 | 1);
-    BK4819_WriteRegister(0x42, 0x6F5C);
-    // BK4819_WriteRegister(0x43, 0x347C);
-    BK4819_WriteRegister(0x2A, 0x7434); // noise gate time constants
-    BK4819_WriteRegister(0x2B, 0x600);  // AF RX HPF300 filter is disabled
-    BK4819_WriteRegister(0x2F, 0x9990);
-  } else {
-    BK4819_WriteRegister(0x31, uVar1 & 0xFFFFFFFE);
-    BK4819_WriteRegister(0x42, 0x6B5A);
-    // BK4819_WriteRegister(0x43, 0x3028);
-    BK4819_WriteRegister(0x2A, 0x7400);
-    BK4819_WriteRegister(0x2B, 0);
-    BK4819_WriteRegister(0x2F, 0x9890);
-  }
 }
 
 // ============================================================================
@@ -1243,7 +1193,7 @@ static void wait_for_crystal_stabilization(void) {
 
 static void configure_microphone_and_tx(void) {
   BK4819_WriteRegister(BK4819_REG_19, 0x1041);                 // MIC PGA
-  BK4819_WriteRegister(BK4819_REG_7D, 0xE940 | gSettings.mic); // MIC sens
+  BK4819_WriteRegister(BK4819_REG_7D, 0xE940 | gDeviceConfig.preferences.mic); // MIC sens
   BK4819_WriteRegister(0x74, 0xAF1F); // 3kHz response TX
 }
 
@@ -1259,7 +1209,7 @@ void BK4819_Init(void) {
   }
   gSelectedFilter = 255;
   gLastFrequency = 0;
-  gLastModulation = 255;
+  BK4819_InvalidateRxMode();
   initialize_gpio_pins();
   initialize_registers();
   initialize_dtmf_coefficients();
@@ -1272,7 +1222,7 @@ void BK4819_Init(void) {
 
   // Set deviation
   BK4819_WriteRegister(0x40, (BK4819_ReadRegister(0x40) & ~(0x7FF)) |
-                                 (gSettings.deviation * 10) | (1 << 12));
+                                 (gDeviceConfig.preferences.deviation * 10) | (1 << 12));
   isInitialized = true;
 }
 

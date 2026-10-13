@@ -1,3 +1,4 @@
+#include "core/device-config.h"
 #include "apps/scaner.h"
 #include "hal/display.h"
 #include "hal/uart.h"
@@ -14,10 +15,13 @@
 #include "ui/statusline.h"
 #include "apps/apps.h"
 #include "apps/chlist.h"
-#include "apps/finput.h"
+#include "ui/number-input.h"
 #include <stdint.h>
 
 static VMinMax minMaxRssi;
+static NumberInput rangeInput;
+static bool rangeEnd;
+static uint32_t rangeStart;
 static uint32_t cursorRangeTimeout = 0;
 static bool isAnalyserMode = false;
 static bool pttWasLongPressed = false;
@@ -48,6 +52,7 @@ static void initBand(void) {
 }
 
 void SCANER_init(void) {
+  rangeInput.active = false;
   gMonitorMode = false;
   SPECTRUM_Y = 8;
   SPECTRUM_H = 44;
@@ -87,7 +92,7 @@ static bool handleLongPress(KEY_Code_t key) {
     return true;
 
   case KEY_PTT:
-    if (gSettings.keylock) {
+    if (gDeviceConfig.preferences.keylock) {
       pttWasLongPressed = true;
       LOOT_WhitelistLast();
       SCAN_Next();
@@ -147,7 +152,7 @@ static void toggleAnalyserMode(void) {
 
 static bool handlePTTRelease(void) {
   // Переход в VFO если не заблокирован и есть активный сигнал
-  if (gLastActiveLoot && !gSettings.keylock) {
+  if (gLastActiveLoot && !gDeviceConfig.preferences.keylock) {
     RADIO_SetParam(ctx, PARAM_FREQUENCY, gLastActiveLoot->f, true);
     RADIO_ApplySettings(ctx);
     RADIO_SaveCurrentVFO(gRadioState);
@@ -156,7 +161,7 @@ static bool handlePTTRelease(void) {
   }
 
   // Блокировка: короткое нажатие = blacklist
-  if (gSettings.keylock && !pttWasLongPressed) {
+  if (gDeviceConfig.preferences.keylock && !pttWasLongPressed) {
     pttWasLongPressed = false;
     SCAN_NextBlacklist();
     return true;
@@ -174,9 +179,8 @@ static bool handleRelease(KEY_Code_t key) {
     return true;
 
   case KEY_5:
-    gFInputCallback = setRange;
-    FINPUT_setup(0, BK4819_F_MAX, UNIT_MHZ, true);
-    APPS_run(APP_FINPUT);
+    rangeEnd = false;
+    NUMBER_Begin(&rangeInput, 0, BK4819_F_MAX, 100000, gCurrentBand.rxF, true);
     return true;
 
   case KEY_SIDE1:
@@ -212,6 +216,20 @@ static bool handleRelease(KEY_Code_t key) {
 }
 
 bool SCANER_key(KEY_Code_t key, Key_State_t state) {
+  if (rangeInput.active) {
+    uint32_t value;
+    NumberInputResult result = NUMBER_Key(&rangeInput, key, state, &value);
+    if (result == NUMBER_ACCEPTED) {
+      if (!rangeEnd) {
+        rangeStart = value; rangeEnd = true;
+        NUMBER_Begin(&rangeInput, 0, BK4819_F_MAX, 100000, gCurrentBand.txF, true);
+      } else {
+        setRange(rangeStart < value ? rangeStart : value,
+                 rangeStart < value ? value : rangeStart);
+      }
+    }
+    return true;
+  }
   if (state == KEY_RELEASED && REGSMENU_Key(key, state)) {
     return true;
   }
@@ -312,6 +330,13 @@ void SCANER_render(void) {
   }
 
   REGSMENU_Draw();
+  if (rangeInput.active) {
+    char draft[18]; NUMBER_Text(&rangeInput, draft);
+    FillRect(0, LCD_HEIGHT-10, LCD_WIDTH, 10, C_CLEAR);
+    PrintSmallEx(1, LCD_HEIGHT-2, POS_L, C_FILL, "%s", rangeEnd ? "End" : "Start");
+    PrintSmallEx(LCD_WIDTH-1, LCD_HEIGHT-2, POS_R, C_FILL, "%s MHz", draft);
+    if (rangeInput.invalid) STATUSLINE_SetText("Invalid value");
+  }
 }
 
-void SCANER_deinit(void) {}
+void SCANER_deinit(void) { rangeInput.active = false; }

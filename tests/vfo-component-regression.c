@@ -139,5 +139,15 @@ int main(void) {
   view.message=NULL; UI_VfoRender(8,&view,&a,1850);
   assert(!strcmp(a.label,label) && !a.showing_message);
   sameRows(0,64); // Message removal restores the original name and surrounding rows.
+  view.message=NULL; view.edit_text="1340.000001_";
+  memcpy(saved,gFrameBuffer,sizeof(saved));
+  UI_VfoRender(8,&view,&a,2000);
+  sameRows(0,8);sameRows(36,64);
+  assert(a.tuning && !a.show_name);
+  assert(!UI_VfoUpdate(&a,10000) && !a.show_name);
+  for(unsigned y=17;y<34;++y) assert(!GetPixel(28,y) && !GetPixel(29,y));
+  view.edit_text=NULL;UI_VfoRender(8,&view,&a,10000);
+  assert(!a.tuning && !a.show_name);
+  assert(UI_VfoUpdate(&a,11000) && a.show_name);
   return 0;
 }

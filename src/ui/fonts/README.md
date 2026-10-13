@@ -12,7 +12,7 @@ VFO 正文（主频率、名称、RDS、提示）和频率输入共用 `helvetic
 python3 tools/bdf-to-gfx.py src/ui/fonts/sources/helvB12-ascii.bdf src/ui/fonts/helvetica12.h
 ```
 
-位图 959 B，95 个 GFXglyph 元数据；不引入 U8g2 解码器。状态栏／频段／单位的小字继续使用 TomThumb，菜单使用已有中字号字库。
+位图 959 B，95 个 GFXglyph 元数据（每个 7 B，合计 665 B，packed 去除尾部填充，不改变字形）；不引入 U8g2 解码器。状态栏／频段／单位的小字继续使用 TomThumb，菜单使用已有中字号字库。
 
 ## Adobe X11 字库许可
 

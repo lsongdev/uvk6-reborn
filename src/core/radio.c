@@ -1,3 +1,4 @@
+#include "core/device-config.h"
 #include "hal/led.h"
 #include "core/radio.h"
 #include "hal/rx-device.h"
@@ -68,10 +69,7 @@ void RADIO_SetAudioOpen(bool open) {
     toggleBK1080SI4732(open);
 
   LED_SetGreen(open);
-  if (open && gSettings.backlightOnSquelch != BL_SQL_OFF)
-    BACKLIGHT_On();
-  else if (!open && gSettings.backlightOnSquelch == BL_SQL_OPEN)
-    BACKLIGHT_Toggle(false);
+  BACKLIGHT_SetReception(open);
 }
 
 void RADIO_StopReception(void) {

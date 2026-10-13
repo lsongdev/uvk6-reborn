@@ -1,8 +1,10 @@
+#include "core/device-config.h"
 // Mock concrete RF drivers, not the receive-planning and apply logic.
 #include "../src/hal/rx-device.c"
 #include <assert.h>
 
 Settings gSettings;
+DeviceConfig gDeviceConfig;
 static unsigned bkTunes, siTunes, broadcastTunes, bkIdle, siMuted, siPowerDowns;
 static unsigned bkModes, lastBkHz10;
 static bool siTuneOk = true, siBandwidthOk = true, siVolumeOk = true;
@@ -23,8 +25,8 @@ void BK4819_CssResetDetection(bool digital) { (void)digital; ++toneResets; }
 bool BK4819_IsSquelchOpen(void) { return true; }
 void BK4819_Idle(void) { ++bkIdle; }
 void BK4819_RX_TurnOn(void) {}
-void BK4819_SetModulation(ModulationType mode) {
-  assert(mode == MOD_FM || mode == MOD_AM); ++bkModes;
+void BK4819_SetRxMode(bool am) {
+  (void)am; ++bkModes;
 }
 void BK4819_SetFilterBandwidth(BK4819_FilterBandwidth_t bw) { (void)bw; }
 void BK4819_SetAGC(bool b, uint8_t i) { (void)b; (void)i; }
@@ -106,10 +108,10 @@ int main(void) {
   RxPlan bkNext = plan(100012500, RX_NFM, RX_DEVICE_BK);
   assert(RX_DEVICE_Apply(&bkNext, RX_DEVICE_BK));
   assert(bkTunes == 2 && bkModes == 1 && lastBkHz10 == 10001250u);
-  gSettings.sqlOpenTime = 2;
+  gDeviceConfig.preferences.sql_open_time = 2;
   assert(RX_DEVICE_Apply(&bkNext, RX_DEVICE_BK));
   assert(bkTunes == 3 && bkModes == 2);
-  gSettings.sqlOpenTime = 0;
+  gDeviceConfig.preferences.sql_open_time = 0;
   RxPlan wfm = plan(100000000, RX_WFM, RX_DEVICE_SI);
   assert(RX_DEVICE_Apply(&wfm, RX_DEVICE_BK));
   assert(bkIdle == 1 && siTunes == 1);
@@ -138,7 +140,7 @@ int main(void) {
   assert(broadcastTunes == 3);
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BROADCAST));
   assert(bkTunes == 4 && lastBkHz10 == 10000000u);
-  gSettings.si4732PowerOff = true;
+  gDeviceConfig.preferences.si4732_power_off = true;
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_SI));
   assert(siPowerDowns == 1 && bkTunes == 5);
   bk.parameters.rx_tone=1;

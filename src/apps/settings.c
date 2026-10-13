@@ -1,176 +1,212 @@
 #include "apps/settings.h"
-#include "hal/backlight.h"
-#include "hal/uart.h"
-#include "external/printf/printf.h"
-#include "core/battery.h"
-#include "ui/menu.h"
-#include "core/misc.h"
+#include "apps/apps.h"
+#include "apps/vfo.h"
 #include "core/settings.h"
 #include "core/device-config.h"
-#include "apps/apps.h"
-#include "apps/finput.h"
+#include "core/battery.h"
+#include "core/misc.h"
+#include "core/measurements.h"
+#include "core/radio.h"
+#include "hal/tx-device.h"
+#include "ui/menu.h"
+#include "ui/graphics.h"
+#include "ui/statusline.h"
+#include "external/printf/printf.h"
 
-static uint8_t DEAD_BUF[] = {0xDE, 0xAD};
+static const char *notice;
+static bool resetConfirm;
+static uint8_t oldOpen, oldClose, oldBoundary;
 
-static void getValS(const MenuItem *item, char *buf, uint8_t buf_size) {
-  snprintf(buf, buf_size, "%s", SETTINGS_GetValueString(item->setting));
+static void getValue(const MenuItem *item, char *out, uint8_t size) {
+  if (item->setting == SETTING_SI4732POWEROFF && !RADIO_GetReceiverCapabilities().si) {
+    snprintf(out,size,"No SI"); return;
+  }
+  SETTINGS_GetValueText(item->setting,out,size);
 }
-
-static void updateValS(const MenuItem *item, bool up) {
-  SETTINGS_IncDecValue(item->setting, up);
+static void changeValue(const MenuItem *item, bool up) {
+  notice = NULL;
+  if (item->setting == SETTING_SI4732POWEROFF && !RADIO_GetReceiverCapabilities().si) {
+    notice = "SI4732 missing"; return;
+  }
+  SETTINGS_IncDecValue(item->setting,up);
 }
-
-static void doCalibrate(uint32_t v, uint32_t _) {
-  (void)_;
-  SETTINGS_SetValue(SETTING_BATTERYCALIBRATION, BATTERY_GetCal(v * 100));
+static void doCalibrate(uint32_t value, uint32_t unused) {
+  (void)unused;
+  uint16_t calibration = BATTERY_GetCal(value*100u);
+  if (calibration < 1900 || calibration > 2154) { notice="Invalid calibration"; return; }
+  ConfigPreferences next = gDeviceConfig.preferences;
+  next.battery_calibration = calibration;
+  notice = DEVICE_SavePreferences(&next) ? "Voltage calibrated" : "Save failed";
 }
-
 static bool calibrate(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
-
-  if (state != KEY_RELEASED || key != KEY_MENU) {
-    return false;
-  }
-
-  uint32_t currentVoltage =
-      BATTERY_GetPreciseVoltage(SETTINGS_GetValue(SETTING_BATTERYCALIBRATION));
-
-  gFInputValue1 = currentVoltage / 100;
-  gFInputCallback = doCalibrate;
-  FINPUT_setup(500, 860, UNIT_VOLTS, false);
-  APPS_run(APP_FINPUT);
+  if (state != KEY_RELEASED || key != KEY_MENU) return false;
+  uint32_t voltage = BATTERY_GetPreciseVoltage(gDeviceConfig.preferences.battery_calibration);
+  MENU_EditNumber(500,860,100,voltage/100u,0,false,"V",doCalibrate);
   return true;
 }
+#define VALUE(name, id) {name, id, getValue, changeValue}
+#define MENU_DEF(variable, caption, entries) static Menu variable = { \
+    .title=caption, .items=entries, .num_items=ARRAY_SIZE(entries)}
 
-// SQL submenu
-static const MenuItem sqlMenuItems[] = {
-    {"Open t", SETTING_SQLOPENTIME, getValS, updateValS},
-    {"Close t", SETTING_SQLCLOSETIME, getValS, updateValS},
+static const MenuItem backlightItems[] = {
+    VALUE("Duration",SETTING_BACKLIGHT),
+    VALUE("Brightness",SETTING_BRIGHTNESS_H),
+    VALUE("Idle level",SETTING_BRIGHTNESS_L),
+    VALUE("On signal",SETTING_BACKLIGHTONSQUELCH),
 };
-
-static Menu sqlMenu = {.title = "SQL",
-                       .items = sqlMenuItems,
-                       .num_items = ARRAY_SIZE(sqlMenuItems)};
-
-// Scan submenu
-// Display submenu
-static const MenuItem displayMenuItems[] = {
-    {"Contrast", SETTING_CONTRAST, getValS, updateValS},
-    {"BL max", SETTING_BRIGHTNESS_H, getValS, updateValS},
-    {"BL min", SETTING_BRIGHTNESS_L, getValS, updateValS},
-    {"BL time", SETTING_BACKLIGHT, getValS, updateValS},
-    {"BL SQL mode", SETTING_BACKLIGHTONSQUELCH, getValS, updateValS},
+MENU_DEF(backlightMenu,"Backlight",backlightItems);
+static const MenuItem displayItems[] = {
+    VALUE("Contrast",SETTING_CONTRAST),
+    {"Backlight",.submenu=&backlightMenu},
 };
+MENU_DEF(displayMenu,"Display",displayItems);
+static const MenuItem squelchItems[] = {
+    VALUE("Open delay",SETTING_SQLOPENTIME),
+    VALUE("Close delay",SETTING_SQLCLOSETIME),
+};
+MENU_DEF(squelchMenu,"Squelch",squelchItems);
+static const MenuItem hardwareItems[] = {
+    VALUE("SI4732 idle",SETTING_SI4732POWEROFF),
+    VALUE("Filter split",SETTING_BOUND240_280),
+};
+MENU_DEF(hardwareMenu,"RX hardware",hardwareItems);
 
-static Menu displayMenu = {.title = "Display",
-                           .items = displayMenuItems,
-                           .num_items = ARRAY_SIZE(displayMenuItems)};
-
-static void getVfoCount(const MenuItem *item, char *out, uint8_t size) {
-  (void)item; snprintf(out,size,"%u",gDeviceConfig.radio.vfo_count);
+static void getRadioValue(const MenuItem *item, char *out, uint8_t size) {
+  if (!item->setting) snprintf(out,size,"%u",gDeviceConfig.radio.vfo_count);
+  else snprintf(out,size,"%s",gDeviceConfig.radio.watch_enabled ? "On" : "Off");
 }
-static void setVfoCount(const MenuItem *item, bool up) {
-  (void)item;
-  uint8_t count=gDeviceConfig.radio.vfo_count;
-  if (up) count=count==RADIO_VFO_CAPACITY ? 2 : count+1;
-  else count=count==2 ? RADIO_VFO_CAPACITY : count-1;
-  if (RADIO_STATE_SetCount(&gDeviceConfig.radio,count)) DEVICE_RequestSave();
-}
-static void getWatch(const MenuItem *item, char *out, uint8_t size) {
-  (void)item; snprintf(out,size,"%s",gDeviceConfig.radio.watch_enabled ? "On" : "Off");
-}
-static void setWatch(const MenuItem *item, bool up) {
-  (void)item; (void)up; gDeviceConfig.radio.watch_enabled^=1;
+static void changeRadioValue(const MenuItem *item, bool up) {
+  notice = NULL;
+  if (!item->setting) {
+    uint8_t count=IncDecU(gDeviceConfig.radio.vfo_count,2,RADIO_VFO_CAPACITY+1u,up);
+    if (!RADIO_STATE_SetCount(&gDeviceConfig.radio,count)) return;
+  } else gDeviceConfig.radio.watch_enabled ^= 1u;
   DEVICE_RequestSave();
 }
-
-// Radio submenu
-static const MenuItem radioMenuItems[] = {
-    {"VFO Count", .get_value_text=getVfoCount, .change_value=setVfoCount},
-    {"Dual Watch", .get_value_text=getWatch, .change_value=setWatch},
-    {"Filter bound", SETTING_BOUND240_280, getValS, updateValS},
-    {"SI power off", SETTING_SI4732POWEROFF, getValS, updateValS},
+static const MenuItem receiveItems[] = {
+    {"VFO count",0,getRadioValue,changeRadioValue},
+    {"Dual watch",1,getRadioValue,changeRadioValue},
+    {"Squelch",.submenu=&squelchMenu},
+    {"Hardware",.submenu=&hardwareMenu},
 };
-
-static Menu radioMenu = {.title = "Radio",
-                         .items = radioMenuItems,
-                         .num_items = ARRAY_SIZE(radioMenuItems)};
-
-// Battery submenu
-static const MenuItem batMenuItems[] = {
-    {"Bat type", SETTING_BATTERYTYPE, getValS, updateValS},
-    {"Bat style", SETTING_BATTERYSTYLE, getValS, updateValS},
-    {"BAT cal", SETTING_BATTERYCALIBRATION, getValS, .action = calibrate},
+MENU_DEF(receiveMenu,"Receive",receiveItems);
+static const MenuItem transmitItems[] = {
+    VALUE("Time limit",SETTING_TX_TIMEOUT),
+    VALUE("Block if busy",SETTING_TX_BUSY_LOCK),
 };
-
-static Menu batteryMenu = {.title = "Battery",
-                           .items = batMenuItems,
-                           .num_items = ARRAY_SIZE(batMenuItems)};
-
+MENU_DEF(transmitMenu,"Transmit",transmitItems);
+static const MenuItem keysItems[] = {VALUE("Lock PTT too",SETTING_PTT_LOCK)};
+MENU_DEF(keysMenu,"Keys",keysItems);
+static const MenuItem batteryItems[] = {
+    VALUE("Show charge",SETTING_BATTERYSTYLE),
+    VALUE("Charge curve",SETTING_BATTERYTYPE),
+    {"Cal voltage",SETTING_BATTERYCALIBRATION,getValue,.action=calibrate},
+};
+MENU_DEF(batteryMenu,"Battery",batteryItems);
 static bool openBands(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
-  if (key != KEY_MENU || state != KEY_RELEASED)
-    return false;
-  APPS_run(APP_BANDS);
-  return true;
+  if (key != KEY_MENU || state != KEY_RELEASED) return false;
+  APPS_run(APP_BANDS); return true;
 }
-
-static void getTXTime(const MenuItem *item, char *out, uint8_t size) {
+static void getSaveStatus(const MenuItem *item, char *out, uint8_t size) {
   (void)item;
-  snprintf(out, size, "%u s", (unsigned)gDeviceConfig.preferences.tx_timeout_seconds);
+  static const char *names[] = {"Read only","Saved","Pending","Failed"};
+  snprintf(out,size,"%s",names[DEVICE_GetSaveStatus()]);
 }
-static void setTXTime(const MenuItem *item, bool up) {
+static bool saveNow(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
-  static const uint16_t values[] = {30, 60, 120, 180, 300, 600};
-  uint16_t current = gDeviceConfig.preferences.tx_timeout_seconds;
-  uint8_t i = 0;
-  while (i < 6 && values[i] != current) ++i;
-  if (i == 6) i = 2;
-  else i = (uint8_t)((i + (up ? 1u : 5u)) % 6u);
-  gDeviceConfig.preferences.tx_timeout_seconds = values[i];
-  DEVICE_RequestSave();
+  if (key != KEY_MENU || state != KEY_RELEASED) return false;
+  notice = DEVICE_SaveNow() ? "Settings saved" : "Save failed"; return true;
 }
-static void getBusyLockout(const MenuItem *item, char *out, uint8_t size) {
+static void getTxStatus(const MenuItem *item, char *out, uint8_t size) {
   (void)item;
-  snprintf(out, size, "%s", gDeviceConfig.preferences.tx_busy_lockout ? "On" : "Off");
+  TxCapabilities capability = TX_DEVICE_Capabilities();
+  TxPolicy policy = TX_DEVICE_Policy();
+  const char *status = !capability.verified ? "HW locked" :
+      !capability.low_power_calibrated ? "Uncalibrated" : !policy.authorized ? "Not allowed" : "Verified";
+  snprintf(out,size,"%s",status);
 }
-static void setBusyLockout(const MenuItem *item, bool up) {
-  (void)item; (void)up;
-  gDeviceConfig.preferences.tx_busy_lockout ^= 1u;
-  DEVICE_RequestSave();
+static bool resetPreferences(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
+  (void)item;
+  if (key != KEY_MENU || state != KEY_RELEASED) return false;
+  resetConfirm = true; notice = NULL; return true;
 }
-static const MenuItem txSafetyItems[] = {
-    {"TX timeout", .get_value_text = getTXTime, .change_value = setTXTime},
-    {"Busy lock", .get_value_text = getBusyLockout, .change_value = setBusyLockout},
+static void getInfo(const MenuItem *item, char *out, uint8_t size) {
+  ReceiverCapabilities capabilities = RADIO_GetReceiverCapabilities();
+  switch (item->setting) {
+  case 0:
+#ifdef GIT_HASH
+    snprintf(out,size,"%s",GIT_HASH);
+#else
+    snprintf(out,size,"dev");
+#endif
+    break;
+  case 1: snprintf(out,size,"%u KiB",(unsigned)(SETTINGS_GetEEPROMSize()/1024u)); break;
+  case 2: snprintf(out,size,"UVR2 %u",CONFIG_STORE_FORMAT); break;
+  case 3: snprintf(out,size,"%s",capabilities.si ? "Present" : "Missing"); break;
+  case 4: snprintf(out,size,"%s",capabilities.broadcast ? "Present" : "Missing"); break;
+  default: snprintf(out,size,"%s",capabilities.ssb_patch ? "Present" : "Missing"); break;
+  }
+}
+static const MenuItem aboutItems[] = {
+    {"Firmware",0,getInfo}, {"EEPROM",1,getInfo}, {"Config",2,getInfo},
+    {"SI4732",3,getInfo}, {"BK1080",4,getInfo}, {"SSB patch",5,getInfo},
 };
-static Menu txSafetyMenu = {.title = "TX Safety",
-                           .items = txSafetyItems,
-                           .num_items = ARRAY_SIZE(txSafetyItems)};
-
-// Main menu
+MENU_DEF(aboutMenu,"About",aboutItems);
+static const MenuItem systemItems[] = {
+    {"About",.submenu=&aboutMenu},
+    {"TX status",.get_value_text=getTxStatus},
+    {"Save status",.get_value_text=getSaveStatus,.action=saveNow},
+    {"Reset prefs",.action=resetPreferences},
+};
+MENU_DEF(systemMenu,"System",systemItems);
 static const MenuItem menuItems[] = {
-    {"Bands", .action = openBands},
-    {"SQL", .submenu = &sqlMenu},
-    {"Radio", .submenu = &radioMenu},
-    {"TX Safety", .submenu = &txSafetyMenu},
-    {"Display", .submenu = &displayMenu},
-    {"Battery", .submenu = &batteryMenu},
-    {"Beep", SETTING_BEEP, getValS, updateValS},
-    {"Lock PTT", SETTING_PTT_LOCK, getValS, updateValS},
+    {"Display",.submenu=&displayMenu}, {"Receive",.submenu=&receiveMenu},
+    {"Transmit",.submenu=&transmitMenu}, {"Keys",.submenu=&keysMenu},
+    {"Battery",.submenu=&batteryMenu}, {"Band presets",.action=openBands},
+    {"System",.submenu=&systemMenu},
 };
+MENU_DEF(settingsMenu,"Settings",menuItems);
 
-static Menu settingsMenu = {
-    .title = "Settings",
-    .items = menuItems,
-    .num_items = ARRAY_SIZE(menuItems),
-};
-
-void SETTINGS_init(void) { MENU_Init(&settingsMenu); }
-
-void SETTINGS_deinit(void) {}
-
-bool SETTINGS_key(KEY_Code_t key, Key_State_t state) {
-  return MENU_HandleInput(key, state);
+void SETTINGS_init(void) {
+  notice = NULL; resetConfirm = false;
+  oldOpen=gDeviceConfig.preferences.sql_open_time;
+  oldClose=gDeviceConfig.preferences.sql_close_time;
+  oldBoundary=gDeviceConfig.preferences.bound_240_280;
+  MENU_Init(&settingsMenu);
 }
-
-void SETTINGS_render(void) { MENU_Render(); }
+void SETTINGS_deinit(void) {
+  ConfigPreferences *p = &gDeviceConfig.preferences;
+  if (oldOpen!=p->sql_open_time || oldClose!=p->sql_close_time || oldBoundary!=p->bound_240_280) {
+    if (!VFO_ApplyRxSettings()) {
+      p->sql_open_time=oldOpen; p->sql_close_time=oldClose; p->bound_240_280=oldBoundary;
+      (void)VFO_ApplyRxSettings();
+      DEVICE_RequestSave();
+    }
+  }
+  if (DEVICE_GetSaveStatus()==DEVICE_PENDING) (void)DEVICE_SaveNow();
+}
+bool SETTINGS_key(KEY_Code_t key, Key_State_t state) {
+  if (resetConfirm) {
+    if (state==KEY_RELEASED && key==KEY_MENU) {
+      resetConfirm=false;
+      notice=SETTINGS_ResetPreferences() ? "Defaults restored" : "Save failed";
+    } else if (state==KEY_RELEASED && key==KEY_EXIT) resetConfirm=false;
+    return true;
+  }
+  notice=NULL;
+  return MENU_HandleInput(key,state);
+}
+void SETTINGS_render(void) {
+  if (resetConfirm) {
+    STATUSLINE_SetText("Reset prefs?");
+    PrintSmall(3,18,"Display, keys, TX limits");
+    PrintSmall(3,29,"Keep radio & calibration");
+    PrintSmall(3,45,"MENU: reset");
+    PrintSmall(3,56,"EXIT: cancel");
+    return;
+  }
+  MENU_Render();
+  if (notice) STATUSLINE_SetText("%s",notice);
+}
