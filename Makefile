@@ -73,6 +73,11 @@ CFLAGS   := $(COMMON_FLAGS) $(OPTIMIZATION) \
 
 # BK4819 NFM transmit and PA control. ENABLE_TX=0 builds a receive-only image.
 ENABLE_TX ?= 1
+# One-off maintenance image: seeds an erased PA calibration table, RX-only.
+SEED_PA_CAL ?= 0
+ifeq ($(SEED_PA_CAL),1)
+    ENABLE_TX := 0
+endif
 
 # Debug/Release specific flags
 DEBUG_FLAGS   := -g3 -DDEBUG -Og
@@ -84,7 +89,8 @@ DEFINES  := -DPRINTF_INCLUDE_CONFIG_H \
             -DTIME_STAMP=\"$(BUILD_TIME)\" \
             -DCMSIS_device_header=\"ARMCM0.h\" \
             -DARMCM0 \
-            -DUVK6_ENABLE_TX=$(ENABLE_TX)
+            -DUVK6_ENABLE_TX=$(ENABLE_TX) \
+            -DUVK6_SEED_PA_CAL=$(SEED_PA_CAL)
 
 # Include paths
 INC_DIRS := -I./src -I./src/config \
