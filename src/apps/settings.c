@@ -1,6 +1,6 @@
 #include "apps/settings.h"
 #include "apps/apps.h"
-#include "apps/vfo.h"
+#include "vfo/vfo.h"
 #include "core/settings.h"
 #include "core/device-config.h"
 #include "core/battery.h"
@@ -49,28 +49,14 @@ static bool calibrate(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
 #define MENU_DEF(variable, caption, entries) static Menu variable = { \
     .title=caption, .items=entries, .num_items=ARRAY_SIZE(entries)}
 
-static const MenuItem backlightItems[] = {
-    VALUE("Duration",SETTING_BACKLIGHT),
-    VALUE("Brightness",SETTING_BRIGHTNESS_H),
-    VALUE("Idle level",SETTING_BRIGHTNESS_L),
-    VALUE("On signal",SETTING_BACKLIGHTONSQUELCH),
-};
-MENU_DEF(backlightMenu,"Backlight",backlightItems);
 static const MenuItem displayItems[] = {
     VALUE("Contrast",SETTING_CONTRAST),
-    {"Backlight",.submenu=&backlightMenu},
+    VALUE("Light time",SETTING_BACKLIGHT),
+    VALUE("Brightness",SETTING_BRIGHTNESS_H),
+    VALUE("Idle light",SETTING_BRIGHTNESS_L),
+    VALUE("Light on RX",SETTING_BACKLIGHTONSQUELCH),
 };
 MENU_DEF(displayMenu,"Display",displayItems);
-static const MenuItem squelchItems[] = {
-    VALUE("Open delay",SETTING_SQLOPENTIME),
-    VALUE("Close delay",SETTING_SQLCLOSETIME),
-};
-MENU_DEF(squelchMenu,"Squelch",squelchItems);
-static const MenuItem hardwareItems[] = {
-    VALUE("SI4732 idle",SETTING_SI4732POWEROFF),
-    VALUE("Filter split",SETTING_BOUND240_280),
-};
-MENU_DEF(hardwareMenu,"RX hardware",hardwareItems);
 
 static void getRadioValue(const MenuItem *item, char *out, uint8_t size) {
   if (!item->setting) snprintf(out,size,"%u",gDeviceConfig.radio.vfo_count);
@@ -87,8 +73,10 @@ static void changeRadioValue(const MenuItem *item, bool up) {
 static const MenuItem receiveItems[] = {
     {"VFO count",0,getRadioValue,changeRadioValue},
     {"Dual watch",1,getRadioValue,changeRadioValue},
-    {"Squelch",.submenu=&squelchMenu},
-    {"Hardware",.submenu=&hardwareMenu},
+    VALUE("SQL open delay",SETTING_SQLOPENTIME),
+    VALUE("SQL close delay",SETTING_SQLCLOSETIME),
+    VALUE("SI4732 idle",SETTING_SI4732POWEROFF),
+    VALUE("Filter split",SETTING_BOUND240_280),
 };
 MENU_DEF(receiveMenu,"Receive",receiveItems);
 static const MenuItem transmitItems[] = {
@@ -96,8 +84,6 @@ static const MenuItem transmitItems[] = {
     VALUE("Block if busy",SETTING_TX_BUSY_LOCK),
 };
 MENU_DEF(transmitMenu,"Transmit",transmitItems);
-static const MenuItem keysItems[] = {VALUE("Lock PTT too",SETTING_PTT_LOCK)};
-MENU_DEF(keysMenu,"Keys",keysItems);
 static const MenuItem batteryItems[] = {
     VALUE("Show charge",SETTING_BATTERYSTYLE),
     VALUE("Charge curve",SETTING_BATTERYTYPE),
@@ -121,10 +107,11 @@ static bool saveNow(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
 }
 static void getTxStatus(const MenuItem *item, char *out, uint8_t size) {
   (void)item;
-  TxCapabilities capability = TX_DEVICE_Capabilities();
+  const VfoConfig *vfo = &gDeviceConfig.radio.vfos[gDeviceConfig.radio.selected_vfo];
+  TxCapabilities capability = TX_DEVICE_Capabilities(vfo->tx.frequency_hz ? vfo->tx.frequency_hz : vfo->current.frequency_hz);
   TxPolicy policy = TX_DEVICE_Policy();
-  const char *status = !capability.verified ? "HW locked" :
-      !capability.low_power_calibrated ? "Uncalibrated" : !policy.authorized ? "Not allowed" : "Verified";
+  const char *status = !capability.available ? "HW locked" :
+      !capability.power_mask ? "Uncalibrated" : !policy.authorized ? "Not allowed" : "Ready";
   snprintf(out,size,"%s",status);
 }
 static bool resetPreferences(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
@@ -155,7 +142,6 @@ static const MenuItem aboutItems[] = {
 };
 MENU_DEF(aboutMenu,"About",aboutItems);
 static const MenuItem systemItems[] = {
-    {"About",.submenu=&aboutMenu},
     {"TX status",.get_value_text=getTxStatus},
     {"Save status",.get_value_text=getSaveStatus,.action=saveNow},
     {"Reset prefs",.action=resetPreferences},
@@ -163,9 +149,9 @@ static const MenuItem systemItems[] = {
 MENU_DEF(systemMenu,"System",systemItems);
 static const MenuItem menuItems[] = {
     {"Display",.submenu=&displayMenu}, {"Receive",.submenu=&receiveMenu},
-    {"Transmit",.submenu=&transmitMenu}, {"Keys",.submenu=&keysMenu},
+    {"Transmit",.submenu=&transmitMenu}, VALUE("Lock PTT too",SETTING_PTT_LOCK),
     {"Battery",.submenu=&batteryMenu}, {"Band presets",.action=openBands},
-    {"System",.submenu=&systemMenu},
+    {"System",.submenu=&systemMenu}, {"About",.submenu=&aboutMenu},
 };
 MENU_DEF(settingsMenu,"Settings",menuItems);
 

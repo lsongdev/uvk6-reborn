@@ -69,14 +69,11 @@ static bool valid(const UserChannel *ch) {
   return memchr(ch->name, '\0', sizeof(ch->name)) != NULL;
 }
 static bool decode(const uint8_t bytes[CHANNEL_RECORD_BYTES], uint16_t number,
-                   UserChannel *out, uint32_t *sequence, bool *occupied) {
+                   UserChannel *out, uint32_t *sequence) {
   if (memcmp(bytes, "UCHN", 4) || bytes[4] != CHANNEL_RECORD_VERSION ||
-      bytes[5] > 1 || bytes[10] != (uint8_t)number ||
+      bytes[5] != 1 || bytes[10] != (uint8_t)number ||
       get32(bytes + CHANNEL_CRC_OFFSET) != crc32(bytes, CHANNEL_RECORD_BYTES))
     return false;
-  if (sequence) *sequence = get32(bytes + 6);
-  if (occupied) *occupied = bytes[5] != 0;
-  if (!bytes[5]) return out == NULL;
   UserChannel ch = {0};
   memcpy(ch.name, bytes + 11, USER_CHANNEL_NAME_MAX);
   ch.name[USER_CHANNEL_NAME_MAX] = '\0';
@@ -100,13 +97,9 @@ static void encode(uint8_t bytes[CHANNEL_RECORD_BYTES], uint16_t number,
   memset(bytes, 0, CHANNEL_RECORD_BYTES);
   memcpy(bytes, "UCHN", 4);
   bytes[4] = CHANNEL_RECORD_VERSION;
-  bytes[5] = ch != NULL;
+  bytes[5] = 1;
   put32(bytes + 6, sequence);
   bytes[10] = (uint8_t)number;
-  if (!ch) {
-    put32(bytes + CHANNEL_CRC_OFFSET, crc32(bytes, CHANNEL_RECORD_BYTES));
-    return;
-  }
   memcpy(bytes + 11, ch->name, USER_CHANNEL_NAME_MAX);
   put32(bytes + 21, ch->frequency_hz);
   put32(bytes + 25, ch->rx.step_hz);
@@ -121,10 +114,10 @@ static void encode(uint8_t bytes[CHANNEL_RECORD_BYTES], uint16_t number,
   put32(bytes + CHANNEL_CRC_OFFSET, crc32(bytes, CHANNEL_RECORD_BYTES));
 }
 static bool readCopy(uint16_t number, uint8_t copy, UserChannel *out,
-                     uint32_t *sequence, bool *occupied) {
+                     uint32_t *sequence) {
   uint8_t bytes[CHANNEL_RECORD_BYTES];
   return EEPROM_ReadBuffer(address(number, copy), bytes, sizeof(bytes)) == 0 &&
-      decode(bytes, number, out, sequence, occupied);
+      decode(bytes, number, out, sequence);
 }
 static bool later(uint32_t a, uint32_t b) { return (int32_t)(a - b) > 0; }
 static bool equalChannel(const UserChannel *a, const UserChannel *b) {
@@ -143,13 +136,13 @@ bool CHANNEL_STORE_Init(void) {
   memset(indexCache, 0, sizeof(indexCache));
   for (uint16_t n = 1; n <= USER_CHANNEL_COUNT; ++n) {
     uint32_t seq[CHANNEL_COPY_COUNT] = {0};
-    bool good[CHANNEL_COPY_COUNT], occupied[CHANNEL_COPY_COUNT];
-    good[0] = readCopy(n, 0, NULL, &seq[0], &occupied[0]);
-    good[1] = readCopy(n, 1, NULL, &seq[1], &occupied[1]);
+    bool good[CHANNEL_COPY_COUNT];
+    good[0] = readCopy(n, 0, NULL, &seq[0]);
+    good[1] = readCopy(n, 1, NULL, &seq[1]);
     if (good[0] || good[1]) {
       uint8_t best = good[0] && good[1] ? (later(seq[1], seq[0]) ? 1 : 0)
                                         : (good[1] ? 1 : 0);
-      indexCache[n - 1] = (ChannelIndex){seq[best], best, occupied[best]};
+      indexCache[n - 1] = (ChannelIndex){seq[best], best, true};
     }
   }
   initialized = true;
@@ -163,42 +156,33 @@ bool CHANNEL_STORE_IsOccupied(uint16_t number) {
 bool CHANNEL_STORE_Load(uint16_t number, UserChannel *channel) {
   if (!CHANNEL_STORE_IsOccupied(number) || !channel) return false;
   ChannelIndex *entry = &indexCache[number - 1];
-  if (readCopy(number, entry->copy, channel, &entry->sequence, NULL)) return true;
+  if (readCopy(number, entry->copy, channel, &entry->sequence)) return true;
   // A later read failure invalidates the cache and permits trying its twin.
   uint8_t other = entry->copy ^ 1u;
   uint32_t sequence;
-  if (!readCopy(number, other, channel, &sequence, NULL)) {
+  if (!readCopy(number, other, channel, &sequence)) {
     entry->occupied = false;
     return false;
   }
   *entry = (ChannelIndex){sequence, other, true};
   return true;
 }
-static bool commit(uint16_t number, const UserChannel *channel) {
+bool CHANNEL_STORE_Save(uint16_t number, const UserChannel *channel) {
+  if (!initialized || number < 1 || number > USER_CHANNEL_COUNT || !valid(channel))
+    return false;
   ChannelIndex *entry = &indexCache[number - 1];
-  uint8_t target = entry->sequence || entry->occupied ? entry->copy ^ 1u : 0;
+  uint8_t target = entry->occupied ? entry->copy ^ 1u : 0;
   uint32_t sequence = entry->sequence + 1u;
   if (!sequence) sequence = 1; // Zero is reserved for an unused index.
   uint8_t bytes[CHANNEL_RECORD_BYTES];
   UserChannel verify;
   uint32_t verifiedSequence;
-  bool occupied;
   encode(bytes, number, channel, sequence);
   if (!EEPROM_TryWriteBuffer(address(number, target), bytes, sizeof(bytes)) ||
-      !readCopy(number, target, channel ? &verify : NULL, &verifiedSequence, &occupied) ||
-      verifiedSequence != sequence || occupied != (channel != NULL) ||
-      (channel && !equalChannel(&verify, channel))) return false;
-  *entry = (ChannelIndex){sequence, target, channel != NULL};
+      !readCopy(number, target, &verify, &verifiedSequence) ||
+      verifiedSequence != sequence || !equalChannel(&verify, channel)) return false;
+  *entry = (ChannelIndex){sequence, target, true};
   return true;
-}
-bool CHANNEL_STORE_Save(uint16_t number, const UserChannel *channel) {
-  return initialized && number >= 1 && number <= USER_CHANNEL_COUNT &&
-      valid(channel) && commit(number, channel);
-}
-// A newer CRC-protected tombstone prevents the older live copy from returning
-// after reboot; never erase both copies in place.
-bool CHANNEL_STORE_Delete(uint16_t number) {
-  return CHANNEL_STORE_IsOccupied(number) && commit(number, NULL);
 }
 uint16_t CHANNEL_STORE_FirstEmpty(void) {
   if (!initialized) return 0;

@@ -1,5 +1,5 @@
-#ifndef VFO_APP_H
-#define VFO_APP_H
+#ifndef VFO_H
+#define VFO_H
 
 #include "hal/keyboard.h"
 #include <stdbool.h>
@@ -17,4 +17,4 @@ void VFO_update();
 bool VFO_key(KEY_Code_t key, Key_State_t state);
 void VFO_render();
 
-#endif /* end of include guard: VFO_APP_H */
+#endif /* end of include guard: VFO_H */

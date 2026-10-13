@@ -9,7 +9,7 @@
 #include "apps/apps.h"
 #include "apps/chcfg.h"
 #include "apps/textinput.h"
-#include "apps/vfo.h"
+#include "vfo/vfo.h"
 #include <string.h>
 
 typedef enum {

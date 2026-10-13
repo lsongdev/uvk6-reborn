@@ -10,6 +10,16 @@ static unsigned bkModes, lastBkHz10;
 static bool siTuneOk = true, siBandwidthOk = true, siVolumeOk = true;
 static bool broadcastOk = true, broadcastMuteOk = true;
 static unsigned broadcastMutes;
+static unsigned scanStarts, scanStops, modeInvalidations;
+static uint32_t scanRaw;
+static bool scanReady;
+static bool rxPinEnabled;
+void BK4819_StopScan(void) { ++scanStops; BK4819_Idle(); }
+void BK4819_InvalidateRxMode(void) { ++modeInvalidations; }
+void BK4819_EnableFrequencyScanEx(FreqScanTime time) {
+  assert(time==F_SC_T_0_2s); ++scanStarts;
+}
+bool BK4819_GetFrequencyScanResult(uint32_t *raw) { *raw=scanRaw; return scanReady; }
 uint32_t SETTINGS_GetFilterBound(void) { return 24000000u; }
 bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index) {
   if (hz != 12000 && hz != 6000) return false;
@@ -172,5 +182,36 @@ int main(void) {
   native.parameters.squelch=8;assert(RX_DEVICE_WatchSignal(&native,&signal) && !signal);
   rsqOK=false;assert(!RX_DEVICE_WatchSignal(&native,&signal));
   assert(!RX_DEVICE_WatchSignal(NULL,&signal) && !RX_DEVICE_WatchSignal(&watch,NULL));
+  // Capture owns BK physically even when the public mirror still names SI.
+  gDeviceConfig.preferences.si4732_power_off=false;
+  unsigned muteBefore=siMuted, invalidateBefore=modeInvalidations;
+  RX_DEVICE_CaptureStart(CAPTURE_RANGE_VHF,RX_DEVICE_SI);
+  assert(siMuted==muteBefore+1 && scanStarts==1 && modeInvalidations==invalidateBefore+1);
+  uint32_t captured=0;
+  assert(RX_DEVICE_CapturePoll(CAPTURE_RANGE_VHF,&captured)==CAPTURE_BUSY);
+  scanReady=true;scanRaw=14550000;
+  assert(RX_DEVICE_CapturePoll(CAPTURE_RANGE_VHF,&captured)==CAPTURE_SAMPLE && captured==145500000);
+  assert(RX_DEVICE_CapturePoll(CAPTURE_RANGE_UHF,&captured)==CAPTURE_INVALID);
+  scanRaw=43850000;
+  assert(RX_DEVICE_CapturePoll(CAPTURE_RANGE_UHF,&captured)==CAPTURE_SAMPLE && captured==438500000);
+  scanRaw=UINT32_MAX;
+  assert(RX_DEVICE_CapturePoll(CAPTURE_RANGE_UHF,&captured)==CAPTURE_INVALID);
+  assert(RX_DEVICE_CapturePoll(CAPTURE_RANGE_UHF,NULL)==CAPTURE_INVALID);
+  RX_DEVICE_CaptureStart(CAPTURE_RANGE_UHF,RX_DEVICE_BROADCAST);
+  assert(broadcastMutes>0);
+  // Same-frequency restoration must reconfigure mode and tune, bypassing cache.
+  watch.parameters.rx_tone=0;
+  assert(RX_DEVICE_Apply(&watch,RX_DEVICE_BK));
+  unsigned modesBefore=bkModes, tunesBefore=bkTunes;
+  RX_DEVICE_CaptureStop();RX_DEVICE_CaptureStop();
+  assert(RX_DEVICE_Apply(&watch,RX_DEVICE_BK));
+  assert(bkModes==modesBefore+1 && bkTunes==tunesBefore+1 && scanStops>=4);
+  rxPinEnabled=false;
+  modesBefore=bkModes;tunesBefore=bkTunes;
+  RX_DEVICE_InvalidateBk();
+  assert(RX_DEVICE_Apply(&watch,RX_DEVICE_BK));
+  assert(rxPinEnabled && bkModes==modesBefore+1 && bkTunes==tunesBefore+1);
   return 0;
 }
+
+void BK4819_ToggleGpioOut(BK4819_GPIO_PIN_t pin, bool enabled) { assert(pin==BK4819_GPIO0_PIN28_RX_ENABLE); rxPinEnabled=enabled; }

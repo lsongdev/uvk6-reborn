@@ -18,7 +18,6 @@ bool CHANNEL_STORE_Available(void);
 bool CHANNEL_STORE_IsOccupied(uint16_t number);
 bool CHANNEL_STORE_Load(uint16_t number, UserChannel *channel);
 bool CHANNEL_STORE_Save(uint16_t number, const UserChannel *channel);
-bool CHANNEL_STORE_Delete(uint16_t number);
 uint16_t CHANNEL_STORE_FirstEmpty(void); // Zero when full/unavailable.
 bool CHANNEL_STORE_Next(uint16_t number, bool up, uint16_t *next);
 

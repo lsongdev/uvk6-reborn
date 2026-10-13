@@ -14,32 +14,32 @@
 
 ## 建议菜单
 
-根菜单为 Display（显示）、Receive（接收）、Transmit（发射）、Keys（按键）、Battery（电池）、Band presets（频段预设）、System（系统）。常用子菜单尽量控制在五项；背光、静噪与接收硬件按具体功能分组，不再使用含义宽泛的 Advanced。屏幕沿用英文，中文名称用于设计与手册；实际排版核对名称与右侧值的宽度，避免挤压。
+根菜单依次为 Display（显示）、Receive（接收）、Transmit（发射）、Lock PTT too、Battery（电池）、Band presets（频段预设）、System（系统）、About（关于）。单项设置直接显示；Display 与 Receive 内的背光、静噪和接收硬件参数不再增加一层子菜单，超过五项时滚动。About 固定为根菜单最后一项，System 保留 TX status、Save status 和 Reset prefs。未来按键设置增加后再评估分组。屏幕沿用英文，中文名称用于设计与手册；实际排版核对名称与右侧值的宽度，避免挤压。
 
 | 路径／屏幕名称 | 设置内容与范围 | 默认策略／生效时机 | 实施范围 |
 | --- | --- | --- | --- |
 | Display → Contrast | 沿用合法硬件范围 0～15，界面显示 -8～+7 | 默认硬件值 8；即时预览 | 首批 |
-| Display → Backlight → Duration | Off、5/10/20/60/120 s、Always | 默认 20 s；即时 | 首批 |
-| Display → Backlight → Brightness | 工作亮度，沿用 0～15 档 | 默认 8；即时预览，具体可见亮度实机验收 | 首批 |
-| Display → Backlight → Idle level | 待机亮度，沿用 0～15 档；限制 ≤ 工作亮度 | 默认 0；即时更新待机状态 | 首批 |
-| Display → Backlight → On signal | Off／Timed／Receiving | 默认 Timed；解释为信号触发续时／随接收关闭，而非解调模式 | 首批 |
+| Display → Light time | Off、5/10/20/60/120 s、Always | 默认 20 s；即时 | 首批 |
+| Display → Brightness | 工作亮度，沿用 0～15 档 | 默认 8；即时预览，具体可见亮度实机验收 | 首批 |
+| Display → Idle light | 待机亮度，沿用 0～15 档；限制 ≤ 工作亮度 | 默认 0；即时更新待机状态 | 首批 |
+| Display → Light on RX | Off／Timed／Receiving | 默认 Timed；解释为信号触发续时／随接收关闭，而非解调模式 | 首批 |
 | Receive → VFO count | 2／3／4 | 默认 2；减少数量保留隐藏项，关闭隐藏 Watch，必要时选择 A | 首批 |
 | Receive → Dual watch | Off／On | 默认 Off；退出菜单后恢复调度，仍最多两项参与 | 首批 |
-| Receive → Squelch → Open delay | BK4819 静噪开启时序，硬件代码 0～7 | 默认 1；退出菜单重新应用当前接收方案 | 首批 |
-| Receive → Squelch → Close delay | BK4819 静噪关闭时序，硬件代码 0～3 | 默认 1；同上 | 首批 |
-| Receive → Hardware → SI4732 idle | Mute／Power off，离开 SI 接收路径时的策略 | 默认 Mute；下一次离开 SI 路径生效 | 首批；无 SI 时不可编辑 |
-| Receive → Hardware → Filter split | 240／280 MHz，BK 接收滤波切换边界 | 默认 240 MHz；退出菜单重建当前接收方案 | 首批；工程项 |
+| Receive → SQL open delay | BK4819 静噪开启时序，硬件代码 0～7 | 默认 1；退出菜单重新应用当前接收方案 | 首批 |
+| Receive → SQL close delay | BK4819 静噪关闭时序，硬件代码 0～3 | 默认 1；同上 | 首批 |
+| Receive → SI4732 idle | Mute／Power off，离开 SI 接收路径时的策略 | 默认 Mute；下一次离开 SI 路径生效 | 首批；无 SI 时不可编辑 |
+| Receive → Filter split | 240／280 MHz，BK 接收滤波切换边界 | 默认 240 MHz；退出菜单重建当前接收方案 | 首批；工程项 |
 | Transmit → Time limit | 30／60／120／180／300／600 s | 默认 120 s；下次 PTT 使用 | 首批 |
 | Transmit → Block if busy | Off／On，忙信道发射保护 | 默认 On；下次 PTT 使用 | 首批 |
 | System → TX status | 只读硬件发射许可状态及阻止原因 | 当前实际 PA 输出仍禁用 | 首批，只读 |
-| Keys → Lock PTT too | 键盘锁定时是否同时拦截 PTT | 默认 Off；沿用现有 ptt_lock 语义 | 首批 |
+| Lock PTT too | 键盘锁定时是否同时拦截 PTT | 默认 Off；沿用现有 ptt_lock 语义 | 首批 |
 | Keys → Auto lock | Off／30／60／120 s，无操作后锁键 | 建议默认 Off；仅在主界面且非 PTT、输入、菜单时计时 | 后续新增 |
 | Keys → Key beep | Off／On，按键反馈 | 默认 Off；必须先接入实际音频路径再开放 | 后续新增 |
 | Battery → Show charge | Icon／Percent／Voltage | 默认 Percent；即时刷新 | 首批 |
 | Battery → Charge curve | 1600／2200／3500 对应现有电压百分比曲线 | 首批沿用已保存值／当前默认；它不是实际容量测量 | 首批 |
 | Battery → Cal voltage | 输入实测电压 5.00～8.60 V；显示当前电压 | 沿用当前校准；校准系数校验成功才提交 | 首批 |
 | Band presets | 打开现有频段预设编辑器 | 保留草稿、Use current、Defaults、Save 语义 | 首批，功能入口 |
-| System → About | 固件版本、接收芯片／补丁能力、EEPROM 容量、配置格式 | 自动探测／只读，可分页 | 首批 |
+| About | 固件版本、接收芯片／补丁能力、EEPROM 容量、配置格式 | 自动探测／只读，可分页 | 首批 |
 | System → Save status | Saved／Pending／Failed／Read only；失败可按 MENU 重试 | 区分内存生效与 EEPROM 写入成功 | 首批 |
 | System → Reset prefs | 恢复普通全局偏好 | 显示范围并确认；成功写入后提交和重应用 | 首批，需新增专用动作 |
 

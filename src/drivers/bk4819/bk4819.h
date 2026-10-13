@@ -151,6 +151,8 @@ void BK4819_Idle(void);
 void BK4819_EnterBypass(void);
 void BK4819_ExitBypass(void);
 void BK4819_PrepareTransmit(void);
+void BK4819_ConfigureMicrophone(uint8_t mic);
+void BK4819_ConfigureVoiceTx(uint32_t frequency, uint8_t mic, uint16_t deviation);
 void BK4819_TxOn_Beep(void);
 void BK4819_ExitSubAu(void);
 

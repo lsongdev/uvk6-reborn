@@ -21,8 +21,8 @@ static uint16_t scrollOffset(uint32_t now, uint32_t started, uint16_t overflow) 
 
 bool UI_VfoUpdate(UI_VfoState *state, uint32_t now) {
   if (!state->initialized) return false;
-  bool show = state->label[0] && (state->showing_message || (!state->tuning &&
-              now-state->tuned_at >= UI_VFO_NAME_DELAY_MS));
+  bool show = state->label[0] && !state->tuning &&
+              now-state->tuned_at >= UI_VFO_NAME_DELAY_MS;
   bool changed = show != state->show_name;
   if (show && !state->show_name) state->label_started = now;
   state->show_name = show;
@@ -90,9 +90,7 @@ void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_
   char label[128], frequency[16];
   const char *name = view->name ? view->name : "";
   const char *rds = view->rds ? view->rds : "";
-  state->showing_message = view->message && *view->message;
-  if (state->showing_message) snprintf(label, sizeof(label), "%s", view->message);
-  else snprintf(label, sizeof(label), "%s%s%s", name, *name && *rds ? " / " : "", rds);
+  snprintf(label, sizeof(label), "%s%s%s", name, *name && *rds ? " / " : "", rds);
   if (strcmp(label, state->label)) {
     strcpy(state->label, label);
     state->label_started = now;
@@ -111,10 +109,11 @@ void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_
   uint8_t modeLeft = LCD_WIDTH-UI_SmallTextWidth(mode);
   char compact[24];
   snprintf(compact, sizeof(compact), "%s%s", frequency, unit);
+  bool headerMessage = view->header_message && *view->header_message;
   uint8_t bandRight = modeLeft-3;
-  if (state->show_name) bandRight -= UI_SmallTextWidth(compact)+3;
+  if (state->show_name && !headerMessage) bandRight -= UI_SmallTextWidth(compact)+3;
   uint16_t bandWidth = bandRight > BAND_X ? bandRight-BAND_X : 0;
-  const char *band = view->band_name ? view->band_name : "";
+  const char *band = headerMessage ? view->header_message : view->band_name ? view->band_name : "";
   if (strncmp(band, state->band, sizeof(state->band)-1) || bandWidth != state->band_width) {
     snprintf(state->band, sizeof(state->band), "%s", band);
     state->band_started = now;
@@ -135,7 +134,7 @@ void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_
   if (view->changed) PrintSmall(10, y+5, "*");
   UI_SmallTextWindow(BAND_X, y+5, bandWidth, state->band, state->band_offset);
   PrintSmallEx(LCD_WIDTH, y+5, POS_R, C_FILL, "%s", mode);
-  if (state->show_name)
+  if (state->show_name && !headerMessage)
     PrintSmallEx(modeLeft-3, y+5, POS_R, C_FILL, "%s", compact);
   FillRect(0, y, LCD_WIDTH, 8, C_INVERT);
   renderActivity(y, view);

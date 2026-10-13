@@ -30,14 +30,18 @@ bool DEVICE_SavePreferences(const ConfigPreferences *next) {
 }
 bool VFO_ApplyRxSettings(void) { ++reapplications; return applyWorks; }
 ReceiverCapabilities RADIO_GetReceiverCapabilities(void) { return capabilities; }
-TxCapabilities TX_DEVICE_Capabilities(void) { return (TxCapabilities){0}; }
+TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) { (void)frequency_hz; return (TxCapabilities){0}; }
 TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
 uint32_t EEPROM_DetectSize(void) { return 524288; }
 void APPS_run(AppType_t app) { assert(app==APP_BANDS); ++appRuns; }
 void STATUSLINE_SetText(const char *pattern, ...) {
   va_list args; va_start(args,pattern); vsnprintf(title,sizeof(title),pattern,args); va_end(args);
 }
-static void press(KEY_Code_t key) { assert(SETTINGS_key(key,KEY_RELEASED)); }
+static void press(KEY_Code_t key) {
+  bool handled=SETTINGS_key(key,KEY_RELEASED);
+  if (!handled) fprintf(stderr,"Unhandled key %u in %s at %u\n",key,active_menu ? active_menu->title : "none",active_menu ? active_menu->i : 0);
+  assert(handled);
+}
 static void capture(void) {
   memset(gFrameBuffer,0,sizeof(gFrameBuffer));
   SETTINGS_render(); PrintSmall(3,5,"%s",title);
@@ -49,16 +53,18 @@ int main(int argc, char **argv) {
   RADIO_STATE_Default(&gDeviceConfig.radio);
   capabilities=(ReceiverCapabilities){.si=true,.ssb_patch=true};
   SETTINGS_init(); capture();
-  enter(KEY_1); enter(KEY_2); capture(); // Display -> Backlight
-  press(KEY_EXIT); press(KEY_EXIT);
+  enter(KEY_1); capture(); // Display directly contains contrast and all light settings.
+  assert(active_menu==&displayMenu && menu_stack_top==1 && active_menu->num_items==5);
+  press(KEY_EXIT);
   enter(KEY_2); capture(); // Receive
-  enter(KEY_3); capture(); // Squelch
-  press(KEY_EXIT); enter(KEY_4); capture(); // Hardware
+  press(KEY_3);press(KEY_STAR);capture(); // SQL delay is editable directly within Receive.
+  assert(active_menu==&receiveMenu && menu_stack_top==1);
+  press(KEY_5);capture(); // SI hardware option also stays in Receive.
   unsigned before=requests;
   capabilities.si=false;
   press(KEY_STAR); assert(requests==before && !strcmp(notice,"SI4732 missing"));
   capabilities.si=true;
-  press(KEY_EXIT); press(KEY_EXIT);
+  press(KEY_EXIT);
   enter(KEY_3); capture(); // Transmit
   press(KEY_EXIT); enter(KEY_5); capture(); // Battery
   enter(KEY_3);
@@ -80,10 +86,13 @@ int main(int argc, char **argv) {
   press(KEY_MENU);press(KEY_4);press(KEY_MENU);assert(number.active && number.invalid && saves==1);
   assert(SETTINGS_key(KEY_EXIT,KEY_LONG_PRESSED));assert(!number.active && saves==1);
   press(KEY_EXIT); enter(KEY_7); capture(); // System
-  enter(KEY_1); capture(); // About
-  press(KEY_EXIT); enter(KEY_4); capture(); // Reset confirmation
+  assert(active_menu==&systemMenu && active_menu->num_items==3);
+  press(KEY_EXIT); enter(KEY_8); capture(); // About is last at the root.
+  assert(active_menu==&aboutMenu && menu_stack_top==1);
+  assert(menuItems[ARRAY_SIZE(menuItems)-1].submenu==&aboutMenu);
+  press(KEY_EXIT); enter(KEY_7); enter(KEY_3); capture(); // Reset confirmation
   press(KEY_EXIT); assert(!resetConfirm && saves==1);
-  enter(KEY_4);press(KEY_MENU);assert(saves==2 && !resetConfirm);
+  enter(KEY_3);press(KEY_MENU);assert(saves==2 && !resetConfirm);
   assert(gDeviceConfig.preferences.battery_calibration==2100);
   // A failed reapplication restores the prior engineering preferences.
   gDeviceConfig.preferences.sql_open_time=3;

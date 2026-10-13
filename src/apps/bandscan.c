@@ -70,7 +70,7 @@ bool BANDSCAN_key(KEY_Code_t key, Key_State_t state) {
 void BANDSCAN_render(void) {
   STATUSLINE_RenderRadioSettings();
   if (gScanlistSize) {
-    PrintMediumBoldEx(LCD_XCENTER, 18, POS_C, C_FILL, "%s", gCurrentBand.name);
+    PrintMediumEx(LCD_XCENTER, 18, POS_C, C_FILL, "%s", gCurrentBand.name);
   }
 
   UI_RenderScanScreen();
