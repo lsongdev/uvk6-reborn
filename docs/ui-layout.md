@@ -49,7 +49,7 @@ MHz 的前三位小数与整数部分用大字显示，实际需要的第四、�
 
 ## 实现与验证
 
-`src/ui/components/vfo.c` 接收 `UI_VfoView`，每个 VFO 独立持有 `UI_VfoState`，不访问接收器全局状态。活动状态显式传入，不以 RSSI 有效推断静噪已打开。频率统一由 `UI_FormatFrequency` 格式化。
+`src/ui/components/radio-card.c` 接收 `UI_RadioCardView`，每个 Slot 独立持有 `UI_RadioCardState`（只保存文本指纹与滚动状态，不复制文本），不访问接收器全局状态。活动状态显式传入，不以 RSSI 有效推断静噪已打开。频率统一由 `UI_FormatFrequency` 格式化。
 
 `tests/vfo-component-regression.c` 验证显示切换、同频率重新调谐、迟到 RDS、搜索结束计时、滚动裁剪、最长频率边界、双组件隔离及计时回绕。预览使用固件真实帧缓冲与字体，不模拟字形。
 

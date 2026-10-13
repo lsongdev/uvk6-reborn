@@ -6,7 +6,7 @@
 
 默认启用 A/B 两个 Radio Slot，可在 Settings → Receive → Slot count 设置 1／2／3／4 项，每页显示两个。主屏幕不区分 VFO 或 MR；`F → 2(A/B)` 在启用的 Slot 间循环选择，`F → 3(VFO/MR)` 切换所选 Slot 的频率来源（直接调频或存储频道）。切到 MR 不覆盖原先的 VFO 频率和频段记忆，切回时恢复；可选双守听按每个 Slot 当前来源轮询，至少启用两个 Slot 才会运行。Slot 的 TX 设置和 Watch 资格独立，频段预设共享。首次初始化 A 为 145.500 MHz NFM、B 为 438.500 MHz NFM。固件根据频率、模式及探测到的芯片能力选择接收路径，无需手动选择芯片。模式为 `NFM / WFM / AM / LSB / USB`，没有 `Auto`。
 
-默认编译 **已开放 BK4819 NFM 发射与功放**：在当前 Slot 菜单把 `TX Enable` 设为 On 后按住 PTT 发射（初始均为 Off）。首次发射请接假负载核对功率与频偏，并只在有执照许可的频率发射；`make ENABLE_TX=0` 可生成仅接收固件。已支持命名频道和频道模式；`F → 4` 可启动 FC 频率捕获、`F → *` 可启动向前 Seek。旧扫描 / Loot 应用目前没有入口。
+默认编译 **已开放 BK4819 NFM 发射与功放**：在当前 Slot 菜单把 `TX Enable` 设为 On 后按住 PTT 发射（初始均为 Off）。首次发射请接假负载核对功率与频偏，并只在有执照许可的频率发射；`make ENABLE_TX=0` 可生成仅接收固件。已支持命名频道和频道模式；`F → 4` 可启动 FC 频率捕获、`F → *` 可启动向前 Seek。旧扫描 / 频谱 / Loot 应用已从源码删除。
 
 ## 刷写固件
 
@@ -244,13 +244,14 @@ Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mi
 | 变更内容 | 核对的实现入口 | 本手册需同步的内容 |
 | --- | --- | --- |
 | 启用应用、按键、键盘锁 | [apps.c](../src/apps/apps.c)、[system.c](../src/apps/system.c)、[Makefile](../Makefile) | 功能范围、主界面按键 |
-| VFO 操作、确认、频率显示 | [vfo.c](../src/vfo/vfo.c) | 快速开始、单位、参数菜单、提示 |
+| Slot 操作、确认、频率显示 | [radio.c](../src/apps/radio.c)、[radio-menu.c](../src/apps/radio-menu.c)、[radio-view.c](../src/apps/radio-view.c) | 快速开始、单位、参数菜单、提示 |
+| Seek、FC、双守听、PTT | [radio-seek.c](../src/apps/radio-seek.c)、[radio-capture.c](../src/apps/radio-capture.c)、[radio-watch.c](../src/apps/radio-watch.c)、[radio-tx.c](../src/apps/radio-tx.c) | 快捷键、提示、发射限制 |
 | 输入解析与按键 | [number-input.c](../src/ui/number-input.c) | 输入单位、示例、确认和取消 |
 | 频段、默认值、模式与能力 | [radio-model.c](../src/core/radio-model.c)、[radio-state.c](../src/core/radio-state.c) | 频段表、模式及接收路径 |
 | 初始化、保存格式与字段 | [reset.c](../src/apps/reset.c)、[device-config.c](../src/core/device-config.c)、[config-store.h](../src/core/config-store.h) | 首次开机、保存、全局持久化 |
 | 频段草稿与预设保存 | [bands.c](../src/apps/bands.c) | 编辑器入口、取消、恢复默认值、保存结果 |
 | 菜单与全局参数 | [settings.c](../src/apps/settings.c)、[menu.c](../src/ui/menu.c)、[settings.c（core）](../src/core/settings.c) | 菜单路径、操作和持久化限制 |
-| 接收失败、发射许可与设备适配 | [rx-runtime.c](../src/core/rx-runtime.c)、[radio.c](../src/core/radio.c)、[rx-device.c](../src/hal/rx-device.c) | 错误提示、接收路径、PTT 行为 |
+| 接收失败、发射许可与设备适配 | [rx-runtime.c](../src/core/rx-runtime.c)、[receiver.c](../src/core/receiver.c)、[rx-device.c](../src/hal/rx-device.c) | 错误提示、接收路径、PTT 行为 |
 
 发布前核对：侧键 1 / 2、锁键、跨频段恢复、输入单位与量化确认、初始化确认、掉电保存、发射限制。代码或主机测试支持的结论与实机验证结果分别记录；手册更新日期表示核对时间，不是硬件验收日期。
 

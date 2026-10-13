@@ -31,7 +31,7 @@ BK4819 REG32 写 `0x0245` 开启 0.2 秒频率检测，`0x0244` 关闭。REG0D b
 | `drivers/bk4819/capture.c` | 检测启动／关闭、原始寄存器读数；驱动单位 10 Hz |
 | `hal/rx-device.*` | 旧芯片离开、BK 接收基线、滤波范围、Hz 转换、停止与缓存失效 |
 | `core/capture.*` | 两次稳定、有界尝试、Auto 轮换与会话超时；没有硬件或配置依赖 |
-| `vfo/vfo.c` | 资源独占、模型校验、临时试听、采用／恢复、按键和显示 |
+| `apps/radio-capture.c` | 资源独占、模型校验、临时试听、采用／恢复、按键和显示 |
 
 核心 API 是 `CAPTURE_Start` / `CAPTURE_Update`，接收 BUSY／INVALID／SAMPLE，输出 WAIT／RESTART／FOUND／TIMEOUT。应用管理 OFF／DETECT／PREVIEW 生命周期，核心不持有芯片或用户状态。HAL 使用 `RX_DEVICE_CaptureStart` / `CapturePoll` / `CaptureStop`；BK 串行写没有 ACK，Start 没有虚构硬件成功返回值。
 

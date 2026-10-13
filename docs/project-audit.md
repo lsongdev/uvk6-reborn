@@ -61,6 +61,14 @@ LTO 价值约 4 KB：同参数关闭 LTO 溢出 4,056 B，必须保留。`dig_11
 
 已实测无收益：`-fipa-pta`、`-flto-partition=one`（均 0 B）；收紧 inline 参数（`max-inline-insns-auto=8`、`early-inlining-insns=4`）反增 36 B。与 [Flash 占用审计](flash-budget.md) 中的历史实验一致。
 
+## 实施状态（2026-10-13 结构重构）
+
+- A 字形压缩：已完成（7→5 B，−508 B）。
+- B 去除有符号除法：已完成（−460 B）。
+- C 合并字符串：仅合并 `EEPROM unknown`，另删除启动 UART 日志；其余重复多为链接器已尾部合并，收益很小。
+- D 表驱动：未做；菜单项已统一枚举。
+- E／F 编译选项：未采用。
+
 ## 建议顺序
 
 1. ~~修复问题 1、2，恢复全部回归通过。~~ 已完成。
