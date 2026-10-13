@@ -20,6 +20,9 @@ bool EEPROM_TryWriteBuffer(uint32_t at, const uint8_t *in, uint16_t size) {
   memcpy(bytes+at,in,size); return true;
 }
 int main(void) {
+  // Production calls CONFIG_Default at the entry point, before peripherals.
+  assert(gDeviceConfig.preferences.battery_calibration==0);
+  CONFIG_Default(&gDeviceConfig);
   assert(DEVICE_GetSaveStatus()==DEVICE_UNAVAILABLE);
   assert(gDeviceConfig.preferences.battery_calibration==2000);
   assert(!DEVICE_SaveNow() && !writes);

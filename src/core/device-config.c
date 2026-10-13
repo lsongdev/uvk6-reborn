@@ -4,7 +4,9 @@
 #include "hal/scheduler.h"
 #include "core/settings.h"
 
-DeviceConfig gDeviceConfig = {.preferences = CONFIG_DEFAULT_PREFERENCES};
+// The boot entry point initializes defaults before touching peripherals.
+// Keeping this in BSS avoids copying the full configuration into Flash.
+DeviceConfig gDeviceConfig;
 bool gDeviceConfigReady;
 static uint32_t committedSequence;
 static uint32_t saveAt;
