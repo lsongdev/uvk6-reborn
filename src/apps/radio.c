@@ -28,11 +28,11 @@
 #include <string.h>
 
 static bool initialized;
-static UI_RadioCardState cards[RADIO_VFO_CAPACITY];
-static uint8_t selectedVfo, receivingVfo = UINT8_MAX, inputVfo;
+static UI_RadioCardState cards[RADIO_SLOT_CAPACITY];
+static uint8_t selectedSlot, receivingSlot = UINT8_MAX, inputSlot;
 static NumberInput number;
 static bool inputTx;
-static struct { uint32_t frequency_hz; char ps[9], text[65]; } labels[RADIO_VFO_CAPACITY];
+static struct { uint32_t frequency_hz; char ps[9], text[65]; } labels[RADIO_SLOT_CAPACITY];
 static RxRuntime runtime;
 static WatchRuntime watcher;
 static uint32_t watchResumeAt;
@@ -47,12 +47,12 @@ static void startTransmit(void);
 static RdsReceiver rds;
 static bool inMenu;
 static bool confirming;
-static UserChannel channelCache[RADIO_VFO_CAPACITY];
-static bool channelCacheValid[RADIO_VFO_CAPACITY];
-static uint8_t channelCacheNumber[RADIO_VFO_CAPACITY];
+static UserChannel channelCache[RADIO_SLOT_CAPACITY];
+static bool channelCacheValid[RADIO_SLOT_CAPACITY];
+static uint8_t channelCacheNumber[RADIO_SLOT_CAPACITY];
 static uint8_t menuIndex;
 enum { MENU_RX_WATCH = 9, MENU_CHANNEL_NAME, MENU_CHANNEL_SAVE, MENU_ITEM_COUNT };
-static VfoConfig user; // Current UI state, committed only on successful RX.
+static RadioSlot user; // Current UI state, committed only on successful RX.
 static RxPlan pending;
 static const char *message;
 static uint32_t messageAt;
@@ -60,9 +60,9 @@ static bool functionPending;
 static uint32_t functionAt;
 static void nextChannel(bool up);
 
-static bool loadChannelForVfo(uint8_t id, UserChannel *channel) {
-  if (id >= RADIO_VFO_CAPACITY || !channel) return false;
-  const VfoConfig *config = &gDeviceConfig.radio.vfos[id];
+static bool loadChannelForSlot(uint8_t id, UserChannel *channel) {
+  if (id >= RADIO_SLOT_CAPACITY || !channel) return false;
+  const RadioSlot *config = &gDeviceConfig.radio.slots[id];
   if (config->source != RADIO_SOURCE_CHANNEL || !config->channel_number)
     return false;
   if (!channelCacheValid[id] || channelCacheNumber[id] != config->channel_number) {
@@ -78,13 +78,13 @@ static bool loadChannelForVfo(uint8_t id, UserChannel *channel) {
   return true;
 }
 
-static bool effectiveVfo(uint8_t id, VfoConfig *effective,
+static bool effectiveSlot(uint8_t id, RadioSlot *effective,
                          UserChannel *channel) {
-  if (id >= RADIO_VFO_CAPACITY || !effective) return false;
-  *effective = gDeviceConfig.radio.vfos[id];
+  if (id >= RADIO_SLOT_CAPACITY || !effective) return false;
+  *effective = gDeviceConfig.radio.slots[id];
   if (effective->source == RADIO_SOURCE_VFO) return true;
   UserChannel loaded;
-  if (!loadChannelForVfo(id, &loaded)) return false;
+  if (!loadChannelForSlot(id, &loaded)) return false;
   effective->active_band = RADIO_MODEL_BandAt(loaded.frequency_hz);
   if (effective->active_band == UINT8_MAX) return false;
   effective->current = (BandState){loaded.frequency_hz, loaded.rx};
@@ -125,7 +125,7 @@ static void __attribute__((noinline)) delayWatch(void) {
   watchResumeAt = Now() + 2000u;
 }
 static void __attribute__((noinline)) showFrequency(void) {
-  UI_RadioCardShowFrequency(&cards[selectedVfo], Now());
+  UI_RadioCardShowFrequency(&cards[selectedSlot], Now());
 }
 
 static void finishSeek(bool found, uint32_t frequency_hz, const char *status);
@@ -134,7 +134,7 @@ static void stopReceiver(void *unused);
 static void txMute(void *unused) {
   (void)unused;
   RADIO_StopReception();
-  receivingVfo = UINT8_MAX;
+  receivingSlot = UINT8_MAX;
   resetRds();
 }
 static bool txPrepare(void *unused, const TxPlan *plan) {
@@ -152,7 +152,7 @@ static bool txRestore(void *unused, const RxPlan *plan) {
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
     return false;
   }
-  receivingVfo = selectedVfo;
+  receivingSlot = selectedSlot;
   resetRds();
   return true;
 }
@@ -189,11 +189,11 @@ static void notify(const char *text) {
 
 static void channelSaved(uint8_t id, uint16_t number,
                          const UserChannel *channel) {
-  if (id >= RADIO_VFO_CAPACITY || !channel) return;
-  gDeviceConfig.radio.vfos[id].channel_number = (uint8_t)number;
-  if (id == selectedVfo) user.channel_number = (uint8_t)number;
-  for (uint8_t i = 0; i < RADIO_VFO_CAPACITY; ++i) {
-    if (gDeviceConfig.radio.vfos[i].channel_number == number) {
+  if (id >= RADIO_SLOT_CAPACITY || !channel) return;
+  gDeviceConfig.radio.slots[id].channel_number = (uint8_t)number;
+  if (id == selectedSlot) user.channel_number = (uint8_t)number;
+  for (uint8_t i = 0; i < RADIO_SLOT_CAPACITY; ++i) {
+    if (gDeviceConfig.radio.slots[i].channel_number == number) {
       channelCache[i] = *channel;
       channelCacheNumber[i] = (uint8_t)number;
       channelCacheValid[i] = true;
@@ -212,7 +212,7 @@ static void stopReceiver(void *unused) {
   (void)unused;
   resetRds();
   RADIO_StopReception();
-  receivingVfo = UINT8_MAX;
+  receivingSlot = UINT8_MAX;
 }
 
 static bool apply(const RxPlan *plan) {
@@ -231,20 +231,20 @@ static bool apply(const RxPlan *plan) {
     return false;
   }
   if (user.source == RADIO_SOURCE_VFO &&
-      !RADIO_VFO_Set(&user, plan->frequency_hz, plan->parameters)) {
+      !RADIO_SLOT_SetVfo(&user, plan->frequency_hz, plan->parameters)) {
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
     notify("State error");
     return false;
   }
   if (user.source == RADIO_SOURCE_VFO) {
     // TX edits are committed independently from the receive draft.
-    user.tx = gDeviceConfig.radio.vfos[selectedVfo].tx;
-    user.watch = gDeviceConfig.radio.vfos[selectedVfo].watch;
-    gDeviceConfig.radio.vfos[selectedVfo] = user;
+    user.tx = gDeviceConfig.radio.slots[selectedSlot].tx;
+    user.watch = gDeviceConfig.radio.slots[selectedSlot].watch;
+    gDeviceConfig.radio.slots[selectedSlot] = user;
   }
-  receivingVfo = selectedVfo;
-  memset(&labels[selectedVfo], 0, sizeof(labels[selectedVfo]));
-  labels[selectedVfo].frequency_hz = plan->frequency_hz;
+  receivingSlot = selectedSlot;
+  memset(&labels[selectedSlot], 0, sizeof(labels[selectedSlot]));
+  labels[selectedSlot].frequency_hz = plan->frequency_hz;
   DEVICE_RequestSave();
   message = NULL;
   showFrequency();
@@ -422,7 +422,7 @@ static void cancelCapture(const char *status) {
     status="RX error";
   } else {
     runtime.active=true;
-    receivingVfo=selectedVfo;
+    receivingSlot=selectedSlot;
   }
   delayWatch();
   showFrequency();
@@ -433,7 +433,7 @@ static void cancelCapture(const char *status) {
 
 static void captureAttempt(void) {
   RADIO_StopReception();
-  receivingVfo=UINT8_MAX;
+  receivingSlot=UINT8_MAX;
   resetRds();
   RxDevice previous=ctx->radio_type==RADIO_BK4819 ? RX_DEVICE_BK :
     ctx->radio_type==RADIO_SI4732 ? RX_DEVICE_SI : RX_DEVICE_BROADCAST;
@@ -465,7 +465,7 @@ static void captureUpdate(void) {
     RX_DEVICE_CaptureStop();
     if (!applyReceiver(NULL, &plan)) { cancelCapture("Tune failed"); return; }
     capturePhase=FC_PREVIEW;
-    receivingVfo=selectedVfo;
+    receivingSlot=selectedSlot;
     showFrequency();
     gRedrawScreen=true;
   }
@@ -481,8 +481,8 @@ static void acceptCapture(void) {
   // apply has queued a deferred save; include these changes in that one save.
   user.tx.enabled=false;
   user.channel_number=0;
-  gDeviceConfig.radio.vfos[selectedVfo]=user;
-  CHANNEL_MANAGER_LoadName(selectedVfo, 0);
+  gDeviceConfig.radio.slots[selectedSlot]=user;
+  CHANNEL_MANAGER_LoadName(selectedSlot, 0);
   delayWatch();
 }
 
@@ -518,7 +518,7 @@ static void request(uint32_t target, RadioParameters values) {
 }
 
 static void tuneTo(uint32_t target) {
-  if (inputVfo != selectedVfo) return;
+  if (inputSlot != selectedSlot) return;
   uint8_t band = RADIO_MODEL_BandAt(target);
   if (band == UINT8_MAX) {
     notify("Out of range");
@@ -531,7 +531,7 @@ static void tuneTo(uint32_t target) {
 
 // RX keypad entry and TX menu editing share the same input lifecycle.
 static void beginFrequencyInput(bool tx) {
-  inputVfo = selectedVfo;
+  inputSlot = selectedSlot;
   inputTx = tx;
   message = NULL;
   uint32_t initial = tx ? (user.tx.frequency_hz
@@ -542,33 +542,33 @@ static void beginFrequencyInput(bool tx) {
 
 void RADIO_APP_init(void) {
   RADIO_APP_cancelShortcut();
-  if (initialized && selectedVfo==gDeviceConfig.radio.selected_vfo &&
-      selectedVfo<gDeviceConfig.radio.vfo_count) return;
+  if (initialized && selectedSlot==gDeviceConfig.radio.selected_slot &&
+      selectedSlot<gDeviceConfig.radio.slot_count) return;
   initialized = true;
   transmitter = (TxRuntime){0};
   CHANNEL_MANAGER_Init(notify, channelSaved);
   seek.active = false;
   if (!RADIO_STATE_Valid(&gDeviceConfig.radio))
     RADIO_STATE_Default(&gDeviceConfig.radio);
-  selectedVfo = gDeviceConfig.radio.selected_vfo;
+  selectedSlot = gDeviceConfig.radio.selected_slot;
   bool invalidSavedChannel = false;
-  for (uint8_t id = 0; id < RADIO_VFO_CAPACITY; ++id) {
+  for (uint8_t id = 0; id < RADIO_SLOT_CAPACITY; ++id) {
     channelCacheValid[id] = false;
-    CHANNEL_MANAGER_LoadName(id, gDeviceConfig.radio.vfos[id].channel_number);
+    CHANNEL_MANAGER_LoadName(id, gDeviceConfig.radio.slots[id].channel_number);
   }
-  if (!effectiveVfo(selectedVfo, &user, NULL)) {
-    gDeviceConfig.radio.vfos[selectedVfo].source = RADIO_SOURCE_VFO;
-    user = gDeviceConfig.radio.vfos[selectedVfo];
+  if (!effectiveSlot(selectedSlot, &user, NULL)) {
+    gDeviceConfig.radio.slots[selectedSlot].source = RADIO_SOURCE_VFO;
+    user = gDeviceConfig.radio.slots[selectedSlot];
     DEVICE_RequestSave();
     invalidSavedChannel = true;
   }
-  receivingVfo = UINT8_MAX;
+  receivingSlot = UINT8_MAX;
   request(user.current.frequency_hz, user.current.parameters);
   if (invalidSavedChannel) notify("Channel unavailable");
 }
 
 bool RADIO_APP_isReceiving(void) {
-  return initialized && receivingVfo != UINT8_MAX && !WATCH_IsProbing(&watcher) && runtime.active && !seek.active && capturePhase!=FC_DETECT &&
+  return initialized && receivingSlot != UINT8_MAX && !WATCH_IsProbing(&watcher) && runtime.active && !seek.active && capturePhase!=FC_DETECT &&
          transmitter.mode == RADIO_RX;
 }
 
@@ -594,7 +594,7 @@ void RADIO_APP_TxSafetyUpdate(void) {
   if (pttPending && (int32_t)(Now()-pttCheckAt) >= 0) {
     pttPending = false;
     bool busy = false;
-    if (!runtime.active || receivingVfo != selectedVfo ||
+    if (!runtime.active || receivingSlot != selectedSlot ||
         !RX_DEVICE_WatchSignal(&runtime.current, &busy)) {
       transmitter.wait_release = true;
       notify("Busy check failed");
@@ -615,9 +615,9 @@ void RADIO_APP_update(void) {
   expireShortcut(now);
   RADIO_APP_TxSafetyUpdate(); // Also permit deterministic host/UI unit tests.
   if (message || (!inMenu && !confirming))
-    for (uint8_t id=0; id<RADIO_VFO_CAPACITY; ++id)
+    for (uint8_t id=0; id<RADIO_SLOT_CAPACITY; ++id)
       if (UI_RadioCardUpdate(&cards[id], now)) gRedrawScreen = true;
-  const UI_RadioCardState *card=&cards[selectedVfo];
+  const UI_RadioCardState *card=&cards[selectedSlot];
   uint32_t duration=2500u;
   uint16_t overflow = card->band_overflow;
   if (overflow)
@@ -635,10 +635,10 @@ void RADIO_APP_update(void) {
                     runtime.current.parameters.mode == RX_WFM;
   bool textExpired = rdsEnabled && now-rds.last_group >= 15000u;
   if (RDS_ReceiverUpdate(&rds, now, rdsEnabled, readRds, NULL) || textExpired) {
-    if (receivingVfo < RADIO_VFO_CAPACITY && rdsEnabled) {
-      labels[receivingVfo].frequency_hz = runtime.current.frequency_hz;
-      memcpy(labels[receivingVfo].ps, rds.decoder.ps, sizeof(rds.decoder.ps));
-      memcpy(labels[receivingVfo].text, rds.decoder.text, sizeof(rds.decoder.text));
+    if (receivingSlot < RADIO_SLOT_CAPACITY && rdsEnabled) {
+      labels[receivingSlot].frequency_hz = runtime.current.frequency_hz;
+      memcpy(labels[receivingSlot].ps, rds.decoder.ps, sizeof(rds.decoder.ps));
+      memcpy(labels[receivingSlot].text, rds.decoder.text, sizeof(rds.decoder.text));
     }
     gRedrawScreen = true;
   }
@@ -651,13 +651,13 @@ static bool restorePrimary(void) {
       plan.frequency_hz!=user.current.frequency_hz) {
     RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX unavailable"); return false;
   }
-  if (runtime.active && receivingVfo==selectedVfo && WATCH_SameReceiver(&runtime.current,&plan))
+  if (runtime.active && receivingSlot==selectedSlot && WATCH_SameReceiver(&runtime.current,&plan))
     return true;
   if (RX_RuntimeTune(&runtime,&plan,applyReceiver,stopReceiver,NULL)!=RX_APPLIED) {
     // A restored background watch plan is never a PTT/primary substitute.
     RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX restore error"); return false;
   }
-  receivingVfo=selectedVfo; gRedrawScreen=true;
+  receivingSlot=selectedSlot; gRedrawScreen=true;
   return true;
 }
 static bool pauseWatch(void) {
@@ -670,7 +670,7 @@ static bool watchTune(void *unused, const WatchTarget *target) {
   (void)unused;
   RxTuneResult result=RX_RuntimeTune(&runtime,&target->plan,applyReceiver,stopReceiver,NULL);
   if (result!=RX_APPLIED) return false;
-  receivingVfo=target->id; gRedrawScreen=true;
+  receivingSlot=target->id; gRedrawScreen=true;
   return true;
 }
 static bool watchSignal(void *unused, const RxPlan *plan, bool *found) {
@@ -703,11 +703,11 @@ static void watchUpdate(void) {
     WatchTarget targets[RADIO_WATCH_LIMIT];
     uint8_t count=0;
     watchStatus="DW: select 2";
-    for (uint8_t id=0; id<gDeviceConfig.radio.vfo_count && count<RADIO_WATCH_LIMIT; ++id) {
-      const VfoConfig *stored=&gDeviceConfig.radio.vfos[id];
-      VfoConfig effective;
+    for (uint8_t id=0; id<gDeviceConfig.radio.slot_count && count<RADIO_WATCH_LIMIT; ++id) {
+      const RadioSlot *stored=&gDeviceConfig.radio.slots[id];
+      RadioSlot effective;
       if (!stored->watch) continue;
-      if (!effectiveVfo(id, &effective, NULL)) {
+      if (!effectiveSlot(id, &effective, NULL)) {
         watchStatus="DW: unavailable"; continue;
       }
       RxPlan plan;
@@ -751,7 +751,7 @@ bool RADIO_APP_ApplyRxSettings(void) {
   else if (RADIO_MODEL_Plan(user.current.frequency_hz, user.current.parameters,
       RADIO_GetReceiverCapabilities(), &plan) != RX_OK) return false;
   if (!tuneDirect(&plan)) return false;
-  receivingVfo = selectedVfo;
+  receivingSlot = selectedSlot;
   return true;
 }
 
@@ -769,10 +769,10 @@ static void tuneChannel(uint16_t number, bool enterMode) {
     return;
   }
   if (!tuneDirect(&plan)) return;
-  channelCache[selectedVfo] = channel;
-  channelCacheValid[selectedVfo] = true;
-  channelCacheNumber[selectedVfo] = (uint8_t)number;
-  VfoConfig *stored = &gDeviceConfig.radio.vfos[selectedVfo];
+  channelCache[selectedSlot] = channel;
+  channelCacheValid[selectedSlot] = true;
+  channelCacheNumber[selectedSlot] = (uint8_t)number;
+  RadioSlot *stored = &gDeviceConfig.radio.slots[selectedSlot];
   bool selectionChanged = stored->channel_number != number;
   stored->channel_number = (uint8_t)number;
   if (enterMode) {
@@ -782,18 +782,18 @@ static void tuneChannel(uint16_t number, bool enterMode) {
   user.active_band = RADIO_MODEL_BandAt(channel.frequency_hz);
   user.current = (BandState){channel.frequency_hz, channel.rx};
   user.tx = channel.tx;
-  receivingVfo = selectedVfo;
-  memset(&labels[selectedVfo], 0, sizeof(labels[selectedVfo]));
-  labels[selectedVfo].frequency_hz = channel.frequency_hz;
+  receivingSlot = selectedSlot;
+  memset(&labels[selectedSlot], 0, sizeof(labels[selectedSlot]));
+  labels[selectedSlot].frequency_hz = channel.frequency_hz;
   message = NULL;
   showFrequency();
   if (enterMode || selectionChanged) DEVICE_RequestSave();
-  CHANNEL_MANAGER_LoadName(selectedVfo, number);
+  CHANNEL_MANAGER_LoadName(selectedSlot, number);
   gRedrawScreen = true;
 }
 
 static void nextChannel(bool up) {
-  uint16_t number = gDeviceConfig.radio.vfos[selectedVfo].channel_number;
+  uint16_t number = gDeviceConfig.radio.slots[selectedSlot].channel_number;
   uint16_t target;
   if (!number || !CHANNEL_STORE_Next(number, up, &target)) {
     notify("No saved channels");
@@ -803,7 +803,7 @@ static void nextChannel(bool up) {
 }
 
 static void switchSource(void) {
-  VfoConfig *stored = &gDeviceConfig.radio.vfos[selectedVfo];
+  RadioSlot *stored = &gDeviceConfig.radio.slots[selectedSlot];
   if (stored->source == RADIO_SOURCE_CHANNEL) {
     RxPlan plan;
     RxResult result = RADIO_MODEL_Plan(stored->current.frequency_hz,
@@ -815,7 +815,7 @@ static void switchSource(void) {
     if (!tuneDirect(&plan)) return;
     stored->source = RADIO_SOURCE_VFO;
     user = *stored;
-    receivingVfo = selectedVfo;
+    receivingSlot = selectedSlot;
     DEVICE_RequestSave();
     message = NULL;
     showFrequency();
@@ -835,10 +835,10 @@ static void switchSource(void) {
   tuneChannel(number, true);
 }
 
-static void switchVfo(void) {
-  uint8_t target = RADIO_STATE_NextVfo(&gDeviceConfig.radio);
-  VfoConfig next;
-  if (!effectiveVfo(target, &next, NULL)) {
+static void switchSlot(void) {
+  uint8_t target = RADIO_STATE_NextSlot(&gDeviceConfig.radio);
+  RadioSlot next;
+  if (!effectiveSlot(target, &next, NULL)) {
     notify("Channel unavailable");
     return;
   }
@@ -850,11 +850,11 @@ static void switchVfo(void) {
     return;
   }
   if (!tuneDirect(&plan)) return;
-  selectedVfo = target;
-  receivingVfo = target;
+  selectedSlot = target;
+  receivingSlot = target;
   user = next;
-  CHANNEL_MANAGER_LoadName(selectedVfo, user.channel_number);
-  gDeviceConfig.radio.selected_vfo = target;
+  CHANNEL_MANAGER_LoadName(selectedSlot, user.channel_number);
+  gDeviceConfig.radio.selected_slot = target;
   DEVICE_RequestSave();
   message = NULL;
   showFrequency();
@@ -886,8 +886,8 @@ static void nextMode(void) {
 }
 
 static bool setTxFrequency(uint32_t value) {
-  if (inputVfo != selectedVfo || !TX_MODEL_FrequencyValid(value)) return false;
-  gDeviceConfig.radio.vfos[selectedVfo].tx.frequency_hz = value;
+  if (inputSlot != selectedSlot || !TX_MODEL_FrequencyValid(value)) return false;
+  gDeviceConfig.radio.slots[selectedSlot].tx.frequency_hz = value;
   user.tx.frequency_hz = value;
   DEVICE_RequestSave();
   notify("TX freq saved");
@@ -899,7 +899,7 @@ static bool changeTxPower(bool up) {
     notify("Channel is read only");
     return false;
   }
-  TxConfig *tx = &gDeviceConfig.radio.vfos[selectedVfo].tx;
+  TxConfig *tx = &gDeviceConfig.radio.slots[selectedSlot].tx;
   tx->power = (tx->power + (up ? 1u : 2u)) % 3u;
   user.tx.power = tx->power;
   DEVICE_RequestSave();
@@ -908,8 +908,8 @@ static bool changeTxPower(bool up) {
 
 static void changeValue(bool up) {
   if (menuIndex == MENU_CHANNEL_NAME) {
-    CHANNEL_MANAGER_StartName(selectedVfo,
-        gDeviceConfig.radio.vfos[selectedVfo].channel_number);
+    CHANNEL_MANAGER_StartName(selectedSlot,
+        gDeviceConfig.radio.slots[selectedSlot].channel_number);
     return;
   }
   if (menuIndex == MENU_CHANNEL_SAVE) {
@@ -918,20 +918,20 @@ static void changeValue(bool up) {
       .rx = user.current.parameters,
       .tx = user.tx,
     };
-    CHANNEL_MANAGER_StartSave(selectedVfo,
-        gDeviceConfig.radio.vfos[selectedVfo].source == RADIO_SOURCE_CHANNEL
-            ? gDeviceConfig.radio.vfos[selectedVfo].channel_number : 0,
+    CHANNEL_MANAGER_StartSave(selectedSlot,
+        gDeviceConfig.radio.slots[selectedSlot].source == RADIO_SOURCE_CHANNEL
+            ? gDeviceConfig.radio.slots[selectedSlot].channel_number : 0,
         &channel);
     return;
   }
-  if (gDeviceConfig.radio.vfos[selectedVfo].source == RADIO_SOURCE_CHANNEL &&
+  if (gDeviceConfig.radio.slots[selectedSlot].source == RADIO_SOURCE_CHANNEL &&
       menuIndex != MENU_RX_WATCH) {
     notify("Channel is read only");
     return;
   }
   if (menuIndex==MENU_RX_WATCH) {
-    bool enabled=!gDeviceConfig.radio.vfos[selectedVfo].watch;
-    if (!RADIO_STATE_SetWatch(&gDeviceConfig.radio,selectedVfo,enabled))
+    bool enabled=!gDeviceConfig.radio.slots[selectedSlot].watch;
+    if (!RADIO_STATE_SetWatch(&gDeviceConfig.radio,selectedSlot,enabled))
       notify("Watch limit: 2");
     else DEVICE_RequestSave();
     return;
@@ -942,7 +942,7 @@ static void changeValue(bool up) {
   }
   if (menuIndex == 7) {
     if (!up) {
-      gDeviceConfig.radio.vfos[selectedVfo].tx.frequency_hz = 0;
+      gDeviceConfig.radio.slots[selectedSlot].tx.frequency_hz = 0;
       user.tx.frequency_hz = 0;
       DEVICE_RequestSave();
     } else {
@@ -951,8 +951,8 @@ static void changeValue(bool up) {
     return;
   }
   if (menuIndex == 8) {
-    gDeviceConfig.radio.vfos[selectedVfo].tx.tone = TONE_Next(gDeviceConfig.radio.vfos[selectedVfo].tx.tone, up);
-    user.tx.tone = gDeviceConfig.radio.vfos[selectedVfo].tx.tone;
+    gDeviceConfig.radio.slots[selectedSlot].tx.tone = TONE_Next(gDeviceConfig.radio.slots[selectedSlot].tx.tone, up);
+    user.tx.tone = gDeviceConfig.radio.slots[selectedSlot].tx.tone;
     DEVICE_RequestSave();
     return;
   }
@@ -961,8 +961,8 @@ static void changeValue(bool up) {
     return;
   }
   if (menuIndex == 5) {
-    gDeviceConfig.radio.vfos[selectedVfo].tx.enabled = !gDeviceConfig.radio.vfos[selectedVfo].tx.enabled;
-    user.tx.enabled = gDeviceConfig.radio.vfos[selectedVfo].tx.enabled;
+    gDeviceConfig.radio.slots[selectedSlot].tx.enabled = !gDeviceConfig.radio.slots[selectedSlot].tx.enabled;
+    user.tx.enabled = gDeviceConfig.radio.slots[selectedSlot].tx.enabled;
     DEVICE_RequestSave();
     return;
   }
@@ -1034,7 +1034,7 @@ static void captureKey(KEY_Code_t key, Key_State_t state) {
 
 static void frequencyInputKey(KEY_Code_t key, Key_State_t state) {
   uint32_t value;
-  if (inputVfo != selectedVfo) { number.active = false; return; }
+  if (inputSlot != selectedSlot) { number.active = false; return; }
   NumberInputResult result = NUMBER_Key(&number, key, state, &value);
   if (result == NUMBER_ACCEPTED) {
     if (inputTx) {
@@ -1053,7 +1053,7 @@ static void shortcutKey(KEY_Code_t key) {
   switch (key) {
   case KEY_1: nextBand(); break;
   case KEY_0: nextMode(); break;
-  case KEY_2: switchVfo(); break;
+  case KEY_2: switchSlot(); break;
   case KEY_3: switchSource(); break;
   case KEY_4: startCapture(); break;
   case KEY_6: {
@@ -1220,9 +1220,9 @@ static const char *menuValue(uint8_t item, char out[24]) {
     if (!user.tx.frequency_hz) return "Same";
     hz = user.tx.frequency_hz; break;
   case 8: TONE_Format(user.tx.tone,out); return out;
-  case MENU_RX_WATCH: return gDeviceConfig.radio.vfos[selectedVfo].watch ? "On" : "Off";
+  case MENU_RX_WATCH: return gDeviceConfig.radio.slots[selectedSlot].watch ? "On" : "Off";
   case MENU_CHANNEL_NAME:
-    return CHANNEL_MANAGER_Name(selectedVfo)[0] ? CHANNEL_MANAGER_Name(selectedVfo) : "(none)";
+    return CHANNEL_MANAGER_Name(selectedSlot)[0] ? CHANNEL_MANAGER_Name(selectedSlot) : "(none)";
   case MENU_CHANNEL_SAVE: return "Choose CH";
   default: return "";
   }
@@ -1235,26 +1235,26 @@ static const char *menuValue(uint8_t item, char out[24]) {
 typedef struct {
   UserChannel channel;
   char header[16];
-} VfoViewStorage;
+} RadioViewStorage;
 
 // Resolve application state here; the UI component only consumes display data.
 static void buildCardView(uint8_t id, const char *inputText,
-                          UI_RadioCardView *view, VfoViewStorage *storage) {
-  bool selected = id == selectedVfo;
-  const VfoConfig *stored = &gDeviceConfig.radio.vfos[id];
-  VfoConfig effective;
+                          UI_RadioCardView *view, RadioViewStorage *storage) {
+  bool selected = id == selectedSlot;
+  const RadioSlot *stored = &gDeviceConfig.radio.slots[id];
+  RadioSlot effective;
   UserChannel *channel = &storage->channel;
   *channel = (UserChannel){0};
   bool effectiveOk;
   if (selected) {
     effective = user;
     effectiveOk = user.source != RADIO_SOURCE_CHANNEL ||
-                  loadChannelForVfo(id, channel);
+                  loadChannelForSlot(id, channel);
   } else {
-    effectiveOk = effectiveVfo(id, &effective, channel);
+    effectiveOk = effectiveSlot(id, &effective, channel);
   }
   if (!effectiveOk) effective = *stored;
-  const VfoConfig *config = &effective;
+  const RadioSlot *config = &effective;
   const TxConfig *tx = &config->tx;
   const BandState *current = &config->current;
   const RadioParameters *p = &current->parameters;
@@ -1263,7 +1263,7 @@ static void buildCardView(uint8_t id, const char *inputText,
   bool modified = !channelMode && (p->mode != preset->mode || p->step_hz != preset->step_hz ||
     p->bandwidth_hz != preset->bandwidth_hz || p->squelch != preset->squelch ||
     p->rx_tone != preset->rx_tone);
-  bool receiving = receivingVfo==id && RADIO_APP_isReceiving();
+  bool receiving = receivingSlot==id && RADIO_APP_isReceiving();
   bool textValid = labels[id].frequency_hz == current->frequency_hz;
   char *channelHeader = storage->header;
   const char *header = radioBands[config->active_band].name;
@@ -1288,7 +1288,7 @@ static void buildCardView(uint8_t id, const char *inputText,
     .activity = selected && transmitter.mode==RADIO_TX ? UI_RADIO_CARD_TRANSMITTING :
       selected && transmitter.mode==RADIO_FAULT ? UI_RADIO_CARD_FAULT :
       selected && seek.active ? UI_RADIO_CARD_SEEKING :
-      receivingVfo==id && WATCH_IsProbing(&watcher) ? UI_RADIO_CARD_WATCHING :
+      receivingSlot==id && WATCH_IsProbing(&watcher) ? UI_RADIO_CARD_WATCHING :
       receiving && vfo->is_open ? UI_RADIO_CARD_RECEIVING :
       (channelMode && !effectiveOk) || (selected && !runtime.active) ? UI_RADIO_CARD_UNAVAILABLE : UI_RADIO_CARD_IDLE,
     .power_label = tx->power == TX_POWER_HIGH ? "HIGH" :
@@ -1316,8 +1316,8 @@ static void renderTitle(void) {
                       user.source != RADIO_SOURCE_CHANNEL;
     const char *mode = inMenu || confirming ? "VFO" :
         user.source == RADIO_SOURCE_CHANNEL ? "MR" : "DW";
-    char id = watchTitle ? (receivingVfo<RADIO_VFO_CAPACITY ?
-              'A'+receivingVfo : '-') : 'A'+selectedVfo;
+    char id = watchTitle ? (receivingSlot<RADIO_SLOT_CAPACITY ?
+              'A'+receivingSlot : '-') : 'A'+selectedSlot;
     STATUSLINE_SetText("%s %c", mode, id);
   } else STATUSLINE_SetText("RADIO");
 }
@@ -1363,9 +1363,9 @@ void RADIO_APP_render(void) {
   if (number.active && !inputTx) NUMBER_Text(&number, inputText);
   uint8_t first = RADIO_STATE_VisibleFirst(&gDeviceConfig.radio);
   uint32_t now = Now();
-  for (uint8_t row = 0; row < RADIO_VFO_VISIBLE; ++row) {
+  for (uint8_t row = 0; row < RADIO_SLOT_VISIBLE; ++row) {
     uint8_t id = first + row;
-    VfoViewStorage storage;
+    RadioViewStorage storage;
     UI_RadioCardView view;
     buildCardView(id, inputText, &view, &storage);
     UI_RadioCardRender(8 + row * UI_RADIO_CARD_HEIGHT, &view, &cards[id], now);

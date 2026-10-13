@@ -7,8 +7,8 @@
 #define HEADER_BANDS 5u
 #define HEADER_SEQUENCE 8u
 #define HEADER_CRC 12u
-#define FORMAT7_BYTES (PAYLOAD_START + 3u + RADIO_VFO_CAPACITY*(2u + 16u*(RADIO_STATE_BANDS+1u) + 8u) + 10u*RADIO_STATE_BANDS + 21u)
-#define FORMAT8_BYTES (FORMAT7_BYTES + 2u*RADIO_VFO_CAPACITY)
+#define FORMAT7_BYTES (PAYLOAD_START + 3u + RADIO_SLOT_CAPACITY*(2u + 16u*(RADIO_STATE_BANDS+1u) + 8u) + 10u*RADIO_STATE_BANDS + 21u)
+#define FORMAT8_BYTES (FORMAT7_BYTES + 2u*RADIO_SLOT_CAPACITY)
 _Static_assert(FORMAT7_BYTES == 810u && FORMAT7_BYTES <= RECORD_BYTES,
                "Multi VFO configuration must fit in a slot");
 _Static_assert(FORMAT8_BYTES == 818u && FORMAT8_BYTES <= RECORD_BYTES,
@@ -93,12 +93,12 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
   bytes[HEADER_BANDS] = RADIO_STATE_BANDS;
   put32(bytes + HEADER_SEQUENCE, sequence);
   uint8_t *p = bytes + PAYLOAD_START;
-  bytes[6] = RADIO_VFO_CAPACITY;
-  *p++ = config->radio.vfo_count;
-  *p++ = config->radio.selected_vfo;
+  bytes[6] = RADIO_SLOT_CAPACITY;
+  *p++ = config->radio.slot_count;
+  *p++ = config->radio.selected_slot;
   *p++ = config->radio.watch_enabled;
-  for (uint8_t id=0; id<RADIO_VFO_CAPACITY; ++id) {
-    const VfoConfig *vfo = &config->radio.vfos[id];
+  for (uint8_t id=0; id<RADIO_SLOT_CAPACITY; ++id) {
+    const RadioSlot *vfo = &config->radio.slots[id];
     *p++ = vfo->active_band;
     *p++ = vfo->watch;
     p = encodeBand6(p, &vfo->current);
@@ -159,17 +159,17 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
   if (bytes[HEADER_VERSION] >= 6u) {
     bool fourVfos = bytes[HEADER_VERSION] >= 7u;
     bool channelSources = bytes[HEADER_VERSION] >= 8u;
-    uint8_t records = fourVfos ? RADIO_VFO_CAPACITY : 2;
-    if (fourVfos && bytes[6] != RADIO_VFO_CAPACITY) return false;
-    candidate.radio.vfo_count = *p++;
-    if (!fourVfos && candidate.radio.vfo_count != 2) return false;
-    candidate.radio.selected_vfo = *p++;
+    uint8_t records = fourVfos ? RADIO_SLOT_CAPACITY : 2;
+    if (fourVfos && bytes[6] != RADIO_SLOT_CAPACITY) return false;
+    candidate.radio.slot_count = *p++;
+    if (!fourVfos && candidate.radio.slot_count != 2) return false;
+    candidate.radio.selected_slot = *p++;
     if (fourVfos) {
       if (*p>1) return false;
       candidate.radio.watch_enabled = *p++;
     }
     for (uint8_t id=0; id<records; ++id) {
-      VfoConfig *vfo = &candidate.radio.vfos[id];
+      RadioSlot *vfo = &candidate.radio.slots[id];
       vfo->active_band = *p++;
       if (fourVfos) {
         if (*p>1) return false;
@@ -199,11 +199,11 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
     candidate.preferences.tx_busy_lockout = *p++;
     if (p != bytes+(channelSources ? FORMAT8_BYTES : fourVfos ? FORMAT7_BYTES : 467u)) return false;
     if (!fourVfos)
-      for (uint8_t id=2; id<RADIO_VFO_CAPACITY; ++id)
-        RADIO_STATE_InitVfo(&candidate.radio, id, id%2 ? 6 : 5);
+      for (uint8_t id=2; id<RADIO_SLOT_CAPACITY; ++id)
+        RADIO_STATE_InitSlot(&candidate.radio, id, id%2 ? 6 : 5);
   } else {
     // Legacy format 4/5 stores one VFO. Keep its exact byte offsets.
-    VfoConfig *vfo = &candidate.radio.vfos[0];
+    RadioSlot *vfo = &candidate.radio.slots[0];
     vfo->active_band = *p++;
     p = decodeBand(p, &vfo->current);
     for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i)
@@ -230,9 +230,9 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
       vfo->tx.tone = get16(p); p += 2;
       vfo->tx.frequency_hz = get32(p);
     } // Format 4 defaults the new fields to Off/Same.
-    for (uint8_t id=1; id<RADIO_VFO_CAPACITY; ++id) {
-      RADIO_STATE_InitVfo(&candidate.radio, id, id%2 ? 6 : 5);
-      candidate.radio.vfos[id].watch = id<2;
+    for (uint8_t id=1; id<RADIO_SLOT_CAPACITY; ++id) {
+      RADIO_STATE_InitSlot(&candidate.radio, id, id%2 ? 6 : 5);
+      candidate.radio.slots[id].watch = id<2;
     }
   }
   if (!valid(&candidate))
