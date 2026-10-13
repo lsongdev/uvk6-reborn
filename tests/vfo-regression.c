@@ -466,7 +466,8 @@ int main(void) {
   press(KEY_SIDE1); // Leave 70cm for LW.
   tuneTo(438500000); // Enter 70cm again.
   assert(user.current.parameters.mode == RX_AM && user.current.parameters.step_hz == 25000);
-  assert(user.current.parameters.squelch == 2 && !changed);
+  assert(user.current.parameters.squelch == 2);
+  VFO_render(); assert(!drawn[0].changed); // Re-entered preset is unmodified.
   press(KEY_SIDE2); // Temporary NFM override.
   assert(gDeviceConfig.radio.presets[6].mode == RX_AM);
   setup(438500000, fm);
