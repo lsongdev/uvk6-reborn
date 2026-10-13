@@ -117,6 +117,12 @@ int main(void) {
   DeviceConfig original, loaded;
   CONFIG_Default(&original);
   assert(RADIO_STATE_Valid(&original.radio));
+  uint8_t guardRecord[CONFIG_STORE_SLOT_SIZE];
+  original.preferences.deviation = 205;
+  assert(!CONFIG_Encode(&original,1,guardRecord));
+  original.preferences.deviation = 204;
+  assert(CONFIG_Encode(&original,1,guardRecord));
+  original.preferences.deviation = 130;
   assert(original.radio.vfos[0].current.frequency_hz == 145500000);
   assert(RADIO_STATE_SelectBand(&original.radio, 0, 7));
   assert(RADIO_STATE_Valid(&original.radio));

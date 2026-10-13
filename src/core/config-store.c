@@ -69,7 +69,8 @@ static bool valid(const DeviceConfig *config) {
          p->battery_type <= 2 && p->battery_style <= 2 &&
          p->backlight_on_squelch <= 2 && p->keylock <= 1 &&
          p->ptt_lock <= 1 && p->beep <= 1 && p->si4732_power_off <= 1 &&
-         p->mic <= 15 && p->bound_240_280 <= 1 &&
+         p->mic <= 15 && p->deviation <= 204 &&
+          p->bound_240_280 <= 1 &&
          p->brightness_low <= 15 && p->sql_open_time <= 7 &&
          p->sql_close_time <= 3;
 }
