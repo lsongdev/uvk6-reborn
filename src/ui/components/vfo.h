@@ -17,7 +17,7 @@ typedef struct {
   UI_VfoActivity activity;
   const char *band_name, *name, *rds, *power_label;
   const char *edit_text; // Native MHz draft; owns the body while editing.
-  const char *message; // Temporarily replaces frequency/name, using the same scrolling text renderer.
+  const char *header_message; // Temporarily replaces band text in the black header.
   char id;
   bool selected, changed, signal_valid;
   uint8_t signal_level; // Existing 0..14 relative/S mapping, rendered as 8 bars.
@@ -26,7 +26,7 @@ typedef struct {
   char label[128], band[64];
   uint32_t tuned_at, label_started, band_started, frequency_hz;
   uint16_t offset, overflow, band_offset, band_overflow, band_width;
-  bool initialized, show_name, tuning, showing_message;
+  bool initialized, show_name, tuning;
 } UI_VfoState;
 // Restart the one-second frequency hold even when retuning to the same Hz.
 void UI_VfoShowFrequency(UI_VfoState *state, uint32_t now);

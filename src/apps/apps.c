@@ -6,7 +6,7 @@
 #include "ui/statusline.h"
 #include "apps/reset.h"
 #include "apps/settings.h"
-#include "apps/vfo.h"
+#include "vfo/vfo.h"
 #include "apps/bands.h"
 #include "apps/textinput.h"
 

@@ -44,6 +44,39 @@ static void leave(RxDevice device) {
   }
 }
 
+void RX_DEVICE_InvalidateBk(void) {
+  bkCached=false;
+  BK4819_InvalidateRxMode();
+}
+void RX_DEVICE_CaptureStop(void) {
+  BK4819_StopScan();
+  RX_DEVICE_InvalidateBk();
+}
+
+void RX_DEVICE_CaptureStart(CaptureRange range, RxDevice previous) {
+  leave(previous);
+  RX_DEVICE_CaptureStop();
+  // A previous SI/BK1080 reception may have left BK asleep. Establish an
+  // RX-only baseline before enabling its autonomous frequency detector.
+  BK4819_RX_TurnOn();
+  BK4819_SetRxMode(false);
+  BK4819_ExitSubAu();
+  BK4819_SetAGC(true, AUTO_GAIN_INDEX);
+  BK4819_SelectFilterEx(range==CAPTURE_RANGE_VHF ? FILTER_VHF : FILTER_UHF);
+  BK4819_EnableFrequencyScanEx(F_SC_T_0_2s);
+}
+
+CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
+  uint32_t raw;
+  if (!BK4819_GetFrequencyScanResult(&raw)) return CAPTURE_BUSY;
+  if (!hz || raw>RADIO_MAX_HZ/10u) return CAPTURE_INVALID;
+  *hz=raw*10u;
+  if (*hz<RADIO_MIN_HZ ||
+      ((*hz/10u < SETTINGS_GetFilterBound()) != (range==CAPTURE_RANGE_VHF)))
+    return CAPTURE_INVALID;
+  return CAPTURE_SAMPLE;
+}
+
 bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
   if (!plan || plan->frequency_hz < RADIO_MIN_HZ ||
       plan->frequency_hz > RADIO_MAX_HZ ||
@@ -101,6 +134,7 @@ bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
   switch (plan->device) {
   case RX_DEVICE_BK:
     if (!fastBk) {
+      BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_RX_ENABLE, true);
       BK4819_RX_TurnOn();
       BK4819_SetRxMode(mode == RX_AM);
       BK4819_SetFilterBandwidth(bandwidth);

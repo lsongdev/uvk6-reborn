@@ -3,7 +3,6 @@
 #include "ui/fonts/helvetica12.h"
 #include "ui/fonts/NumbersStepanv4.h"
 #include "ui/fonts/TomThumb.h"
-#include "ui/fonts/muHeavy8ptBold.h"
 #include "ui/fonts/muMatrix8ptRegular.h"
 #include "ui/fonts/symbols.h"
 #include <stdlib.h>
@@ -13,7 +12,7 @@ static Cursor cursor;
 static int16_t textClipLeft = 0, textClipRight = LCD_WIDTH;
 
 static const GFXfont *const fonts[] = {&TomThumb, &MuMatrix8ptRegular,
-                                       &muHeavy8ptBold, &dig_11, &uiBodyFont};
+                                       &MuMatrix8ptRegular, &dig_11, &uiBodyFont};
 
 void UI_ClearStatus(void) { FillRect(0, 0, LCD_WIDTH, 7, C_CLEAR); }
 void UI_ClearScreen(void) {

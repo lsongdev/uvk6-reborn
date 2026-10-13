@@ -25,16 +25,17 @@ TxResult TX_MODEL_Plan(const RxPlan *rx, const TxConfig *config,
   if (!TX_MODEL_FrequencyValid(frequency)) return TX_OUT_OF_BAND;
   if ((unsigned)config->power > TX_POWER_HIGH)
     return TX_UNCALIBRATED;
-  if (!capabilities->verified || !policy->authorized)
+  if (!capabilities->available || !policy->authorized)
     return TX_UNVERIFIED_HARDWARE;
-  if (frequency < policy->lower_hz ||
-      frequency >= policy->upper_hz ||
-      policy->lower_hz >= policy->upper_hz)
-    return TX_OUT_OF_BAND;
-  // Until medium/high power curves are measured, do not issue a TxPlan for
-  // an uncalibrated output level.
-  if (!capabilities->low_power_calibrated || config->power != TX_POWER_LOW)
-    return TX_UNCALIBRATED;
-  *out = (TxPlan){.frequency_hz = frequency, .power = TX_POWER_LOW, .tone = config->tone};
+  if (!policy->count || policy->count > TX_RANGE_CAPACITY) return TX_OUT_OF_BAND;
+  bool allowed = false;
+  for (uint8_t i=0; i<policy->count; ++i) {
+    const TxFrequencyRange *range = &policy->ranges[i];
+    if (range->lower_hz >= range->upper_hz) return TX_OUT_OF_BAND;
+    allowed |= frequency >= range->lower_hz && frequency < range->upper_hz;
+  }
+  if (!allowed) return TX_OUT_OF_BAND;
+  if (!(capabilities->power_mask & (1u << config->power))) return TX_UNCALIBRATED;
+  *out = (TxPlan){.frequency_hz = frequency, .power = config->power, .tone = config->tone};
   return TX_OK;
 }

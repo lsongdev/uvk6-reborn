@@ -21,7 +21,7 @@ int main(void) {
   RxPlan rx = {RX_DEVICE_BK,145500000,{RX_NFM,12500,12000,4,0}};
   TxConfig cfg = {.enabled=true,.power=TX_POWER_LOW};
   TxCapabilities hw = {true,true};
-  TxPolicy policy = {true,144000000,148000000};
+  TxPolicy policy = {true,1,{{144000000,148000000}}};
   TxPlan plan = {0};
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
   assert(plan.frequency_hz==145500000);
@@ -37,11 +37,11 @@ int main(void) {
   rx.device=RX_DEVICE_SI;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_UNSUPPORTED_MODE);
   rx.device=RX_DEVICE_BK;
   policy.authorized=false;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_UNVERIFIED_HARDWARE);
-  policy.authorized=true;hw.verified=false;
+  policy.authorized=true;hw.available=false;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_UNVERIFIED_HARDWARE);
-  hw.verified=true;
-  policy.upper_hz=145500000;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
-  policy.upper_hz=148000000;
+  hw.available=true;
+  policy.ranges[0].upper_hz=145500000;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
+  policy.ranges[0].upper_hz=148000000;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
   cfg.power = (TxPower)255;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_UNCALIBRATED);
@@ -51,11 +51,11 @@ int main(void) {
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
   rx.parameters.step_hz = 12500;
   rx.frequency_hz = 700000000u;
-  policy.lower_hz = 690000000u;
-  policy.upper_hz = 710000000u;
+  policy.ranges[0].lower_hz = 690000000u;
+  policy.ranges[0].upper_hz = 710000000u;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
-  policy.lower_hz = 144000000u;
-  policy.upper_hz = 148000000u;
+  policy.ranges[0].lower_hz = 144000000u;
+  policy.ranges[0].upper_hz = 148000000u;
   rx.frequency_hz = 145500000u;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
 
@@ -73,6 +73,20 @@ int main(void) {
   cfg.frequency_hz=0;cfg.tone=259;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
   cfg.tone=0;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
+
+  // Each calibrated level and each disjoint board range is checked independently.
+  hw.power_mask=7;
+  policy.count=2;policy.ranges[1]=(TxFrequencyRange){400000000u,470000000u};
+  cfg.frequency_hz=438500000;cfg.power=TX_POWER_HIGH;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK && plan.power==TX_POWER_HIGH);
+  cfg.power=TX_POWER_MEDIUM;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK && plan.power==TX_POWER_MEDIUM);
+  cfg.frequency_hz=300000000;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
+  cfg.frequency_hz=470000000;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
+  cfg.frequency_hz=0;cfg.power=TX_POWER_LOW;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
 
   TxOperations ops = {NULL,mute,prepare,enable,disable,restore};
   TxRuntime state = {0};

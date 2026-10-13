@@ -1050,39 +1050,6 @@ uint16_t BK4819_GetVoiceAmplitude(void) { return BK4819_ReadRegister(0x64); }
 // Frequency Scanning
 // ============================================================================
 
-bool BK4819_GetFrequencyScanResult(uint32_t *frequency) {
-  uint16_t high = BK4819_ReadRegister(BK4819_REG_0D);
-  bool finished = (high & 0x8000) == 0;
-
-  if (finished) {
-    uint16_t low = BK4819_ReadRegister(BK4819_REG_0E);
-    *frequency = (uint32_t)((high & 0x7FF) << 16) | low;
-  }
-
-  return finished;
-}
-
-void BK4819_EnableFrequencyScan(void) {
-  BK4819_WriteRegister(BK4819_REG_32, 0x0245);
-}
-
-void BK4819_EnableFrequencyScanEx(FreqScanTime time) {
-  BK4819_WriteRegister(BK4819_REG_32, 0x0245 | (time << 14));
-}
-
-void BK4819_EnableFrequencyScanEx2(FreqScanTime time, uint16_t hz) {
-  BK4819_WriteRegister(BK4819_REG_32, (time << 14) | (hz << 1) | true);
-}
-
-void BK4819_DisableFrequencyScan(void) {
-  BK4819_WriteRegister(BK4819_REG_32, 0x0244);
-}
-
-void BK4819_StopScan(void) {
-  BK4819_DisableFrequencyScan();
-  BK4819_Idle();
-}
-
 // ============================================================================
 // FSK (Frequency Shift Keying)
 // ============================================================================
@@ -1191,12 +1158,6 @@ static void wait_for_crystal_stabilization(void) {
   }
 }
 
-static void configure_microphone_and_tx(void) {
-  BK4819_WriteRegister(BK4819_REG_19, 0x1041);                 // MIC PGA
-  BK4819_WriteRegister(BK4819_REG_7D, 0xE940 | gDeviceConfig.preferences.mic); // MIC sens
-  BK4819_WriteRegister(0x74, 0xAF1F); // 3kHz response TX
-}
-
 static void configure_receiver(void) {
   BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_RX_ENABLE, true);
 }
@@ -1215,7 +1176,7 @@ void BK4819_Init(void) {
   initialize_dtmf_coefficients();
   initialize_audio();
   wait_for_crystal_stabilization();
-  configure_microphone_and_tx();
+  BK4819_ConfigureMicrophone(gDeviceConfig.preferences.mic);
   configure_receiver();
 
   BK4819_DisableDTMF();

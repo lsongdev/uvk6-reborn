@@ -43,12 +43,14 @@ static void renderItem(uint16_t index, uint8_t i) {
   const uint8_t by = y + active_menu->itemHeight -
                      (active_menu->itemHeight >= MENU_ITEM_H ? 3 : 2);
 
-  renderFn(3, by, "%s %c", item->name, item->submenu ? '>' : ' ');
+  renderFn(3, by, "%s", item->name);
+  if (item->submenu)
+    PrintSmallEx(ex - 7, by, POS_R, C_FILL, ">");
 
   if (item->get_value_text) {
     char value_buf[32];
     item->get_value_text(item, value_buf, sizeof(value_buf));
-    PrintSmallEx(ex - 7, by, POS_R, C_FILL, "%s", value_buf);
+    PrintSmallEx(ex - 7 - (item->submenu ? 8 : 0), by, POS_R, C_FILL, "%s", value_buf);
   }
 }
 

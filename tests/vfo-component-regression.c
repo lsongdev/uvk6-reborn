@@ -128,18 +128,19 @@ int main(void) {
   UI_VfoRender(8,&view,&a,500);
   memcpy(saved,gFrameBuffer,sizeof(saved));
   char label[128]; strcpy(label,a.label);
-  view.message="TX mode not supported";
+  // Every status uses the header; scrolling never changes the body or B card.
+  view.header_message="Channel store unavailable: please retry";
   UI_VfoRender(8,&view,&a,500);
-  sameRows(0,16); sameRows(36,64);
-  assert(!strcmp(a.label,view.message) && a.show_name && a.overflow);
-  assert(UI_VfoUpdate(&a,1850) && a.offset==1);
+  sameRows(0,8); sameRows(16,64);
+  assert(!strcmp(a.band,view.header_message) && !strcmp(a.label,label) && a.show_name);
+  assert(a.band_overflow);
+  assert(UI_VfoUpdate(&a,1850) && a.band_offset==1);
   UI_VfoRender(8,&view,&a,1850);
-  for (unsigned y=16;y<36;++y) for(unsigned x=0;x<30;++x)
-    assert(GetPixel(x,y)==!!(saved[y/8][x]&(1<<(y%8))));
-  view.message=NULL; UI_VfoRender(8,&view,&a,1850);
-  assert(!strcmp(a.label,label) && !a.showing_message);
-  sameRows(0,64); // Message removal restores the original name and surrounding rows.
-  view.message=NULL; view.edit_text="1340.000001_";
+  sameRows(16,64); sameRows(0,8);
+  view.header_message=NULL; UI_VfoRender(8,&view,&a,1850);
+  assert(!strcmp(a.label,label));
+  sameRows(0,64); // Removing status restores the header without resetting the name.
+  view.edit_text="1340.000001_";
   memcpy(saved,gFrameBuffer,sizeof(saved));
   UI_VfoRender(8,&view,&a,2000);
   sameRows(0,8);sameRows(36,64);

@@ -1,7 +1,7 @@
 #include "core/device-config.h"
 #include "apps/system.h"
 #include "apps/apps.h"
-#include "apps/vfo.h"
+#include "vfo/vfo.h"
 #include "hal/backlight.h"
 #include "hal/eeprom.h"
 #include "hal/keyboard.h"

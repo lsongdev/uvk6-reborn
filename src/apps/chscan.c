@@ -85,7 +85,7 @@ bool CHSCAN_key(KEY_Code_t key, Key_State_t state) {
 void CHSCAN_render(void) {
   if (gScanlistSize) {
     if (vfo->is_open) {
-      PrintMediumBoldEx(LCD_XCENTER, 18, POS_C, C_FILL, "%s", activeCh.name);
+      PrintMediumEx(LCD_XCENTER, 18, POS_C, C_FILL, "%s", activeCh.name);
     } else {
       PrintMediumEx(LCD_XCENTER, 18, POS_C, C_FILL,
                     isWaiting ? "Waiting..." : "Scanning...");

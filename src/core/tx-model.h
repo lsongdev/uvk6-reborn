@@ -10,17 +10,19 @@ typedef struct {
   RadioTone tone;
 } TxConfig;
 
-// The board TX capability is separate from BK4819 receive range. No board
-// is assumed verified merely because a BK4819 is detected.
+// Board implementation availability and factory calibration for the target Hz.
+// A populated calibration record is not a measurement of RF output quality.
 typedef struct {
-  bool verified;
-  bool low_power_calibrated;
+  bool available;
+  uint8_t power_mask; // Bit (1 << TxPower) for usable calibration records.
 } TxCapabilities;
 
+typedef struct { uint32_t lower_hz, upper_hz; } TxFrequencyRange;
+#define TX_RANGE_CAPACITY 2
 typedef struct {
   bool authorized;
-  uint32_t lower_hz; // Inclusive, verified board TX window.
-  uint32_t upper_hz; // Exclusive.
+  uint8_t count;
+  TxFrequencyRange ranges[TX_RANGE_CAPACITY]; // Upper bounds are exclusive.
 } TxPolicy;
 
 typedef struct {

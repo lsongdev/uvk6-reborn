@@ -131,6 +131,6 @@ void BANDS_render(void) {
     if (i == index)
       FillRect(0, y-8, 128, 11, C_INVERT);
   }
-  PrintSmall(2, 61, "%s", message ? message : !editing ? "MENU: edit EXIT: back"
-             : field < FIELD_CURRENT ? "*/#: edit EXIT: cancel" : "MENU: select EXIT: cancel");
+  if (message)
+    PrintSmall(2, 61, "%s", message);
 }

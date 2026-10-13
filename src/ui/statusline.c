@@ -1,7 +1,7 @@
 #include "ui/statusline.h"
 #include "core/device-config.h"
 #include "apps/apps.h"
-#include "apps/vfo.h"
+#include "vfo/vfo.h"
 #include "hal/eeprom.h"
 #include "drivers/si473x/si473x.h"
 #include "hal/display.h"
@@ -71,29 +71,29 @@ void STATUSLINE_render(void) {
 
   DrawHLine(0, 6, LCD_WIDTH, C_FILL);
 
-  if (showBattery) {
-    uint8_t bars = previousBatteryLevel > 10 ? gBatteryPercent / 10
-                                              : previousBatteryLevel;
-    if (bars > 10)
-      bars = 10;
-    // Keep the main radio header compact; preserve the setting in other apps.
-    if (gCurrentApp == APP_VFO) {
-      UI_Battery(bars);
-    } else {
-      switch (gDeviceConfig.preferences.battery_style) {
-      case BAT_CLEAN:
-        UI_Battery(bars);
-        break;
-      case BAT_PERCENT:
-        PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_INVERT, "%u%%",
-                     gBatteryPercent);
-        break;
-      case BAT_VOLTAGE:
-        PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_FILL, "%u.%02uV",
-                     gBatteryVoltage / 100, gBatteryVoltage % 100);
-        break;
-      }
-    }
+  uint8_t bars = previousBatteryLevel > 10 ? gBatteryPercent / 10
+                                          : previousBatteryLevel;
+  if (bars > 10) bars = 10;
+  char batteryText[16];
+  uint16_t batteryWidth;
+  switch (gDeviceConfig.preferences.battery_style) {
+  case BAT_PERCENT:
+    snprintf(batteryText, sizeof(batteryText), "%u%%", gBatteryPercent);
+    batteryWidth = UI_SmallTextWidth(batteryText);
+    if (showBattery)
+      PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_FILL, "%s", batteryText);
+    break;
+  case BAT_VOLTAGE:
+    snprintf(batteryText, sizeof(batteryText), "%u.%02uV",
+             gBatteryVoltage / 100, gBatteryVoltage % 100);
+    batteryWidth = UI_SmallTextWidth(batteryText);
+    if (showBattery)
+      PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_FILL, "%s", batteryText);
+    break;
+  default:
+    batteryWidth = 13;
+    if (showBattery) UI_Battery(bars);
+    break;
   }
 
   char icons[8] = {'\0'};
@@ -115,25 +115,22 @@ void STATUSLINE_render(void) {
     icons[idx++] = SYM_LOCK;
   }
 
-  uint8_t iconsRight = LCD_WIDTH - 1 - 22;
+  uint8_t iconsRight = batteryWidth + 4 < LCD_WIDTH ? LCD_WIDTH - 1 - batteryWidth - 3 : 0;
   if (gCurrentApp == APP_VFO && VFO_isShortcutPending()) {
     PrintSmallEx(iconsRight, BASE_Y, POS_R, C_FILL, "F");
     iconsRight -= 8;
   }
   PrintSymbolsEx(iconsRight, BASE_Y, POS_R, C_FILL, "%s", icons);
 
+  uint16_t iconWidth = UI_SymbolsTextWidth(icons);
+  uint8_t textWidth = iconWidth + 2 < iconsRight ? iconsRight - iconWidth - 2 : 0;
+  char selection[32];
+  const char *text = statuslineTicker[0] == '\0' ? statuslineText : statuslineTicker;
   if (gIsNumNavInput) {
-    PrintSmall(0, BASE_Y, "Select: %s", gNumNavInput);
-  } else {
-    const char *text = statuslineTicker[0] == '\0' ? statuslineText : statuslineTicker;
-    if (gCurrentApp == APP_VFO) {
-      uint16_t iconWidth = UI_SymbolsTextWidth(icons);
-      uint8_t textWidth = iconWidth+2 < iconsRight ? iconsRight-iconWidth-2 : 0;
-      UI_SmallTextWindow(0, BASE_Y, textWidth, text, 0);
-    } else {
-      PrintSmall(0, BASE_Y, "%s", text);
-    }
+    snprintf(selection, sizeof(selection), "Select: %s", gNumNavInput);
+    text = selection;
   }
+  UI_SmallTextWindow(0, BASE_Y, textWidth, text, 0);
 }
 
 // Current receiver settings come from the Hz-based radio user state.

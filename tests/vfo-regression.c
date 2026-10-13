@@ -1,6 +1,6 @@
 #include "core/device-config.h"
 // Exercise real main-screen state transitions; only hardware/UI plumbing is mocked.
-#include "../src/apps/vfo.c"
+#include "../src/vfo/vfo.c"
 #include <assert.h>
 
 RadioState state;
@@ -39,15 +39,18 @@ static unsigned appRuns;
 static bool failApply;
 Settings gSettings;
 static bool txFakeVerified, txFakePrepareOK, txFakeEnableOK;
+static bool txFakePttPressed=true, txFakeVoltageValid=true;
 static unsigned txFakePrepares, txFakeEnables, txFakeDisables;
-// These capabilities exist exclusively in the host test. Production HAL
-// returns unverified, and cannot energize the PA.
-TxCapabilities TX_DEVICE_Capabilities(void) {
-  return (TxCapabilities){txFakeVerified, txFakeVerified};
+// Host capabilities and hardware calls are isolated from the production HAL.
+TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) {
+  (void)frequency_hz;
+  return (TxCapabilities){txFakeVerified, txFakeVerified ? 1u : 0u};
 }
 TxPolicy TX_DEVICE_Policy(void) {
-  return (TxPolicy){txFakeVerified, 430000000u, 440000000u};
+  return (TxPolicy){txFakeVerified, 1, {{430000000u, 440000000u}}};
 }
+bool TX_DEVICE_PttPressed(void) { return txFakePttPressed; }
+bool TX_DEVICE_VoltageValid(void) { return txFakeVoltageValid; }
 void TX_DEVICE_Disable(void) { ++txFakeDisables; }
 bool TX_DEVICE_Prepare(const TxPlan *plan) {
   ++txFakePrepares;
@@ -66,6 +69,17 @@ static bool nativeSeekBusy;
 static RxSeekResult nativeReply;
 static unsigned nativeStarts, nativeCancels;
 static uint32_t nativeFrequency;
+static unsigned captureStarts, captureStops;
+static CaptureSample captureReply;
+static uint32_t captureHz;
+static CaptureRange captureRange;
+void RX_DEVICE_CaptureStart(CaptureRange range, RxDevice previous) {
+  (void)previous; captureRange=range; ++captureStarts;
+}
+CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
+  assert(range==captureRange); *hz=captureHz; return captureReply;
+}
+void RX_DEVICE_CaptureStop(void) { ++captureStops; }
 bool RX_DEVICE_SeekNative(const RxPlan *plan) {
   return plan->device == RX_DEVICE_SI &&
          (plan->parameters.mode == RX_WFM || plan->parameters.mode == RX_AM);
@@ -140,7 +154,6 @@ uint8_t gTextInputSize;
 void (*gTextInputCallback)(void);
 static UserChannel fakeChannels[USER_CHANNEL_COUNT + 1];
 static bool fakeChannelUsed[USER_CHANNEL_COUNT + 1];
-static bool fakeDeleteFails;
 bool CHANNEL_STORE_Init(void) { return true; }
 bool CHANNEL_STORE_Available(void) { return true; }
 bool CHANNEL_STORE_IsOccupied(uint16_t number) {
@@ -149,10 +162,6 @@ bool CHANNEL_STORE_IsOccupied(uint16_t number) {
 bool CHANNEL_STORE_Load(uint16_t number, UserChannel *channel) {
   if (!CHANNEL_STORE_IsOccupied(number) || !channel) return false;
   *channel = fakeChannels[number]; return true;
-}
-bool CHANNEL_STORE_Delete(uint16_t number) {
-  if (fakeDeleteFails || !CHANNEL_STORE_IsOccupied(number)) return false;
-  fakeChannelUsed[number] = false; return true;
 }
 bool CHANNEL_STORE_Save(uint16_t number, const UserChannel *channel) {
   if (!number || number > USER_CHANNEL_COUNT || !channel) return false;
@@ -175,12 +184,15 @@ bool CHANNEL_STORE_Next(uint16_t number, bool up, uint16_t *next) {
 bool APPS_key(KEY_Code_t key, Key_State_t keyState) { (void)key; (void)keyState; return true; }
 
 static void setup(uint32_t frequency, RadioParameters values) {
+  capturePhase=FC_OFF;
+  captureStarts=captureStops=0; captureReply=CAPTURE_BUSY;
   number = (NumberInput){0};
   clockNow=100;
   rdsReads=rdsClears=rdsIndex=0;
   rdsAvailable=false;
   watchSignalFrequency=0;watchSignalOK=true;
   initialized = changed = inMenu = confirming = false;
+  menuIndex = 0;
   WATCH_Stop(&watcher); watchDelay=false; watchResumeAt=0;
   functionPending = false;
   selectedVfo = inputVfo = 0;
@@ -188,6 +200,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   memset(cards, 0, sizeof(cards));
   memset(labels, 0, sizeof(labels));
   transmitter = (TxRuntime){0};
+  txFakePttPressed=txFakeVoltageValid=true;
   pttPending = false;
   seek = (Seek){0};
   runtime = (RxRuntime){0};
@@ -219,44 +232,24 @@ static void setup(uint32_t frequency, RadioParameters values) {
 static void press(KEY_Code_t key) { assert(VFO_key(key, KEY_RELEASED)); }
 
 int main(void) {
-  // List and direct channel jump never retune until explicit selection.
+  // MR mode retains channel stepping and save/name operations only.
   RadioParameters testRx = {RX_NFM,12500,12000,4};
   setup(145500000, testRx);
   fakeChannels[12] = (UserChannel){.name="TEST",.frequency_hz=438500000,.rx=testRx};
   fakeChannelUsed[12] = true;
-  press(KEY_F);press(KEY_4);assert(channelList);
-  unsigned beforeList = applied;
-  press(KEY_1);press(KEY_2);press(KEY_MENU);
-  assert(channelCursor==12 && channelList && !number.active && applied==beforeList);
-  VFO_render();assert(!strcmp(statusText,"Channels 012"));
-  press(KEY_0);press(KEY_MENU);assert(number.active && number.invalid);
-  assert(VFO_key(KEY_EXIT,KEY_LONG_PRESSED));assert(!channelJump && channelList);
-  failApply=true;press(KEY_MENU);assert(channelList && user.source==RADIO_SOURCE_VFO);
-  failApply=false;
-  press(KEY_MENU);assert(!channelList && user.source==RADIO_SOURCE_CHANNEL);
-  assert(gDeviceConfig.radio.vfos[0].current.frequency_hz==145500000);
-  press(KEY_F);press(KEY_4);press(KEY_STAR);press(KEY_EXIT);
-  assert(CHANNEL_STORE_IsOccupied(12) && !channelDeleteConfirm);
-  press(KEY_STAR);press(KEY_MENU);
-  assert(CHANNEL_STORE_IsOccupied(12) && !strcmp(message,"Channel in use"));
-  press(KEY_EXIT);press(KEY_F);press(KEY_3);
-  press(KEY_F);press(KEY_4);press(KEY_F);
-  assert(!channelList && inMenu && user.source==RADIO_SOURCE_VFO && channelEditTarget==12);
+  press(KEY_F);press(KEY_3);assert(user.source==RADIO_SOURCE_CHANNEL);
   assert(user.current.frequency_hz==438500000);
-  user.current.parameters.squelch=6;
-  startChannelSave();assert(channelTarget==12);press(KEY_MENU);assert(overwriteConfirm);
-  press(KEY_MENU);assert(fakeChannels[12].rx.squelch==6 && !channelEditTarget);
-  inMenu=false;press(KEY_F);press(KEY_4);
-  gDeviceConfig.radio.vfos[3].source=RADIO_SOURCE_CHANNEL;
-  gDeviceConfig.radio.vfos[3].channel_number=12;
-  press(KEY_STAR);press(KEY_MENU);
-  assert(CHANNEL_STORE_IsOccupied(12) && !strcmp(message,"Channel in use"));
-  gDeviceConfig.radio.vfos[3].source=RADIO_SOURCE_VFO;
-  fakeDeleteFails=true;press(KEY_STAR);press(KEY_MENU);
-  assert(CHANNEL_STORE_IsOccupied(12) && !strcmp(message,"Delete failed"));
-  fakeDeleteFails=false;press(KEY_STAR);press(KEY_MENU);
-  assert(!CHANNEL_STORE_IsOccupied(12) && !gDeviceConfig.radio.vfos[0].channel_number);
-  press(KEY_EXIT);
+  press(KEY_UP);assert(user.current.frequency_hz==438500000); // One occupied channel wraps to itself.
+  inMenu=true;menuIndex=MENU_CHANNEL_NAME;press(KEY_MENU);
+  assert(gTextinputText==CHANNEL_MANAGER_Name(selectedVfo));
+  strcpy(gTextinputText,"NAMED");gTextInputCallback();
+  menuIndex=MENU_CHANNEL_SAVE;press(KEY_MENU);assert(CHANNEL_MANAGER_Active());
+  press(KEY_MENU);assert(CHANNEL_MANAGER_Active()); // First press confirms overwrite.
+  press(KEY_MENU);assert(!CHANNEL_MANAGER_Active());
+  assert(!strcmp(fakeChannels[12].name,"NAMED"));
+  assert(gDeviceConfig.radio.vfos[0].current.frequency_hz==145500000);
+  inMenu=false;
+  press(KEY_F);press(KEY_3);assert(user.source==RADIO_SOURCE_VFO);
   memset(fakeChannelUsed,0,sizeof(fakeChannelUsed));
   RadioParameters fm = {RX_NFM, 12500, 12000, 4};
   setup(438500000, fm);
@@ -289,6 +282,28 @@ int main(void) {
   assert(user.current.frequency_hz == 225000 && user.current.parameters.mode == RX_AM);
   press(KEY_1);
   assert(number.active && appRuns == 0); // The prefix is consumed; plain 1 enters frequency input.
+
+  // F6 cycles only the selected VFO's TX intent, saves it and consumes the key.
+  setup(438500000, fm);
+  unsigned powerSaves = saveRequests, powerApplies = applied;
+  TxConfig otherTx = gDeviceConfig.radio.vfos[1].tx;
+  press(KEY_F);
+  assert(VFO_key(KEY_6, KEY_PRESSED));
+  assert(user.tx.power == TX_POWER_LOW && saveRequests == powerSaves);
+  press(KEY_6);
+  assert(user.tx.power == TX_POWER_MEDIUM && !functionPending && !number.active);
+  assert(!strcmp(message, "TX Power: Medium"));
+  press(KEY_F);press(KEY_6);
+  assert(user.tx.power == TX_POWER_HIGH);
+  press(KEY_F);press(KEY_6);
+  assert(user.tx.power == TX_POWER_LOW && saveRequests == powerSaves + 3);
+  assert(gDeviceConfig.radio.vfos[0].tx.power == TX_POWER_LOW && !user.tx.enabled);
+  assert(!memcmp(&otherTx, &gDeviceConfig.radio.vfos[1].tx, sizeof(otherTx)));
+  assert(applied == powerApplies && !txFakePrepares);
+  user.source = gDeviceConfig.radio.vfos[0].source = RADIO_SOURCE_CHANNEL;
+  press(KEY_F);press(KEY_6);
+  assert(user.tx.power == TX_POWER_LOW && saveRequests == powerSaves + 3);
+  assert(!strcmp(message, "Channel is read only") && !number.active && !functionPending);
 
   setup(438500000, fm);
   gMonitorMode = true;
@@ -517,6 +532,9 @@ int main(void) {
   assert(!gDeviceConfig.radio.vfos[0].tx.enabled);
   assert(VFO_key(KEY_PTT, KEY_PRESSED));
   assert(!strcmp(message, "TX disabled"));
+  VFO_render();
+  assert(drawn[0].header_message && !strcmp(drawn[0].header_message,"TX disabled"));
+  assert(!drawn[1].header_message);
   press(KEY_MENU);
   for (unsigned i=0;i<5;++i) press(KEY_DOWN);
   assert(menuIndex == 5);
@@ -641,13 +659,12 @@ int main(void) {
   appliesBefore=applied;
   press(KEY_DOWN);assert(menuIndex==MENU_RX_WATCH);
   press(KEY_DOWN);assert(menuIndex==MENU_CHANNEL_NAME);
-  press(KEY_MENU);assert(gTextinputText==channelNameDraft[selectedVfo]);
+  press(KEY_MENU);assert(gTextinputText==CHANNEL_MANAGER_Name(selectedVfo));
   press(KEY_DOWN);assert(menuIndex==MENU_CHANNEL_SAVE);
-  press(KEY_MENU);assert(channelPicker);press(KEY_EXIT);assert(!channelPicker);
+  press(KEY_MENU);assert(CHANNEL_MANAGER_Active());press(KEY_EXIT);assert(!CHANNEL_MANAGER_Active());
   assert(saveRequests==savesBeforePlaceholder && applied==appliesBefore);
   assert(inMenu && !confirming);
-  press(KEY_DOWN);assert(menuIndex==MENU_CHANNEL_LIST);
-  press(KEY_DOWN);assert(menuIndex==0); // Includes channel actions, no section titles.
+  press(KEY_DOWN);assert(menuIndex==0); // Menu cycles through RX/TX settings and channel actions.
   // Dual VFO: selection is a receive transaction, not an alias to one state.
   setup(145500000, fm);
   assert(selectedVfo==0 && receivingVfo==0);
@@ -688,7 +705,7 @@ int main(void) {
   assert(gDeviceConfig.radio.selected_vfo==0 && saveRequests==oldSaves);
   assert(!strcmp(message,"Tune failed") && ctx->frequency==14550000);
   VFO_render();assert(!strcmp(statusText,"RADIO"));
-  assert(!strcmp(drawn[0].message,"Tune failed") && !drawn[1].message);
+  assert(!strcmp(drawn[0].header_message,"Tune failed") && !drawn[1].header_message);
   // Both applies fail: ownership is cleared and no row claims reception.
   failApply=true;press(KEY_F);press(KEY_2);
   assert(selectedVfo==0 && receivingVfo==UINT8_MAX && !runtime.active);
@@ -832,7 +849,7 @@ int main(void) {
   gDeviceConfig.radio.watch_enabled=true;unsigned noVisits=applied;
   VFO_update();assert(watcher.phase==WATCH_OFF && applied==noVisits);
   VFO_render();assert(!strcmp(statusText,"DW A"));
-  assert(!strcmp(drawn[0].message,"DW: same channel") && !drawn[1].message);
+  assert(!strcmp(drawn[0].header_message,"DW: same channel") && !drawn[1].header_message);
   for (unsigned i=0;i<10;++i) { clockNow+=100;VFO_update(); }
   assert(applied==noVisits);
   // Apply/sample errors back off; even primary restore is attempted only once.
@@ -892,10 +909,121 @@ int main(void) {
   assert(VFO_ApplyRxSettings());
   assert(saveRequests==savedBeforeRefresh);
   assert(!memcmp(&vfoBeforeRefresh,&gDeviceConfig.radio.vfos[0],sizeof(vfoBeforeRefresh)));
+  // Physical release and battery faults stop TX before queued UI events.
+  setup(438500000,fm);txFakeVerified=true;
+  user.tx.enabled=gDeviceConfig.radio.vfos[0].tx.enabled=true;
+  assert(VFO_key(KEY_PTT,KEY_PRESSED) && transmitter.mode==RADIO_TX);
+  txFakePttPressed=false;VFO_TxSafetyUpdate();
+  assert(transmitter.mode==RADIO_RX && !pttPending && receivingVfo==selectedVfo);
+  txFakePttPressed=true;
+  assert(VFO_key(KEY_PTT,KEY_PRESSED) && transmitter.mode==RADIO_TX);
+  txFakeVoltageValid=false;VFO_TxSafetyUpdate();
+  assert(transmitter.mode==RADIO_RX && transmitter.wait_release);
+  assert(!strcmp(message,"TX battery voltage"));
+  VFO_render();assert(!strcmp(drawn[0].header_message,"TX battery voltage"));
+  press(KEY_PTT);
+
   // An inexact target still requires the existing hardware quantization confirmation.
   setup(100000000,(RadioParameters){RX_WFM,100000,0,0});
   press(KEY_9);press(KEY_5);press(KEY_STAR);press(KEY_9);press(KEY_2);press(KEY_5);press(KEY_MENU);
   assert(!number.active && confirming && user.current.frequency_hz==100000000);
   press(KEY_EXIT);assert(!confirming && user.current.frequency_hz==100000000);
+  // F4 binds capture, not numeric input. Detection and preview own PTT/UI.
+  setup(438500000,fm);
+  VfoConfig fcOrigin=gDeviceConfig.radio.vfos[0];
+  unsigned fcSaves=saveRequests;
+  press(KEY_F);press(KEY_4);
+  assert(capturePhase==FC_DETECT && !number.active && !functionPending);
+  assert(!VFO_isReceiving() && receivingVfo==UINT8_MAX && captureStarts==1);
+  assert(VFO_key(KEY_PTT,KEY_PRESSED));press(KEY_PTT);
+  press(KEY_F);press(KEY_2);press(KEY_MENU); // Cancel while detecting.
+  assert(capturePhase==FC_OFF && selectedVfo==0 && !txFakePrepares);
+  assert(!memcmp(&fcOrigin,&gDeviceConfig.radio.vfos[0],sizeof(fcOrigin)) && saveRequests==fcSaves);
+  press(KEY_F);press(KEY_4);
+  clockNow+=500;VFO_update();clockNow+=500;VFO_update();
+  assert(capture.range==CAPTURE_RANGE_UHF); // No-results Auto still advances.
+  captureReply=CAPTURE_SAMPLE;captureHz=438512340;
+  clockNow+=20;VFO_update();assert(capturePhase==FC_DETECT);
+  captureHz+=3000;clockNow+=20;VFO_update();
+  assert(capturePhase==FC_PREVIEW && VFO_isReceiving());
+  assert(runtime.current.frequency_hz==438500000 && user.current.frequency_hz==438500000);
+  assert(saveRequests==fcSaves && ctx->frequency*10u==captureHz);
+  VFO_render();assert(drawn[0].frequency_hz==captureHz && drawn[0].mode==RX_NFM);
+  assert(!drawn[0].name && !drawn[0].rds);
+  assert(VFO_key(KEY_PTT,KEY_PRESSED));press(KEY_PTT);assert(!txFakePrepares);
+  press(KEY_EXIT);assert(capturePhase==FC_OFF && ctx->frequency*10u==438500000);
+  assert(saveRequests==fcSaves && !memcmp(&fcOrigin,&gDeviceConfig.radio.vfos[0],sizeof(fcOrigin)));
+  // Preview adoption affects only the bound VFO and requests one save.
+  press(KEY_F);press(KEY_4);press(KEY_SIDE1);press(KEY_SIDE1); // UHF
+  assert(capture.scope==CAPTURE_UHF && capture.range==CAPTURE_RANGE_UHF);
+  clockNow+=20;VFO_update();clockNow+=20;VFO_update();
+  assert(capturePhase==FC_PREVIEW);
+  gDeviceConfig.radio.vfos[0].tx.enabled=user.tx.enabled=true;
+  VfoConfig other=gDeviceConfig.radio.vfos[1];
+  press(KEY_MENU);
+  assert(capturePhase==FC_OFF && runtime.current.frequency_hz==captureHz);
+  assert(user.current.parameters.mode==RX_NFM && !user.current.parameters.rx_tone && !user.tx.enabled);
+  assert(saveRequests==fcSaves+1 && !memcmp(&other,&gDeviceConfig.radio.vfos[1],sizeof(other)));
+  // Timeout, application exit and same-frequency preview restore without writes.
+  setup(145500000,fm);fcSaves=saveRequests;
+  press(KEY_F);press(KEY_4);clockNow+=15000;VFO_update();
+  assert(capturePhase==FC_OFF && saveRequests==fcSaves && ctx->frequency*10u==145500000);
+  VFO_render();assert(!strcmp(drawn[0].header_message,"FC timeout") && !drawn[1].header_message);
+  assert(drawn[0].frequency_hz==145500000);
+  press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145500000;
+  clockNow+=20;VFO_update();clockNow+=20;VFO_update();
+  assert(capturePhase==FC_PREVIEW);VFO_deinit();
+  assert(capturePhase==FC_OFF && saveRequests==fcSaves);
+  // SI/BK1080 origin remains committed through preview; cancel restores it.
+  for (unsigned chip=0;chip<2;++chip) {
+    setup(95900000,(RadioParameters){RX_WFM,100000,0,0});
+    if (chip) {
+      capabilities=(ReceiverCapabilities){false,true,false};
+      request(95900000,user.current.parameters);
+    }
+    fcOrigin=gDeviceConfig.radio.vfos[0];fcSaves=saveRequests;
+    press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145500000;
+    clockNow+=20;VFO_update();clockNow+=20;VFO_update();
+    assert(capturePhase==FC_PREVIEW && ctx->radio_type==RADIO_BK4819);
+    unsigned reads=rdsReads;clockNow+=100;VFO_update();assert(rdsReads==reads);
+    press(KEY_EXIT);
+    assert(ctx->radio_type==(chip ? RADIO_BK1080 : RADIO_SI4732) && ctx->frequency*10u==95900000);
+    assert(saveRequests==fcSaves && !memcmp(&fcOrigin,&gDeviceConfig.radio.vfos[0],sizeof(fcOrigin)));
+  }
+  // Unsupported candidate cannot preview; failed preview and failed restore mute.
+  setup(145500000,fm);fcSaves=saveRequests;
+  press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=700000000;
+  clockNow+=20;VFO_update();clockNow+=20;VFO_update();assert(capturePhase==FC_DETECT);
+  press(KEY_SIDE1);captureHz=145500000;failFrequency=captureHz;
+  clockNow+=20;VFO_update();clockNow+=20;VFO_update();
+  assert(capturePhase==FC_OFF && !runtime.active && receivingVfo==UINT8_MAX && saveRequests==fcSaves);
+  // Final adoption failure restores the origin and never commits the candidate.
+  setup(145500000,fm);fcSaves=saveRequests;
+  press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145600000;
+  clockNow+=20;VFO_update();clockNow+=20;VFO_update();
+  assert(capturePhase==FC_PREVIEW);failFrequency=captureHz;press(KEY_MENU);
+  assert(capturePhase==FC_OFF && runtime.active && runtime.current.frequency_hz==145500000);
+  assert(gDeviceConfig.radio.vfos[0].current.frequency_hz==145500000 && saveRequests==fcSaves);
+  // A restart from preview forgets prior hits while retaining the committed origin.
+  failFrequency=0;press(KEY_F);press(KEY_4);
+  clockNow+=20;VFO_update();clockNow+=20;VFO_update();assert(capturePhase==FC_PREVIEW);
+  press(KEY_SIDE2);assert(capturePhase==FC_DETECT && capture.scope==CAPTURE_VHF && !capture.hits);
+  press(KEY_EXIT);assert(runtime.current.frequency_hz==145500000 && saveRequests==fcSaves);
+  // Hidden VFOs can be the bound owner as well; F2 is swallowed until adoption.
+  setup(145500000,fm);
+  assert(RADIO_STATE_SetCount(&gDeviceConfig.radio,4));
+  for (unsigned id=1;id<4;++id) {
+    press(KEY_F);press(KEY_2);assert(selectedVfo==id);
+    VfoConfig untouched=gDeviceConfig.radio.vfos[0];fcSaves=saveRequests;
+    press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145600000+id*10000u;
+    clockNow+=20;VFO_update();clockNow+=20;VFO_update();assert(capturePhase==FC_PREVIEW);
+    press(KEY_F);press(KEY_2);assert(selectedVfo==id);
+    press(KEY_MENU);
+    assert(gDeviceConfig.radio.vfos[id].current.frequency_hz==captureHz && saveRequests==fcSaves+1);
+    assert(!memcmp(&untouched,&gDeviceConfig.radio.vfos[0],sizeof(untouched)));
+  }
+  // MR and input retain their existing controls; F4 never starts capture there.
+  setup(145500000,fm);user.source=RADIO_SOURCE_CHANNEL;
+  press(KEY_F);press(KEY_4);assert(capturePhase==FC_OFF && !captureStarts);
   return 0;
 }
