@@ -249,6 +249,17 @@ int main(void) {
   assert(!strcmp(fakeChannels[12].name,"NAMED"));
   assert(gDeviceConfig.radio.vfos[0].current.frequency_hz==145500000);
   inMenu=false;
+  // Both F-prefix and side-key controls must refuse tuning in MR mode.
+  unsigned mrApplies = applied, mrSaves = saveRequests;
+  uint32_t mrFrequency = user.current.frequency_hz;
+  press(KEY_F); press(KEY_1);
+  assert(!strcmp(message,"Channel mode") && !functionPending);
+  press(KEY_F); press(KEY_0);
+  assert(!strcmp(message,"Channel mode") && !functionPending);
+  press(KEY_SIDE1); assert(!strcmp(message,"Channel mode"));
+  press(KEY_SIDE2); assert(!strcmp(message,"Channel mode"));
+  assert(applied==mrApplies && saveRequests==mrSaves &&
+         user.current.frequency_hz==mrFrequency);
   press(KEY_F);press(KEY_3);assert(user.source==RADIO_SOURCE_VFO);
   memset(fakeChannelUsed,0,sizeof(fakeChannelUsed));
   RadioParameters fm = {RX_NFM, 12500, 12000, 4};

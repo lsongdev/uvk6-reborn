@@ -164,8 +164,8 @@ void VFO_deinit(void) {
   (void)pauseWatch();
 }
 
-static void expireShortcut(void) {
-  if (functionPending && Now()-functionAt >= 3000)
+static void expireShortcut(uint32_t now) {
+  if (functionPending && now-functionAt >= 3000u)
     VFO_cancelShortcut();
 }
 
@@ -520,6 +520,17 @@ static void tuneTo(uint32_t target) {
   request(target, values);
 }
 
+// RX keypad entry and TX menu editing share the same input lifecycle.
+static void beginFrequencyInput(bool tx) {
+  inputVfo = selectedVfo;
+  inputTx = tx;
+  message = NULL;
+  uint32_t initial = tx ? (user.tx.frequency_hz
+      ? user.tx.frequency_hz : user.current.frequency_hz) : 0;
+  NUMBER_Begin(&number, tx ? 0u : RADIO_MIN_HZ,
+               tx ? 1300000000u : RADIO_MAX_HZ, 1000000u, initial, tx);
+}
+
 void VFO_init(void) {
   VFO_cancelShortcut();
   if (initialized && selectedVfo==gDeviceConfig.radio.selected_vfo &&
@@ -591,17 +602,18 @@ void VFO_TxSafetyUpdate(void) {
 }
 
 void VFO_update(void) {
-  expireShortcut();
+  uint32_t now = Now();
+  expireShortcut(now);
   VFO_TxSafetyUpdate(); // Also permit deterministic host/UI unit tests.
   if (message || (!inMenu && !confirming))
     for (uint8_t id=0; id<RADIO_VFO_CAPACITY; ++id)
-      if (UI_VfoUpdate(&cards[id], Now())) gRedrawScreen = true;
+      if (UI_VfoUpdate(&cards[id], now)) gRedrawScreen = true;
   const UI_VfoState *card=&cards[selectedVfo];
   uint32_t duration=2500u;
   uint16_t overflow = card->band_overflow;
   if (overflow)
     duration=2u*UI_VFO_SCROLL_PAUSE_MS+overflow*UI_VFO_SCROLL_PIXEL_MS;
-  if (message && Now()-messageAt >= duration) {
+  if (message && now-messageAt >= duration) {
     message = NULL;
     gRedrawScreen = true;
   }
@@ -612,8 +624,8 @@ void VFO_update(void) {
   watchUpdate();
   bool rdsEnabled = VFO_isReceiving() && runtime.active && runtime.current.device == RX_DEVICE_SI &&
                     runtime.current.parameters.mode == RX_WFM;
-  bool textExpired = rdsEnabled && Now()-rds.last_group >= 15000u;
-  if (RDS_ReceiverUpdate(&rds, Now(), rdsEnabled, readRds, NULL) || textExpired) {
+  bool textExpired = rdsEnabled && now-rds.last_group >= 15000u;
+  if (RDS_ReceiverUpdate(&rds, now, rdsEnabled, readRds, NULL) || textExpired) {
     if (receivingVfo < RADIO_VFO_CAPACITY && rdsEnabled) {
       labels[receivingVfo].frequency_hz = runtime.current.frequency_hz;
       memcpy(labels[receivingVfo].ps, rds.decoder.ps, sizeof(rds.decoder.ps));
@@ -841,13 +853,22 @@ static void switchVfo(void) {
   gRedrawScreen = true;
 }
 
+// F-prefix and side-key shortcuts must enforce the same VFO-only rule.
+static bool requireVfoSource(void) {
+  if (user.source == RADIO_SOURCE_VFO) return true;
+  notify("Channel mode");
+  return false;
+}
+
 static void nextBand(void) {
+  if (!requireVfoSource()) return;
   uint8_t band = RADIO_MODEL_NextBand(user.active_band);
   const BandState *saved = &user.bands[band];
   request(saved->frequency_hz, gDeviceConfig.radio.presets[band]);
 }
 
 static void nextMode(void) {
+  if (!requireVfoSource()) return;
   RadioParameters candidate = user.current.parameters;
   if (RADIO_MODEL_Adjust(user.current.frequency_hz, &candidate,
                          RADIO_GetReceiverCapabilities(), RADIO_FIELD_MODE, true))
@@ -917,11 +938,7 @@ static void changeValue(bool up) {
       user.tx.frequency_hz = 0;
       DEVICE_RequestSave();
     } else {
-      inputVfo = selectedVfo;
-      inputTx = true;
-      message = NULL;
-      NUMBER_Begin(&number, 0, 1300000000u, 1000000u,
-                   user.tx.frequency_hz ? user.tx.frequency_hz : user.current.frequency_hz, true);
+      beginFrequencyInput(true);
     }
     return;
   }
@@ -988,36 +1005,67 @@ static void startTransmit(void) {
     notify("TX not allowed");
 }
 
+// While FC or numeric editing owns the keyboard, keep all other actions
+// blocked; especially never allow an input digit to become a global shortcut.
+static void captureKey(KEY_Code_t key, Key_State_t state) {
+  if (key==KEY_PTT && state==KEY_RELEASED) VFO_PttRelease();
+  if (state != KEY_RELEASED) return;
+  if (key==KEY_EXIT || (key==KEY_MENU && capturePhase==FC_DETECT))
+    cancelCapture(NULL);
+  else if (key==KEY_MENU) acceptCapture();
+  else if (key==KEY_SIDE1 || key==KEY_SIDE2) {
+    RX_DEVICE_CaptureStop();
+    CAPTURE_Start(&capture, (capture.scope+1u)%3u, Now());
+    captureAttempt();
+  }
+}
+
+static void frequencyInputKey(KEY_Code_t key, Key_State_t state) {
+  uint32_t value;
+  if (inputVfo != selectedVfo) { number.active = false; return; }
+  NumberInputResult result = NUMBER_Key(&number, key, state, &value);
+  if (result == NUMBER_ACCEPTED) {
+    if (inputTx) {
+      if (!setTxFrequency(value)) { number.active = true; number.invalid = true; }
+    } else tuneTo(value);
+  }
+  if (result != NUMBER_EDITING && !number.active) {
+    watchDelay = true; watchResumeAt = Now()+2000u;
+    UI_VfoShowFrequency(&cards[selectedVfo], Now());
+  }
+  gRedrawScreen = true;
+}
+
+static void shortcutKey(KEY_Code_t key) {
+  VFO_cancelShortcut();
+  switch (key) {
+  case KEY_1: nextBand(); break;
+  case KEY_0: nextMode(); break;
+  case KEY_2: switchVfo(); break;
+  case KEY_3: switchSource(); break;
+  case KEY_4: startCapture(); break;
+  case KEY_6: {
+    static const char *const messages[] = {
+      "TX Power: Low", "TX Power: Medium", "TX Power: High"
+    };
+    if (changeTxPower(true)) notify(messages[user.tx.power]);
+    break;
+  }
+  case KEY_STAR: startSeek(); break;
+  default:
+    if (key != KEY_F && key != KEY_EXIT) notify("Not supported");
+    break;
+  }
+}
+
 bool VFO_key(KEY_Code_t key, Key_State_t state) {
-  expireShortcut();
+  expireShortcut(Now());
   if (capturePhase!=FC_OFF) {
-    if (key==KEY_PTT && state==KEY_RELEASED) VFO_PttRelease();
-    if (state==KEY_RELEASED) {
-      if (key==KEY_EXIT || (key==KEY_MENU && capturePhase==FC_DETECT))
-        cancelCapture(NULL);
-      else if (key==KEY_MENU) acceptCapture();
-      else if (key==KEY_SIDE1 || key==KEY_SIDE2) {
-        RX_DEVICE_CaptureStop();
-        CAPTURE_Start(&capture, (capture.scope+1u)%3u, Now());
-        captureAttempt();
-      }
-    }
+    captureKey(key, state);
     return true;
   }
   if (number.active) {
-    uint32_t value;
-    if (inputVfo != selectedVfo) { number.active = false; return true; }
-    NumberInputResult result = NUMBER_Key(&number, key, state, &value);
-    if (result == NUMBER_ACCEPTED) {
-      if (inputTx) {
-        if (!setTxFrequency(value)) { number.active = true; number.invalid = true; }
-      } else tuneTo(value);
-    }
-    if (result != NUMBER_EDITING && !number.active) {
-      watchDelay = true; watchResumeAt = Now()+2000u;
-      UI_VfoShowFrequency(&cards[selectedVfo], Now());
-    }
-    gRedrawScreen = true;
+    frequencyInputKey(key, state);
     return true;
   }
   if (seek.active) {
@@ -1092,30 +1140,7 @@ bool VFO_key(KEY_Code_t key, Key_State_t state) {
       VFO_cancelShortcut();
       return false; // Keep the global settings shortcut available.
     }
-    if (state == KEY_RELEASED) {
-      VFO_cancelShortcut();
-      if (key == KEY_1)
-        nextBand();
-      else if (key == KEY_0)
-        nextMode();
-      else if (key == KEY_2)
-        switchVfo();
-      else if (key == KEY_3)
-        switchSource();
-      else if (key == KEY_4)
-        startCapture();
-      else if (key == KEY_6) {
-        static const char *const messages[] = {"TX Power: Low", "TX Power: Medium", "TX Power: High"};
-        if (changeTxPower(true)) notify(messages[user.tx.power]);
-      }
-      else if ((key == KEY_1 || key == KEY_0) &&
-               user.source == RADIO_SOURCE_CHANNEL)
-        notify("Channel mode");
-      else if (key == KEY_STAR)
-        startSeek();
-      else if (key != KEY_F && key != KEY_EXIT)
-        notify("Not supported");
-    }
+    if (state == KEY_RELEASED) shortcutKey(key);
     return true;
   }
   if ((key == KEY_UP || key == KEY_DOWN) &&
@@ -1138,11 +1163,9 @@ bool VFO_key(KEY_Code_t key, Key_State_t state) {
     functionAt = Now();
     gRedrawScreen = true;
   } else if (key == KEY_SIDE1) {
-    if (user.source == RADIO_SOURCE_CHANNEL) notify("Channel mode");
-    else nextBand();
+    nextBand();
   } else if (key == KEY_SIDE2) {
-    if (user.source == RADIO_SOURCE_CHANNEL) notify("Channel mode");
-    else nextMode();
+    nextMode();
   }
   else if (key == KEY_MENU)
     inMenu = true;
@@ -1153,10 +1176,7 @@ bool VFO_key(KEY_Code_t key, Key_State_t state) {
       notify("Switch to VFO first");
       return true;
     }
-    inputVfo = selectedVfo;
-    inputTx = false;
-    message = NULL;
-    NUMBER_Begin(&number, RADIO_MIN_HZ, RADIO_MAX_HZ, 1000000u, 0, false);
+    beginFrequencyInput(false);
     uint32_t unused;
     NUMBER_Key(&number, key, state, &unused);
   } else {
@@ -1279,11 +1299,14 @@ static void renderTitle(void) {
       capture.scope==CAPTURE_AUTO ? "Auto" : capture.scope==CAPTURE_VHF ? "VHF" : "UHF",
       capturePhase==FC_PREVIEW ? "MENU:Use" : capture.range==CAPTURE_RANGE_VHF ? "VHF" : "UHF");
   else if (number.active) STATUSLINE_SetText(number.invalid ? "Invalid value" : inputTx ? "TX Frequency" : "RX Frequency");
-  else if (inMenu || confirming) STATUSLINE_SetText("VFO %c", 'A'+selectedVfo);
-  else if (user.source == RADIO_SOURCE_CHANNEL) STATUSLINE_SetText("MR %c", 'A'+selectedVfo);
-  else if (gDeviceConfig.radio.watch_enabled)
-    STATUSLINE_SetText("DW %c", receivingVfo<RADIO_VFO_CAPACITY ? 'A'+receivingVfo : '-');
-  else STATUSLINE_SetText("RADIO");
+  else if (inMenu || confirming || user.source == RADIO_SOURCE_CHANNEL ||
+           gDeviceConfig.radio.watch_enabled) {
+    const char *mode = inMenu || confirming ? "VFO" :
+        user.source == RADIO_SOURCE_CHANNEL ? "MR" : "DW";
+    char id = mode[0]=='D' ? (receivingVfo<RADIO_VFO_CAPACITY ?
+              'A'+receivingVfo : '-') : 'A'+selectedVfo;
+    STATUSLINE_SetText("%s %c", mode, id);
+  } else STATUSLINE_SetText("RADIO");
 }
 
 static void renderConfirmation(void) {
@@ -1316,17 +1339,15 @@ static void renderMenu(void) {
 void VFO_render(void) {
   renderTitle();
   if (CHANNEL_MANAGER_Render()) return;
-  if (confirming && !message) {
-    renderConfirmation();
-    return;
-  }
-  if (inMenu && !message) {
-    renderMenu();
+  if (!message && (confirming || inMenu)) {
+    if (confirming) renderConfirmation();
+    else renderMenu();
     return;
   }
 
   char inputText[18];
-  NUMBER_Text(&number, inputText);
+  // The number formatter is only needed by an active RX frequency editor.
+  if (number.active && !inputTx) NUMBER_Text(&number, inputText);
   uint8_t first = RADIO_STATE_VisibleFirst(&gDeviceConfig.radio);
   uint32_t now = Now();
   for (uint8_t row = 0; row < RADIO_VFO_VISIBLE; ++row) {
