@@ -10,6 +10,8 @@
 #define RADIO_WATCH_LIMIT 2
 #define RADIO_VFO_VISIBLE 2
 
+typedef enum { RADIO_SOURCE_VFO, RADIO_SOURCE_CHANNEL } RadioSource;
+
 typedef struct {
   uint32_t frequency_hz;
   RadioParameters parameters;
@@ -21,6 +23,8 @@ typedef struct {
   BandState bands[RADIO_STATE_BANDS];
   TxConfig tx;
   bool watch;
+  RadioSource source;
+  uint8_t channel_number;
 } VfoConfig;
 
 typedef struct {

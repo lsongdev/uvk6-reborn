@@ -9,48 +9,22 @@
 #define SCANLIST_ALL 0
 
 typedef enum {
-  SETTING_EEPROMTYPE,
-  SETTING_BATSAVE,
-  SETTING_VOX,
   SETTING_BACKLIGHT,
-  SETTING_TXTIME,
-  SETTING_CURRENTSCANLIST,
-  SETTING_ROGER,
-  SETTING_SCANMODE,
-  SETTING_CHDISPLAYMODE,
-  SETTING_BEEP,
-  SETTING_KEYLOCK,
-  SETTING_PTT_LOCK,
-  SETTING_BUSYCHANNELTXLOCK,
-  SETTING_STE,
-  SETTING_REPEATERSTE,
-  SETTING_DTMFDECODE,
   SETTING_BRIGHTNESS_H,
   SETTING_BRIGHTNESS_L,
   SETTING_CONTRAST,
-  SETTING_MAINAPP,
-  SETTING_SQOPENEDTIMEOUT,
-  SETTING_SQCLOSEDTIMEOUT,
-  SETTING_SQLOPENTIME,
-  SETTING_SQLCLOSETIME,
-  SETTING_SKIPGARBAGEFREQUENCIES,
-  SETTING_ACTIVEVFO,
   SETTING_BACKLIGHTONSQUELCH,
   SETTING_BATTERYCALIBRATION,
   SETTING_BATTERYTYPE,
   SETTING_BATTERYSTYLE,
-  SETTING_UPCONVERTER,
-  SETTING_DEVIATION,
-  SETTING_MIC,
-  SETTING_SHOWLEVELINVFO,
-  SETTING_BOUND240_280,
-  SETTING_NOLISTEN,
+  SETTING_KEYLOCK,
+  SETTING_PTT_LOCK,
   SETTING_SI4732POWEROFF,
-  SETTING_TONELOCAL,
-  SETTING_FCTIME,
-  SETTING_MULTIWATCH,
-  SETTING_FREQ_CORRECTION,
-
+  SETTING_SQLOPENTIME,
+  SETTING_SQLCLOSETIME,
+  SETTING_BOUND240_280,
+  SETTING_TX_TIMEOUT,
+  SETTING_TX_BUSY_LOCK,
   SETTING_COUNT,
 } Setting;
 
@@ -126,12 +100,6 @@ typedef struct {
   uint16_t currentScanlist;
   uint8_t mainApp : 8;
 
-  uint16_t batteryCalibration : 12;
-  uint8_t contrast : 4;
-
-  uint8_t backlight : 4;
-  uint8_t mic : 4;
-
   uint8_t reserved3 : 4;
   uint8_t batsave : 4;
 
@@ -145,38 +113,24 @@ typedef struct {
 
   uint8_t scanmode : 2;
   CHDisplayMode chDisplayMode : 2;
-  uint8_t pttLock : 1;
   bool showLevelInVFO : 1;
-  uint8_t beep : 1;
-  uint8_t keylock : 1;
 
   uint8_t busyChannelTxLock : 1;
   uint8_t ste : 1;
   uint8_t repeaterSte : 1;
   uint8_t dtmfdecode : 1;
-  uint8_t brightness : 4;
 
-  uint8_t brightnessLow : 4;
   EEPROMType eepromType : 3;
-  bool bound_240_280 : 1;
 
   ScanTimeout sqClosedTimeout : 4;
   ScanTimeout sqOpenedTimeout : 4;
 
-  BatteryType batteryType : 2;
-  BatteryStyle batteryStyle : 2;
   bool noListen : 1;
-  bool si4732PowerOff : 1;
   uint8_t mWatch : 2;
 
   uint8_t freqCorrection;
 
-  BacklightOnSquelchMode backlightOnSquelch : 2;
   bool toneLocal : 1;
-  uint8_t sqlOpenTime : 3;
-  uint8_t sqlCloseTime : 2;
-
-  uint8_t deviation;
 
   uint8_t activeVFO : 2;
   bool skipGarbageFrequencies : 1;
@@ -217,8 +171,9 @@ uint16_t SETTINGS_GetPageSize();
 bool SETTINGS_IsPatchPresent();
 
 uint32_t SETTINGS_GetValue(Setting s);
-void SETTINGS_SetValue(Setting s, uint32_t v);
-const char *SETTINGS_GetValueString(Setting s);
+bool SETTINGS_SetValue(Setting s, uint32_t v);
+void SETTINGS_GetValueText(Setting s, char *out, uint8_t size);
+bool SETTINGS_ResetPreferences(void);
 void SETTINGS_IncDecValue(Setting s, bool inc);
 
 void SETTINGS_UpdateSave();

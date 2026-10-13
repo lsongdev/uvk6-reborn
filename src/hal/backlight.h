@@ -10,5 +10,7 @@ void BACKLIGHT_Update();
 void BACKLIGHT_SetDuration(uint8_t durationSec);
 void BACKLIGHT_SetBrightness(uint8_t brigtness);
 void BACKLIGHT_Init();
+void BACKLIGHT_ApplySettings(void);
+void BACKLIGHT_SetReception(bool open);
 
 #endif /* end of include guard: BACKLIGHT_H */

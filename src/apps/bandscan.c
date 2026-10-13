@@ -1,3 +1,4 @@
+#include "core/device-config.h"
 #include "apps/chscan.h"
 
 #include "hal/uart.h"
@@ -53,7 +54,7 @@ bool BANDSCAN_key(KEY_Code_t key, Key_State_t state) {
       APPS_run(APP_LOOT_LIST);
       return true;
     case KEY_PTT:
-      if (gLastActiveLoot && !gSettings.keylock) {
+      if (gLastActiveLoot && !gDeviceConfig.preferences.keylock) {
         RADIO_SetParam(ctx, gLastActiveLoot->f, PARAM_FREQUENCY, true);
         RADIO_ApplySettings(ctx);
         APPS_run(APP_VFO);

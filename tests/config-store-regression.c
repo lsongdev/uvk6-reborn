@@ -92,7 +92,7 @@ static bool encodeV6(const DeviceConfig *config, uint32_t sequence, uint8_t *byt
     put32(p,preset->step_hz);put16(p+4,preset->bandwidth_hz);
     p[6]=preset->mode;p[7]=preset->squelch;put16(p+8,preset->rx_tone);p+=10;
   }
-  memcpy(p,native+FORMAT7_BYTES-21,18);p+=18;
+  memcpy(p,native+FORMAT8_BYTES-21,18);p+=18;
   put16(p,config->preferences.tx_timeout_seconds);p+=2;
   *p++=config->preferences.tx_busy_lockout;assert(p==bytes+467);
   put32(bytes+HEADER_CRC,crc32(bytes,CONFIG_LEGACY_SLOT_SIZE));return true;
@@ -224,7 +224,7 @@ int main(void) {
   assert(loaded.radio.vfos[0].current.frequency_hz == 100000000);
   assert(memory.writes == 3);
   assert(loaded.radio.presets[6].squelch == 4);
-  // Native format7 preserves independent B state and last selection.
+  // Native format8 preserves independent B state, source, and last selection.
   assert(RADIO_STATE_Set(&original.radio,1,438550000,
       (RadioParameters){RX_NFM,25000,14000,7,50}));
   original.radio.vfos[1].tx=(TxConfig){true,TX_POWER_MEDIUM,438650000,155};
@@ -247,14 +247,14 @@ int main(void) {
   assert(loaded.radio.vfos[1].current.frequency_hz==radioBands[6].initial_hz);
   assert(loaded.radio.vfos[1].current.parameters.rx_tone==155);
   assert(!loaded.radio.vfos[1].tx.enabled && !loaded.radio.vfos[1].tx.tone && !loaded.radio.vfos[1].tx.frequency_hz);
-  // Load/migrate does not write; first format7 save retains the old good slot.
+  // Load/migrate does not write; first format8 save retains the old good slot.
   memset(&memory,0xff,sizeof(memory));memory.writes=0;memory.write_limit=-1;
   memcpy(memory.bytes,record,sizeof(record));
   assert(CONFIG_Load(&io,&loaded,&sequence) && sequence==21 && !memory.writes);
   memory.write_limit=30;assert(!CONFIG_Save(&io,&loaded,NULL));
   assert(CONFIG_Load(&io,&loaded,&sequence) && sequence==21);
   memory.write_limit=-1;assert(CONFIG_Save(&io,&loaded,&sequence) && sequence==22);
-  assert(memory.bytes[4]==5 && memory.bytes[CONFIG_STORE_BASE+4]==7);
+  assert(memory.bytes[4]==5 && memory.bytes[CONFIG_STORE_BASE+4]==8);
   assert(CONFIG_Load(&io,&loaded,&sequence) && sequence==22);
   // Format6 upgrades retain both VFOs, B selection, tones, shared presets.
   assert(encodeV6(&original,30,record));

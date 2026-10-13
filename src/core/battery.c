@@ -1,3 +1,4 @@
+#include "core/device-config.h"
 #include "core/battery.h"
 #include "hal/board.h"
 #include "core/misc.h"
@@ -72,7 +73,7 @@ const uint16_t Voltage2PercentageTable[][11][2] = {
 };
 
 uint8_t BATTERY_VoltsToPercent(const unsigned int voltage_10mV) {
-  const uint16_t(*crv)[2] = Voltage2PercentageTable[gSettings.batteryType];
+  const uint16_t(*crv)[2] = Voltage2PercentageTable[gDeviceConfig.preferences.battery_type];
   const uint32_t mulipl = 1000;
 
   // Предполагаем, что таблица отсортирована от ВЫСОКОГО напряжения к НИЗКОМУ.
@@ -80,7 +81,7 @@ uint8_t BATTERY_VoltsToPercent(const unsigned int voltage_10mV) {
   // Проверка: if (voltage_10mV > crv[i][0]) — значит мы нашли диапазон.
 
   for (uint8_t i = 1;
-       i < ARRAY_SIZE(Voltage2PercentageTable[gSettings.batteryType]); i++) {
+       i < ARRAY_SIZE(Voltage2PercentageTable[gDeviceConfig.preferences.battery_type]); i++) {
     if (voltage_10mV > crv[i][0]) {
       // Точки интерполяции:
       // P1 (v1, p1) = crv[i-1] (Выше напряжение, Выше процент)
@@ -120,7 +121,7 @@ void BATTERY_UpdateBatteryInfo() {
     batAvgV = batAvgV - (batAvgV - batAdcV) / 7;
   }
 
-  gBatteryVoltage = (batAvgV * 760) / gSettings.batteryCalibration;
+  gBatteryVoltage = (batAvgV * 760) / gDeviceConfig.preferences.battery_calibration;
   gChargingWithTypeC = charg;
   gBatteryPercent = BATTERY_VoltsToPercent(gBatteryVoltage);
 }
@@ -130,6 +131,6 @@ uint32_t BATTERY_GetPreciseVoltage(uint16_t cal) {
 }
 
 uint16_t BATTERY_GetCal(uint32_t v) {
-  return (uint32_t)gSettings.batteryCalibration *
-         BATTERY_GetPreciseVoltage(gSettings.batteryCalibration) / v;
+  return (uint32_t)gDeviceConfig.preferences.battery_calibration *
+         BATTERY_GetPreciseVoltage(gDeviceConfig.preferences.battery_calibration) / v;
 }

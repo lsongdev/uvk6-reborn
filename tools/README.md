@@ -52,3 +52,7 @@ A/B 首屏切换预览：`python3 tools/ui-preview.py --frames ab-a ab-b --outpu
 VFO 提示位置预览：`python3 tools/ui-preview.py --frames error-short error-long --output /tmp/vfo-errors.png`，分别展示长提示的起始位置和滚动到末尾的位置。
 
 统一字库预览：`python3 tools/ui-preview.py --frames font-frequency font-name --output docs/images/vfo-font.png`，对照频率数字与名称中相同数字的字形。
+
+## 固件资源占用
+
+`python3 tools/map_analyze.py obj/output.map 20` 输出实际链接的 Flash、静态 RAM、栈／堆预留和较大输入段；排除 discarded／debug，`.data` 同时消耗 Flash 镜像和 RAM。LTO 下函数段包含内联调用，合并字符串池也不能归因于段名里的某一个函数。修改构建参数时使用 `make -B -j4 all` 或独立输出目录。详细实验与预算见 [Flash 审计](../docs/flash-budget.md)。

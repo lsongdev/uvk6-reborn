@@ -15,6 +15,7 @@ static uint8_t minDigits = 1;
 static uint8_t maxDigits = 1;
 
 void NUMNAV_Init(uint16_t initialValue, uint16_t min, uint16_t max) {
+  pos = 0;
   initV = initialValue;
   minV = min;
   maxV = max;
@@ -59,8 +60,12 @@ uint16_t NUMNAV_Input(KEY_Code_t key) {
     return initV;
   }
   if (key == KEY_MENU || key == KEY_PTT) {
-    NUMNAV_Accept();
-    return NUMNAV_GetCurrentValue();
+    uint16_t value = NUMNAV_GetCurrentValue();
+    if (value >= minV && value <= maxV) {
+      NUMNAV_Accept();
+      return value;
+    }
+    return NUMNAV_Deinit();
   }
   if (key > KEY_9) {
     uint16_t v = NUMNAV_GetCurrentValue();
@@ -93,6 +98,8 @@ uint16_t NUMNAV_Deinit(void) {
 }
 
 void NUMNAV_Accept(void) {
-  gNumNavCallback(NUMNAV_GetCurrentValue());
+  uint16_t value = NUMNAV_GetCurrentValue();
+  if (gNumNavCallback && value >= minV && value <= maxV)
+    gNumNavCallback(value);
   NUMNAV_Deinit();
 }

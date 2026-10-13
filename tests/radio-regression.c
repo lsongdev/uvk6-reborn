@@ -1,6 +1,8 @@
 #include "hal/led.h"
 #include "../src/core/radio.c"
 #include <assert.h>
+bool gRedrawScreen;
+DeviceConfig gDeviceConfig;
 
 static bool hasSi = true;
 static bool carrierOpen, toneDetected;
@@ -26,6 +28,7 @@ void BK4819_ToggleAFDAC(bool on) { (void)on; }
 void BK4819_ToggleAFBit(bool on) { (void)on; }
 void LED_SetGreen(bool on) { (void)on; }
 void BACKLIGHT_On(void) {}
+void BACKLIGHT_SetReception(bool open) { (void)open; }
 void BACKLIGHT_Toggle(bool on) { (void)on; }
 void SYS_DelayMs(uint32_t ms) { (void)ms; }
 bool BK1080_Detect(void) { ++probes; return !hasSi; }

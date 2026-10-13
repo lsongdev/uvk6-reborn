@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 bool VFO_isReceiving(void);
+bool VFO_ApplyRxSettings(void);
 void VFO_init();
 void VFO_deinit(void);
 void VFO_cancelShortcut(void);

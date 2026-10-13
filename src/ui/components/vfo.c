@@ -84,7 +84,7 @@ void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_
     state->frequency_hz = view->frequency_hz;
   }
   bool wasTuning = state->tuning;
-  state->tuning = view->activity == UI_VFO_SEEKING;
+  state->tuning = view->edit_text || view->activity == UI_VFO_SEEKING;
   if (wasTuning && !state->tuning) UI_VfoShowFrequency(state, now);
   if (state->tuning) UI_VfoShowFrequency(state, now);
   char label[128], frequency[16];
@@ -102,6 +102,11 @@ void UI_VfoRender(uint8_t y, const UI_VfoView *view, UI_VfoState *state, uint32_
   state->overflow = textWidth > LCD_WIDTH-BODY_X ? textWidth-(LCD_WIDTH-BODY_X) : 0;
   UI_VfoUpdate(state, now);
   const char *unit = UI_FormatFrequency(view->frequency_hz, frequency);
+  if (view->edit_text) {
+    snprintf(frequency, sizeof(frequency), "%s", view->edit_text);
+    unit = "MHz";
+    state->show_name = false;
+  }
   const char *mode = (unsigned)view->mode < RX_MODE_COUNT ? rxModeNames[view->mode] : "--";
   uint8_t modeLeft = LCD_WIDTH-UI_SmallTextWidth(mode);
   char compact[24];

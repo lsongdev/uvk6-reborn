@@ -215,7 +215,9 @@ uint8_t BK4819_GetAFCSpeed(void);
 void BK4819_TuneTo(uint32_t f, bool precise);
 void BK4819_SetToneFrequency(uint16_t f);
 void BK4819_SetTone2Frequency(uint16_t f);
-void BK4819_SetModulation(ModulationType type);
+// Production RX modes are NFM and AM; WFM/SSB use other receiver chips.
+void BK4819_SetRxMode(bool am);
+void BK4819_InvalidateRxMode(void);
 ModulationType BK4819_GetModulation();
 bool BK4819_IsSquelchOpen();
 

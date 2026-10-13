@@ -1,3 +1,4 @@
+#include "core/device-config.h"
 #include "apps/system.h"
 #include "apps/apps.h"
 #include "apps/vfo.h"
@@ -67,20 +68,20 @@ static void systemUpdate() {
 }
 
 static bool checkKeylock(Key_State_t state, KEY_Code_t key) {
-  bool isKeyLocked = gSettings.keylock;
-  bool isPttLocked = gSettings.pttLock;
+  bool isKeyLocked = gDeviceConfig.preferences.keylock;
+  bool isPttLocked = gDeviceConfig.preferences.ptt_lock;
   // Side keys now change tuning, so the keyboard lock must cover them.
   bool isSpecialKey = key == KEY_PTT;
   bool isLongPressF = state == KEY_LONG_PRESSED && key == KEY_F;
 
   if (isLongPressF) {
     VFO_cancelShortcut();
-    gSettings.keylock = !gSettings.keylock;
+    gDeviceConfig.preferences.keylock = !gDeviceConfig.preferences.keylock;
     SETTINGS_Save();
     return true;
   }
 
-  /* if (gSettings.keylock && state == KEY_LONG_PRESSED && key == KEY_8) {
+  /* if (gDeviceConfig.preferences.keylock && state == KEY_LONG_PRESSED && key == KEY_8) {
     captureScreen();
     return true;
   } */
@@ -127,7 +128,7 @@ static void processKeyboard() {
 
 void initDisplay() {
   LogC(LOG_C_BRIGHT_WHITE, "DISPLAY");
-  DISPLAY_Init(true, gSettings.contrast);
+  DISPLAY_Init(true, gDeviceConfig.preferences.contrast);
   LogC(LOG_C_BRIGHT_WHITE, "BACKLIGHT");
   BACKLIGHT_Init();
 }
@@ -140,8 +141,8 @@ void SYS_Main() {
     // Unknown EEPROM contents are not our config: never write a marker or
     // restart automatically. Only explicit initialization may unlock writes.
     initDisplay();
-    gSettings.batteryCalibration = 2000;
-    gSettings.backlight = 5;
+    gDeviceConfig.preferences.battery_calibration = 2000;
+    gDeviceConfig.preferences.backlight = 5;
     APPS_run(APP_RESET);
   } else {
     EEPROM_SetWritesEnabled(true);

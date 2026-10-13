@@ -11,7 +11,7 @@
 #define CONFIG_STORE_BASE 0x0800u
 #define CONFIG_STORE_END (CONFIG_STORE_BASE + CONFIG_STORE_SLOT_SIZE*CONFIG_STORE_SLOTS)
 #define CONFIG_LEGACY_SLOT_SIZE 512u
-#define CONFIG_STORE_FORMAT 7u
+#define CONFIG_STORE_FORMAT 8u
 
 // Explicit on-disk fields. Never serialize C compiler bitfields or structs.
 typedef struct {
@@ -23,6 +23,14 @@ typedef struct {
   uint16_t tx_timeout_seconds; // Global PTT time-out, enforced by runtime.
   uint8_t tx_busy_lockout;     // User preference, not a hardware bypass.
 } ConfigPreferences;
+
+// Shared by boot-time initialization and reset; never serialize this struct.
+#define CONFIG_DEFAULT_PREFERENCES { \
+    .battery_calibration = 2000, .backlight = 3, .contrast = 8, \
+    .brightness = 8, .battery_type = 0, .battery_style = 1, \
+    .backlight_on_squelch = 1, .mic = 0, .deviation = 130, \
+    .brightness_low = 0, .sql_open_time = 1, .sql_close_time = 1, \
+    .tx_timeout_seconds = 120, .tx_busy_lockout = 1 }
 
 typedef struct {
   RadioUserState radio;

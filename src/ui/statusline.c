@@ -80,7 +80,7 @@ void STATUSLINE_render(void) {
     if (gCurrentApp == APP_VFO) {
       UI_Battery(bars);
     } else {
-      switch (gSettings.batteryStyle) {
+      switch (gDeviceConfig.preferences.battery_style) {
       case BAT_CLEAN:
         UI_Battery(bars);
         break;
@@ -111,7 +111,7 @@ void STATUSLINE_render(void) {
     icons[idx++] = SYM_BROADCAST;
   }
 
-  if (gSettings.keylock) {
+  if (gDeviceConfig.preferences.keylock) {
     icons[idx++] = SYM_LOCK;
   }
 

@@ -242,7 +242,7 @@ static void SendReply(void *pReply, uint16_t Size) {
 }
 
 static void SendVersion(void) {
-  REPLY_0514_t Reply;
+  REPLY_0514_t Reply = {0};
 
   Reply.Header.ID = 0x0515;
   Reply.Header.Size = sizeof(Reply.Data);
