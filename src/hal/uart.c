@@ -81,8 +81,12 @@ void UART_Send(const void *pBuffer, uint32_t Size) {
   uint32_t i;
 
   for (i = 0; i < Size; i++) {
+    // The UART can fail or be stopped. Do not freeze the main loop
+    // indefinitely (including the system's software PTT timeout).
+    uint32_t spins = 100000u;
     while ((UART1->IF & UART_IF_TXFIFO_FULL_MASK) !=
            UART_IF_TXFIFO_FULL_BITS_NOT_SET) {
+      if (!--spins) return;
     }
     UART1->TDR = pData[i];
   }
