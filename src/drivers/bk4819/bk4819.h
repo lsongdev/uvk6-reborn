@@ -135,7 +135,6 @@ void BK4819_ExitSubAu(void);
 uint16_t BK4819_GetRSSI(void);
 uint8_t BK4819_GetNoise(void);
 uint8_t BK4819_GetGlitch(void);
-uint8_t BK4819_GetSNR(void);
 
 bool BK4819_GetFrequencyScanResult(uint32_t *pFrequency);
 void BK4819_DisableFrequencyScan(void);

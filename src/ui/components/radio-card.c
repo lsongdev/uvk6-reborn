@@ -12,6 +12,12 @@ void UI_RadioCardShowFrequency(UI_RadioCardState *state, uint32_t now) {
   state->offset = 0;
 }
 
+static uint32_t textHash(const char *text) {
+  uint32_t hash = 2166136261u; // FNV-1a
+  while (*text) hash = (hash ^ (uint8_t)*text++) * 16777619u;
+  return hash;
+}
+
 static uint16_t scrollOffset(uint32_t now, uint32_t started, uint16_t overflow) {
   if (!overflow) return 0;
   uint32_t phase = (now-started)%(2u*UI_RADIO_CARD_SCROLL_PAUSE_MS+overflow*UI_RADIO_CARD_SCROLL_PIXEL_MS);
@@ -21,7 +27,7 @@ static uint16_t scrollOffset(uint32_t now, uint32_t started, uint16_t overflow) 
 
 bool UI_RadioCardUpdate(UI_RadioCardState *state, uint32_t now) {
   if (!state->initialized) return false;
-  bool show = state->label[0] && !state->tuning &&
+  bool show = state->has_label && !state->tuning &&
               now-state->tuned_at >= UI_RADIO_CARD_NAME_DELAY_MS;
   bool changed = show != state->show_name;
   if (show && !state->show_name) state->label_started = now;
@@ -91,12 +97,14 @@ void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view, UI_RadioCardSta
   const char *name = view->name ? view->name : "";
   const char *rds = view->rds ? view->rds : "";
   snprintf(label, sizeof(label), "%s%s%s", name, *name && *rds ? " / " : "", rds);
-  if (strcmp(label, state->label)) {
-    strcpy(state->label, label);
+  uint32_t labelHash = textHash(label);
+  state->has_label = label[0];
+  if (labelHash != state->label_hash) {
+    state->label_hash = labelHash;
     state->label_started = now;
     state->offset = 0;
   }
-  uint16_t textWidth = UI_BodyTextWidth(state->label);
+  uint16_t textWidth = UI_BodyTextWidth(label);
   state->overflow = textWidth > LCD_WIDTH-BODY_X ? textWidth-(LCD_WIDTH-BODY_X) : 0;
   UI_RadioCardUpdate(state, now);
   const char *unit = UI_FormatFrequency(view->frequency_hz, frequency);
@@ -114,13 +122,14 @@ void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view, UI_RadioCardSta
   if (state->show_name && !headerMessage) bandRight -= UI_SmallTextWidth(compact)+3;
   uint16_t bandWidth = bandRight > BAND_X ? bandRight-BAND_X : 0;
   const char *band = headerMessage ? view->header_message : view->band_name ? view->band_name : "";
-  if (strncmp(band, state->band, sizeof(state->band)-1) || bandWidth != state->band_width) {
-    snprintf(state->band, sizeof(state->band), "%s", band);
+  uint32_t bandHash = textHash(band);
+  if (bandHash != state->band_hash || bandWidth != state->band_width) {
+    state->band_hash = bandHash;
     state->band_started = now;
     state->band_offset = 0;
     state->band_width = bandWidth;
   }
-  uint16_t bandTextWidth = UI_SmallTextWidth(state->band);
+  uint16_t bandTextWidth = UI_SmallTextWidth(band);
   state->band_overflow = bandTextWidth > bandWidth ? bandTextWidth-bandWidth : 0;
   state->band_offset = scrollOffset(now, state->band_started, state->band_overflow);
 
@@ -132,7 +141,7 @@ void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view, UI_RadioCardSta
   }
   PrintSmall(5, y+5, "%c", view->id ? view->id : 'A');
   if (view->changed) PrintSmall(10, y+5, "*");
-  UI_SmallTextWindow(BAND_X, y+5, bandWidth, state->band, state->band_offset);
+  UI_SmallTextWindow(BAND_X, y+5, bandWidth, band, state->band_offset);
   PrintSmallEx(LCD_WIDTH, y+5, POS_R, C_FILL, "%s", mode);
   if (state->show_name && !headerMessage)
     PrintSmallEx(modeLeft-3, y+5, POS_R, C_FILL, "%s", compact);
@@ -141,7 +150,7 @@ void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view, UI_RadioCardSta
   if (state->show_name) {
     int16_t offset = state->overflow ? state->offset :
                      (int16_t)textWidth-(LCD_WIDTH-BODY_X);
-    UI_BodyTextWindow(BODY_X, y+22, LCD_WIDTH-BODY_X, state->label, offset);
+    UI_BodyTextWindow(BODY_X, y+22, LCD_WIDTH-BODY_X, label, offset);
   } else {
     char *tail = NULL;
     char *dot = strchr(frequency, '.');

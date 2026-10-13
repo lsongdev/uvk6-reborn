@@ -1,6 +1,5 @@
 #include "hal/eeprom.h"
 #include "hal/eeprom-layout.h"
-#include "external/printf/printf.h"
 #include "hal/scheduler.h"
 #include "hal/i2c.h"
 #include "hal/system.h"
@@ -13,13 +12,9 @@ static bool writes_enabled = false;
 void EEPROM_SetWritesEnabled(bool enabled) { writes_enabled = enabled; }
 
 static uint32_t g_eeprom_size = 0;
-static uint16_t g_eeprom_page_size = 0;
 
 void EEPROM_Init(void) {
   g_eeprom_size = EEPROM_DetectSize();
-  g_eeprom_page_size = EEPROM_GetPageSize();
-  printf("EEPROM: %lu bytes, page %u bytes\n", g_eeprom_size,
-         g_eeprom_page_size);
 }
 
 bool EEPROM_WaitReady(uint8_t device_addr, uint32_t timeout_ms) {

@@ -14,7 +14,7 @@ void RESET_Init(void) {
   gDeviceConfig.preferences.keylock = false;
   STATUSLINE_SetText("%s", EEPROM_DetectType() < EEPROM_UNKNOWN
                                  ? EEPROM_TYPE_NAMES[EEPROM_DetectType()]
-                                 : "EEPROM UNKNOWN");
+                                 : "EEPROM unknown");
 }
 void RESET_Update(void) {}
 void RESET_Render(void) {

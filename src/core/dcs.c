@@ -63,18 +63,6 @@ uint32_t DCS_GetGolayCodeWord(DCS_CodeType_t CodeType, uint8_t Option) {
 
 
 
-void PrintRTXCode(char *Output, uint8_t codeType, uint8_t code) {
-  if (codeType == CODE_TYPE_CONTINUOUS_TONE) {
-    sprintf(Output, "CT:%u.%u", CTCSS_Options[code] / 10,
-            CTCSS_Options[code] % 10);
-  } else if (codeType == CODE_TYPE_DIGITAL) {
-    sprintf(Output, "DCS:D%03oN", DCS_Options[code]);
-  } else if (codeType == CODE_TYPE_REVERSE_DIGITAL) {
-    sprintf(Output, "DCS:D%03oI", DCS_Options[code]);
-  } else if (codeType == CODE_TYPE_OFF) {
-    sprintf(Output, "No code");
-  }
-}
 
 void TONE_Format(RadioTone tone, char text[24]) {
   if (!TONE_Valid(tone)) { snprintf(text,24,"Invalid"); return; }

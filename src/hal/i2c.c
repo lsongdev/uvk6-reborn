@@ -16,7 +16,6 @@ static inline void i2c_delay_short(void) {
                  "nop\n nop\n nop\n nop\n nop\n"
                  "nop\n nop\n nop\n nop\n nop\n"
                  "nop\n nop\n nop\n nop\n");
-  // TIMER_DelayTicks(2);
 }
 
 static inline void i2c_delay_long(void) {
@@ -33,7 +32,6 @@ static inline void i2c_delay_long(void) {
                  "nop\n nop\n nop\n nop\n nop\n"
                  "nop\n nop\n nop\n nop\n nop\n"
                  "nop\n nop\n nop\n");
-  // TIMER_DelayTicks(4);
 }
 
 /* === Управление состоянием SDA === */
@@ -191,8 +189,6 @@ int I2C_Write(uint8_t Data) {
   }
 
   scl_lo();
-  // sda_out();
-  // sda_lo();
   return ret;
 }
 

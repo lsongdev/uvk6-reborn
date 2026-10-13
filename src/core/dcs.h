@@ -38,6 +38,5 @@ extern const uint16_t DCS_Options[104];
 
 uint32_t DCS_GetGolayCodeWord(DCS_CodeType_t CodeType, uint8_t Option);
 
-void PrintRTXCode(char *Output, uint8_t codeType, uint8_t code);
 
 #endif
