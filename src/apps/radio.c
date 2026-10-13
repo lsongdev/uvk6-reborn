@@ -6,6 +6,7 @@
 #include "core/device-config.h"
 #include "core/channel-store.h"
 #include "core/channel-model.h"
+#include "core/tuning.h"
 #include "core/rx-runtime.h"
 #include "core/watch.h"
 #include "core/tx-model.h"
@@ -79,16 +80,14 @@ static bool loadChannelForSlot(uint8_t id, UserChannel *channel) {
 }
 
 static bool effectiveSlot(uint8_t id, RadioSlot *effective,
-                         UserChannel *channel) {
+                          UserChannel *channel) {
   if (id >= RADIO_SLOT_CAPACITY || !effective) return false;
-  *effective = gDeviceConfig.radio.slots[id];
-  if (effective->source == RADIO_SOURCE_VFO) return true;
+  const RadioSlot *stored = &gDeviceConfig.radio.slots[id];
+  if (stored->source == RADIO_SOURCE_VFO)
+    return TUNING_Resolve(stored, NULL, effective);
   UserChannel loaded;
   if (!loadChannelForSlot(id, &loaded)) return false;
-  effective->active_band = RADIO_MODEL_BandAt(loaded.frequency_hz);
-  if (effective->active_band == UINT8_MAX) return false;
-  effective->current = (BandState){loaded.frequency_hz, loaded.rx};
-  effective->tx = loaded.tx;
+  if (!TUNING_Resolve(stored, &loaded, effective)) return false;
   if (channel) *channel = loaded;
   return true;
 }
@@ -646,9 +645,8 @@ void RADIO_APP_update(void) {
 
 static bool restorePrimary(void) {
   RxPlan plan;
-  if (RADIO_MODEL_Plan(user.current.frequency_hz,user.current.parameters,
-      RADIO_GetReceiverCapabilities(),&plan)!=RX_OK ||
-      plan.frequency_hz!=user.current.frequency_hz) {
+  if (TUNING_ExactPlan(user.current.frequency_hz,user.current.parameters,
+      RADIO_GetReceiverCapabilities(),&plan)!=RX_OK) {
     RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX unavailable"); return false;
   }
   if (runtime.active && receivingSlot==selectedSlot && WATCH_SameReceiver(&runtime.current,&plan))
@@ -711,9 +709,9 @@ static void watchUpdate(void) {
         watchStatus="DW: unavailable"; continue;
       }
       RxPlan plan;
-      RxResult result=RADIO_MODEL_Plan(effective.current.frequency_hz,effective.current.parameters,
+      RxResult result=TUNING_ExactPlan(effective.current.frequency_hz,effective.current.parameters,
           RADIO_GetReceiverCapabilities(),&plan);
-      if (result!=RX_OK || plan.frequency_hz!=effective.current.frequency_hz) {
+      if (result!=RX_OK) {
         watchStatus="DW: unavailable"; continue;
       }
       if (!WATCH_Eligible(&plan)) { watchStatus="DW: SSB off"; continue; }
@@ -762,9 +760,9 @@ static void tuneChannel(uint16_t number, bool enterMode) {
     return;
   }
   RxPlan plan;
-  RxResult result = RADIO_MODEL_Plan(channel.frequency_hz, channel.rx,
+  RxResult result = TUNING_ExactPlan(channel.frequency_hz, channel.rx,
       RADIO_GetReceiverCapabilities(), &plan);
-  if (result != RX_OK || plan.frequency_hz != channel.frequency_hz) {
+  if (result != RX_OK) {
     notify(result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
     return;
   }
@@ -806,9 +804,9 @@ static void switchSource(void) {
   RadioSlot *stored = &gDeviceConfig.radio.slots[selectedSlot];
   if (stored->source == RADIO_SOURCE_CHANNEL) {
     RxPlan plan;
-    RxResult result = RADIO_MODEL_Plan(stored->current.frequency_hz,
+    RxResult result = TUNING_ExactPlan(stored->current.frequency_hz,
         stored->current.parameters, RADIO_GetReceiverCapabilities(), &plan);
-    if (result != RX_OK || plan.frequency_hz != stored->current.frequency_hz) {
+    if (result != RX_OK) {
       notify(result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
       return;
     }
@@ -843,9 +841,9 @@ static void switchSlot(void) {
     return;
   }
   RxPlan plan;
-  RxResult planned = RADIO_MODEL_Plan(next.current.frequency_hz,
+  RxResult planned = TUNING_ExactPlan(next.current.frequency_hz,
       next.current.parameters, RADIO_GetReceiverCapabilities(), &plan);
-  if (planned != RX_OK || plan.frequency_hz != next.current.frequency_hz) {
+  if (planned != RX_OK) {
     notify(planned == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
     return;
   }
@@ -1160,11 +1158,11 @@ bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
       nextChannel(key == KEY_UP);
       return true;
     }
-    uint32_t target = RADIO_MODEL_Step(user.current.frequency_hz, user.current.parameters.step_hz, key == KEY_UP);
-    uint8_t band = RADIO_MODEL_BandAt(target);
-    if (band != UINT8_MAX)
-      request(target, band == user.active_band ? user.current.parameters
-                                               : gDeviceConfig.radio.presets[band]);
+    uint32_t target;
+    RadioParameters params;
+    if (TUNING_StepVfo(&user, gDeviceConfig.radio.presets, key == KEY_UP,
+                       &target, &params))
+      request(target, params);
     return true;
   }
   if (state != KEY_RELEASED)
