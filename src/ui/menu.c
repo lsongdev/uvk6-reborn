@@ -100,8 +100,6 @@ void MENU_Deinit() { NUMNAV_Deinit(); number.active = false; active_menu = NULL;
 void MENU_Render(void) {
   if (!active_menu || !active_menu->num_items)
     return;
-  STATUSLINE_SetText("%s", active_menu->title);
-
   STATUSLINE_SetText(number.active && number.invalid ? "Invalid value" : active_menu->title);
 
   uint8_t itemsShow = active_menu->height / active_menu->itemHeight;
