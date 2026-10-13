@@ -1,7 +1,6 @@
 #include "core/channel-store.h"
-#include "core/channels.h"
 #include "core/radio-model.h"
-#include "core/settings.h"
+#include "core/config-store.h"
 #include "hal/eeprom.h"
 #include <string.h>
 
@@ -10,8 +9,8 @@
 #define CHANNEL_RECORD_VERSION 1u
 #define CHANNEL_CRC_OFFSET 44u
 
-_Static_assert(CHANNELS_OFFSET + SCANLIST_MAX * CH_SIZE <= CHANNEL_STORE_BASE,
-               "User channels must not overlap the reserved legacy channel area");
+_Static_assert(CONFIG_STORE_END <= CHANNEL_STORE_BASE,
+               "User channels must not overlap the configuration slots");
 _Static_assert(CHANNEL_STORE_END <= 0x1e00u || CHANNEL_STORE_BASE >= 0x2000u,
                "User channel storage must not overlap factory calibration");
 

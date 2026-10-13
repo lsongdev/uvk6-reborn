@@ -12,14 +12,13 @@ static bool failed;
 void RESET_Init(void) {
   confirm = failed = false;
   gDeviceConfig.preferences.keylock = false;
-  gSettings.eepromType = EEPROM_DetectType();
-  STATUSLINE_SetText("%s", gSettings.eepromType < EEPROM_UNKNOWN
-                                 ? EEPROM_TYPE_NAMES[gSettings.eepromType]
+  STATUSLINE_SetText("%s", EEPROM_DetectType() < EEPROM_UNKNOWN
+                                 ? EEPROM_TYPE_NAMES[EEPROM_DetectType()]
                                  : "EEPROM UNKNOWN");
 }
 void RESET_Update(void) {}
 void RESET_Render(void) {
-  if (gSettings.eepromType == EEPROM_UNKNOWN) {
+  if (EEPROM_DetectType() == EEPROM_UNKNOWN) {
     PrintMedium(2, 20, "EEPROM unknown");
     PrintMedium(2, 32, "Cannot initialize");
   } else if (failed) {
@@ -41,7 +40,7 @@ bool RESET_key(KEY_Code_t key, Key_State_t state) {
     confirm = failed = false;
     return true;
   }
-  if (gSettings.eepromType == EEPROM_UNKNOWN)
+  if (EEPROM_DetectType() == EEPROM_UNKNOWN)
     return true;
   if (!confirm && key == KEY_0) {
     confirm = true;

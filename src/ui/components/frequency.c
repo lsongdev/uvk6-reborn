@@ -1,5 +1,5 @@
 #include "ui/components/frequency.h"
-#include "core/radio.h"
+#include "core/receiver.h"
 #include "core/measurements.h"
 
 const char *UI_FormatFrequency(uint32_t frequency_hz, char text[16]) {

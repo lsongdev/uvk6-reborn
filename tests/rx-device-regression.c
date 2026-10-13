@@ -3,7 +3,6 @@
 #include "../src/hal/rx-device.c"
 #include <assert.h>
 
-Settings gSettings;
 DeviceConfig gDeviceConfig;
 static unsigned bkTunes, siTunes, broadcastTunes, bkIdle, siMuted, siPowerDowns;
 static unsigned bkModes, lastBkHz10;
@@ -16,9 +15,10 @@ static bool scanReady;
 static bool rxPinEnabled;
 static bool speakerOn, bkDac;
 static uint8_t siVolume;
-void AUDIO_ToggleSpeaker(bool on) { speakerOn=on; }
+static void audioEvent(char c);
+void AUDIO_ToggleSpeaker(bool on) { speakerOn=on; audioEvent(on ? 'S' : 's'); }
 void BK4819_SetAF(BK4819_AF_Type_t af) { (void)af; }
-void BK4819_ToggleAFDAC(bool on) { bkDac=on; }
+void BK4819_ToggleAFDAC(bool on) { bkDac=on; audioEvent(on ? 'D' : 'd'); }
 
 void BK4819_StopScan(void) { ++scanStops; BK4819_Idle(); }
 void BK4819_InvalidateRxMode(void) { ++modeInvalidations; }
@@ -38,7 +38,8 @@ void BK4819_SetCDCSSCodeWord(uint32_t word) { lastDcs=word; }
 void BK4819_ExitSubAu(void) { ++tonesOff; }
 void BK4819_WriteRegister(BK4819_REGISTER_t reg, uint16_t value) { (void)reg; (void)value; }
 void BK4819_CssResetDetection(bool digital) { (void)digital; ++toneResets; }
-bool BK4819_IsSquelchOpen(void) { return true; }
+static bool carrierOpen=true;
+bool BK4819_IsSquelchOpen(void) { return carrierOpen; }
 void BK4819_Idle(void) { ++bkIdle; }
 void BK4819_RX_TurnOn(void) {}
 void BK4819_SetRxMode(bool am) {
@@ -103,6 +104,13 @@ bool BK4819_CssIsDetected(bool digital) { (void)digital; return watchTone; }
 SQL GetSql(uint8_t level) {
   assert(level>=4); return (SQL){.ro=108,.no=44,.go=60};
 }
+static char audioOrder[16];
+static unsigned audioCount;
+static void audioEvent(char c) { if (audioCount < sizeof(audioOrder)) audioOrder[audioCount++] = c; }
+void BK4819_ToggleAFBit(bool on) { audioEvent(on ? 'B' : 'b'); }
+void SYS_DelayMs(uint32_t ms) { assert(ms == 8); audioEvent('t'); }
+uint16_t BK1080_GetRSSI(void) { return 30; }
+uint8_t BK1080_GetSNR(void) { return 10; }
 static RxPlan plan(uint32_t hz, RxMode mode, RxDevice device) {
   return (RxPlan){device, hz, {mode, mode == RX_WFM ? 100000 : 12500,
     mode == RX_WFM ? 0 : mode == RX_NFM ? 12000 : 6000, 0}};
@@ -236,6 +244,31 @@ int main(void) {
   RX_DEVICE_InvalidateBk();
   assert(RX_DEVICE_Apply(&watch,RX_DEVICE_BK));
   assert(rxPinEnabled && bkModes==modesBefore+1 && bkTunes==tunesBefore+1);
+  // Squelch sample: BK requires carrier and the configured tone.
+  RxPlan toned = plan(438500000u, RX_NFM, RX_DEVICE_BK);
+  toned.parameters.rx_tone = 1;
+  uint16_t rssi; bool open;
+  carrierOpen=true; watchTone=false;
+  assert(RX_DEVICE_Sample(&toned,&rssi,&open) && !open && rssi==watchRSSI);
+  watchTone=true; assert(RX_DEVICE_Sample(&toned,&rssi,&open) && open);
+  carrierOpen=false; assert(RX_DEVICE_Sample(&toned,&rssi,&open) && !open);
+  toned.parameters.rx_tone=0; carrierOpen=true;
+  assert(RX_DEVICE_Sample(&toned,&rssi,&open) && open);
+  // SI/BK1080 open on SNR above the squelch level; unanswered SI stays closed.
+  RxPlan si = plan(100000000u, RX_WFM, RX_DEVICE_SI);
+  rsqStatus.resp.RSSI=40; rsqStatus.resp.SNR=6; si.parameters.squelch=5;
+  assert(RX_DEVICE_Sample(&si,&rssi,&open) && open && rssi==40);
+  si.parameters.squelch=6; assert(RX_DEVICE_Sample(&si,&rssi,&open) && !open);
+  rsqOK=false; assert(!RX_DEVICE_Sample(&si,&rssi,&open) && !open && !rssi); rsqOK=true;
+  RxPlan fm = plan(100000000u, RX_WFM, RX_DEVICE_BROADCAST); fm.parameters.squelch=9;
+  assert(RX_DEVICE_Sample(&fm,&rssi,&open) && open && rssi==30);
+  // Speaker gate: DAC before speaker on open, speaker first on close.
+  bkDac=false; audioCount=0;
+  RX_DEVICE_SetAudio(RX_DEVICE_BK,true); RX_DEVICE_SetAudio(RX_DEVICE_BK,false);
+  assert(audioCount==8 && !memcmp(audioOrder,"DBtSstdb",8));
+  audioCount=0;
+  RX_DEVICE_SetAudio(RX_DEVICE_SI,true); RX_DEVICE_SetAudio(RX_DEVICE_SI,false);
+  assert(audioCount==4 && !memcmp(audioOrder,"tSst",4) && !speakerOn);
   return 0;
 }
 

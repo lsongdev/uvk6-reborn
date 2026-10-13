@@ -6,7 +6,6 @@
 #include "drivers/si473x/si473x.h"
 #include "hal/display.h"
 #include "core/battery.h"
-#include "core/channels.h"
 #include "ui/numnav.h"
 #include "hal/scheduler.h"
 #include "ui/components/battery.h"
@@ -101,11 +100,7 @@ void STATUSLINE_render(void) {
     icons[idx++] = SYM_EEPROM_W;
   }
 
-  if (gMonitorMode) {
-    icons[idx++] = SYM_MONITOR;
-  }
-
-  if (ctx && (ctx->radio_type == RADIO_BK1080 || isSi4732On)) {
+  if (gReceiver.plan.device == RX_DEVICE_BROADCAST || isSi4732On) {
     icons[idx++] = SYM_BROADCAST;
   }
 

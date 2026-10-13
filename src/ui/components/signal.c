@@ -1,5 +1,6 @@
 #include "ui/components/signal.h"
-#include "core/radio.h"
+#include "core/receiver.h"
+#include "drivers/bk4819/bk4819.h"
 #include "core/measurements.h"
 
 
@@ -9,13 +10,14 @@ uint8_t UI_SMeterLevel(void) {
   enum { SEGMENTS = 14 };
   uint8_t level = 0;
 
-  if (ctx->radio_type == RADIO_BK4819) {
-    if (vfo->msm.rssi) {
-      int16_t dBm = Rssi2DBm(vfo->msm.rssi) + BK4819_GetAttenuation();
-      level = DBm2S(dBm, ctx->frequency >= 300 * MHZ);
+  uint16_t rssi = gReceiver.rssi;
+  if (gReceiver.plan.device == RX_DEVICE_BK) {
+    if (rssi) {
+      int16_t dBm = Rssi2DBm(rssi) + BK4819_GetAttenuation();
+      level = DBm2S(dBm, gReceiver.plan.frequency_hz >= 300000000u);
     }
   } else {
-    level = ConvertDomain(vfo->msm.rssi, 0, 75, 0, SEGMENTS);
+    level = ConvertDomain(rssi, 0, 75, 0, SEGMENTS);
   }
 
   return level > SEGMENTS ? SEGMENTS : level;

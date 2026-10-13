@@ -1,7 +1,7 @@
 #include "apps/bands.h"
 #include "apps/apps.h"
 #include "core/device-config.h"
-#include "core/radio.h"
+#include "core/receiver.h"
 #include "ui/graphics.h"
 #include "ui/statusline.h"
 
@@ -30,7 +30,7 @@ static void save(void) {
   }
   RxPlan plan;
   RxResult result = RADIO_MODEL_Plan(selectedSlot()->bands[selected].frequency_hz,
-                                    draft, RADIO_GetReceiverCapabilities(), &plan);
+                                    draft, RECEIVER_Capabilities(), &plan);
   if (result != RX_OK) {
     message = result == RX_PATCH_MISSING ? "SSB patch missing"
             : result == RX_INVALID_PARAMETERS ? "Invalid params" : "RX unavailable";
@@ -83,7 +83,7 @@ bool BANDS_key(KEY_Code_t key, Key_State_t state) {
   message = NULL;
   if (field < FIELD_CURRENT) {
     if (!RADIO_MODEL_Adjust(selectedSlot()->bands[selected].frequency_hz,
-                            &draft, RADIO_GetReceiverCapabilities(),
+                            &draft, RECEIVER_Capabilities(),
                             (RadioParameterField)field, key != KEY_F))
       message = field == RADIO_FIELD_BANDWIDTH && draft.mode == RX_WFM ? "Fixed bandwidth" : "No valid option";
   } else if (key == KEY_MENU) {

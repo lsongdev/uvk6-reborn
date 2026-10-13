@@ -29,7 +29,7 @@ bool DEVICE_SavePreferences(const ConfigPreferences *next) {
   gDeviceConfig.preferences=*next; ++saves; return true;
 }
 bool RADIO_APP_ApplyRxSettings(void) { ++reapplications; return applyWorks; }
-ReceiverCapabilities RADIO_GetReceiverCapabilities(void) { return capabilities; }
+ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
 TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) { (void)frequency_hz; return (TxCapabilities){0}; }
 TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
 uint32_t EEPROM_DetectSize(void) { return 524288; }

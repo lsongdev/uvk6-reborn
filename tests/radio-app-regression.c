@@ -3,10 +3,7 @@
 #include "../src/apps/radio.c"
 #include <assert.h>
 
-RadioState state;
-RadioState *gRadioState = &state;
-RadioState *vfo = &state;
-RadioReceiver *ctx = &state.context;
+Receiver gReceiver;
 bool gRedrawScreen;
 static char statusText[32];
 void STATUSLINE_SetText(const char *pattern, ...) {
@@ -30,14 +27,11 @@ void PrintSmallEx(uint8_t x, uint8_t y, TextPos pos, Color c, const char *patter
 void PrintMediumEx(uint8_t x, uint8_t y, TextPos pos, Color c, const char *pattern, ...) {
   (void)x; (void)y; (void)pos; (void)c; (void)pattern;
 }
-bool gMonitorMode;
 static ReceiverCapabilities capabilities = {true, false, true};
-static RadioParameters savedParameters;
 static unsigned applied, applyAttempts;
 static unsigned routed;
 static unsigned appRuns;
 static bool failApply;
-Settings gSettings;
 static bool txFakeVerified, txFakePrepareOK, txFakeEnableOK;
 static bool txFakePttPressed=true, txFakeVoltageValid=true;
 static unsigned txFakePrepares, txFakeEnables, txFakeDisables;
@@ -96,7 +90,7 @@ RxSeekResult RX_DEVICE_SeekPoll(RxDevice dev, uint32_t *found) {
 }
 void RX_DEVICE_SeekCancel(RxDevice dev) { (void)dev; ++nativeCancels; }
 bool RX_DEVICE_SeekSignal(RxDevice dev, bool *found) {
-  (void)dev; *found = ctx->frequency*10u == soughtFrequency; return true;
+  (void)dev; *found = gReceiver.plan.frequency_hz == soughtFrequency; return true;
 }
 void UI_RadioCardShowFrequency(UI_RadioCardState *state, uint32_t now) { state->tuned_at = now; }
 bool UI_RadioCardUpdate(UI_RadioCardState *state, uint32_t now) { (void)state; (void)now; return false; }
@@ -123,19 +117,13 @@ void DEVICE_RequestSave(void) { ++saveRequests; }
 static uint32_t failFrequency;
 
 uint32_t Now(void) { return clockNow; }
-ReceiverCapabilities RADIO_GetReceiverCapabilities(void) { return capabilities; }
-RadioParameters RADIO_ReadParameters(const RadioReceiver *context) {
-  (void)context;
-  return savedParameters;
-}
-bool RADIO_ApplyRxPlan(RadioReceiver *context, const RxPlan *plan) {
+ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
+bool RECEIVER_Apply(const RxPlan *plan) {
   ++applyAttempts;
   if (failApply || (failFrequency && plan->frequency_hz == failFrequency))
     return false;
   ++applied;
-  context->frequency = plan->frequency_hz/10;
-  context->radio_type = plan->device == RX_DEVICE_BK ? RADIO_BK4819
-                      : plan->device == RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
+  gReceiver.plan = *plan;
   return true;
 }
 static unsigned concurrentPrepares, audioSelects, chipStops;
@@ -144,24 +132,22 @@ bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan) {
   return !failApply && (!failFrequency || plan->frequency_hz!=failFrequency);
 }
 void RX_DEVICE_StopChip(RxDevice device) { (void)device;++chipStops; }
-bool RADIO_SelectPreparedRxPlan(const RxPlan *plan, uint8_t devices, bool open) {
+bool RECEIVER_Select(const RxPlan *plan, uint8_t devices, bool open) {
   assert(devices & (1u<<plan->device));++audioSelects;
-  ctx->frequency=plan->frequency_hz/10;
-  ctx->radio_type=plan->device==RX_DEVICE_BK ? RADIO_BK4819 :
-                  plan->device==RX_DEVICE_SI ? RADIO_SI4732 : RADIO_BK1080;
-  vfo->is_open=vfo->msm.open=open;
+  gReceiver.plan=*plan;
+  gReceiver.open=open;
   return true;
 }
-void RADIO_Measure(RadioState *state) { (void)state; }
+bool RECEIVER_Measure(void) { return gReceiver.open; }
 static uint32_t watchSignalFrequency;
 static bool watchSignalOK=true;
 static uint32_t watchSecondSignalFrequency;
 bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found) {
   *found=plan->frequency_hz==watchSignalFrequency || plan->frequency_hz==watchSecondSignalFrequency; return watchSignalOK;
 }
-void RADIO_SetAudioOpen(bool open) { (void)open; }
-void RADIO_StopReception(void) {
-  vfo->is_open = false;
+void RECEIVER_SetOpen(bool open) { gReceiver.open = open; }
+void RECEIVER_Mute(void) {
+  gReceiver.open = false;
   ++routed;
 }
 void APPS_run(AppType_t app) { (void)app; ++appRuns; }
@@ -226,16 +212,14 @@ static void setup(uint32_t frequency, RadioParameters values) {
   gDeviceConfig.radio.slots[0].tx = (TxConfig){0};
   gDeviceConfig.preferences.tx_timeout_seconds = 120;
   gDeviceConfig.preferences.tx_busy_lockout = 0;
-  gMonitorMode = false;
   gDeviceConfig.preferences.ptt_lock = false;
   gDeviceConfig.preferences.keylock = false;
   txFakeVerified = false;
   txFakePrepareOK = txFakeEnableOK = true;
   txFakePrepares = txFakeEnables = txFakeDisables = 0;
-  vfo->is_open = false;
+  gReceiver.open = false;
   assert(RADIO_STATE_Set(&gDeviceConfig.radio, 0, frequency, values));
-  *ctx = (RadioReceiver){.frequency = frequency/10};
-  savedParameters = values;
+  gReceiver = (Receiver){.plan = {.device = RX_DEVICE_BK, .frequency_hz = frequency}};
   applied = routed = appRuns = saveRequests = applyAttempts = 0;
   failApply = false;
   failFrequency = 0;
@@ -290,7 +274,7 @@ int main(void) {
 
   setup(100000000, (RadioParameters){RX_WFM,100000,0,0});
   press(KEY_F);press(KEY_0);
-  assert(!confirming && activeSlot.current.parameters.mode == RX_AM && ctx->radio_type == RADIO_BK4819);
+  assert(!confirming && activeSlot.current.parameters.mode == RX_AM && gReceiver.plan.device == RX_DEVICE_BK);
   assert(activeSlot.current.frequency_hz == 100000000);
 
   setup(7100000, (RadioParameters){RX_AM,5000,6000,0});
@@ -334,9 +318,8 @@ int main(void) {
   assert(!strcmp(message, "Channel is read only") && !number.active && !functionPending);
 
   setup(438500000, fm);
-  gMonitorMode = true;
   press(KEY_F);press(KEY_EXIT);
-  assert(!functionPending && gMonitorMode && applied == 1);
+  assert(!functionPending && applied == 1);
   press(KEY_F);press(KEY_F);
   assert(!functionPending && applied == 1);
   press(KEY_F);press(KEY_3);
@@ -380,9 +363,9 @@ int main(void) {
 
   // The same 100 MHz carrier must use BK for NFM and SI for WFM.
   setup(100000000, (RadioParameters){RX_NFM, 12500, 12000, 0});
-  assert(runtime.active && ctx->radio_type == RADIO_BK4819);
+  assert(runtime.active && gReceiver.plan.device == RX_DEVICE_BK);
   setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0});
-  assert(runtime.active && ctx->radio_type == RADIO_SI4732);
+  assert(runtime.active && gReceiver.plan.device == RX_DEVICE_SI);
   RADIO_APP_update();assert(!rdsReads);
   clockNow=400;RADIO_APP_update();assert(rdsClears==1);
   rdsAvailable=true;
@@ -431,14 +414,14 @@ int main(void) {
   assert(activeSlot.current.frequency_hz == 438500000 && runtime.active);
   tuneTo(95925000);
   press(KEY_MENU);
-  assert(activeSlot.current.frequency_hz == 95930000 && activeSlot.current.parameters.mode == RX_WFM && ctx->radio_type == RADIO_SI4732);
+  assert(activeSlot.current.frequency_hz == 95930000 && activeSlot.current.parameters.mode == RX_WFM && gReceiver.plan.device == RX_DEVICE_SI);
   press(KEY_SIDE2);
   assert(!confirming && activeSlot.current.parameters.mode == RX_AM);
-  assert(activeSlot.current.frequency_hz == 95930000 && ctx->radio_type == RADIO_BK4819);
+  assert(activeSlot.current.frequency_hz == 95930000 && gReceiver.plan.device == RX_DEVICE_BK);
   assert(activeSlot.current.parameters.bandwidth_hz == 6000);
   press(KEY_SIDE2);
   assert(!confirming && activeSlot.current.parameters.mode == RX_NFM);
-  assert(activeSlot.current.frequency_hz == 95930000 && ctx->radio_type == RADIO_BK4819);
+  assert(activeSlot.current.frequency_hz == 95930000 && gReceiver.plan.device == RX_DEVICE_BK);
 
   // WFM to NFM also applies immediately when SSB modes are unavailable.
   setup(100000000, (RadioParameters){RX_WFM, 100000, 0, 0});
@@ -447,18 +430,18 @@ int main(void) {
   assert(!confirming && activeSlot.current.parameters.mode == RX_AM);
   press(KEY_SIDE2);
   assert(!confirming && activeSlot.current.parameters.mode == RX_NFM);
-  assert(activeSlot.current.frequency_hz == 100000000 && ctx->radio_type == RADIO_BK4819);
+  assert(activeSlot.current.frequency_hz == 100000000 && gReceiver.plan.device == RX_DEVICE_BK);
 
   setup(147987500, fm);
   press(KEY_UP);
   assert(activeSlot.current.frequency_hz == 148000000 && activeSlot.active_band == 7 && activeSlot.current.parameters.step_hz == 25000);
-  assert(ctx->radio_type == RADIO_BK4819);
+  assert(gReceiver.plan.device == RX_DEVICE_BK);
 
   setup(438500000, fm);
   capabilities = (ReceiverCapabilities){false, false, false};
   press(KEY_SIDE1);
   assert(!runtime.active && activeSlot.current.frequency_hz == 225000 && routed == 1);
-  assert(ctx->frequency == 43850000); // Unsupported target was not committed.
+  assert(gReceiver.plan.frequency_hz==438500000u); // Unsupported target was not committed.
   press(KEY_UP);
   assert(activeSlot.current.frequency_hz == 226000 && !runtime.active);
   press(KEY_SIDE1); // MW has no receiver.
@@ -496,7 +479,7 @@ int main(void) {
   failApply = true;
   press(KEY_UP);
   assert(activeSlot.current.frequency_hz == 438500000 && activeSlot.current.parameters.mode == RX_NFM && applied == 2);
-  assert(!runtime.active && !vfo->is_open && routed == 1);
+  assert(!runtime.active && !gReceiver.open && routed == 1);
 
   // F,* starts forward-only BK software seek. Intermediate tunes are not
   // persisted, and a stable carrier commits exactly once.
@@ -507,7 +490,7 @@ int main(void) {
   assert(seek.active && !seekNative && !functionPending);
   assert(activeSlot.current.frequency_hz == 438500000);
   RADIO_APP_update();
-  assert(seek.active && ctx->frequency == 43851250 &&
+  assert(seek.active && gReceiver.plan.frequency_hz==438512500u &&
          saveRequests == savedBeforeSeek);
   clockNow += 185;
   RADIO_APP_update(); // First squelch sample.
@@ -525,7 +508,7 @@ int main(void) {
   press(KEY_EXIT);
   assert(!seek.active && runtime.active &&
          activeSlot.current.frequency_hz == 438500000 &&
-         ctx->frequency == 43850000 && saveRequests == savedBeforeSeek);
+         gReceiver.plan.frequency_hz==438500000u && saveRequests == savedBeforeSeek);
   assert(RADIO_APP_key(KEY_UP, KEY_PRESSED) == false); // Manual tuning unchanged.
 
   // Hardware seek must not overwrite RadioUserState until the final tune.
@@ -548,14 +531,14 @@ int main(void) {
   RADIO_APP_update();
   clockNow += 100;RADIO_APP_update();
   clockNow += 100;RADIO_APP_update();
-  assert(seek.active && seek.wrapped && ctx->frequency == 6400000);
+  assert(seek.active && seek.wrapped && gReceiver.plan.frequency_hz==64000000u);
   assert(saveRequests == savedBeforeSeek);
   clockNow += 190;RADIO_APP_update(); // Check the band start once.
   clockNow += 10;RADIO_APP_update(); // Continue native seek from the band start.
   clockNow += 100;RADIO_APP_update();
   clockNow += 100;RADIO_APP_update();
   assert(!seek.active && activeSlot.current.frequency_hz == 100000000);
-  assert(ctx->frequency == 10000000 && saveRequests == savedBeforeSeek);
+  assert(gReceiver.plan.frequency_hz==100000000u && saveRequests == savedBeforeSeek);
 
   // The single VFO owns TX intent, never a per-band transmit flag.
   setup(438500000, fm);
@@ -597,9 +580,8 @@ int main(void) {
   gDeviceConfig.radio.slots[0].tx.enabled = activeSlot.tx.enabled = true;
   gDeviceConfig.preferences.tx_busy_lockout = 1;
   txFakeVerified = true;
-  vfo->is_open = false; // A stale/cleared audio flag cannot bypass lockout.
+  gReceiver.open = false; // A stale/cleared audio flag cannot bypass lockout.
   watchSignalFrequency = 438500000;
-  gMonitorMode = true;
   assert(RADIO_APP_key(KEY_PTT, KEY_PRESSED));
   assert(pttPending && !txFakePrepares);
   clockNow += 180;
@@ -667,7 +649,6 @@ int main(void) {
   assert(menuIndex==MENU_RX_TONE);
   press(KEY_MENU);
   assert(activeSlot.current.parameters.rx_tone==1 && runtime.current.parameters.rx_tone==1);
-  assert(!gMonitorMode);
   press(KEY_F);assert(activeSlot.current.parameters.rx_tone==0);
   for(unsigned i=MENU_RX_TONE;i<MENU_TX_FREQUENCY;++i) press(KEY_DOWN);
   assert(menuIndex==MENU_TX_FREQUENCY);
@@ -709,7 +690,7 @@ int main(void) {
   assert(activeSlot.current.frequency_hz==438512500 && gDeviceConfig.radio.slots[0].current.frequency_hz==145500000);
   press(KEY_MENU);menuIndex=MENU_TX_TONE;press(KEY_MENU);press(KEY_EXIT);
   assert(gDeviceConfig.radio.slots[1].tx.tone==1 && !gDeviceConfig.radio.slots[0].tx.tone);
-  vfo->is_open=true;
+  gReceiver.open=true;
   RADIO_APP_render();assert(drawn[1].selected && drawn[1].activity==UI_RADIO_CARD_RECEIVING);
   assert(!drawn[0].signal_valid && drawn[0].activity==UI_RADIO_CARD_IDLE);
   press(KEY_F);press(KEY_2);
@@ -732,7 +713,7 @@ int main(void) {
   failFrequency=438500000;press(KEY_F);press(KEY_2);
   assert(selectedSlot==0 && receivingSlot==0 && runtime.active);
   assert(gDeviceConfig.radio.selected_slot==0 && saveRequests==oldSaves);
-  assert(!strcmp(message,"Tune failed") && ctx->frequency==14550000);
+  assert(!strcmp(message,"Tune failed") && gReceiver.plan.frequency_hz==145500000u);
   RADIO_APP_render();assert(!strcmp(statusText,"RADIO"));
   assert(!strcmp(drawn[0].header_message,"Tune failed") && !drawn[1].header_message);
   // Both applies fail: ownership is cleared and no row claims reception.
@@ -819,11 +800,11 @@ int main(void) {
   watchSecondSignalFrequency=438500000;
   unsigned broadcastSaves=saveRequests;
   for(unsigned i=0;i<15;++i) { RADIO_APP_update();clockNow+=50; }
-  assert(watcher.parallel && watcher.phase==WATCH_HOLD && receivingSlot==0 && vfo->is_open);
+  assert(watcher.parallel && watcher.phase==WATCH_HOLD && receivingSlot==0 && gReceiver.open);
   assert(concurrentPrepares==1); // SI already tuned; only BK needs preparation.
   unsigned broadcastApplies=applied, broadcastSelects=audioSelects;
   for(unsigned i=0;i<5;++i) { clockNow+=3000;RADIO_APP_update(); }
-  assert(receivingSlot==0 && vfo->is_open && applied==broadcastApplies);
+  assert(receivingSlot==0 && gReceiver.open && applied==broadcastApplies);
   assert(audioSelects==broadcastSelects && concurrentPrepares==1);
   assert(selectedSlot==0 && saveRequests==broadcastSaves);
   // Select B: idle B permits A playback; B's signal then takes audio only.
@@ -831,16 +812,16 @@ int main(void) {
   press(KEY_F);press(KEY_2);assert(selectedSlot==1 && chipStops==2);
   clockNow+=2000;
   for(unsigned i=0;i<15;++i) { RADIO_APP_update();clockNow+=50; }
-  assert(watcher.phase==WATCH_HOLD && receivingSlot==0 && vfo->is_open);
+  assert(watcher.phase==WATCH_HOLD && receivingSlot==0 && gReceiver.open);
   unsigned parallelApplies=applied, parallelPrepares=concurrentPrepares;
   watchSecondSignalFrequency=438500000;
   for(unsigned i=0;i<4;++i) { RADIO_APP_update();clockNow+=50; }
-  assert(receivingSlot==1 && vfo->is_open && selectedSlot==1);
+  assert(receivingSlot==1 && gReceiver.open && selectedSlot==1);
   assert(applied==parallelApplies && concurrentPrepares==parallelPrepares);
-  clockNow+=10000;RADIO_APP_update();assert(receivingSlot==1 && vfo->is_open);
+  clockNow+=10000;RADIO_APP_update();assert(receivingSlot==1 && gReceiver.open);
   // End of B signal: a silent one-second gap, then resume A without retuning.
-  watchSecondSignalFrequency=0;clockNow+=50;RADIO_APP_update();assert(!vfo->is_open);
-  clockNow+=WATCH_HANG_MS;RADIO_APP_update();assert(receivingSlot==0 && vfo->is_open);
+  watchSecondSignalFrequency=0;clockNow+=50;RADIO_APP_update();assert(!gReceiver.open);
+  clockNow+=WATCH_HANG_MS;RADIO_APP_update();assert(receivingSlot==0 && gReceiver.open);
   assert(applied==parallelApplies && concurrentPrepares==parallelPrepares);
 
   // RDS remains live on SI while selected BK owns the speaker.
@@ -851,7 +832,7 @@ int main(void) {
   watchSecondSignalFrequency=100000000;rdsAvailable=true;
   unsigned parallelSaves=saveRequests;
   for(unsigned i=0;i<40;++i) { RADIO_APP_update();clockNow+=50; }
-  assert(receivingSlot==0 && vfo->is_open && labels[1].ps[0] && !labels[0].ps[0]);
+  assert(receivingSlot==0 && gReceiver.open && labels[1].ps[0] && !labels[0].ps[0]);
   assert(rdsReads && rdsClears);
   assert(saveRequests==parallelSaves && concurrentPrepares==1);
   // PTT stops both background receivers and restores the selected RX plan.
@@ -868,7 +849,7 @@ int main(void) {
   RADIO_APP_update();assert(receivingSlot==1 && selectedSlot==0);
   clockNow+=180;RADIO_APP_update();assert(watcher.phase==WATCH_VERIFY);
   clockNow+=80;RADIO_APP_update();assert(watcher.phase==WATCH_HOLD && RADIO_APP_isReceiving());
-  assert(vfo->is_open);RADIO_APP_render();assert(drawn[1].activity==UI_RADIO_CARD_RECEIVING && !drawn[1].selected);
+  assert(gReceiver.open);RADIO_APP_render();assert(drawn[1].activity==UI_RADIO_CARD_RECEIVING && !drawn[1].selected);
   assert(drawn[0].selected && !drawn[0].signal_valid);
   assert(saveRequests==watchSaves && activeSlot.current.frequency_hz==145500000);
   assert(gDeviceConfig.radio.slots[1].current.frequency_hz==438500000 && !gDeviceConfig.radio.selected_slot);
@@ -1026,11 +1007,11 @@ int main(void) {
   captureHz+=3000;clockNow+=20;RADIO_APP_update();
   assert(capturePhase==FC_PREVIEW && RADIO_APP_isReceiving());
   assert(runtime.current.frequency_hz==438500000 && activeSlot.current.frequency_hz==438500000);
-  assert(saveRequests==fcSaves && ctx->frequency*10u==captureHz);
+  assert(saveRequests==fcSaves && gReceiver.plan.frequency_hz==captureHz);
   RADIO_APP_render();assert(drawn[0].frequency_hz==captureHz && drawn[0].mode==RX_NFM);
   assert(!drawn[0].name && !drawn[0].rds);
   assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED));press(KEY_PTT);assert(!txFakePrepares);
-  press(KEY_EXIT);assert(capturePhase==FC_OFF && ctx->frequency*10u==438500000);
+  press(KEY_EXIT);assert(capturePhase==FC_OFF && gReceiver.plan.frequency_hz==438500000);
   assert(saveRequests==fcSaves && !memcmp(&fcOrigin,&gDeviceConfig.radio.slots[0],sizeof(fcOrigin)));
   // Preview adoption affects only the bound VFO and requests one save.
   press(KEY_F);press(KEY_4);press(KEY_SIDE1);press(KEY_SIDE1); // UHF
@@ -1046,7 +1027,7 @@ int main(void) {
   // Timeout, application exit and same-frequency preview restore without writes.
   setup(145500000,fm);fcSaves=saveRequests;
   press(KEY_F);press(KEY_4);clockNow+=15000;RADIO_APP_update();
-  assert(capturePhase==FC_OFF && saveRequests==fcSaves && ctx->frequency*10u==145500000);
+  assert(capturePhase==FC_OFF && saveRequests==fcSaves && gReceiver.plan.frequency_hz==145500000);
   RADIO_APP_render();assert(!strcmp(drawn[0].header_message,"FC timeout") && !drawn[1].header_message);
   assert(drawn[0].frequency_hz==145500000);
   press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145500000;
@@ -1063,10 +1044,10 @@ int main(void) {
     fcOrigin=gDeviceConfig.radio.slots[0];fcSaves=saveRequests;
     press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145500000;
     clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();
-    assert(capturePhase==FC_PREVIEW && ctx->radio_type==RADIO_BK4819);
+    assert(capturePhase==FC_PREVIEW && gReceiver.plan.device == RX_DEVICE_BK);
     unsigned reads=rdsReads;clockNow+=100;RADIO_APP_update();assert(rdsReads==reads);
     press(KEY_EXIT);
-    assert(ctx->radio_type==(chip ? RADIO_BK1080 : RADIO_SI4732) && ctx->frequency*10u==95900000);
+    assert(gReceiver.plan.device==(chip ? RX_DEVICE_BROADCAST : RX_DEVICE_SI) && gReceiver.plan.frequency_hz==95900000);
     assert(saveRequests==fcSaves && !memcmp(&fcOrigin,&gDeviceConfig.radio.slots[0],sizeof(fcOrigin)));
   }
   // Unsupported candidate cannot preview; failed preview and failed restore mute.
