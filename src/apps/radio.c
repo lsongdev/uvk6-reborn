@@ -102,6 +102,24 @@ static void channelSaved(uint8_t id, uint16_t number,
   DEVICE_RequestSave();
 }
 
+static const char *unavailable(RxResult result) {
+  return result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable";
+}
+
+// The selected slot is now the one being heard.
+static void tuned(void) {
+  receivingSlot = selectedSlot;
+  message = NULL;
+  showFrequency();
+  gRedrawScreen = true;
+}
+
+// RDS text from the previous frequency must not follow a retune.
+static void resetLabel(uint32_t frequency_hz) {
+  memset(&labels[selectedSlot], 0, sizeof(labels[selectedSlot]));
+  labels[selectedSlot].frequency_hz = frequency_hz;
+}
+
 bool applyReceiver(void *unused, const RxPlan *plan) {
   (void)unused;
   resetRds();
@@ -142,12 +160,9 @@ bool apply(const RxPlan *plan) {
     activeSlot.watch = gDeviceConfig.radio.slots[selectedSlot].watch;
     gDeviceConfig.radio.slots[selectedSlot] = activeSlot;
   }
-  receivingSlot = selectedSlot;
-  memset(&labels[selectedSlot], 0, sizeof(labels[selectedSlot]));
-  labels[selectedSlot].frequency_hz = plan->frequency_hz;
+  resetLabel(plan->frequency_hz);
+  tuned();
   DEVICE_RequestSave();
-  message = NULL;
-  showFrequency();
   return true;
 }
 
@@ -165,7 +180,7 @@ void request(uint32_t target, RadioParameters values) {
     activeSlot.current.parameters = values;
     activeSlot.active_band = RADIO_MODEL_BandAt(target);
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
-    notify(result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
+    notify(unavailable(result));
     return;
   }
   if (RADIO_MODEL_BandAt(plan.frequency_hz) != RADIO_MODEL_BandAt(target)) {
@@ -296,6 +311,18 @@ static bool tuneDirect(const RxPlan *plan) {
   return true;
 }
 
+// Saved sources (MR, slot switch, VFO return) must tune exactly.
+static bool tuneExact(uint32_t frequency_hz, RadioParameters parameters) {
+  RxPlan plan;
+  RxResult result = TUNING_ExactPlan(frequency_hz, parameters,
+                                     RECEIVER_Capabilities(), &plan);
+  if (result != RX_OK) {
+    notify(unavailable(result));
+    return false;
+  }
+  return tuneDirect(&plan);
+}
+
 // Reapply only the active receive plan. Global settings never rewrite VFOs
 // or presets, and the receive runtime remains responsible for recovery.
 bool RADIO_APP_ApplyRxSettings(void) {
@@ -316,14 +343,7 @@ static void tuneChannel(uint16_t number, bool enterMode) {
     notify("Channel unavailable");
     return;
   }
-  RxPlan plan;
-  RxResult result = TUNING_ExactPlan(channel.frequency_hz, channel.rx,
-      RECEIVER_Capabilities(), &plan);
-  if (result != RX_OK) {
-    notify(result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
-    return;
-  }
-  if (!tuneDirect(&plan)) return;
+  if (!tuneExact(channel.frequency_hz, channel.rx)) return;
   channelCache[selectedSlot] = channel;
   channelCacheValid[selectedSlot] = true;
   channelCacheNumber[selectedSlot] = (uint8_t)number;
@@ -337,14 +357,10 @@ static void tuneChannel(uint16_t number, bool enterMode) {
   activeSlot.active_band = RADIO_MODEL_BandAt(channel.frequency_hz);
   activeSlot.current = (BandState){channel.frequency_hz, channel.rx};
   activeSlot.tx = channel.tx;
-  receivingSlot = selectedSlot;
-  memset(&labels[selectedSlot], 0, sizeof(labels[selectedSlot]));
-  labels[selectedSlot].frequency_hz = channel.frequency_hz;
-  message = NULL;
-  showFrequency();
+  resetLabel(channel.frequency_hz);
+  tuned();
   if (enterMode || selectionChanged) DEVICE_RequestSave();
   CHANNEL_MANAGER_LoadName(selectedSlot, number);
-  gRedrawScreen = true;
 }
 
 static void nextChannel(bool up) {
@@ -360,21 +376,11 @@ static void nextChannel(bool up) {
 static void switchSource(void) {
   RadioSlot *stored = &gDeviceConfig.radio.slots[selectedSlot];
   if (stored->source == RADIO_SOURCE_CHANNEL) {
-    RxPlan plan;
-    RxResult result = TUNING_ExactPlan(stored->current.frequency_hz,
-        stored->current.parameters, RECEIVER_Capabilities(), &plan);
-    if (result != RX_OK) {
-      notify(result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
-      return;
-    }
-    if (!tuneDirect(&plan)) return;
+    if (!tuneExact(stored->current.frequency_hz, stored->current.parameters)) return;
     stored->source = RADIO_SOURCE_VFO;
     activeSlot = *stored;
-    receivingSlot = selectedSlot;
+    tuned();
     DEVICE_RequestSave();
-    message = NULL;
-    showFrequency();
-    gRedrawScreen = true;
     return;
   }
   uint16_t number = stored->channel_number;
@@ -397,23 +403,13 @@ static void switchSlot(void) {
     notify("Channel unavailable");
     return;
   }
-  RxPlan plan;
-  RxResult planned = TUNING_ExactPlan(next.current.frequency_hz,
-      next.current.parameters, RECEIVER_Capabilities(), &plan);
-  if (planned != RX_OK) {
-    notify(planned == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable");
-    return;
-  }
-  if (!tuneDirect(&plan)) return;
+  if (!tuneExact(next.current.frequency_hz, next.current.parameters)) return;
   selectedSlot = target;
-  receivingSlot = target;
   activeSlot = next;
+  tuned();
   CHANNEL_MANAGER_LoadName(selectedSlot, activeSlot.channel_number);
   gDeviceConfig.radio.selected_slot = target;
   DEVICE_RequestSave();
-  message = NULL;
-  showFrequency();
-  gRedrawScreen = true;
 }
 
 // F-prefix and side-key shortcuts must enforce the same VFO-only rule.
