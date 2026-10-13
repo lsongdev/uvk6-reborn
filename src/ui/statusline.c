@@ -116,7 +116,7 @@ void STATUSLINE_render(void) {
   }
 
   uint8_t iconsRight = batteryWidth + 4 < LCD_WIDTH ? LCD_WIDTH - 1 - batteryWidth - 3 : 0;
-  if (gCurrentApp == APP_VFO && RADIO_APP_isShortcutPending()) {
+  if (gCurrentApp == APP_RADIO && RADIO_APP_isShortcutPending()) {
     PrintSmallEx(iconsRight, BASE_Y, POS_R, C_FILL, "F");
     iconsRight -= 8;
   }
@@ -135,7 +135,7 @@ void STATUSLINE_render(void) {
 
 // Current receiver settings come from the Hz-based radio user state.
 void STATUSLINE_RenderRadioSettings(void) {
-  const RadioParameters *p = &gDeviceConfig.radio.vfos[gDeviceConfig.radio.selected_vfo].current.parameters;
+  const RadioParameters *p = &gDeviceConfig.radio.slots[gDeviceConfig.radio.selected_slot].current.parameters;
   STATUSLINE_SetText("%s %u Hz SQ%u",
                      rxModeNames[p->mode], (unsigned)p->bandwidth_hz,
                      (unsigned)p->squelch);
