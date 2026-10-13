@@ -5,17 +5,17 @@ static bool parametersValid(const RadioParameters *p) {
          p->bandwidth_hz <= UINT16_MAX && p->squelch <= 10 &&
          TONE_Valid(p->rx_tone) && (!p->rx_tone || p->mode == RX_NFM);
 }
-bool RADIO_SLOT_Valid(const RadioSlot *vfo) {
-  if (!vfo || vfo->active_band >= radioBandCount ||
-      RADIO_MODEL_BandAt(vfo->current.frequency_hz) != vfo->active_band ||
-      !parametersValid(&vfo->current.parameters) ||
-      (unsigned)vfo->source > RADIO_SOURCE_CHANNEL ||
-      vfo->channel_number > 128 ||
-      (vfo->source == RADIO_SOURCE_CHANNEL && !vfo->channel_number) ||
-      (unsigned)vfo->tx.power > TX_POWER_HIGH || !TONE_Valid(vfo->tx.tone) ||
-      !TX_MODEL_FrequencyValid(vfo->tx.frequency_hz)) return false;
+bool RADIO_SLOT_Valid(const RadioSlot *slot) {
+  if (!slot || slot->active_band >= radioBandCount ||
+      RADIO_MODEL_BandAt(slot->current.frequency_hz) != slot->active_band ||
+      !parametersValid(&slot->current.parameters) ||
+      (unsigned)slot->source > RADIO_SOURCE_CHANNEL ||
+      slot->channel_number > 128 ||
+      (slot->source == RADIO_SOURCE_CHANNEL && !slot->channel_number) ||
+      (unsigned)slot->tx.power > TX_POWER_HIGH || !TONE_Valid(slot->tx.tone) ||
+      !TX_MODEL_FrequencyValid(slot->tx.frequency_hz)) return false;
   for (uint8_t i = 0; i < radioBandCount; ++i) {
-    const BandState *band = &vfo->bands[i];
+    const BandState *band = &slot->bands[i];
     if (band->frequency_hz < radioBands[i].start_hz ||
         band->frequency_hz >= radioBands[i].end_hz ||
         !parametersValid(&band->parameters)) return false;
@@ -39,12 +39,12 @@ bool RADIO_STATE_Valid(const RadioUserState *state) {
 }
 void RADIO_STATE_InitSlot(RadioUserState *state, uint8_t id, uint8_t band) {
   if (!state || id >= RADIO_SLOT_CAPACITY || band >= radioBandCount) return;
-  RadioSlot *vfo = &state->slots[id];
-  *vfo = (RadioSlot){0};
+  RadioSlot *slot = &state->slots[id];
+  *slot = (RadioSlot){0};
   for (uint8_t i = 0; i < radioBandCount; ++i)
-    vfo->bands[i] = (BandState){radioBands[i].initial_hz, state->presets[i]};
-  vfo->active_band = band;
-  vfo->current = vfo->bands[band];
+    slot->bands[i] = (BandState){radioBands[i].initial_hz, state->presets[i]};
+  slot->active_band = band;
+  slot->current = slot->bands[band];
 }
 bool RADIO_STATE_Default(RadioUserState *state) {
   if (!state || radioBandCount != RADIO_STATE_BANDS) return false;
@@ -58,12 +58,12 @@ bool RADIO_STATE_Default(RadioUserState *state) {
   }
   return RADIO_STATE_Valid(state);
 }
-bool RADIO_SLOT_SetVfo(RadioSlot *vfo, uint32_t hz, RadioParameters p) {
+bool RADIO_SLOT_SetVfo(RadioSlot *slot, uint32_t hz, RadioParameters p) {
   uint8_t band = RADIO_MODEL_BandAt(hz);
-  if (!vfo || band == UINT8_MAX || !parametersValid(&p)) return false;
-  vfo->active_band = band;
-  vfo->current = (BandState){hz, p};
-  vfo->bands[band] = vfo->current;
+  if (!slot || band == UINT8_MAX || !parametersValid(&p)) return false;
+  slot->active_band = band;
+  slot->current = (BandState){hz, p};
+  slot->bands[band] = slot->current;
   return true;
 }
 bool RADIO_STATE_Set(RadioUserState *state, uint8_t id, uint32_t hz,
@@ -74,8 +74,8 @@ bool RADIO_STATE_Set(RadioUserState *state, uint8_t id, uint32_t hz,
 bool RADIO_STATE_SelectBand(RadioUserState *state, uint8_t id, uint8_t band) {
   if (!RADIO_STATE_Valid(state) || id >= state->slot_count || band >= radioBandCount)
     return false;
-  RadioSlot *vfo = &state->slots[id];
-  return RADIO_SLOT_SetVfo(vfo, vfo->bands[band].frequency_hz, state->presets[band]);
+  RadioSlot *slot = &state->slots[id];
+  return RADIO_SLOT_SetVfo(slot, slot->bands[band].frequency_hz, state->presets[band]);
 }
 
 bool RADIO_STATE_SetCount(RadioUserState *state, uint8_t count) {

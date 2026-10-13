@@ -3,7 +3,7 @@
 Experimental fork of [Hawk5](https://github.com/fagci/hawk5) for the
 DP32G030-based Quansheng UV-K6, including radios modified with SI4732.
 
-The refactored receiver supports up to four VFO slots (two visible at once),
+The Radio main screen supports up to four independent A/B/C/D slots (two visible at once). Each slot can tune directly (VFO) or use a saved channel (MR), without discarding its VFO memories. The receiver supports
 NFM/WFM/AM/SSB modes, band presets, dual watch, user channels, UVR2
 persistence and receiver selection. **Production builds disable TX at compile
 time.** The experimental PA path is tested with `UVK6_ENABLE_TX=1` in host

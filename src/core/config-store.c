@@ -98,18 +98,18 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
   *p++ = config->radio.selected_slot;
   *p++ = config->radio.watch_enabled;
   for (uint8_t id=0; id<RADIO_SLOT_CAPACITY; ++id) {
-    const RadioSlot *vfo = &config->radio.slots[id];
-    *p++ = vfo->active_band;
-    *p++ = vfo->watch;
-    p = encodeBand6(p, &vfo->current);
+    const RadioSlot *slot = &config->radio.slots[id];
+    *p++ = slot->active_band;
+    *p++ = slot->watch;
+    p = encodeBand6(p, &slot->current);
     for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
-      p = encodeBand6(p, &vfo->bands[i]);
-    *p++ = vfo->tx.enabled;
-    *p++ = vfo->tx.power;
-    put32(p, vfo->tx.frequency_hz); p+=4;
-    put16(p, vfo->tx.tone); p+=2;
-    *p++ = (uint8_t)vfo->source;
-    *p++ = vfo->channel_number;
+      p = encodeBand6(p, &slot->bands[i]);
+    *p++ = slot->tx.enabled;
+    *p++ = slot->tx.power;
+    put32(p, slot->tx.frequency_hz); p+=4;
+    put16(p, slot->tx.tone); p+=2;
+    *p++ = (uint8_t)slot->source;
+    *p++ = slot->channel_number;
   }
   for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
     const RadioParameters *preset = &config->radio.presets[i];
@@ -169,23 +169,23 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
       candidate.radio.watch_enabled = *p++;
     }
     for (uint8_t id=0; id<records; ++id) {
-      RadioSlot *vfo = &candidate.radio.slots[id];
-      vfo->active_band = *p++;
+      RadioSlot *slot = &candidate.radio.slots[id];
+      slot->active_band = *p++;
       if (fourVfos) {
         if (*p>1) return false;
-        vfo->watch = *p++;
+        slot->watch = *p++;
       }
-      p = decodeBand6(p, &vfo->current);
+      p = decodeBand6(p, &slot->current);
       for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
-        p = decodeBand6(p, &vfo->bands[i]);
+        p = decodeBand6(p, &slot->bands[i]);
       if (p[0] > 1 || p[1] > TX_POWER_HIGH) return false;
-      vfo->tx.enabled = *p++;
-      vfo->tx.power = *p++;
-      vfo->tx.frequency_hz = get32(p); p+=4;
-      vfo->tx.tone = get16(p); p+=2;
+      slot->tx.enabled = *p++;
+      slot->tx.power = *p++;
+      slot->tx.frequency_hz = get32(p); p+=4;
+      slot->tx.tone = get16(p); p+=2;
       if (channelSources) {
-        vfo->source = (RadioSource)*p++;
-        vfo->channel_number = *p++;
+        slot->source = (RadioSource)*p++;
+        slot->channel_number = *p++;
       }
     }
     for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
@@ -203,11 +203,11 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
         RADIO_STATE_InitSlot(&candidate.radio, id, id%2 ? 6 : 5);
   } else {
     // Legacy format 4/5 stores one VFO. Keep its exact byte offsets.
-    RadioSlot *vfo = &candidate.radio.slots[0];
-    vfo->active_band = *p++;
-    p = decodeBand(p, &vfo->current);
+    RadioSlot *slot = &candidate.radio.slots[0];
+    slot->active_band = *p++;
+    p = decodeBand(p, &slot->current);
     for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i)
-      p = decodeBand(p, &vfo->bands[i]);
+      p = decodeBand(p, &slot->bands[i]);
     p = decodePreferences(p, &candidate.preferences);
     for (uint8_t i = 0; i < RADIO_STATE_BANDS; ++i) {
       candidate.radio.presets[i] = (RadioParameters){
@@ -216,19 +216,19 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
       p += 8;
     }
     if (p[0] > 1 || p[1] > TX_POWER_HIGH) return false;
-    vfo->tx.enabled = p[0] != 0;
-    vfo->tx.power = (TxPower)p[1];
+    slot->tx.enabled = p[0] != 0;
+    slot->tx.power = (TxPower)p[1];
     candidate.preferences.tx_timeout_seconds = get16(p+2);
     candidate.preferences.tx_busy_lockout = p[4];
     if (bytes[HEADER_VERSION] == 5u) {
       p += 5;
-      vfo->current.parameters.rx_tone = get16(p); p += 2;
+      slot->current.parameters.rx_tone = get16(p); p += 2;
       for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
-        vfo->bands[i].parameters.rx_tone = get16(p); p += 2;
+        slot->bands[i].parameters.rx_tone = get16(p); p += 2;
         candidate.radio.presets[i].rx_tone = get16(p); p += 2;
       }
-      vfo->tx.tone = get16(p); p += 2;
-      vfo->tx.frequency_hz = get32(p);
+      slot->tx.tone = get16(p); p += 2;
+      slot->tx.frequency_hz = get32(p);
     } // Format 4 defaults the new fields to Off/Same.
     for (uint8_t id=1; id<RADIO_SLOT_CAPACITY; ++id) {
       RADIO_STATE_InitSlot(&candidate.radio, id, id%2 ? 6 : 5);
