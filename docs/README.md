@@ -1,6 +1,7 @@
 # 文档
 
 - [Flash 占用审计与优化](flash-budget.md)：实际段分布、对照构建、已采用压缩与 FC 资源门槛。
+- [Radio 架构与源码分层](radio-architecture.md)：Slot／来源／RxPlan／Receiver 概念，Radio 应用七个模块与芯片差异边界。
 - [项目审计与 Flash 优化建议](project-audit.md)：当前回归失败原因、潜在缺陷、Flash 分布及按收益／风险排序的压缩方案。
 - [FC 频率捕获](fc-design.md)：F4 入口、临时试听、接收恢复与验证范围；主机通过，待实机验收。
 

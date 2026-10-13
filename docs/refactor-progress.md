@@ -1,5 +1,13 @@
 # UVK6 Reborn 重构进度
 
+## 2026-10-13 结构重构（当前 main）
+
+- **删除旧代码**：扫描、频谱、频道列表、Loot、独立 FC、RTC、AES、两套未用字库与 RTOS 配置，以及 108 个无引用函数（BK4819 DTMF/VOX/FSK/扰频、SI4732 Seek 设定等），源码 −6,455 行。`make` 不再维护排除清单。
+- **统一接收层**：`core/receiver` 只保存硬件当前所调谐的 `RxPlan`、RSSI 与音频开关，取代 `RadioReceiver`／`RadioState` 镜像和 `vfo`/`ctx` 全局量；芯片 RSSI/SNR、亚音静噪与音频门时序集中到 `hal/rx-device`。删除不可达的 Monitor、旧 `Settings` 位域与 `channels.h`/`lootlist.h`。
+- **拆分 Radio 应用**：1,400 行的 `apps/radio.c` 拆为控制器与 Seek、FC、守听、TX、菜单、视图六个模块，`radio-internal.h` 声明其间少量共享状态；PTT 与菜单按键归入各自模块。
+- **体积与内存**：字形元数据 7→5 B、去除有符号除法、合并调谐收尾、删除启动日志、卡片只存文本指纹。Flash **61,368 → 59,364 B**（余 2,076 B），链接 RAM **8,096 → 7,320 B**。
+- EEPROM 格式、按键与界面行为不变；主机回归全部通过，UI 预览逐帧一致。实机未重新验收。架构见 [Radio 架构](radio-architecture.md)。
+
 ## 2026-10-13 Radio / Slot / Tuning 架构迁移
 
 - 主应用更名为 `apps/radio.c`，`APP_RADIO` 与 `APP_SETTINGS` 同时加入已启用应用列表；辅助的频段、输入、首次初始化仍保持可达。
