@@ -3,10 +3,12 @@
 Experimental fork of [Hawk5](https://github.com/fagci/hawk5) for the
 DP32G030-based Quansheng UV-K6, including radios modified with SI4732.
 
-The minimal-radio refactor provides one VFO, explicit demodulation modes,
-built-in band defaults, an independent band preset editor, UVR2 persistence
-and automatic receiver selection. Validated transmit routing remains planned;
-transmission is currently disabled. See the
+The refactored receiver supports up to four VFO slots (two visible at once),
+NFM/WFM/AM/SSB modes, band presets, dual watch, user channels, UVR2
+persistence and receiver selection. **Production builds disable TX at compile
+time.** The experimental PA path is tested with `UVK6_ENABLE_TX=1` in host
+tests only. Do not enable RF transmission before verifying the board,
+calibration, filtering, PA shutdown timing and applicable frequency limits. See the
 [user manual](docs/user-manual.md) for current controls and the
 [implementation status](docs/refactor-progress.md) before testing.
 
@@ -54,8 +56,10 @@ automatically migrate EEPROM content.
   writing an EEPROM marker or rebooting repeatedly**.
 - EEPROM writes stay locked until a recognized UVK6 Reborn configuration is
   loaded, or the user explicitly initializes: press `0`, then `1` to
-  confirm. **This overwrites the low 512-byte configuration region, which may contain
-  settings or channels from older firmware.** Do not confirm
+  confirm. **This writes the two UVR2 configuration slots at
+  `0x0800–0x0FFF`, which may contain data from earlier firmware.**
+  Legacy settings are not automatically migrated. User channels use a
+  separate `0xB000–0xDFFF` region. Do not confirm
   before obtaining a backup and checking the EEPROM geometry.
 - The 4-Mbit / 512-KiB addressing mode assumes eight 64-KiB address banks
   (`0xA0` through `0xAE`). Writes are limited to at most 32 bytes per chunk until hardware is verified;
