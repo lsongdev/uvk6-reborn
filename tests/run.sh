@@ -60,6 +60,12 @@ esac
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/tx-device-regression.c src/core/dcs.c "$dead_strip" -o "$test_binary"
 "$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wno-missing-field-initializers -DPRINTF_INCLUDE_CONFIG_H -Isrc/config \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
+  tests/tx-disabled-regression.c "$dead_strip" -o "$test_binary"
+"$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/tx-regression.c \
   src/core/tx-model.c src/core/tx-runtime.c -o "$test_binary"
 "$test_binary"

@@ -11,6 +11,12 @@
 #include "core/battery.h"
 #include "core/dcs.h"
 
+// TX hardware is experimental. Never authorize it from EEPROM data alone.
+#ifndef UVK6_ENABLE_TX
+#define UVK6_ENABLE_TX 0
+#endif
+
+#if UVK6_ENABLE_TX
 // Factory calibration layout from DualTachyon's UV-K5 radio.c/frequencies.c.
 // Read only: seven 16-byte band records starting at 0x1ED0, three anchors
 // per Low/Medium/High level. Our board policy uses records 2 and 5 only.
@@ -47,6 +53,14 @@ TxPolicy TX_DEVICE_Policy(void) {
   return (TxPolicy){.authorized=true, .count=2,
     .ranges={{136000000u,174000000u},{400000000u,470000000u}}};
 }
+#else
+TxCapabilities TX_DEVICE_Capabilities(uint32_t hz) {
+  (void)hz;
+  return (TxCapabilities){0};
+}
+TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
+#endif
+
 bool TX_DEVICE_PttPressed(void) {
   return !GPIO_CheckBit(&GPIOC->DATA, GPIOC_PIN_PTT);
 }
@@ -59,6 +73,7 @@ void TX_DEVICE_Disable(void) {
   BK4819_ToggleGpioOut(BK4819_GPIO1_PIN29_PA_ENABLE, false);
   BK4819_WriteRegister(BK4819_REG_36, 0);
   LED_SetRed(false);
+#if UVK6_ENABLE_TX
   if (prepared) {
     BK4819_EnterTxMute();
     BK4819_Idle();
@@ -66,7 +81,9 @@ void TX_DEVICE_Disable(void) {
     RX_DEVICE_InvalidateBk();
   }
   prepared = false;
+#endif
 }
+#if UVK6_ENABLE_TX
 static uint8_t interpolate(uint8_t a, uint8_t b, uint32_t hz,
                            uint32_t low, uint32_t high) {
   if (hz <= low) return a;
@@ -111,3 +128,15 @@ bool TX_DEVICE_Enable(void) {
   LED_SetRed(true);
   return true; // Register commands sent; this is not an RF measurement.
 }
+
+#else
+bool TX_DEVICE_Prepare(const TxPlan *plan) {
+  (void)plan;
+  TX_DEVICE_Disable();
+  return false;
+}
+bool TX_DEVICE_Enable(void) {
+  TX_DEVICE_Disable();
+  return false;
+}
+#endif
