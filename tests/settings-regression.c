@@ -1,6 +1,22 @@
 // Verify preference validation and side effects before touching hardware.
+// Deliberate known fixture CRC: header followed by zero-filled patch bytes.
+#define UVK6_SSB_PATCH_CRC32 0x5026026fu
 #include "../src/core/settings.c"
 #include <assert.h>
+static bool patchCorrupted, patchReadFails;
+uint32_t EEPROM_DetectSize(void) { return 524288u; }
+int EEPROM_ReadBuffer(uint32_t address, void *out, uint16_t n) {
+  const uint32_t start=524288u-PATCH_SIZE;
+  if (patchReadFails || address<start || address+n>524288u) return -1;
+  static const uint8_t header[8]={0x15,0x00,0x03,0x74,0x0b,0xd4,0x84,0x60};
+  uint8_t *buf=out;
+  for (unsigned i=0;i<n;++i) {
+    uint32_t offset=address-start+i;
+    buf[i]=offset<sizeof(header) ? header[offset] : 0;
+    if (patchCorrupted && offset==100) buf[i]^=1;
+  }
+  return 0;
+}
 DeviceConfig gDeviceConfig = {.preferences = CONFIG_DEFAULT_PREFERENCES};
 static unsigned requests, lights, contrasts;
 static bool saveWorks = true;
@@ -16,6 +32,9 @@ void BACKLIGHT_ApplySettings(void) {
 }
 void DISPLAY_Init(bool full, uint8_t contrast) { (void)full; assert(contrast<=15); ++contrasts; }
 int main(void) {
+  assert(SETTINGS_IsPatchPresent());
+  patchCorrupted=true; assert(!SETTINGS_IsPatchPresent()); patchCorrupted=false;
+  patchReadFails=true; assert(!SETTINGS_IsPatchPresent()); patchReadFails=false;
   assert(!SETTINGS_SetValue(SETTING_BACKLIGHT,7));
   assert(!SETTINGS_SetValue(SETTING_CONTRAST,16));
   assert(!SETTINGS_SetValue(SETTING_BATTERYCALIBRATION,1899));

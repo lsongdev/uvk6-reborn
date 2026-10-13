@@ -22,6 +22,9 @@ calibration, filtering, PA shutdown timing and applicable frequency limits. See 
 ## Build
 
 Requires an ARM GNU toolchain (`arm-none-eabi-gcc`), Python 3 and `crcmod`.
+CI pins Ubuntu 24.04's ARM GCC 13.2.rel1 package and checks the 60-KiB
+application partition; compiler versions other than the CI toolchain may
+produce a different Flash size. Run a full clean rebuild when changing flags.
 
 ```sh
 git submodule update --init --recursive
