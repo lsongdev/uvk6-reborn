@@ -9,8 +9,11 @@
 #include "external/printf/printf.h"
 #include "drivers/dp32g030/gpio.h"
 #include "apps/system.h"
+#include "core/device-config.h"
 
 void Main(void) {
+  // A BSS-backed configuration must be initialized before early battery reads.
+  CONFIG_Default(&gDeviceConfig);
   SYS_ConfigureClocks();
   SYS_ConfigureSysCon();
 
