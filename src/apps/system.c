@@ -101,11 +101,9 @@ static void processKeyboard() {
     }
 
     if (APPS_key(n.key, n.state) || (MENU_IsActive() && n.key != KEY_EXIT)) {
-      // LogC(LOG_C_BRIGHT_WHITE, "[SYS] Apps key");
       gRedrawScreen = true;
       gLastRender = 0;
     } else {
-      // LogC(LOG_C_BRIGHT_WHITE, "[SYS] Global key");
       if (n.key == KEY_MENU) {
         if (n.state == KEY_LONG_PRESSED) {
           APPS_run(APP_SETTINGS);
@@ -194,6 +192,5 @@ void SYS_Main() {
       lastUartDataTime = Now();
     }
 
-    // __WFI();
   }
 }

@@ -41,7 +41,6 @@ bool SI47XX_ReadBuffer(uint8_t *buf, uint8_t size) {
     I2C_Stop();
     TIMER_DelayUs(1); // Short retry delay
   }
-  // printf("SI R ERR\n");
   return false;
 }
 
@@ -77,7 +76,6 @@ static bool waitToSend(void) {
 static bool SI47XX_downloadPatch(void) {
   if (!SETTINGS_IsPatchPresent())
     return false;
-  // Log("DL patch");
 
   uint8_t buf[64]; // 64 is optimal, more has no sense
   const uint16_t BUF_SIZE = ARRAY_SIZE(buf);
@@ -181,7 +179,6 @@ bool SI47XX_SetAutomaticGainControl(uint8_t AGCDIS, uint8_t AGCIDX) {
 }
 
 bool SI47XX_PowerUp() {
-  // printf("SI PU\n");
   RST_HIGH;
 
   uint8_t cmd[3] = {CMD_POWER_UP, FLG_XOSCEN | FUNC_FM, OUT_ANALOG};
@@ -232,7 +229,6 @@ bool SI47XX_SsbSetup(SI47XX_SsbFilterBW AUDIOBW, uint8_t SBCUTFLT,
 }
 
 bool SI47XX_PatchPowerUp() {
-  // printf("SI PPU\n");
   RST_HIGH;
   uint8_t cmd[3] = {CMD_POWER_UP, 0b00110001, OUT_ANALOG};
   SYS_DelayMs(10);
@@ -361,7 +357,6 @@ void SI47XX_SeekCancel(void) {
 
 void SI47XX_PowerDown() {
   rdsReady = false;
-  // printf("SI PD\n");
   uint8_t cmd[1] = {CMD_POWER_DOWN};
 
   waitToSend();
@@ -397,7 +392,6 @@ bool SI47XX_SwitchMode(SI47XX_MODE mode) {
 
 bool SI47XX_SetFreq(uint16_t freq) {
   if (freq == 0) {
-    // printf("SI f=0 skip\n");
     return false; // Reject invalid carrier
   }
   if (siCurrentFreq == freq)

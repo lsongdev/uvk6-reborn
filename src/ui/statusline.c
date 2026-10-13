@@ -34,7 +34,6 @@ void STATUSLINE_SetText(const char *pattern, ...) {
 }
 
 void STATUSLINE_update(void) {
-  // BATTERY_UpdateBatteryInfo();
   uint8_t level = gBatteryPercent / 10;
   if (gBatteryPercent < BAT_WARN_PERCENT) {
     showBattery = !showBattery;

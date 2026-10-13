@@ -82,7 +82,6 @@ static void init() {
 }
 
 void MENU_Init(Menu *main_menu) {
-  // Log("[MENU] Init");
   NUMNAV_Deinit();
   number.active = false;
   active_menu = main_menu;
@@ -215,7 +214,6 @@ bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
   // Numeric input owns MENU/PTT until accepted, before item actions.
   if (gIsNumNavInput && handleNumNav(key, state)) return true;
 
-  // Log("[MENU] Key");
 
   const bool hasItems = (active_menu->items != NULL);
 

@@ -23,10 +23,12 @@ typedef struct {
   uint8_t signal_level; // Existing 0..14 relative/S mapping, rendered as 8 bars.
 } UI_RadioCardView;
 typedef struct {
-  char label[128], band[64];
+  // Text is rebuilt from the view on every render; only its identity is kept
+  // so scrolling restarts when the text changes.
+  uint32_t label_hash, band_hash;
   uint32_t tuned_at, label_started, band_started, frequency_hz;
   uint16_t offset, overflow, band_offset, band_overflow, band_width;
-  bool initialized, show_name, tuning;
+  bool initialized, has_label, show_name, tuning;
 } UI_RadioCardState;
 // Restart the one-second frequency hold even when retuning to the same Hz.
 void UI_RadioCardShowFrequency(UI_RadioCardState *state, uint32_t now);

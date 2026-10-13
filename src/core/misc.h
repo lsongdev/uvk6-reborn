@@ -20,7 +20,5 @@
 #define KHZ 100
 #define MHZ 100000
 
-void mhzToS(char *buf, uint32_t f);
-void bkAttToS(char *buf, uint8_t v);
 
 #endif /* end of include guard: MISC_H */

@@ -172,10 +172,8 @@ uint16_t BK4819_ReadRegister(BK4819_REGISTER_t reg) {
   if (reg == BK4819_REG_30 && reg30state != 0xffff) {
     return reg30state;
   }
-  // Log("[BK] R 0x%02x", reg);
   gpio_set_scn(true);
   gpio_set_scl(false);
-  // TIMER_DelayTicks(1);
   __asm volatile("nop \n"
                  "nop \n");
   gpio_set_scn(false);
@@ -184,7 +182,6 @@ uint16_t BK4819_ReadRegister(BK4819_REGISTER_t reg) {
   uint16_t value = spi_read_word();
 
   gpio_set_scn(true);
-  // TIMER_DelayTicks(1);
   gpio_set_scl(true);
   gpio_set_sda(true);
 
@@ -195,18 +192,8 @@ void BK4819_WriteRegister(BK4819_REGISTER_t reg, uint16_t data) {
   if (reg == BK4819_REG_30) {
     reg30state = data;
   }
-  /* if (reg == BK4819_REG_13) {
-    uint8_t lnas = (uint8_t[]){19, 16, 11, 0}[(data >> 8) & 0b11];
-    uint8_t lna = (uint8_t[]){24, 19, 14, 9, 6, 4, 2, 0}[(data >> 5) & 0b111];
-    uint8_t mix = (uint8_t[]){8, 6, 3, 0}[(data >> 3) & 0b11];
-    uint8_t pga = (uint8_t[]){33, 27, 21, 15, 9, 6, 3, 0}[data & 0b111];
-    printf("LNAs %u, LNA %u, MIX %u, PGA %u = %u\n", lnas, lna, mix, pga,
-           lnas + lna + mix + pga);
-  } */
-  // Log("[BK] W 0x%02x %u", reg, data);
   gpio_set_scn(true);
   gpio_set_scl(false);
-  // TIMER_DelayTicks(1);
   __asm volatile("nop \n"
                  "nop \n");
   gpio_set_scn(false);
@@ -215,9 +202,7 @@ void BK4819_WriteRegister(BK4819_REGISTER_t reg, uint16_t data) {
   spi_write_word(data);
 
   gpio_set_scn(true);
-  // TIMER_DelayTicks(1);
   gpio_set_scl(true);
-  // gpio_set_sda(true);
 }
 
 
@@ -330,7 +315,6 @@ void BK4819_SelectFilterEx(Filter filter) {
     return;
   }
   gSelectedFilter = filter;
-  // Log("flt=%u", filter);
   const uint16_t PIN_BIT_VHF = 0x40U >> BK4819_GPIO4_PIN32_VHF_LNA;
   const uint16_t PIN_BIT_UHF = 0x40U >> BK4819_GPIO3_PIN31_UHF_LNA;
 
@@ -696,7 +680,6 @@ uint8_t BK4819_GetGlitch(void) {
 
 
 
-uint8_t BK4819_GetSNR(void) { return BK4819_ReadRegister(0x61) & 0xFF; }
 
 
 // ============================================================================
