@@ -68,7 +68,7 @@ CFLAGS   := $(COMMON_FLAGS) $(OPTIMIZATION) \
             -Wno-missing-field-initializers \
             -Wno-incompatible-pointer-types \
             -Wno-unused-function -Wno-unused-variable \
-            -fno-builtin -fshort-enums \
+            -fshort-enums \
             -fno-delete-null-pointer-checks \
             -fsingle-precision-constant \
             -finline-functions-called-once \
