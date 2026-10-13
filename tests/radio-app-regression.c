@@ -1,6 +1,13 @@
 #include "core/device-config.h"
 // Exercise real main-screen state transitions; only hardware/UI plumbing is mocked.
+// Unity build keeps every module's private state reachable for assertions.
 #include "../src/apps/radio.c"
+#include "../src/apps/radio-seek.c"
+#include "../src/apps/radio-capture.c"
+#include "../src/apps/radio-watch.c"
+#include "../src/apps/radio-tx.c"
+#include "../src/apps/radio-menu.c"
+#include "../src/apps/radio-view.c"
 #include <assert.h>
 
 Receiver gReceiver;

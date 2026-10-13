@@ -1,83 +1,27 @@
-#include "apps/radio.h"
-#include "hal/display.h"
-#include "external/printf/printf.h"
-#include "ui/menu.h"
-#include "core/receiver.h"
-#include "core/misc.h"
-#include "core/device-config.h"
-#include "core/channel-store.h"
-#include "core/channel-model.h"
-#include "core/tuning.h"
-#include "core/rx-runtime.h"
-#include "core/watch.h"
-#include "core/tx-model.h"
-#include "core/tx-runtime.h"
-#include "hal/tx-device.h"
-#include "core/settings.h"
-#include "core/seek.h"
-#include "core/capture.h"
-#include "core/rds-receiver.h"
-#include "hal/rx-device.h"
-#include "hal/scheduler.h"
-#include "ui/components/signal.h"
-#include "ui/components/frequency.h"
-#include "ui/components/radio-card.h"
-#include "ui/graphics.h"
-#include "ui/statusline.h"
-#include "apps/apps.h"
-#include "ui/number-input.h"
-#include "apps/channel-manager.h"
-#include <string.h>
+// Radio app controller: slots, VFO/MR resolution, the tune transaction and
+// key dispatch. Features live in radio-*.c; see radio-internal.h.
+#include "apps/radio-internal.h"
 
 static bool initialized;
-static UI_RadioCardState cards[RADIO_SLOT_CAPACITY];
-static uint8_t selectedSlot, receivingSlot = UINT8_MAX, inputSlot;
-static NumberInput number;
-static bool inputTx;
-static struct { uint32_t frequency_hz; char ps[9], text[65]; } labels[RADIO_SLOT_CAPACITY];
-static RxRuntime runtime;
-static WatchRuntime watcher;
-static uint32_t watchResumeAt;
-static bool watchDelay;
-static const char *watchStatus;
-static bool pauseWatch(void);
-static void watchUpdate(void);
-static TxRuntime transmitter;
-static bool pttPending;
-static uint32_t pttCheckAt;
-static void startTransmit(void);
-static RdsReceiver rds;
-static bool inMenu;
-static bool confirming;
+uint8_t selectedSlot, receivingSlot = UINT8_MAX, inputSlot;
+NumberInput number;
+bool inputTx;
+SlotLabel labels[RADIO_SLOT_CAPACITY];
+RxRuntime runtime;
+RdsReceiver rds;
+bool inMenu;
+bool confirming;
 static UserChannel channelCache[RADIO_SLOT_CAPACITY];
 static bool channelCacheValid[RADIO_SLOT_CAPACITY];
 static uint8_t channelCacheNumber[RADIO_SLOT_CAPACITY];
-static uint8_t menuIndex;
-// RX items share RadioParameterField order; changeValue passes them through.
-enum {
-  MENU_RX_MODE = RADIO_FIELD_MODE,
-  MENU_RX_STEP = RADIO_FIELD_STEP,
-  MENU_RX_BANDWIDTH = RADIO_FIELD_BANDWIDTH,
-  MENU_RX_SQUELCH = RADIO_FIELD_SQUELCH,
-  MENU_RX_TONE = RADIO_FIELD_RX_TONE,
-  MENU_RX_WATCH,
-  MENU_TX_ENABLE,
-  MENU_TX_POWER,
-  MENU_TX_FREQUENCY,
-  MENU_TX_TONE,
-  MENU_CHANNEL_NAME,
-  MENU_CHANNEL_SAVE,
-  MENU_ITEM_COUNT
-};
-static RadioSlot activeSlot; // Selected slot's effective source; MR never writes VFO memories.
-static RxPlan pending;
-static const char *message;
+RadioSlot activeSlot; // Selected slot's effective source; MR never writes VFO memories.
+RxPlan pending;
+const char *message;
 static uint32_t messageAt;
-static bool functionPending;
+bool functionPending;
 static uint32_t functionAt;
-static void nextChannel(bool up);
 
-static bool loadChannelForSlot(uint8_t id, UserChannel *channel) {
+bool loadChannelForSlot(uint8_t id, UserChannel *channel) {
   if (id >= RADIO_SLOT_CAPACITY || !channel) return false;
   const RadioSlot *config = &gDeviceConfig.radio.slots[id];
   if (config->source != RADIO_SOURCE_CHANNEL || !config->channel_number)
@@ -95,7 +39,7 @@ static bool loadChannelForSlot(uint8_t id, UserChannel *channel) {
   return true;
 }
 
-static bool effectiveSlot(uint8_t id, RadioSlot *effective,
+bool effectiveSlot(uint8_t id, RadioSlot *effective,
                           UserChannel *channel) {
   if (id >= RADIO_SLOT_CAPACITY || !effective) return false;
   const RadioSlot *stored = &gDeviceConfig.radio.slots[id];
@@ -107,20 +51,6 @@ static bool effectiveSlot(uint8_t id, RadioSlot *effective,
   if (channel) *channel = loaded;
   return true;
 }
-
-// Search never mutates activeSlot/EEPROM until one final station is accepted.
-typedef enum { SEEK_STEP, SEEK_SETTLE, SEEK_VERIFY,
-               SEEK_NATIVE_START, SEEK_NATIVE_POLL, SEEK_WRAP_SETTLE } SeekPhase;
-static Seek seek;
-static SeekPhase seekPhase;
-static RxPlan seekOrigin;
-static bool seekNative;
-static CaptureRuntime capture;
-static enum { FC_OFF, FC_DETECT, FC_PREVIEW } capturePhase;
-static uint32_t capturePollAt;
-static void cancelCapture(const char *status);
-static void captureUpdate(void);
-static uint32_t seekAt, seekDeadline;
 bool RADIO_APP_isShortcutPending(void) { return functionPending; }
 
 void RADIO_APP_cancelShortcut(void) {
@@ -132,53 +62,8 @@ void RADIO_APP_cancelShortcut(void) {
 
 // These operations recur across FC, Seek, Watch, PTT and manual input.
 // Keep their event ordering identical while sharing one implementation.
-static void __attribute__((noinline)) resetRds(void) {
+void __attribute__((noinline)) resetRds(void) {
   RDS_ReceiverReset(&rds, Now());
-}
-static void __attribute__((noinline)) delayWatch(void) {
-  watchDelay = true;
-  watchResumeAt = Now() + 2000u;
-}
-static void __attribute__((noinline)) showFrequency(void) {
-  UI_RadioCardShowFrequency(&cards[selectedSlot], Now());
-}
-
-static void finishSeek(bool found, uint32_t frequency_hz, const char *status);
-
-static void stopReceiver(void *unused);
-static void txMute(void *unused) {
-  (void)unused;
-  RECEIVER_Mute();
-  receivingSlot = UINT8_MAX;
-  resetRds();
-}
-static bool txPrepare(void *unused, const TxPlan *plan) {
-  (void)unused; return TX_DEVICE_Prepare(plan);
-}
-static bool txEnable(void *unused) {
-  (void)unused; return TX_DEVICE_Enable();
-}
-static void txDisable(void *unused) {
-  (void)unused; TX_DEVICE_Disable();
-}
-static bool txRestore(void *unused, const RxPlan *plan) {
-  (void)unused;
-  if (!RECEIVER_Apply(plan)) {
-    RX_RuntimeStop(&runtime, stopReceiver, NULL);
-    return false;
-  }
-  receivingSlot = selectedSlot;
-  resetRds();
-  return true;
-}
-static const TxOperations txOperations = {
-  .mute_rx = txMute, .prepare = txPrepare, .enable = txEnable,
-  .disable = txDisable, .restore_rx = txRestore
-};
-
-void RADIO_APP_PttRelease(void) {
-  pttPending = false;
-  TX_RuntimeRelease(&transmitter, &txOperations);
 }
 
 void RADIO_APP_deinit(void) {
@@ -196,7 +81,7 @@ static void expireShortcut(uint32_t now) {
     RADIO_APP_cancelShortcut();
 }
 
-static void notify(const char *text) {
+void notify(const char *text) {
   message = text;
   messageAt = Now();
   gRedrawScreen = true;
@@ -217,20 +102,20 @@ static void channelSaved(uint8_t id, uint16_t number,
   DEVICE_RequestSave();
 }
 
-static bool applyReceiver(void *unused, const RxPlan *plan) {
+bool applyReceiver(void *unused, const RxPlan *plan) {
   (void)unused;
   resetRds();
   return RECEIVER_Apply(plan);
 }
 
-static void stopReceiver(void *unused) {
+void stopReceiver(void *unused) {
   (void)unused;
   resetRds();
   RECEIVER_Mute();
   receivingSlot = UINT8_MAX;
 }
 
-static bool apply(const RxPlan *plan) {
+bool apply(const RxPlan *plan) {
   bool needsSsb = plan->parameters.mode == RX_LSB || plan->parameters.mode == RX_USB;
   bool wasSsb = runtime.active && (runtime.current.parameters.mode == RX_LSB ||
                                   runtime.current.parameters.mode == RX_USB);
@@ -266,240 +151,7 @@ static bool apply(const RxPlan *plan) {
   return true;
 }
 
-// Forward-only seek owns temporary RF tuning; RxRuntime retains the last
-// committed plan so cancel/exhaustion never writes the EEPROM.
-static void finishSeek(bool found, uint32_t frequency_hz, const char *status) {
-  // SEEK_Next/SEEK_Wrap may already have marked exhaustion.
-  if (seekNative)
-    RX_DEVICE_SeekCancel(seekOrigin.device);
-  SEEK_Stop(&seek);
-  resetRds();
-  gRedrawScreen = true;
-
-  if (found) {
-    RxPlan selected;
-    if (RADIO_MODEL_Plan(frequency_hz, seekOrigin.parameters,
-                         RECEIVER_Capabilities(), &selected) == RX_OK &&
-        selected.device == seekOrigin.device &&
-        SEEK_Accept(&(Seek){.active=true, .origin_hz=seek.origin_hz,
-                             .lower_hz=seek.lower_hz,.end_hz=seek.end_hz,
-                             .wrapped=seek.wrapped}, selected.frequency_hz)) {
-      apply(&selected); // The only place a found station is saved.
-      return;
-    }
-    status = "Seek error";
-  }
-  // Restoring directly does not update RadioUserState or request a save.
-  if (!RECEIVER_Apply(&seekOrigin)) {
-    RX_RuntimeStop(&runtime, stopReceiver, NULL);
-    notify("RX error");
-  } else if (status) {
-    notify(status);
-  }
-}
-
-static void startSeek(void) {
-  if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
-    notify("Seek is VFO only");
-    return;
-  }
-  if (!runtime.active || activeSlot.active_band >= radioBandCount) {
-    notify("RX unavailable");
-    return;
-  }
-  if (activeSlot.current.parameters.mode == RX_LSB ||
-      activeSlot.current.parameters.mode == RX_USB) {
-    notify("SSB seek off");
-    return;
-  }
-  seekOrigin = runtime.current;
-  if (!SEEK_Start(&seek, &radioBands[activeSlot.active_band],
-                  seekOrigin.frequency_hz, seekOrigin.parameters.step_hz)) {
-    notify("Seek unavailable");
-    return;
-  }
-  seekNative = RX_DEVICE_SeekNative(&seekOrigin);
-  seekPhase = seekNative ? SEEK_NATIVE_START : SEEK_STEP;
-  seekAt = Now();
-  seekDeadline = Now() + 15000;
-  RECEIVER_Mute();
-  resetRds();
-  message = NULL;
-  gRedrawScreen = true;
-}
-
-static void seekUpdate(void) {
-  if (!seek.active) return;
-  uint32_t now = Now();
-  if (seekPhase == SEEK_STEP) {
-    uint32_t next;
-    if (!SEEK_Next(&seek, &next)) {
-      finishSeek(false, 0, "No station");
-      return;
-    }
-    RxPlan candidate;
-    RadioParameters params = seekOrigin.parameters;
-    if (params.squelch < 4 && seekOrigin.device == RX_DEVICE_BK)
-      params.squelch = 4; // Monitor/SQ0 must not match every noise carrier.
-    if (RADIO_MODEL_Plan(next, params, RECEIVER_Capabilities(),
-                         &candidate) != RX_OK ||
-        candidate.device != seekOrigin.device ||
-        candidate.frequency_hz < seek.lower_hz ||
-        candidate.frequency_hz >= seek.end_hz)
-      return;
-    if (!RECEIVER_Apply(&candidate)) {
-      finishSeek(false, 0, "Seek error");
-      return;
-    }
-    seekAt = now;
-    seekPhase = SEEK_SETTLE;
-  } else if (seekPhase == SEEK_SETTLE || seekPhase == SEEK_VERIFY ||
-             seekPhase == SEEK_WRAP_SETTLE) {
-    uint32_t elapsed = now - seekAt;
-    uint32_t wait = seekPhase == SEEK_VERIFY ? 80u : 180u;
-    if (elapsed < wait) return;
-    bool detected;
-    if (!RX_DEVICE_SeekSignal(seekOrigin.device, &detected)) {
-      finishSeek(false, 0, "Seek error");
-      return;
-    }
-    if (detected && seekPhase == SEEK_SETTLE) {
-      seekPhase = SEEK_VERIFY;
-      seekAt = now;
-    } else if (detected) {
-      finishSeek(true, seek.cursor_hz, NULL);
-    } else if (seekPhase == SEEK_WRAP_SETTLE) {
-      seekPhase = SEEK_NATIVE_START;
-    } else {
-      seekPhase = SEEK_STEP;
-    }
-  } else if (seekPhase == SEEK_NATIVE_START) {
-    // The SI hardware cannot search over arbitrary VFO modes or spacings.
-    uint32_t end = seek.wrapped ? seek.origin_hz : seek.end_hz-1u;
-    if (!RX_DEVICE_SeekStart(&seekOrigin, seek.lower_hz, end)) {
-      finishSeek(false, 0, "Seek error");
-      return;
-    }
-    seekDeadline = now + 15000u;
-    seekAt = now;
-    seekPhase = SEEK_NATIVE_POLL;
-  } else if (seekPhase == SEEK_NATIVE_POLL) {
-    if ((int32_t)(now-seekDeadline) >= 0) {
-      finishSeek(false, 0, "Seek timeout");
-      return;
-    }
-    if (now-seekAt < 90u) return;
-    seekAt = now;
-    uint32_t frequency = 0;
-    RxSeekResult result = RX_DEVICE_SeekPoll(seekOrigin.device, &frequency);
-    if (result == RX_SEEK_BUSY) return;
-    if (result == RX_SEEK_ERROR) {
-      finishSeek(false, 0, "Seek error");
-      return;
-    }
-    if (result == RX_SEEK_FOUND && SEEK_Accept(&seek, frequency)) {
-      finishSeek(true, frequency, NULL);
-      return;
-    }
-    // A complete hardware segment ended; the application owns the one wrap.
-    if (seek.wrapped || !SEEK_Wrap(&seek)) {
-      finishSeek(false, 0, "No station");
-      return;
-    }
-    RX_DEVICE_SeekCancel(seekOrigin.device);
-    RxPlan first;
-    if (RADIO_MODEL_Plan(seek.lower_hz, seekOrigin.parameters,
-                         RECEIVER_Capabilities(), &first) != RX_OK ||
-        first.device != seekOrigin.device ||
-        !RECEIVER_Apply(&first)) {
-      finishSeek(false, 0, "Seek error");
-      return;
-    }
-    seek.cursor_hz = first.frequency_hz;
-    seekAt = now;
-    seekPhase = SEEK_WRAP_SETTLE; // Evaluate the first channel once.
-  }
-  gRedrawScreen = true;
-}
-
-// Runtime keeps the committed origin throughout detection and temporary preview.
-static bool capturePlan(uint32_t hz, RxPlan *plan) {
-  return RADIO_MODEL_Plan(hz, (RadioParameters){RX_NFM,12500,12000,4},
-      RECEIVER_Capabilities(), plan)==RX_OK &&
-      plan->device==RX_DEVICE_BK && plan->frequency_hz==hz;
-}
-
-static void cancelCapture(const char *status) {
-  RX_DEVICE_CaptureStop();
-  capturePhase=FC_OFF;
-  if (!applyReceiver(NULL, &runtime.current)) {
-    RX_RuntimeStop(&runtime, stopReceiver, NULL);
-    status="RX error";
-  } else {
-    runtime.active=true;
-    receivingSlot=selectedSlot;
-  }
-  delayWatch();
-  showFrequency();
-  message=NULL;
-  if (status) notify(status);
-  gRedrawScreen=true;
-}
-
-static void captureAttempt(void) {
-  RECEIVER_Mute();
-  receivingSlot=UINT8_MAX;
-  resetRds();
-  RX_DEVICE_CaptureStart(capture.range, gReceiver.plan.device);
-  capturePhase=FC_DETECT;
-  capturePollAt=Now();
-  message=NULL;
-  gRedrawScreen=true;
-}
-
-static void startCapture(void) {
-  if (activeSlot.source!=RADIO_SOURCE_VFO) { notify("FC: VFO only"); return; }
-  if (!runtime.active || !pauseWatch()) return;
-  CAPTURE_Start(&capture, CAPTURE_AUTO, Now());
-  captureAttempt();
-}
-
-static void captureUpdate(void) {
-  if (capturePhase!=FC_DETECT || Now()-capturePollAt<20u) return;
-  capturePollAt=Now();
-  uint32_t hz=0;
-  CaptureSample sample=RX_DEVICE_CapturePoll(capture.range, &hz);
-  RxPlan plan;
-  if (sample==CAPTURE_SAMPLE && !capturePlan(hz, &plan)) sample=CAPTURE_INVALID;
-  CaptureAction action=CAPTURE_Update(&capture, Now(), sample, hz);
-  if (action==CAPTURE_TIMEOUT) cancelCapture("FC timeout");
-  else if (action==CAPTURE_RESTART) captureAttempt();
-  else if (action==CAPTURE_FOUND) {
-    RX_DEVICE_CaptureStop();
-    if (!applyReceiver(NULL, &plan)) { cancelCapture("Tune failed"); return; }
-    capturePhase=FC_PREVIEW;
-    receivingSlot=selectedSlot;
-    showFrequency();
-    gRedrawScreen=true;
-  }
-}
-
-static void acceptCapture(void) {
-  RxPlan plan;
-  RX_DEVICE_CaptureStop();
-  capturePhase=FC_OFF;
-  if (!capturePlan(capture.last_hz, &plan) || !apply(&plan)) {
-    cancelCapture("Tune failed"); return;
-  }
-  // apply has queued a deferred save; include these changes in that one save.
-  activeSlot.tx.enabled=false;
-  activeSlot.channel_number=0;
-  gDeviceConfig.radio.slots[selectedSlot]=activeSlot;
-  CHANNEL_MANAGER_LoadName(selectedSlot, 0);
-  delayWatch();
-}
-
-static void request(uint32_t target, RadioParameters values) {
+void request(uint32_t target, RadioParameters values) {
   RxPlan plan;
   RxResult result = RADIO_MODEL_Plan(target, values, RECEIVER_Capabilities(), &plan);
   if (result == RX_OUT_OF_RANGE || result == RX_INVALID_PARAMETERS) {
@@ -543,7 +195,7 @@ static void tuneTo(uint32_t target) {
 }
 
 // RX keypad entry and TX menu editing share the same input lifecycle.
-static void beginFrequencyInput(bool tx) {
+void beginFrequencyInput(bool tx) {
   inputSlot = selectedSlot;
   inputTx = tx;
   message = NULL;
@@ -580,8 +232,6 @@ void RADIO_APP_init(void) {
   if (invalidSavedChannel) notify("Channel unavailable");
 }
 
-bool RADIO_APP_isWatching(void) { return watcher.phase!=WATCH_OFF; }
-
 bool RADIO_APP_isReceiving(void) {
   return initialized && receivingSlot != UINT8_MAX && !WATCH_IsProbing(&watcher) && runtime.active && !seek.active && capturePhase!=FC_DETECT &&
          transmitter.mode == RADIO_RX;
@@ -590,39 +240,6 @@ bool RADIO_APP_isReceiving(void) {
 static bool readRds(void *unused, RdsPacket *packet, bool clear_fifo) {
   (void)unused;
   return RX_DEVICE_ReadRDS(packet, clear_fifo);
-}
-
-void RADIO_APP_TxSafetyUpdate(void) {
-  // Check the physical button, not just the queued keyboard release event.
-  if ((pttPending || transmitter.mode == RADIO_TX) && !TX_DEVICE_PttPressed()) {
-    RADIO_APP_PttRelease();
-    gRedrawScreen = true;
-    return;
-  }
-  if (transmitter.mode == RADIO_TX && !TX_DEVICE_VoltageValid()) {
-    RADIO_APP_PttRelease();
-    transmitter.wait_release = true;
-    notify("TX battery voltage");
-    return;
-  }
-
-  if (pttPending && (int32_t)(Now()-pttCheckAt) >= 0) {
-    pttPending = false;
-    bool busy = false;
-    if (!runtime.active || receivingSlot != selectedSlot ||
-        !RX_DEVICE_WatchSignal(&runtime.current, &busy)) {
-      transmitter.wait_release = true;
-      notify("Busy check failed");
-    } else if (busy) {
-      transmitter.wait_release = true;
-      notify("Channel busy");
-    } else {
-      startTransmit();
-    }
-  }
-  // TOT is a system-level safety deadline, not a screen refresh feature.
-  if (TX_RuntimeUpdate(&transmitter, Now(), &txOperations))
-    notify(transmitter.mode == RADIO_FAULT ? "RX restore error" : "TX timeout");
 }
 
 void RADIO_APP_update(void) {
@@ -667,118 +284,6 @@ void RADIO_APP_update(void) {
     }
     gRedrawScreen = true;
   }
-}
-
-static bool restorePrimary(void) {
-  RxPlan plan;
-  if (TUNING_ExactPlan(activeSlot.current.frequency_hz,activeSlot.current.parameters,
-      RECEIVER_Capabilities(),&plan)!=RX_OK) {
-    RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX unavailable"); return false;
-  }
-  if (runtime.active && receivingSlot==selectedSlot && WATCH_SameReceiver(&runtime.current,&plan))
-    return true;
-  if (RX_RuntimeTune(&runtime,&plan,applyReceiver,stopReceiver,NULL)!=RX_APPLIED) {
-    // A restored background watch plan is never a PTT/primary substitute.
-    RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX restore error"); return false;
-  }
-  receivingSlot=selectedSlot; gRedrawScreen=true;
-  return true;
-}
-static bool pauseWatch(void) {
-  bool wasWatching=watcher.phase!=WATCH_OFF;
-  if (watcher.parallel) {
-    RECEIVER_Mute();
-    for (uint8_t i=0; i<watcher.count; ++i)
-      RX_DEVICE_StopChip(watcher.targets[i].plan.device);
-    runtime.active=false;receivingSlot=UINT8_MAX;
-  }
-  WATCH_Stop(&watcher);
-  delayWatch();
-  return !wasWatching || restorePrimary();
-}
-static bool watchTune(void *unused, const WatchTarget *target) {
-  (void)unused;
-  RxTuneResult result=RX_RuntimeTune(&runtime,&target->plan,applyReceiver,stopReceiver,NULL);
-  if (result!=RX_APPLIED) return false;
-  receivingSlot=target->id; gRedrawScreen=true;
-  return true;
-}
-static bool watchSignal(void *unused, const RxPlan *plan, bool *found) {
-  (void)unused; return RX_DEVICE_WatchSignal(plan,found);
-}
-static void watchAudio(void *unused, bool open) {
-  (void)unused;
-  if (gReceiver.open==open) return;
-  RECEIVER_SetOpen(open); gRedrawScreen=true;
-}
-static bool watchPrepare(void *unused, const WatchTarget *target) {
-  (void)unused;
-  if (!watcher.blocked && runtime.active && WATCH_SameReceiver(&runtime.current,&target->plan)) return true;
-  if (!RX_DEVICE_ApplyConcurrent(&target->plan)) return false;
-  if (target->plan.device==RX_DEVICE_SI) resetRds();
-  return true;
-}
-static bool watchSelect(void *unused, const WatchTarget *target, bool open) {
-  (void)unused;
-  uint8_t devices=0;
-  for (uint8_t i=0; i<watcher.count; ++i) devices |= 1u<<watcher.targets[i].plan.device;
-  if (!RECEIVER_Select(&target->plan,devices,open)) {
-    gReceiver.open=false;runtime.active=false;receivingSlot=UINT8_MAX;
-    gRedrawScreen=true;return false;
-  }
-  runtime.current=target->plan;runtime.active=true;receivingSlot=target->id;
-  gRedrawScreen=true;return true;
-}
-static uint32_t watchNow(void *unused) { (void)unused; return Now(); }
-static const WatchOperations watchOperations={
-  .tune=watchTune,.signal=watchSignal,.audio=watchAudio,
-  .prepare=watchPrepare,.select=watchSelect,.now=watchNow
-};
-static void watchUpdate(void) {
-  if (capturePhase!=FC_OFF || number.active || CHANNEL_MANAGER_Active() || inMenu || confirming || seek.active || functionPending ||
-      transmitter.mode!=RADIO_RX || transmitter.wait_release || pttPending) return;
-  if (!gDeviceConfig.radio.watch_enabled || gDeviceConfig.radio.slot_count < 2) {
-    watchStatus=NULL;
-    if (watcher.phase!=WATCH_OFF) (void)pauseWatch();
-    return;
-  }
-  if (watchDelay) {
-    if ((int32_t)(Now()-watchResumeAt)<0) return;
-    watchDelay=false;
-  }
-  if (watcher.phase==WATCH_OFF) {
-    if (!runtime.active) return;
-    WatchTarget targets[RADIO_WATCH_LIMIT];
-    uint8_t count=0;
-    watchStatus="DW: select 2";
-    for (uint8_t id=0; id<gDeviceConfig.radio.slot_count && count<RADIO_WATCH_LIMIT; ++id) {
-      const RadioSlot *stored=&gDeviceConfig.radio.slots[id];
-      RadioSlot effective;
-      if (!stored->watch) continue;
-      if (!effectiveSlot(id, &effective, NULL)) {
-        watchStatus="DW: unavailable"; continue;
-      }
-      RxPlan plan;
-      RxResult result=TUNING_ExactPlan(effective.current.frequency_hz,effective.current.parameters,
-          RECEIVER_Capabilities(),&plan);
-      if (result!=RX_OK) {
-        watchStatus="DW: unavailable"; continue;
-      }
-      if (!WATCH_Eligible(&plan)) { watchStatus="DW: SSB off"; continue; }
-      targets[count++]=(WatchTarget){id,plan};
-    }
-    if (!WATCH_Start(&watcher,targets,count,selectedSlot)) {
-      if (count==2) watchStatus="DW: same channel";
-      watchDelay=true; watchResumeAt=Now()+WATCH_RETRY_MS; return;
-    }
-  }
-  watchStatus=NULL;
-  bool wasRetrying=watcher.phase==WATCH_RETRY;
-  WATCH_Update(&watcher,Now(),&watchOperations);
-  // Refresh RSSI for display; Watch, not squelch, owns the audio gate here.
-  if (watcher.phase==WATCH_HOLD && watcher.signal) (void)RECEIVER_Measure();
-  // If all candidates fail, listen to the primary during bounded retry delay.
-  if (watcher.phase==WATCH_RETRY && !wasRetrying) (void)restorePrimary();
 }
 
 static bool tuneDirect(const RxPlan *plan) {
@@ -925,7 +430,7 @@ static void nextBand(void) {
   request(saved->frequency_hz, gDeviceConfig.radio.presets[band]);
 }
 
-static void nextMode(void) {
+void nextMode(void) {
   if (!requireVfoSource()) return;
   RadioParameters candidate = activeSlot.current.parameters;
   if (RADIO_MODEL_Adjust(activeSlot.current.frequency_hz, &candidate,
@@ -933,153 +438,6 @@ static void nextMode(void) {
     request(activeSlot.current.frequency_hz, candidate);
   else
     notify("No other mode");
-}
-
-static bool setTxFrequency(uint32_t value) {
-  if (inputSlot != selectedSlot || !TX_MODEL_FrequencyValid(value)) return false;
-  gDeviceConfig.radio.slots[selectedSlot].tx.frequency_hz = value;
-  activeSlot.tx.frequency_hz = value;
-  DEVICE_RequestSave();
-  notify("TX freq saved");
-  return true;
-}
-
-static bool changeTxPower(bool up) {
-  if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
-    notify("Channel is read only");
-    return false;
-  }
-  TxConfig *tx = &gDeviceConfig.radio.slots[selectedSlot].tx;
-  tx->power = (tx->power + (up ? 1u : 2u)) % 3u;
-  activeSlot.tx.power = tx->power;
-  DEVICE_RequestSave();
-  return true;
-}
-
-static void changeValue(bool up) {
-  if (menuIndex == MENU_CHANNEL_NAME) {
-    CHANNEL_MANAGER_StartName(selectedSlot,
-        gDeviceConfig.radio.slots[selectedSlot].channel_number);
-    return;
-  }
-  if (menuIndex == MENU_CHANNEL_SAVE) {
-    UserChannel channel = {
-      .frequency_hz = activeSlot.current.frequency_hz,
-      .rx = activeSlot.current.parameters,
-      .tx = activeSlot.tx,
-    };
-    CHANNEL_MANAGER_StartSave(selectedSlot,
-        gDeviceConfig.radio.slots[selectedSlot].source == RADIO_SOURCE_CHANNEL
-            ? gDeviceConfig.radio.slots[selectedSlot].channel_number : 0,
-        &channel);
-    return;
-  }
-  if (gDeviceConfig.radio.slots[selectedSlot].source == RADIO_SOURCE_CHANNEL &&
-      menuIndex != MENU_RX_WATCH) {
-    notify("Channel is read only");
-    return;
-  }
-  if (menuIndex==MENU_RX_WATCH) {
-    bool enabled=!gDeviceConfig.radio.slots[selectedSlot].watch;
-    if (!RADIO_STATE_SetWatch(&gDeviceConfig.radio,selectedSlot,enabled))
-      notify("Watch limit: 2");
-    else DEVICE_RequestSave();
-    return;
-  }
-  if (menuIndex == MENU_RX_MODE) {
-    nextMode();
-    return;
-  }
-  if (menuIndex == MENU_TX_FREQUENCY) {
-    if (!up) {
-      gDeviceConfig.radio.slots[selectedSlot].tx.frequency_hz = 0;
-      activeSlot.tx.frequency_hz = 0;
-      DEVICE_RequestSave();
-    } else {
-      beginFrequencyInput(true);
-    }
-    return;
-  }
-  if (menuIndex == MENU_TX_TONE) {
-    gDeviceConfig.radio.slots[selectedSlot].tx.tone = TONE_Next(gDeviceConfig.radio.slots[selectedSlot].tx.tone, up);
-    activeSlot.tx.tone = gDeviceConfig.radio.slots[selectedSlot].tx.tone;
-    DEVICE_RequestSave();
-    return;
-  }
-  if (menuIndex == MENU_RX_TONE && activeSlot.current.parameters.mode != RX_NFM) {
-    notify("Tone: NFM only");
-    return;
-  }
-  if (menuIndex == MENU_TX_ENABLE) {
-    gDeviceConfig.radio.slots[selectedSlot].tx.enabled = !gDeviceConfig.radio.slots[selectedSlot].tx.enabled;
-    activeSlot.tx.enabled = gDeviceConfig.radio.slots[selectedSlot].tx.enabled;
-    DEVICE_RequestSave();
-    return;
-  }
-  if (menuIndex == MENU_TX_POWER) {
-    changeTxPower(up);
-    return;
-  }
-  RadioParameters candidate = activeSlot.current.parameters;
-  if (RADIO_MODEL_Adjust(activeSlot.current.frequency_hz, &candidate,
-                         RECEIVER_Capabilities(), (RadioParameterField)menuIndex, up))
-    request(activeSlot.current.frequency_hz, candidate);
-  else if (menuIndex == MENU_RX_BANDWIDTH && candidate.mode == RX_WFM)
-    notify("Fixed bandwidth");
-}
-
-static bool txReady(void) {
-  return !inMenu && !confirming && runtime.active && gDeviceConfigReady &&
-      !(gDeviceConfig.preferences.keylock && gDeviceConfig.preferences.ptt_lock);
-}
-
-static void startTransmit(void) {
-  if (!txReady() || transmitter.mode != RADIO_RX) {
-    notify("TX busy/locked");
-    return;
-  }
-  TxCapabilities capability = TX_DEVICE_Capabilities(activeSlot.tx.frequency_hz ? activeSlot.tx.frequency_hz : runtime.current.frequency_hz);
-  TxPolicy policy = TX_DEVICE_Policy();
-  TxPlan planned;
-  TxResult result = TX_MODEL_Plan(&runtime.current, &activeSlot.tx,
-                                 &capability, &policy, &planned);
-  // The board policy and target-frequency calibration authorize TX independently of RX.
-  if (result == TX_OK && !TX_DEVICE_VoltageValid()) {
-    notify("TX battery voltage");
-    return;
-  }
-  if (result == TX_OK &&
-      !TX_RuntimePress(&transmitter, &runtime.current, &planned,
-                       gDeviceConfig.preferences.tx_timeout_seconds,
-                       Now(), &txOperations))
-    notify("TX hardware error");
-  else if (result == TX_DISABLED)
-    notify("TX disabled");
-  else if (result == TX_UNSUPPORTED_MODE)
-    notify("TX mode not supported");
-  else if (result == TX_UNVERIFIED_HARDWARE)
-    notify("TX HW locked");
-  else if (result == TX_UNCALIBRATED)
-    notify("TX calibration missing");
-  else if (result == TX_OUT_OF_BAND)
-    notify("TX out of band");
-  else if (result != TX_OK)
-    notify("TX not allowed");
-}
-
-// While FC or numeric editing owns the keyboard, keep all other actions
-// blocked; especially never allow an input digit to become a global shortcut.
-static void captureKey(KEY_Code_t key, Key_State_t state) {
-  if (key==KEY_PTT && state==KEY_RELEASED) RADIO_APP_PttRelease();
-  if (state != KEY_RELEASED) return;
-  if (key==KEY_EXIT || (key==KEY_MENU && capturePhase==FC_DETECT))
-    cancelCapture(NULL);
-  else if (key==KEY_MENU) acceptCapture();
-  else if (key==KEY_SIDE1 || key==KEY_SIDE2) {
-    RX_DEVICE_CaptureStop();
-    CAPTURE_Start(&capture, (capture.scope+1u)%3u, Now());
-    captureAttempt();
-  }
 }
 
 static void frequencyInputKey(KEY_Code_t key, Key_State_t state) {
@@ -1136,30 +494,10 @@ bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
     return true; // Search temporarily owns all controls except cancel.
   }
   if (key == KEY_PTT) {
-    RADIO_APP_cancelShortcut();
-    if (state == KEY_RELEASED) {
-      RADIO_APP_PttRelease();
-      return true;
-    }
-    if (state != KEY_PRESSED || pttPending || transmitter.wait_release ||
-        transmitter.mode != RADIO_RX)
-      return true;
-    if (!pauseWatch()) return true;
-    if (CHANNEL_MANAGER_Active() || !txReady()) {
-      notify("TX busy/locked");
-      return true;
-    }
-    if (gDeviceConfig.preferences.tx_busy_lockout) {
-      // Restore/tune first, then sample the selected receiver after settling.
-      // Keep this nonblocking so PTT release can cancel before PA preparation.
-      pttPending = true;
-      pttCheckAt = Now()+(runtime.current.device == RX_DEVICE_BK ? 180u : 350u);
-    } else {
-      startTransmit();
-    }
+    pttKey(state);
     return true;
   }
-  if (pttPending || transmitter.mode != RADIO_RX || transmitter.wait_release)
+  if (txBusy())
     return true;
   if ((state==KEY_RELEASED || state==KEY_LONG_PRESSED || state==KEY_LONG_PRESSED_CONT) &&
       !pauseWatch()) return true;
@@ -1178,22 +516,8 @@ bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
     }
     return true;
   }
-  if (inMenu) {
-    if (key == KEY_MENU && state == KEY_LONG_PRESSED) {
-      inMenu = false;
-      return false; // System opens global settings.
-    }
-    if (state == KEY_RELEASED) {
-      if (key == KEY_EXIT)
-        inMenu = false;
-      else if (key == KEY_UP || key == KEY_DOWN)
-        menuIndex = key == KEY_DOWN ? (menuIndex+1)%MENU_ITEM_COUNT
-                                   : (menuIndex+MENU_ITEM_COUNT-1)%MENU_ITEM_COUNT;
-      else if (key == KEY_STAR || key == KEY_F || key == KEY_MENU)
-        changeValue(key != KEY_F);
-    }
-    return true;
-  }
+  if (inMenu)
+    return menuKey(key, state);
   // The function key is a sequential, one-shot prefix on the main screen.
   // Consume the target so it cannot also enter frequency input or a menu.
   if (functionPending) {
@@ -1244,182 +568,4 @@ bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
     return false;
   }
   return true;
-}
-
-static const char *menuValue(uint8_t item, char out[24]) {
-  const RadioParameters *rx = &activeSlot.current.parameters;
-  char frequency[16];
-  uint32_t hz;
-  switch (item) {
-  case MENU_RX_MODE: return rxModeNames[rx->mode];
-  case MENU_RX_STEP: hz = rx->step_hz; break;
-  case MENU_RX_BANDWIDTH:
-    if (rx->mode == RX_WFM) return "Fixed";
-    hz = rx->bandwidth_hz; break;
-  case MENU_RX_SQUELCH: snprintf(out,24,"%u",rx->squelch); return out;
-  case MENU_RX_TONE:
-    if (rx->mode != RX_NFM) return "NFM only";
-    TONE_Format(rx->rx_tone,out); return out;
-  case MENU_RX_WATCH: return gDeviceConfig.radio.slots[selectedSlot].watch ? "On" : "Off";
-  case MENU_TX_ENABLE: return activeSlot.tx.enabled ? "On" : "Off";
-  case MENU_TX_POWER: {
-    static const char *const powers[] = {"Low", "Medium", "High"};
-    return powers[activeSlot.tx.power <= TX_POWER_HIGH ? activeSlot.tx.power : 0];
-  }
-  case MENU_TX_FREQUENCY:
-    if (number.active && inputTx) { NUMBER_Text(&number,out); return out; }
-    if (!activeSlot.tx.frequency_hz) return "Same";
-    hz = activeSlot.tx.frequency_hz; break;
-  case MENU_TX_TONE: TONE_Format(activeSlot.tx.tone,out); return out;
-  case MENU_CHANNEL_NAME:
-    return CHANNEL_MANAGER_Name(selectedSlot)[0] ? CHANNEL_MANAGER_Name(selectedSlot) : "(none)";
-  case MENU_CHANNEL_SAVE: return "Choose CH";
-  default: return "";
-  }
-  const char *unit = UI_FormatFrequency(hz,frequency);
-  snprintf(out,24,"%s %s",frequency,unit);
-  return out;
-}
-
-// Owns transient strings until the card has been drawn.
-typedef struct {
-  UserChannel channel;
-  char header[16];
-} RadioViewStorage;
-
-// Resolve application state here; the UI component only consumes display data.
-static void buildCardView(uint8_t id, const char *inputText,
-                          UI_RadioCardView *view, RadioViewStorage *storage) {
-  bool selected = id == selectedSlot;
-  const RadioSlot *stored = &gDeviceConfig.radio.slots[id];
-  RadioSlot effective;
-  UserChannel *channel = &storage->channel;
-  *channel = (UserChannel){0};
-  bool effectiveOk;
-  if (selected) {
-    effective = activeSlot;
-    effectiveOk = activeSlot.source != RADIO_SOURCE_CHANNEL ||
-                  loadChannelForSlot(id, channel);
-  } else {
-    effectiveOk = effectiveSlot(id, &effective, channel);
-  }
-  if (!effectiveOk) effective = *stored;
-  const RadioSlot *config = &effective;
-  const TxConfig *tx = &config->tx;
-  const BandState *current = &config->current;
-  const RadioParameters *p = &current->parameters;
-  const RadioParameters *preset = &gDeviceConfig.radio.presets[config->active_band];
-  bool channelMode = stored->source == RADIO_SOURCE_CHANNEL;
-  bool modified = !channelMode && (p->mode != preset->mode || p->step_hz != preset->step_hz ||
-    p->bandwidth_hz != preset->bandwidth_hz || p->squelch != preset->squelch ||
-    p->rx_tone != preset->rx_tone);
-  bool receiving = receivingSlot==id && RADIO_APP_isReceiving();
-  bool textValid = labels[id].frequency_hz == current->frequency_hz;
-  char *channelHeader = storage->header;
-  const char *header = radioBands[config->active_band].name;
-  const char *channelName = NULL;
-  if (channelMode) {
-    snprintf(channelHeader, sizeof(storage->header), "CH %03u", stored->channel_number);
-    header = channelHeader;
-    channelName = effectiveOk && channel->name[0] ? channel->name : channelHeader;
-    if (!effectiveOk) { channelName = NULL; header = "Channel unavailable"; }
-  }
-  *view = (UI_RadioCardView){
-    .id = 'A'+id, .selected = selected,
-    .edit_text = selected && number.active && !inputTx ? inputText : NULL,
-    .frequency_hz = selected && seek.active ? seek.cursor_hz : current->frequency_hz,
-    .mode = p->mode, .band_name = header,
-    .changed = modified, .step_hz = p->step_hz,
-    .name = channelMode ? channelName : textValid ? labels[id].ps : NULL,
-    .rds = textValid ? labels[id].text : NULL,
-    .header_message = selected && !number.active ? (message ? message :
-        gDeviceConfig.radio.watch_enabled ? watchStatus : NULL) : NULL,
-    .signal_valid = receiving, .signal_level = receiving ? UI_SMeterLevel() : 0,
-    .activity = selected && transmitter.mode==RADIO_TX ? UI_RADIO_CARD_TRANSMITTING :
-      selected && transmitter.mode==RADIO_FAULT ? UI_RADIO_CARD_FAULT :
-      selected && seek.active ? UI_RADIO_CARD_SEEKING :
-      receivingSlot==id && WATCH_IsProbing(&watcher) ? UI_RADIO_CARD_WATCHING :
-      receiving && gReceiver.open ? UI_RADIO_CARD_RECEIVING :
-      (channelMode && !effectiveOk) || (selected && !runtime.active) ? UI_RADIO_CARD_UNAVAILABLE : UI_RADIO_CARD_IDLE,
-    .power_label = tx->power == TX_POWER_HIGH ? "HIGH" :
-                   tx->power == TX_POWER_MEDIUM ? "MID" : "LOW",
-  };
-  if (selected && capturePhase!=FC_OFF) {
-    view->name=view->rds=NULL;
-    view->header_message=capturePhase==FC_PREVIEW ? "FC Preview" : "FC detecting";
-    if (capturePhase==FC_PREVIEW) {
-      view->frequency_hz=capture.last_hz;
-      view->mode=RX_NFM;
-      view->step_hz=12500;
-    }
-  }
-}
-
-static void renderTitle(void) {
-  if (capturePhase!=FC_OFF) STATUSLINE_SetText("FC %s %s",
-      capture.scope==CAPTURE_AUTO ? "Auto" : capture.scope==CAPTURE_VHF ? "VHF" : "UHF",
-      capturePhase==FC_PREVIEW ? "MENU:Use" : capture.range==CAPTURE_RANGE_VHF ? "VHF" : "UHF");
-  else if (number.active) STATUSLINE_SetText(number.invalid ? "Invalid value" : inputTx ? "TX Frequency" : "RX Frequency");
-  else if (inMenu || confirming || activeSlot.source == RADIO_SOURCE_CHANNEL ||
-           (gDeviceConfig.radio.watch_enabled && gDeviceConfig.radio.slot_count > 1)) {
-    bool watchTitle = !inMenu && !confirming &&
-                      activeSlot.source != RADIO_SOURCE_CHANNEL &&
-                      gDeviceConfig.radio.slot_count > 1;
-    const char *mode = inMenu || confirming ? "VFO" :
-        activeSlot.source == RADIO_SOURCE_CHANNEL ? "MR" : "DW";
-    char id = watchTitle ? (receivingSlot<RADIO_SLOT_CAPACITY ?
-              'A'+receivingSlot : '-') : 'A'+selectedSlot;
-    STATUSLINE_SetText("%s %c", mode, id);
-  } else STATUSLINE_SetText("RADIO");
-}
-
-static void renderConfirmation(void) {
-  char frequencyText[16];
-  const char *unit = UI_FormatFrequency(pending.frequency_hz, frequencyText);
-  PrintMediumEx(2, 18, POS_L, C_FILL, "Apply %s?", rxModeNames[pending.parameters.mode]);
-  PrintMediumEx(2, 30, POS_L, C_FILL, "%s %s", frequencyText, unit);
-  PrintSmall(2, 40, "BW %u Hz STEP %u Hz", pending.parameters.bandwidth_hz, pending.parameters.step_hz);
-  PrintSmall(2, 57, "MENU: apply  EXIT: cancel");
-}
-
-static void renderMenu(void) {
-  static const char *const names[] = {
-    "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone", "RX Watch", "TX Enable", "TX Power", "TX Frequency", "TX Tone", "Name", "Save"
-  };
-  _Static_assert(sizeof(names)/sizeof(names[0]) == MENU_ITEM_COUNT,
-                 "Every VFO menu item needs a label");
-  uint8_t first = menuIndex < 5 ? 0 : menuIndex-4;
-  for (uint8_t i = first; i < MENU_ITEM_COUNT && i < first+5; ++i) {
-    uint8_t y = 17+(i-first)*11;
-    if (i == MENU_TX_FREQUENCY && number.active) PrintSmallEx(2, y, POS_L, C_FILL, "TX Freq");
-    else PrintMediumEx(2, y, POS_L, C_FILL, "%s", names[i]);
-    char value[24];
-    PrintSmallEx(124, y, POS_R, C_FILL, "%s", menuValue(i, value));
-    if (i == menuIndex)
-      FillRect(0, y-7, 128, 10, C_INVERT);
-  }
-}
-
-void RADIO_APP_render(void) {
-  renderTitle();
-  if (CHANNEL_MANAGER_Render()) return;
-  if (!message && (confirming || inMenu)) {
-    if (confirming) renderConfirmation();
-    else renderMenu();
-    return;
-  }
-
-  char inputText[18];
-  // The number formatter is only needed by an active RX frequency editor.
-  if (number.active && !inputTx) NUMBER_Text(&number, inputText);
-  uint8_t first = RADIO_STATE_VisibleFirst(&gDeviceConfig.radio);
-  uint32_t now = Now();
-  uint8_t visible = MIN(gDeviceConfig.radio.slot_count, RADIO_SLOT_VISIBLE);
-  for (uint8_t row = 0; row < visible; ++row) {
-    uint8_t id = first + row;
-    RadioViewStorage storage;
-    UI_RadioCardView view;
-    buildCardView(id, inputText, &view, &storage);
-    UI_RadioCardRender(8 + row * UI_RADIO_CARD_HEIGHT, &view, &cards[id], now);
-  }
 }
