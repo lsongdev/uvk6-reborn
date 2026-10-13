@@ -18,19 +18,34 @@ Settings gSettings;
 static unsigned probes;
 static bool hardwareApplyOk = true;
 static unsigned hardwareApplies, audioMutes;
+static bool trackAudio;
+static char audioOrder[16];
+static unsigned audioCount;
+static void audioEvent(char c) {
+  if (trackAudio) {
+    assert(audioCount < sizeof(audioOrder));
+    audioOrder[audioCount++] = c;
+  }
+}
 bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
   (void)plan; (void)previous;
   ++hardwareApplies;
   return hardwareApplyOk;
 }
-void AUDIO_ToggleSpeaker(bool on) { if (!on) ++audioMutes; }
-void BK4819_ToggleAFDAC(bool on) { (void)on; }
-void BK4819_ToggleAFBit(bool on) { (void)on; }
+void AUDIO_ToggleSpeaker(bool on) {
+  if (!on) ++audioMutes;
+  audioEvent(on ? 'S' : 's');
+}
+void BK4819_ToggleAFDAC(bool on) { audioEvent(on ? 'D' : 'd'); }
+void BK4819_ToggleAFBit(bool on) { audioEvent(on ? 'B' : 'b'); }
 void LED_SetGreen(bool on) { (void)on; }
 void BACKLIGHT_On(void) {}
 void BACKLIGHT_SetReception(bool open) { (void)open; }
 void BACKLIGHT_Toggle(bool on) { (void)on; }
-void SYS_DelayMs(uint32_t ms) { (void)ms; }
+void SYS_DelayMs(uint32_t ms) {
+  if (trackAudio) assert(ms == 8);
+  audioEvent('t');
+}
 bool BK1080_Detect(void) { ++probes; return !hasSi; }
 bool SI47XX_Detect(void) { ++probes; return hasSi; }
 bool SETTINGS_IsPatchPresent(void) { return true; }
@@ -97,6 +112,18 @@ int main(int argc, char **argv) {
   RADIO_GetReceiverCapabilities();
   RADIO_GetReceiverCapabilities();
   assert(probes == initialProbes);
+  // The unified audio path must preserve PA-independent speaker sequencing.
+  trackAudio = true;
+  ctx->radio_type = RADIO_BK4819;
+  RADIO_SetAudioOpen(true);
+  RADIO_SetAudioOpen(false);
+  assert(audioCount == 8 && !memcmp(audioOrder, "DBtSstdb", 8));
+  audioCount = 0;
+  ctx->radio_type = RADIO_SI4732;
+  RADIO_SetAudioOpen(true);
+  RADIO_SetAudioOpen(false);
+  assert(audioCount == 4 && !memcmp(audioOrder, "tSst", 4));
+  trackAudio = false;
   testFrequencyInput();
   return 0;
 }
