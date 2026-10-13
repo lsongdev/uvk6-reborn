@@ -26,7 +26,7 @@ SRC := $(SRC_DIR)/main.c \
        $(filter-out $(SRC_DIR)/ui/spectrum.c $(SRC_DIR)/ui/regs-menu.c,$(wildcard $(SRC_DIR)/ui/*.c)) \
        $(wildcard $(SRC_DIR)/ui/components/*.c) \
        $(wildcard $(SRC_DIR)/vfo/*.c) \
-       $(addprefix $(SRC_DIR)/apps/,apps.c system.c bands.c settings.c reset.c textinput.c)
+       $(addprefix $(SRC_DIR)/apps/,apps.c radio.c system.c bands.c settings.c reset.c textinput.c)
 
 OBJS := $(OBJ_DIR)/hal/start.o \
         $(OBJ_DIR)/external/printf/printf.o \

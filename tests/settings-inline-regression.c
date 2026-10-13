@@ -28,7 +28,7 @@ bool DEVICE_SavePreferences(const ConfigPreferences *next) {
   if (!saveWorks) return false;
   gDeviceConfig.preferences=*next; ++saves; return true;
 }
-bool VFO_ApplyRxSettings(void) { ++reapplications; return applyWorks; }
+bool RADIO_APP_ApplyRxSettings(void) { ++reapplications; return applyWorks; }
 ReceiverCapabilities RADIO_GetReceiverCapabilities(void) { return capabilities; }
 TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) { (void)frequency_hz; return (TxCapabilities){0}; }
 TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }

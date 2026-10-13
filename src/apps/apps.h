@@ -4,7 +4,7 @@
 #include "hal/keyboard.h"
 #include "core/radio.h"
 
-#define RUN_APPS_COUNT 1
+#define RUN_APPS_COUNT 2
 
 typedef enum {
   APP_NONE,
@@ -19,7 +19,7 @@ typedef enum {
   APP_TEXTINPUT,
   APP_CH_CFG,
   APP_SETTINGS,
-  APP_VFO,
+  APP_RADIO,
   // APP_GENERATOR,
   APP_ABOUT,
   APP_BANDS,

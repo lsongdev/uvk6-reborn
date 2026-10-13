@@ -1,7 +1,7 @@
 #include "core/device-config.h"
 #include "apps/system.h"
 #include "apps/apps.h"
-#include "vfo/vfo.h"
+#include "apps/radio.h"
 #include "hal/backlight.h"
 #include "hal/eeprom.h"
 #include "hal/keyboard.h"
@@ -75,7 +75,7 @@ static bool checkKeylock(Key_State_t state, KEY_Code_t key) {
   bool isLongPressF = state == KEY_LONG_PRESSED && key == KEY_F;
 
   if (isLongPressF) {
-    VFO_cancelShortcut();
+    RADIO_APP_cancelShortcut();
     gDeviceConfig.preferences.keylock = !gDeviceConfig.preferences.keylock;
     SETTINGS_Save();
     return true;
@@ -95,7 +95,7 @@ static void processKeyboard() {
   if (n.message == MSG_KEYPRESSED) {
     // Release cannot be swallowed by keylock, menu, or UART activity.
     if (n.key == KEY_PTT && n.state == KEY_RELEASED)
-      VFO_PttRelease();
+      RADIO_APP_PttRelease();
     if (isUartWaiting()) return;
     BACKLIGHT_On();
 
@@ -114,7 +114,7 @@ static void processKeyboard() {
         if (n.state == KEY_LONG_PRESSED) {
           APPS_run(APP_SETTINGS);
         } else if (n.state == KEY_RELEASED) {
-          APPS_run(APP_VFO);
+          APPS_run(APP_RADIO);
         }
       }
       if (n.key == KEY_EXIT) {
@@ -158,17 +158,17 @@ void SYS_Main() {
     // Built-in frequency profiles no longer depend on EEPROM band records.
 
     LogC(LOG_C_BRIGHT_WHITE, "RUN DEFAULT APP");
-    APPS_run(APP_VFO);
+    APPS_run(APP_RADIO);
   }
 
   for (;;) {
 
     // Highest-priority half-duplex safety check, even when another app owns
     // the UI. Physical PA shutoff must not depend on VFO repaint cadence.
-    VFO_TxSafetyUpdate();
+    RADIO_APP_TxSafetyUpdate();
     SETTINGS_UpdateSave();
 
-    if (gRadioState && VFO_isReceiving() && Now()-radioTimer >= SQL_DELAY) {
+    if (gRadioState && RADIO_APP_isReceiving() && Now()-radioTimer >= SQL_DELAY) {
       RADIO_UpdateSquelch(gRadioState);
       radioTimer = Now();
     }
