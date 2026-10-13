@@ -1,10 +1,10 @@
 # UVK6 Reborn 中文用户手册
 
-更新于 2026-10-13，依据当前工作区的多 VFO 与双守听实现。本文描述当前可达的界面与操作；后续设计见 [design.md](design.md)，实现与验收进度见 [refactor-progress.md](refactor-progress.md)。代码行为与实机接收效果分开判断，硬件依据见 [hardware.md](hardware.md)。
+更新于 2026-10-13，依据 Radio 主应用、RadioSlot 与双守听实现。本文描述当前可达的界面与操作；后续设计见 [design.md](design.md)，实现与验收进度见 [refactor-progress.md](refactor-progress.md)。代码行为与实机接收效果分开判断，硬件依据见 [hardware.md](hardware.md)。
 
 ## 当前功能范围
 
-默认启用 A/B，可在 Settings → Receive → VFO count 启用 2／3／4 个 VFO，每页显示两个，围绕频段、频率和明确的解调模式操作。默认一次接收选中项，使用 `F → 2(A/B)` 按已启用数量循环切换；`F → 3(VFO/MR)` 在选中 VFO 的连续调谐和频道记忆之间切换；可选双守听会按各 VFO 当前来源轮询。各 VFO 的频率、RX/TX 参数和各频段记忆独立，频段预设共享。首次初始化 A 为 145.500 MHz NFM、B 为 438.500 MHz NFM。固件根据频率、模式及探测到的芯片能力选择接收路径，无需手动选择芯片。模式为 `NFM / WFM / AM / LSB / USB`，没有 `Auto`。
+默认启用 A/B 两个 Radio Slot，可在 Settings → Receive → Slot count 启用 2／3／4 项，每页显示两个。主屏幕不区分 VFO 或 MR；`F → 2(A/B)` 在 Slot 间循环选择，`F → 3(VFO/MR)` 切换所选 Slot 的频率来源（直接调频或存储频道）。切到 MR 不覆盖原先的 VFO 频率和频段记忆，切回时恢复；可选双守听按每个 Slot 当前来源轮询。Slot 的 TX 设置和 Watch 资格独立，频段预设共享。首次初始化 A 为 145.500 MHz NFM、B 为 438.500 MHz NFM。固件根据频率、模式及探测到的芯片能力选择接收路径，无需手动选择芯片。模式为 `NFM / WFM / AM / LSB / USB`，没有 `Auto`。
 
 默认的生产编译 **TX 在编译期禁用**：可保存各 VFO 的 TX 意图、Tone、功率和独立频率以及 TOT/Busy Lock 参数，但这些设置不构成实际射频授权，按 PTT 不会开启 PA。实验性 TX 路径仅供具备假负载和仪表的受控硬件验收使用。已支持命名频道和频道模式；`F → 4` 可启动 FC 频率捕获、`F → *` 可启动向前 Seek。旧扫描 / Loot 应用目前没有入口。
 

@@ -193,7 +193,7 @@ void SYS_Main() {
 
     appRender();
 
-    while (gCurrentApp != APP_SCANER && UART_IsCommandAvailable()) {
+    while (UART_IsCommandAvailable()) {
       UART_HandleCommand();
       lastUartDataTime = Now();
     }

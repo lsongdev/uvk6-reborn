@@ -8,22 +8,11 @@
 
 typedef enum {
   APP_NONE,
-  APP_SCANER,
-  APP_CH_SCAN,
-  APP_BAND_SCAN,
-  APP_FC,
-  APP_CH_LIST,
-  APP_APPS_LIST,
-  APP_LOOT_LIST,
-  APP_RESET,
-  APP_TEXTINPUT,
-  APP_CH_CFG,
-  APP_SETTINGS,
   APP_RADIO,
-  // APP_GENERATOR,
-  APP_ABOUT,
-  APP_BANDS,
-
+  APP_SETTINGS,
+  APP_BANDS,       // Internal editor launched from Settings.
+  APP_TEXTINPUT,   // Internal channel-name editor.
+  APP_RESET,       // Initialization when configuration is absent.
   APPS_COUNT,
 } AppType_t;
 
