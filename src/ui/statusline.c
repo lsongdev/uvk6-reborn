@@ -1,7 +1,7 @@
 #include "ui/statusline.h"
 #include "core/device-config.h"
 #include "apps/apps.h"
-#include "vfo/vfo.h"
+#include "apps/radio.h"
 #include "hal/eeprom.h"
 #include "drivers/si473x/si473x.h"
 #include "hal/display.h"
@@ -116,7 +116,7 @@ void STATUSLINE_render(void) {
   }
 
   uint8_t iconsRight = batteryWidth + 4 < LCD_WIDTH ? LCD_WIDTH - 1 - batteryWidth - 3 : 0;
-  if (gCurrentApp == APP_VFO && VFO_isShortcutPending()) {
+  if (gCurrentApp == APP_VFO && RADIO_APP_isShortcutPending()) {
     PrintSmallEx(iconsRight, BASE_Y, POS_R, C_FILL, "F");
     iconsRight -= 8;
   }
