@@ -33,7 +33,7 @@ typedef struct {
 typedef struct {
   uint8_t slot_count, selected_slot;
   bool watch_enabled;
-  RadioSlot vfos[RADIO_SLOT_CAPACITY];
+  RadioSlot slots[RADIO_SLOT_CAPACITY];
   RadioParameters presets[RADIO_STATE_BANDS];
 } RadioUserState;
 
