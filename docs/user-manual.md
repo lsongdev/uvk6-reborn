@@ -59,13 +59,13 @@ VFO 标识后的 `*` 表示当前模式、步进、带宽或静噪与该频段�
 | 长按 `MENU` | 打开全局设置 |
 | 短按 `EXIT` | 关闭监听 |
 | 长按 `F`（副标 `#`、钥匙图标） | 锁定 / 解锁键盘 |
-| `PTT` | 校验当前 VFO 的 TX 意图、模式及独立硬件授权；未验证的设备始终拒绝发射 |
+| `PTT` | 当前 VFO 的 TX Enable 设为 On 后，按住进行 NFM 发射，松开恢复 RX；只开放 136–174／400–470 MHz，要求本机功率校准和有效供电 |
 
 侧键不承担旧手册中的监听、手电筒或 SSB ±50 Hz 微调功能。在参数菜单和频率输入中，侧键不执行全局频段 / 模式切换。
 
 副标快捷键采用顺序操作，无需同时按住。目前实现 `F → 1` 切频段、`F → 0` 切模式、`F → 2` 循环 VFO、`F → 3` 切换 VFO/MR、`F → 6` 切换发射功率、`F → 4` 频率捕获和 `F → *` 搜台；其他目标键显示 `Not supported`，不进入频率输入。执行一次后退出前缀；再次短按 `F` 或短按 `EXIT` 可取消，3 秒未执行也自动取消。PTT、长按 F 锁键、进入设置或其他界面会清除前缀。菜单中 F 保留原有局部操作，数值编辑期间短按 F 不执行操作。侧键功能暂不可配置，后续设计见 [统一绑定规则](design.md#33-f-前缀与副标快捷键统一绑定规则)。
 
-键盘锁定后，两个侧键也被锁定，防止误调谐。默认 PTT 不受键盘锁影响；全局设置 `Lock PTT too` 为 `On` 时，PTT 也被屏蔽。该选项不会解除发射禁用。
+键盘锁定后，两个侧键也被锁定，防止误调谐。默认 PTT 不受键盘锁影响；全局设置 `Lock PTT too` 为 `On` 时，PTT 也被屏蔽。该选项不改变 TX Enable 或板级发射范围。
 
 ## 频段与独立参数
 
@@ -155,7 +155,7 @@ NFM 是对讲机窄带 FM，WFM 是广播宽带 FM。95.925 MHz 上从 WFM 切�
 | `RX Squelch` | 静噪等级，0～10 |
 | `RX Tone` | Off、50 个 CTCSS 频率、104 个 DCS 正码／反码；仅 NFM 可编辑 |
 | `TX Enable` | 选中 VFO 的发射意图，默认 Off；不是硬件许可 |
-| `TX Power` | Low / Medium / High，未标定档位不允许真实输出 |
+| `TX Power` | Low / Medium / High，使用对应原厂校准档；缺少校准的档位拒绝发射 |
 | `TX Frequency` | Same 跟随当前 RX，或独立 TX 频率；MENU／* 原地编辑，# 恢复 Same |
 | `TX Tone` | Off、CTCSS、DCS 正码／反码，独立于 RX Tone 保存 |
 | `RX Watch` | 是否加入守听组，最多两项 On；需开启 Receive → Dual watch 才运行 |
@@ -204,7 +204,7 @@ TX Frequency 在菜单当前行原地编辑，进入时显示当前值，首个�
 | Battery → Cal voltage | 按 MENU 在当前行输入实测电压，5.00～8.60 V；首个数字替换草稿，MENU 提交，长按 EXIT 取消。最终校准系数也须合法，保存成功后才采用新值 |
 | Band presets | 频段默认接收参数编辑器，保留独立草稿与 Save 操作 |
 | About | 固件版本、EEPROM 容量、配置格式、SI4732／BK1080 与 SSB 补丁状态，只读 |
-| System → TX status | 当前发射硬件及许可状态，只读；当前生产 HAL 显示 HW locked |
+| System → TX status | 当前发射硬件及许可状态，只读；显示所选目标频率的板级支持／校准状态，Ready 不等于已测量 RF 输出 |
 | System → Save status | Saved／Pending／Failed／Read only；按 MENU 立即保存或重试，写入失败保留待保存状态 |
 | System → Reset prefs | 显示恢复范围；MENU 确认、EXIT 取消。只在写入成功后恢复显示、按键、发射保护和电量显示等偏好 |
 
@@ -226,7 +226,10 @@ Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mi
 | `Band boundary` | 频率量化后落入另一个频段，本次请求未应用 |
 | `Fixed bandwidth` | WFM 带宽固定 |
 | `TX disabled` | VFO TX Enable 为 Off |
-| `TX HW locked` | PA/滤波与功率未实机验证，即使设置 On 也不发射 |
+| `TX HW locked` | 当前板级发射实现不可用 |
+| `TX calibration missing` | 目标频率／功率档校准缺失或读取失败 |
+| `TX out of band` | TX 频率不在 136–174／400–470 MHz |
+| `TX battery voltage` | 电池电压未知或超出 6.00–9.00 V，拒绝或中止发射 |
 | `TX mode not supported` | 当前模式不是候选 BK4819/NFM |
 
 显示可导航的目标频率不保证接收已成功；确认没有 `RX --`，并检查模式、天线、音量和静噪。FM 广播使用 WFM，UHF 对讲使用 NFM。进入设置后，主界面 `EXIT` 的关闭监听含义不适用于菜单返回键。
@@ -275,3 +278,5 @@ Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mi
 FC 不识别解调模式或亚音，也可能捕获谐波／强信号误报；NFM 试听与频率准确度仍需实机验证。详见 [FC 实现与验收](fc-design.md)。
 
 发射被拒绝时（例如 TX disabled、TX mode not supported、TX HW locked），提示临时显示在选中 VFO 的黑底横条中，替换频段文案，保留 A–D 标识和模式；长文案滚动，提示结束恢复原横条。频率／名称正文保持显示，FC timeout、调谐错误、Seek 状态、频道保存反馈和守听提示也使用同一状态条。
+
+PTT 发射已接入 BK4819 NFM 实际 HAL；初始化默认 TX Enable 仍为 Off，需在当前 VFO 菜单启用。Same／独立 TX 频率及 TX Tone 均进入发射方案，F→6 选择功率档。松开 PTT、超时或供电异常先关闭功放，再恢复原 RX；本轮尚未刷机测量射频输出。实现与校准布局见[PTT 发射链路](tx-design.md)。
