@@ -60,7 +60,7 @@ automatically migrate EEPROM content.
   writing an EEPROM marker or rebooting repeatedly**.
 - EEPROM writes stay locked until a recognized UVK6 Reborn configuration is
   loaded, or the user explicitly initializes: press `0`, then `1` to
-  confirm. **This writes the two UVR2 configuration slots at
+  confirm. **This writes within the two UVR2 configuration slots at
   `0x0800–0x0FFF`, which may contain data from earlier firmware.**
   Legacy settings are not automatically migrated. User channels use a
   separate `0xB000–0xDFFF` region. Do not confirm
