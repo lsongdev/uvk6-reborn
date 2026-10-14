@@ -83,12 +83,14 @@ void RADIO_APP_TxSafetyUpdate(void) {
     notify(transmitter.mode == RADIO_FAULT ? "RX error" : "TX timeout");
 }
 
-bool setTxFrequency(uint32_t value) {
-  if (inputSlot != selectedSlot || !TX_MODEL_FrequencyValid(value)) return false;
-  gDeviceConfig.radio.slots[selectedSlot].tx.frequency_hz = value;
-  activeSlot.tx.frequency_hz = value;
+// Accepts the TX Offset (+/-) or TX Freq (Split) edit; zero clears it.
+bool setTxValue(uint32_t value) {
+  TxConfig tx = activeSlot.tx;
+  if (tx.shift == TX_SHIFT_SPLIT) tx.split_hz = value; else tx.offset_hz = value;
+  if (inputSlot != selectedSlot || !TX_MODEL_ConfigValid(&tx)) return false;
+  activeSlot.tx = gDeviceConfig.radio.slots[selectedSlot].tx = tx;
   DEVICE_RequestSave();
-  notify("TX freq saved");
+  notify("Saved");
   return true;
 }
 
@@ -117,7 +119,7 @@ static void startTransmit(void) {
     return;
   }
   const TxConfig *tx = txConfig();
-  TxCapabilities capability = TX_DEVICE_Capabilities(tx->frequency_hz ? tx->frequency_hz : runtime.current.frequency_hz);
+  TxCapabilities capability = TX_DEVICE_Capabilities(TX_MODEL_Frequency(tx, runtime.current.frequency_hz));
   TxPolicy policy = TX_DEVICE_Policy();
   TxPlan planned;
   TxResult result = TX_MODEL_Plan(&runtime.current, tx,

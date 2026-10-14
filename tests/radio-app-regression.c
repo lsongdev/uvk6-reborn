@@ -250,13 +250,16 @@ int main(void) {
   press(KEY_F);press(KEY_3);assert(activeSlot.source==RADIO_SOURCE_CHANNEL);
   assert(activeSlot.current.frequency_hz==438500000);
   press(KEY_UP);assert(activeSlot.current.frequency_hz==438500000); // One occupied channel wraps to itself.
-  inMenu=true;menuIndex=MENU_CHANNEL_NAME;press(KEY_MENU);
-  assert(gTextinputText==CHANNEL_MANAGER_Name(selectedSlot));
-  strcpy(gTextinputText,"NAMED");gTextInputCallback();
-  menuIndex=MENU_CHANNEL_SAVE;press(KEY_MENU);assert(CHANNEL_MANAGER_Active());
+  // Save as channel: the current channel is offered first, overwriting is
+  // confirmed, then the name (prefilled with the old one) is asked for.
+  inMenu=true;menuIndex=MENU_SAVE_CHANNEL;press(KEY_MENU);assert(CHANNEL_MANAGER_Active());
   press(KEY_MENU);assert(CHANNEL_MANAGER_Active()); // First press confirms overwrite.
-  press(KEY_MENU);assert(!CHANNEL_MANAGER_Active());
-  assert(!strcmp(fakeChannels[12].name,"NAMED"));
+  unsigned runsBeforeName=appRuns;
+  press(KEY_MENU);assert(!CHANNEL_MANAGER_Active() && appRuns==runsBeforeName+1);
+  assert(!strcmp(gTextinputText,"TEST") && gTextInputSize==USER_CHANNEL_NAME_MAX);
+  assert(!strcmp(fakeChannels[12].name,"TEST")); // Nothing saved before the name.
+  strcpy(gTextinputText,"NAMED");gTextInputCallback();
+  assert(!strcmp(fakeChannels[12].name,"NAMED") && !strcmp(message,"Saved"));
   assert(gDeviceConfig.radio.slots[0].current.frequency_hz==145500000);
   inMenu=false;
   // Both F-prefix and side-key controls must refuse tuning in MR mode.
@@ -659,27 +662,39 @@ int main(void) {
   press(KEY_MENU);
   assert(activeSlot.current.parameters.rx_tone==1 && runtime.current.parameters.rx_tone==1);
   press(KEY_F);assert(activeSlot.current.parameters.rx_tone==0);
-  for(unsigned i=MENU_RX_TONE;i<MENU_TX_FREQUENCY;++i) press(KEY_DOWN);
-  assert(menuIndex==MENU_TX_FREQUENCY);
+  for(unsigned i=MENU_RX_TONE;i<MENU_TX_SHIFT;++i) press(KEY_DOWN);
+  assert(menuIndex==MENU_TX_SHIFT && activeSlot.tx.shift==TX_SHIFT_OFF);
+  // TX Offset is inert while the shift is Off.
+  press(KEY_DOWN);press(KEY_MENU);assert(!number.active && !strcmp(message,"TX Shift is Off"));
+  press(KEY_UP);press(KEY_MENU);assert(activeSlot.tx.shift==TX_SHIFT_PLUS);
   unsigned appliesBefore=applied;
-  press(KEY_MENU);
+  press(KEY_DOWN);press(KEY_MENU);
   assert(appRuns==0 && number.active && inputTx);
-  press(KEY_4);press(KEY_3);press(KEY_8);press(KEY_STAR);press(KEY_6);
-  press(KEY_MENU);
-  assert(gDeviceConfig.radio.slots[0].tx.frequency_hz==438600000 && applied==appliesBefore);
+  press(KEY_0);press(KEY_STAR);press(KEY_6);press(KEY_MENU);
+  assert(gDeviceConfig.radio.slots[0].tx.offset_hz==600000 && applied==appliesBefore);
+  assert(TX_MODEL_Frequency(&activeSlot.tx,438500000)==439100000);
+  // Split edits its own TX frequency; the offset is kept for +/-.
+  press(KEY_UP);press(KEY_MENU);press(KEY_MENU);assert(activeSlot.tx.shift==TX_SHIFT_SPLIT);
+  press(KEY_DOWN);press(KEY_MENU);
+  press(KEY_4);press(KEY_3);press(KEY_8);press(KEY_STAR);press(KEY_6);press(KEY_MENU);
+  assert(gDeviceConfig.radio.slots[0].tx.split_hz==438600000 && activeSlot.tx.offset_hz==600000);
   assert(activeSlot.current.frequency_hz==438500000);
   press(KEY_MENU);press(KEY_7);press(KEY_0);press(KEY_0);press(KEY_MENU);
-  assert(number.active && number.invalid && gDeviceConfig.radio.slots[0].tx.frequency_hz==438600000);
+  assert(number.active && number.invalid && gDeviceConfig.radio.slots[0].tx.split_hz==438600000);
   assert(RADIO_APP_key(KEY_EXIT,KEY_LONG_PRESSED));
-  inMenu=true;press(KEY_F);assert(!gDeviceConfig.radio.slots[0].tx.frequency_hz);
+  inMenu=true;
   press(KEY_DOWN);assert(menuIndex==MENU_TX_TONE);
   press(KEY_MENU);assert(gDeviceConfig.radio.slots[0].tx.tone==1);
   press(KEY_F);assert(gDeviceConfig.radio.slots[0].tx.tone==0);
+  // Reset to defaults: the band preset comes back, frequency and TX stay.
+  press(KEY_DOWN);assert(menuIndex==MENU_RESET);
+  activeSlot.current.parameters.squelch=9;
+  press(KEY_MENU);
+  assert(activeSlot.current.parameters.squelch==gDeviceConfig.radio.presets[activeSlot.active_band].squelch);
+  assert(activeSlot.current.frequency_hz==438500000 && activeSlot.tx.split_hz==438600000);
   unsigned savesBeforePlaceholder=saveRequests;
   appliesBefore=applied;
-  press(KEY_DOWN);assert(menuIndex==MENU_CHANNEL_NAME);
-  press(KEY_MENU);assert(gTextinputText==CHANNEL_MANAGER_Name(selectedSlot));
-  press(KEY_DOWN);assert(menuIndex==MENU_CHANNEL_SAVE);
+  press(KEY_DOWN);assert(menuIndex==MENU_SAVE_CHANNEL);
   press(KEY_MENU);assert(CHANNEL_MANAGER_Active());press(KEY_EXIT);assert(!CHANNEL_MANAGER_Active());
   assert(saveRequests==savesBeforePlaceholder && applied==appliesBefore);
   assert(inMenu && !confirming);

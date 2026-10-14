@@ -1,4 +1,5 @@
 #include "core/radio-state.h"
+#include "core/channel-model.h"
 
 static bool parametersValid(const RadioParameters *p) {
   return (unsigned)p->mode < RX_MODE_COUNT && p->step_hz &&
@@ -10,10 +11,10 @@ bool RADIO_SLOT_Valid(const RadioSlot *slot) {
       RADIO_MODEL_BandAt(slot->current.frequency_hz) != slot->active_band ||
       !parametersValid(&slot->current.parameters) ||
       (unsigned)slot->source > RADIO_SOURCE_CHANNEL ||
-      slot->channel_number > 128 ||
+      slot->channel_number > USER_CHANNEL_COUNT ||
       (slot->source == RADIO_SOURCE_CHANNEL && !slot->channel_number) ||
       (unsigned)slot->tx.power > TX_POWER_HIGH || !TONE_Valid(slot->tx.tone) ||
-      !TX_MODEL_FrequencyValid(slot->tx.frequency_hz)) return false;
+      !TX_MODEL_ConfigValid(&slot->tx)) return false;
   for (uint8_t i = 0; i < radioBandCount; ++i) {
     const BandState *band = &slot->bands[i];
     if (band->frequency_hz < radioBands[i].start_hz ||

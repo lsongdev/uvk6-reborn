@@ -108,7 +108,7 @@ static bool saveNow(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
 static void getTxStatus(const MenuItem *item, char *out, uint8_t size) {
   (void)item;
   const RadioSlot *slot = &gDeviceConfig.radio.slots[gDeviceConfig.radio.selected_slot];
-  TxCapabilities capability = TX_DEVICE_Capabilities(slot->tx.frequency_hz ? slot->tx.frequency_hz : slot->current.frequency_hz);
+  TxCapabilities capability = TX_DEVICE_Capabilities(TX_MODEL_Frequency(&slot->tx, slot->current.frequency_hz));
   TxPolicy policy = TX_DEVICE_Policy();
   const char *status = !capability.available ? "HW locked" :
       !capability.power_mask ? "Uncalibrated" : !policy.authorized ? "Not allowed" : "Ready";

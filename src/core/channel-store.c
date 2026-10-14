@@ -4,202 +4,176 @@
 #include "hal/eeprom.h"
 #include <string.h>
 
-#define CHANNEL_RECORD_BYTES CHANNEL_STORE_RECORD_BYTES
-#define CHANNEL_COPY_COUNT CHANNEL_STORE_COPY_COUNT
-#define CHANNEL_RECORD_VERSION 1u
-#define CHANNEL_CRC_OFFSET 44u
+// Record: tag, sequence, number, flags, name[16], RX (14 B), TX (11 B),
+// reserved, CRC32 of bytes 0..59. Start-up reads only tag and sequence.
+#define RECORD CHANNEL_STORE_RECORD_BYTES
+#define TAG 0xC5u
+#define CRC_AT (RECORD - 4u)
+#define NAME_AT 4u
+#define NAME_LEN (USER_CHANNEL_NAME_BYTES - 1u)
 
 _Static_assert(CONFIG_STORE_END <= CHANNEL_STORE_BASE,
                "User channels must not overlap the configuration slots");
-_Static_assert(CHANNEL_STORE_END <= 0x1e00u || CHANNEL_STORE_BASE >= 0x2000u,
+_Static_assert(CHANNEL_STORE_BASE >= 0x2000u,
                "User channel storage must not overlap factory calibration");
 
-typedef struct {
-  uint32_t sequence;
-  uint8_t copy;
-  bool occupied;
-} ChannelIndex;
-
-static ChannelIndex indexCache[USER_CHANNEL_COUNT];
+static uint8_t occupied[(USER_CHANNEL_COUNT + 7) / 8], newer[(USER_CHANNEL_COUNT + 7) / 8];
 static bool initialized;
 
-static uint16_t get16(const uint8_t *p) {
-  return (uint16_t)p[0] | (uint16_t)p[1] << 8;
+static bool bit(const uint8_t *map, uint16_t n) { return map[(n-1u) >> 3] & (1u << ((n-1u) & 7)); }
+static void setBit(uint8_t *map, uint16_t n, bool on) {
+  uint8_t mask = 1u << ((n-1u) & 7);
+  if (on) map[(n-1u) >> 3] |= mask; else map[(n-1u) >> 3] &= ~mask;
 }
-static uint32_t get32(const uint8_t *p) {
-  return (uint32_t)get16(p) | (uint32_t)get16(p + 2) << 16;
-}
-static void put16(uint8_t *p, uint16_t v) {
-  p[0] = (uint8_t)v;
-  p[1] = (uint8_t)(v >> 8);
-}
-static void put32(uint8_t *p, uint32_t v) {
-  put16(p, (uint16_t)v);
-  put16(p + 2, (uint16_t)(v >> 16));
-}
-static uint32_t crc32(const uint8_t *p, uint16_t size) {
+static uint16_t get16(const uint8_t *p) { return (uint16_t)p[0] | (uint16_t)p[1] << 8; }
+static uint32_t get32(const uint8_t *p) { return get16(p) | (uint32_t)get16(p + 2) << 16; }
+static void put16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
+static void put32(uint8_t *p, uint32_t v) { put16(p, (uint16_t)v); put16(p + 2, (uint16_t)(v >> 16)); }
+static uint32_t crc32(const uint8_t *p) {
   uint32_t crc = 0xffffffffu;
-  for (uint16_t i = 0; i < size; ++i) {
-    uint8_t value = i >= CHANNEL_CRC_OFFSET ? 0 : p[i];
-    crc ^= value;
-    for (uint8_t bit = 0; bit < 8; ++bit)
-      crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
+  for (uint8_t i = 0; i < CRC_AT; ++i) {
+    crc ^= p[i];
+    for (uint8_t b = 0; b < 8; ++b) crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
   }
   return ~crc;
 }
 static uint32_t address(uint16_t number, uint8_t copy) {
   return CHANNEL_STORE_BASE +
-      (((uint32_t)number - 1u) * CHANNEL_COPY_COUNT + copy) * CHANNEL_RECORD_BYTES;
-}
-static bool available(void) {
-  uint32_t capacity = EEPROM_DetectSize();
-  return capacity >= CHANNEL_STORE_END + PATCH_SIZE;
+      (((uint32_t)number - 1u) * CHANNEL_STORE_COPY_COUNT + copy) * RECORD;
 }
 static bool valid(const UserChannel *ch) {
-  if (!ch || RADIO_MODEL_BandAt(ch->frequency_hz) == UINT8_MAX ||
-      (unsigned)ch->rx.mode >= RX_MODE_COUNT || !ch->rx.step_hz ||
-      ch->rx.bandwidth_hz > UINT16_MAX || ch->rx.squelch > 10 ||
-      !TONE_Valid(ch->rx.rx_tone) ||
-      (ch->rx.rx_tone && ch->rx.mode != RX_NFM) ||
-      (unsigned)ch->tx.power > TX_POWER_HIGH ||
-      !TONE_Valid(ch->tx.tone) ||
-      !TX_MODEL_FrequencyValid(ch->tx.frequency_hz))
-    return false;
-  return memchr(ch->name, '\0', sizeof(ch->name)) != NULL;
+  return ch && RADIO_MODEL_BandAt(ch->frequency_hz) != UINT8_MAX &&
+      (unsigned)ch->rx.mode < RX_MODE_COUNT && ch->rx.step_hz &&
+      ch->rx.bandwidth_hz <= UINT16_MAX && ch->rx.squelch <= 10 &&
+      TONE_Valid(ch->rx.rx_tone) && (!ch->rx.rx_tone || ch->rx.mode == RX_NFM) &&
+      TX_MODEL_ConfigValid(&ch->tx) && memchr(ch->name, '\0', sizeof(ch->name));
 }
-static bool decode(const uint8_t bytes[CHANNEL_RECORD_BYTES], uint16_t number,
-                   UserChannel *out, uint32_t *sequence) {
-  if (memcmp(bytes, "UCHN", 4) || bytes[4] != CHANNEL_RECORD_VERSION ||
-      bytes[5] != 1 || bytes[10] != (uint8_t)number ||
-      get32(bytes + CHANNEL_CRC_OFFSET) != crc32(bytes, CHANNEL_RECORD_BYTES))
-    return false;
+static bool decode(const uint8_t b[RECORD], uint16_t number, UserChannel *out) {
+  if (b[0] != TAG || b[2] != number || get32(b + CRC_AT) != crc32(b)) return false;
   UserChannel ch = {0};
-  memcpy(ch.name, bytes + 11, USER_CHANNEL_NAME_MAX);
-  ch.name[USER_CHANNEL_NAME_MAX] = '\0';
-  ch.frequency_hz = get32(bytes + 21);
-  ch.rx.step_hz = get32(bytes + 25);
-  ch.rx.bandwidth_hz = get16(bytes + 29);
-  ch.rx.mode = (RxMode)bytes[31];
-  ch.rx.squelch = bytes[32];
-  ch.rx.rx_tone = get16(bytes + 33);
-  ch.tx.enabled = bytes[35] != 0;
-  ch.tx.power = (TxPower)bytes[36];
-  ch.tx.frequency_hz = get32(bytes + 37);
-  ch.tx.tone = get16(bytes + 41);
-  if (bytes[35] > 1 || !valid(&ch)) return false;
+  memcpy(ch.name, b + NAME_AT, NAME_LEN);
+  const uint8_t *p = b + NAME_AT + NAME_LEN;
+  ch.frequency_hz = get32(p);
+  ch.rx.step_hz = get32(p + 4);
+  ch.rx.bandwidth_hz = get16(p + 8);
+  ch.rx.mode = (RxMode)p[10];
+  ch.rx.squelch = p[11];
+  ch.rx.rx_tone = get16(p + 12);
+  uint8_t tx = p[14];
+  ch.tx.enabled = tx & 1u;
+  ch.tx.power = (TxPower)(tx >> 1 & 3u);
+  ch.tx.shift = (TxShift)(tx >> 3 & 3u);
+  ch.tx.offset_hz = get32(p + 15);
+  ch.tx.split_hz = get32(p + 19);
+  ch.tx.tone = get16(p + 23);
+  if (!valid(&ch)) return false;
   if (out) *out = ch;
-  if (sequence) *sequence = get32(bytes + 6);
   return true;
 }
-static void encode(uint8_t bytes[CHANNEL_RECORD_BYTES], uint16_t number,
-                   const UserChannel *ch, uint32_t sequence) {
-  memset(bytes, 0, CHANNEL_RECORD_BYTES);
-  memcpy(bytes, "UCHN", 4);
-  bytes[4] = CHANNEL_RECORD_VERSION;
-  bytes[5] = 1;
-  put32(bytes + 6, sequence);
-  bytes[10] = (uint8_t)number;
-  memcpy(bytes + 11, ch->name, USER_CHANNEL_NAME_MAX);
-  put32(bytes + 21, ch->frequency_hz);
-  put32(bytes + 25, ch->rx.step_hz);
-  put16(bytes + 29, (uint16_t)ch->rx.bandwidth_hz);
-  bytes[31] = (uint8_t)ch->rx.mode;
-  bytes[32] = ch->rx.squelch;
-  put16(bytes + 33, ch->rx.rx_tone);
-  bytes[35] = ch->tx.enabled;
-  bytes[36] = (uint8_t)ch->tx.power;
-  put32(bytes + 37, ch->tx.frequency_hz);
-  put16(bytes + 41, ch->tx.tone);
-  put32(bytes + CHANNEL_CRC_OFFSET, crc32(bytes, CHANNEL_RECORD_BYTES));
+static void encode(uint8_t b[RECORD], uint16_t number, uint8_t sequence, const UserChannel *ch) {
+  memset(b, 0, RECORD);
+  b[0] = TAG;
+  b[1] = sequence;
+  b[2] = (uint8_t)number;
+  memcpy(b + NAME_AT, ch->name, NAME_LEN);
+  uint8_t *p = b + NAME_AT + NAME_LEN;
+  put32(p, ch->frequency_hz);
+  put32(p + 4, ch->rx.step_hz);
+  put16(p + 8, (uint16_t)ch->rx.bandwidth_hz);
+  p[10] = (uint8_t)ch->rx.mode;
+  p[11] = ch->rx.squelch;
+  put16(p + 12, ch->rx.rx_tone);
+  p[14] = (uint8_t)(ch->tx.enabled | ch->tx.power << 1 | ch->tx.shift << 3);
+  put32(p + 15, ch->tx.offset_hz);
+  put32(p + 19, ch->tx.split_hz);
+  put16(p + 23, ch->tx.tone);
+  put32(b + CRC_AT, crc32(b));
 }
-static bool readCopy(uint16_t number, uint8_t copy, UserChannel *out,
-                     uint32_t *sequence) {
-  uint8_t bytes[CHANNEL_RECORD_BYTES];
-  return EEPROM_ReadBuffer(address(number, copy), bytes, sizeof(bytes)) == 0 &&
-      decode(bytes, number, out, sequence);
+static bool readCopy(uint16_t number, uint8_t copy, UserChannel *out) {
+  uint8_t b[RECORD];
+  return EEPROM_ReadBuffer(address(number, copy), b, RECORD) == 0 && decode(b, number, out);
 }
-static bool later(uint32_t a, uint32_t b) { return (int32_t)(a - b) > 0; }
-static bool equalChannel(const UserChannel *a, const UserChannel *b) {
-  return !memcmp(a->name, b->name, sizeof(a->name)) &&
-      a->frequency_hz == b->frequency_hz &&
+// Tag and sequence of one copy; false when the copy is not a channel.
+static bool header(uint16_t number, uint8_t copy, uint8_t *sequence) {
+  uint8_t h[2];
+  if (EEPROM_ReadBuffer(address(number, copy), h, 2) || h[0] != TAG) return false;
+  *sequence = h[1];
+  return true;
+}
+static uint8_t current(uint16_t number) { return bit(newer, number) ? 1 : 0; }
+// Field by field: names compare up to their terminator, padding is ignored.
+static bool same(const UserChannel *a, const UserChannel *b) {
+  return !strncmp(a->name, b->name, NAME_LEN) && a->frequency_hz == b->frequency_hz &&
       a->rx.mode == b->rx.mode && a->rx.step_hz == b->rx.step_hz &&
-      a->rx.bandwidth_hz == b->rx.bandwidth_hz &&
-      a->rx.squelch == b->rx.squelch && a->rx.rx_tone == b->rx.rx_tone &&
-      a->tx.enabled == b->tx.enabled && a->tx.power == b->tx.power &&
-      a->tx.frequency_hz == b->tx.frequency_hz && a->tx.tone == b->tx.tone;
+      a->rx.bandwidth_hz == b->rx.bandwidth_hz && a->rx.squelch == b->rx.squelch &&
+      a->rx.rx_tone == b->rx.rx_tone && a->tx.enabled == b->tx.enabled &&
+      a->tx.power == b->tx.power && a->tx.shift == b->tx.shift &&
+      a->tx.offset_hz == b->tx.offset_hz && a->tx.split_hz == b->tx.split_hz &&
+      a->tx.tone == b->tx.tone;
 }
 
 bool CHANNEL_STORE_Init(void) {
   initialized = false;
-  if (!available()) return false;
-  memset(indexCache, 0, sizeof(indexCache));
+  if (EEPROM_DetectSize() < CHANNEL_STORE_END + PATCH_SIZE) return false;
+  memset(occupied, 0, sizeof(occupied));
+  memset(newer, 0, sizeof(newer));
   for (uint16_t n = 1; n <= USER_CHANNEL_COUNT; ++n) {
-    uint32_t seq[CHANNEL_COPY_COUNT] = {0};
-    bool good[CHANNEL_COPY_COUNT];
-    good[0] = readCopy(n, 0, NULL, &seq[0]);
-    good[1] = readCopy(n, 1, NULL, &seq[1]);
-    if (good[0] || good[1]) {
-      uint8_t best = good[0] && good[1] ? (later(seq[1], seq[0]) ? 1 : 0)
-                                        : (good[1] ? 1 : 0);
-      indexCache[n - 1] = (ChannelIndex){seq[best], best, true};
-    }
+    uint8_t s0, s1;
+    bool a = header(n, 0, &s0), b = header(n, 1, &s1);
+    setBit(occupied, n, a || b);
+    setBit(newer, n, b && (!a || (int8_t)(s1 - s0) > 0));
   }
   initialized = true;
   return true;
 }
 bool CHANNEL_STORE_Available(void) { return initialized; }
 bool CHANNEL_STORE_IsOccupied(uint16_t number) {
-  return initialized && number >= 1 && number <= USER_CHANNEL_COUNT &&
-      indexCache[number - 1].occupied;
+  return initialized && number >= 1 && number <= USER_CHANNEL_COUNT && bit(occupied, number);
 }
+// The newer copy wins; a corrupt one falls back to its twin.
 bool CHANNEL_STORE_Load(uint16_t number, UserChannel *channel) {
   if (!CHANNEL_STORE_IsOccupied(number) || !channel) return false;
-  ChannelIndex *entry = &indexCache[number - 1];
-  if (readCopy(number, entry->copy, channel, &entry->sequence)) return true;
-  // A later read failure invalidates the cache and permits trying its twin.
-  uint8_t other = entry->copy ^ 1u;
-  uint32_t sequence;
-  if (!readCopy(number, other, channel, &sequence)) {
-    entry->occupied = false;
-    return false;
-  }
-  *entry = (ChannelIndex){sequence, other, true};
-  return true;
+  uint8_t copy = current(number);
+  if (readCopy(number, copy, channel)) return true;
+  if (readCopy(number, copy ^ 1u, channel)) { setBit(newer, number, !copy); return true; }
+  setBit(occupied, number, false);
+  return false;
 }
 bool CHANNEL_STORE_Save(uint16_t number, const UserChannel *channel) {
   if (!initialized || number < 1 || number > USER_CHANNEL_COUNT || !valid(channel))
     return false;
-  ChannelIndex *entry = &indexCache[number - 1];
-  uint8_t target = entry->occupied ? entry->copy ^ 1u : 0;
-  uint32_t sequence = entry->sequence + 1u;
-  if (!sequence) sequence = 1; // Zero is reserved for an unused index.
-  uint8_t bytes[CHANNEL_RECORD_BYTES];
+  uint8_t copy = current(number), sequence = 0, target = 0;
+  if (bit(occupied, number) && header(number, copy, &sequence)) target = copy ^ 1u;
+  uint8_t b[RECORD];
   UserChannel verify;
-  uint32_t verifiedSequence;
-  encode(bytes, number, channel, sequence);
-  if (!EEPROM_TryWriteBuffer(address(number, target), bytes, sizeof(bytes)) ||
-      !readCopy(number, target, &verify, &verifiedSequence) ||
-      verifiedSequence != sequence || !equalChannel(&verify, channel)) return false;
-  *entry = (ChannelIndex){sequence, target, true};
+  encode(b, number, (uint8_t)(sequence + 1u), channel);
+  if (!EEPROM_TryWriteBuffer(address(number, target), b, RECORD) ||
+      !readCopy(number, target, &verify) || !same(&verify, channel))
+    return false;
+  setBit(occupied, number, true);
+  setBit(newer, number, target);
+  return true;
+}
+bool CHANNEL_STORE_Delete(uint16_t number) {
+  if (!CHANNEL_STORE_IsOccupied(number)) return false;
+  static const uint8_t erased = 0;
+  for (uint8_t copy = 0; copy < CHANNEL_STORE_COPY_COUNT; ++copy)
+    if (!EEPROM_TryWriteBuffer(address(number, copy), &erased, 1)) return false;
+  setBit(occupied, number, false);
   return true;
 }
 uint16_t CHANNEL_STORE_FirstEmpty(void) {
   if (!initialized) return 0;
   for (uint16_t n = 1; n <= USER_CHANNEL_COUNT; ++n)
-    if (!indexCache[n - 1].occupied) return n;
+    if (!bit(occupied, n)) return n;
   return 0;
 }
 bool CHANNEL_STORE_Next(uint16_t number, bool up, uint16_t *next) {
-  if (!initialized || !next || number < 1 || number > USER_CHANNEL_COUNT)
-    return false;
-  for (uint16_t offset = 1; offset <= USER_CHANNEL_COUNT; ++offset) {
-    uint16_t candidate = up
-        ? (uint16_t)(((number - 1u + offset) % USER_CHANNEL_COUNT) + 1u)
-        : (uint16_t)(((number - 1u + USER_CHANNEL_COUNT - offset) % USER_CHANNEL_COUNT) + 1u);
-    if (indexCache[candidate - 1].occupied) {
-      *next = candidate;
-      return true;
-    }
+  if (!initialized || !next || number < 1 || number > USER_CHANNEL_COUNT) return false;
+  for (uint16_t step = 1; step <= USER_CHANNEL_COUNT; ++step) {
+    uint16_t n = up ? (uint16_t)((number - 1u + step) % USER_CHANNEL_COUNT + 1u)
+                    : (uint16_t)((number - 1u + USER_CHANNEL_COUNT - step) % USER_CHANNEL_COUNT + 1u);
+    if (bit(occupied, n)) { *next = n; return true; }
   }
   return false;
 }

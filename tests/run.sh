@@ -58,7 +58,7 @@ esac
   tests/rx-device-regression.c src/core/dcs.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/tuning-regression.c \
-  src/core/tuning.c src/core/radio-state.c src/core/radio-model.c -o "$test_binary"
+  src/core/tuning.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/watch-regression.c \
   src/core/watch.c -o "$test_binary"
@@ -82,13 +82,13 @@ esac
   src/core/rx-runtime.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/config-store-regression.c \
-  src/core/radio-state.c src/core/radio-model.c -o "$test_binary"
+  src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/band-editor-regression.c src/core/config-store.c src/core/radio-model.c src/core/radio-state.c "$dead_strip" -o "$test_binary"
+  tests/band-editor-regression.c src/core/config-store.c src/core/radio-model.c src/core/radio-state.c src/core/tx-model.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
@@ -120,10 +120,10 @@ esac
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   \
   -Wno-missing-field-initializers tests/settings-inline-regression.c src/ui/number-input.c src/ui/numnav.c \
-  src/core/measurements.c src/core/radio-state.c src/core/radio-model.c src/ui/graphics.c src/core/text.c "$dead_strip" -o "$test_binary"
+  src/core/measurements.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c src/ui/graphics.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/device-config-regression.c \
-  src/core/config-store.c src/core/radio-state.c src/core/radio-model.c -o "$test_binary"
+  src/core/config-store.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
@@ -131,7 +131,7 @@ esac
   tests/backlight-regression.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/channel-store-regression.c \
-  src/core/radio-model.c -o "$test_binary"
+  src/core/radio-model.c src/core/tx-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/bk-rx-mode-regression.c \
   src/drivers/bk4819/rx.c -o "$test_binary"

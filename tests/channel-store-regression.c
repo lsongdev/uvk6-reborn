@@ -1,12 +1,15 @@
+// 200 channels, two 64-byte copies each; start-up reads only headers.
 #include "../src/core/channel-store.c"
 #include <assert.h>
 
 static uint8_t eeprom[524288];
 static int writeLimit = -1;
 static bool failRead;
+static unsigned readBytes;
 uint32_t EEPROM_DetectSize(void) { return sizeof(eeprom); }
 int EEPROM_ReadBuffer(uint32_t at, void *out, uint16_t size) {
   if (failRead || at+size>sizeof(eeprom)) return -1;
+  readBytes += size;
   memcpy(out,eeprom+at,size);return 0;
 }
 bool EEPROM_TryWriteBuffer(uint32_t at, const uint8_t *bytes, uint16_t size) {
@@ -17,44 +20,68 @@ bool EEPROM_TryWriteBuffer(uint32_t at, const uint8_t *bytes, uint16_t size) {
   return n==size;
 }
 int main(void) {
+  // Erased (0xFF) and zero-filled EEPROM both read as empty.
+  memset(eeprom,0x00,sizeof(eeprom));
+  assert(CHANNEL_STORE_Init() && !CHANNEL_STORE_IsOccupied(1));
   memset(eeprom,0xff,sizeof(eeprom));
-  UserChannel ch={.name="TEST",.frequency_hz=145500000,
-    .rx={.mode=RX_NFM,.step_hz=12500,.bandwidth_hz=12000,.squelch=4}};
+  readBytes=0;
+  assert(CHANNEL_STORE_Init() && CHANNEL_STORE_FirstEmpty()==1);
+  assert(readBytes==USER_CHANNEL_COUNT*CHANNEL_STORE_COPY_COUNT*2u); // Headers only.
+
+  // Round trip: a 16-character name and every TX field.
+  UserChannel ch={.name="Repeater 438.725",.frequency_hz=438725000,
+    .rx={.mode=RX_NFM,.step_hz=12500,.bandwidth_hz=12000,.squelch=4,.rx_tone=12},
+    .tx={.enabled=true,.power=TX_POWER_MEDIUM,.shift=TX_SHIFT_MINUS,
+         .offset_hz=5000000,.split_hz=0,.tone=12}};
   UserChannel loaded;
-  assert(CHANNEL_STORE_Init());
-  assert(CHANNEL_STORE_Save(12,&ch));
-  for (int n=0;n<(int)CHANNEL_RECORD_BYTES;++n) {
+  assert(strlen(ch.name)==USER_CHANNEL_NAME_MAX);
+  assert(CHANNEL_STORE_Save(12,&ch) && CHANNEL_STORE_Load(12,&loaded));
+  assert(!strcmp(loaded.name,ch.name) && loaded.frequency_hz==438725000);
+  assert(loaded.rx.rx_tone==12 && loaded.tx.enabled && loaded.tx.power==TX_POWER_MEDIUM);
+  assert(loaded.tx.shift==TX_SHIFT_MINUS && loaded.tx.offset_hz==5000000 && loaded.tx.tone==12);
+  ch.tx.shift=TX_SHIFT_SPLIT;ch.tx.split_hz=145500000;
+  assert(CHANNEL_STORE_Save(12,&ch) && CHANNEL_STORE_Init() && CHANNEL_STORE_Load(12,&loaded));
+  assert(loaded.tx.shift==TX_SHIFT_SPLIT && loaded.tx.split_hz==145500000);
+  // Invalid channels are refused.
+  UserChannel bad=ch;bad.tx.offset_hz=TX_OFFSET_MAX_HZ+10;
+  assert(!CHANNEL_STORE_Save(13,&bad));
+  bad=ch;bad.frequency_hz=0;assert(!CHANNEL_STORE_Save(13,&bad));
+  assert(!CHANNEL_STORE_Save(0,&ch) && !CHANNEL_STORE_Save(USER_CHANNEL_COUNT+1,&ch));
+
+  // Power loss at every byte of a save keeps the previous version.
+  for (int n=0;n<(int)CHANNEL_STORE_RECORD_BYTES;++n) {
     writeLimit=n;
-    ch.rx.squelch = (uint8_t)(4 + (n & 1));
+    ch.rx.squelch = (uint8_t)(5 + (n & 1));
     assert(!CHANNEL_STORE_Save(12,&ch));
     assert(CHANNEL_STORE_IsOccupied(12));
     assert(CHANNEL_STORE_Init());
-    assert(CHANNEL_STORE_Load(12,&loaded));
-    assert(loaded.frequency_hz==ch.frequency_hz);
-    assert(loaded.rx.squelch==4);
+    assert(CHANNEL_STORE_Load(12,&loaded) && loaded.rx.squelch==4);
   }
   writeLimit=-1;
   ch.rx.squelch = 5;
   assert(CHANNEL_STORE_Save(12,&ch));
-  assert(CHANNEL_STORE_Init() && CHANNEL_STORE_Load(12,&loaded));
-  assert(!strcmp(loaded.name,"TEST"));
-  failRead=true;
-  ch.rx.squelch = 6;
-  assert(!CHANNEL_STORE_Save(12,&ch));
-  assert(CHANNEL_STORE_IsOccupied(12)); // Cache commits only after verification.
+  assert(CHANNEL_STORE_Init() && CHANNEL_STORE_Load(12,&loaded) && loaded.rx.squelch==5);
+  // A failed read-back leaves the stored channel untouched.
+  failRead=true;ch.rx.squelch=6;
+  assert(!CHANNEL_STORE_Save(12,&ch) && CHANNEL_STORE_IsOccupied(12));
   failRead=false;
-  assert(CHANNEL_STORE_Init()); // Both CRC-protected copies remain recoverable.
-  assert(CHANNEL_STORE_Save(128,&ch));
+  assert(CHANNEL_STORE_Init() && CHANNEL_STORE_Load(12,&loaded));
+  // Sequence numbers compare across their 8-bit wrap.
+  for (unsigned i=0;i<300;++i) {
+    ch.rx.squelch=(uint8_t)(i%10);
+    assert(CHANNEL_STORE_Save(12,&ch));
+  }
+  assert(CHANNEL_STORE_Init() && CHANNEL_STORE_Load(12,&loaded) && loaded.rx.squelch==9);
+
+  // Navigation, the last channel, and delete.
+  assert(CHANNEL_STORE_Save(USER_CHANNEL_COUNT,&ch));
   uint16_t next;
-  assert(CHANNEL_STORE_Next(12,true,&next) && next==128);
-  assert(CHANNEL_STORE_Next(128,true,&next) && next==12);
-  indexCache[127].sequence=UINT32_MAX;
-  uint8_t wrapped[CHANNEL_RECORD_BYTES];
-  encode(wrapped,128,&ch,UINT32_MAX);
-  memcpy(eeprom+address(128,indexCache[127].copy),wrapped,sizeof(wrapped));
-  assert(CHANNEL_STORE_Save(128,&ch));
-  assert(indexCache[127].sequence==1);
-  assert(CHANNEL_STORE_Init());
-  assert(CHANNEL_STORE_IsOccupied(128));
+  assert(CHANNEL_STORE_Next(12,true,&next) && next==USER_CHANNEL_COUNT);
+  assert(CHANNEL_STORE_Next(USER_CHANNEL_COUNT,true,&next) && next==12);
+  assert(CHANNEL_STORE_Next(12,false,&next) && next==USER_CHANNEL_COUNT);
+  assert(CHANNEL_STORE_Delete(12) && !CHANNEL_STORE_IsOccupied(12));
+  assert(CHANNEL_STORE_Init() && !CHANNEL_STORE_IsOccupied(12) && CHANNEL_STORE_IsOccupied(USER_CHANNEL_COUNT));
+  assert(!CHANNEL_STORE_Delete(12) && CHANNEL_STORE_FirstEmpty()==1);
+  assert(CHANNEL_STORE_Save(12,&ch) && CHANNEL_STORE_Load(12,&loaded)); // Reusable.
   return 0;
 }

@@ -55,10 +55,11 @@ enum {
   MENU_RX_TONE = RADIO_FIELD_RX_TONE,
   MENU_TX_ENABLE,
   MENU_TX_POWER,
-  MENU_TX_FREQUENCY,
+  MENU_TX_SHIFT,
+  MENU_TX_OFFSET, // TX Offset for +/-, TX Freq for Split.
   MENU_TX_TONE,
-  MENU_CHANNEL_NAME,
-  MENU_CHANNEL_SAVE,
+  MENU_RESET,
+  MENU_SAVE_CHANNEL,
   MENU_ITEM_COUNT
 };
 
@@ -118,7 +119,7 @@ void delayWatch(void);
 extern TxRuntime transmitter;
 bool txBusy(void);
 void pttKey(Key_State_t state);
-bool setTxFrequency(uint32_t value);
+bool setTxValue(uint32_t value);
 extern const char *const txPowerNames[3]; // Indexed by TxPower.
 bool changeTxPower(bool up);
 extern uint8_t txSlot; // Slot PTT transmits on: selected, or a talkback reply.

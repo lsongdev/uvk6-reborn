@@ -49,14 +49,15 @@ static const char *symbols[9] = {
 
 static const char **currentSet = lettersCapital;
 static const char *currentRow;
-static char inputField[16] = {0};
+#define FIELD_BYTES 17 // Longest caller buffer: a 16-byte channel name.
+static char inputField[FIELD_BYTES] = {0};
 static uint8_t inputIndex = 0;
 static bool coursorBlink = true;
 
 static void insert(char c) {
   if (inputField[inputIndex] != '\0') {
     memmove(inputField + inputIndex + 1, inputField + inputIndex,
-            16 - inputIndex);
+            FIELD_BYTES - 1 - inputIndex);
   }
   inputField[inputIndex++] = c;
 }
@@ -65,7 +66,7 @@ static void backspace(void) {
   if (inputField[inputIndex] != '\0') {
     inputIndex--;
     memmove(inputField + inputIndex, inputField + inputIndex + 1,
-            16 - inputIndex);
+            FIELD_BYTES - 1 - inputIndex);
 
   } else {
     inputField[--inputIndex] = '\0';
@@ -89,7 +90,7 @@ bool TEXTINPUT_key(KEY_Code_t key, Key_State_t state) {
   if (state == KEY_RELEASED || state == KEY_LONG_PRESSED) {
     switch (key) {
     case KEY_UP:
-      if (inputIndex < 14 && inputField[inputIndex] != '\0') {
+      if (inputField[inputIndex] != '\0') {
         inputIndex++;
       }
       return true;
@@ -106,7 +107,7 @@ bool TEXTINPUT_key(KEY_Code_t key, Key_State_t state) {
   if (state == KEY_LONG_PRESSED) {
     switch (key) {
     case KEY_EXIT:
-      memset(inputField, 0, 15);
+      memset(inputField, 0, sizeof(inputField));
       inputIndex = 0;
       return true;
     default:

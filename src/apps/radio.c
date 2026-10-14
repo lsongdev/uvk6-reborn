@@ -209,15 +209,19 @@ static void tuneTo(uint32_t target) {
   request(target, values);
 }
 
-// RX keypad entry and TX menu editing share the same input lifecycle.
+// RX keypad entry and the TX Offset / TX Freq menu edit share one input
+// lifecycle. TX edits the repeater offset for +/-, the frequency for Split.
 void beginFrequencyInput(bool tx) {
   inputSlot = selectedSlot;
   inputTx = tx;
   message = NULL;
-  uint32_t initial = tx ? (activeSlot.tx.frequency_hz
-      ? activeSlot.tx.frequency_hz : activeSlot.current.frequency_hz) : 0;
+  const TxConfig *t = &activeSlot.tx;
+  bool split = t->shift == TX_SHIFT_SPLIT;
+  uint32_t initial = !tx ? 0 : !split ? t->offset_hz :
+      t->split_hz ? t->split_hz : activeSlot.current.frequency_hz;
   NUMBER_Begin(&number, tx ? 0u : RADIO_MIN_HZ,
-               tx ? 1300000000u : RADIO_MAX_HZ, 1000000u, initial, tx);
+               !tx ? RADIO_MAX_HZ : split ? 1300000000u : TX_OFFSET_MAX_HZ,
+               1000000u, initial, tx);
 }
 
 void RADIO_APP_init(void) {
@@ -232,10 +236,7 @@ void RADIO_APP_init(void) {
     RADIO_STATE_Default(&gDeviceConfig.radio);
   selectedSlot = gDeviceConfig.radio.selected_slot;
   bool invalidSavedChannel = false;
-  for (uint8_t id = 0; id < RADIO_SLOT_CAPACITY; ++id) {
-    channelCacheValid[id] = false;
-    CHANNEL_MANAGER_LoadName(id, gDeviceConfig.radio.slots[id].channel_number);
-  }
+  for (uint8_t id = 0; id < RADIO_SLOT_CAPACITY; ++id) channelCacheValid[id] = false;
   if (!effectiveSlot(selectedSlot, &activeSlot, NULL)) {
     gDeviceConfig.radio.slots[selectedSlot].source = RADIO_SOURCE_VFO;
     activeSlot = gDeviceConfig.radio.slots[selectedSlot];
@@ -363,7 +364,6 @@ static void tuneChannel(uint16_t number, bool enterMode) {
   resetLabel(channel.frequency_hz);
   tuned();
   if (enterMode || selectionChanged) DEVICE_RequestSave();
-  CHANNEL_MANAGER_LoadName(selectedSlot, number);
 }
 
 static void nextChannel(bool up) {
@@ -410,7 +410,6 @@ static void switchSlot(void) {
   selectedSlot = target;
   activeSlot = next;
   tuned();
-  CHANNEL_MANAGER_LoadName(selectedSlot, activeSlot.channel_number);
   gDeviceConfig.radio.selected_slot = target;
   DEVICE_RequestSave();
 }
@@ -445,7 +444,7 @@ static void frequencyInputKey(KEY_Code_t key, Key_State_t state) {
   NumberInputResult result = NUMBER_Key(&number, key, state, &value);
   if (result == NUMBER_ACCEPTED) {
     if (inputTx) {
-      if (!setTxFrequency(value)) { number.active = true; number.invalid = true; }
+      if (!setTxValue(value)) { number.active = true; number.invalid = true; }
     } else tuneTo(value);
   }
   if (result != NUMBER_EDITING && !number.active) delayWatch();
