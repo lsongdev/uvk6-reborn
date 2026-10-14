@@ -104,7 +104,7 @@
 | NFM | BK4819：18–660 MHz、840–1300 MHz |
 | WFM | 64–108 MHz；优先 SI4732，否则探测到的 BK1080 |
 | AM | ≤30 MHz 且有 SI4732 时优先 SI；其余 BK 支持范围用 BK AM 实现 |
-| LSB／USB | ≤30 MHz 的 SI4732；须有全量 CRC 校验通过的补丁，默认构建不可用 |
+| LSB／USB | ≤30 MHz 的 SI4732；须安装全量 CRC 校验通过的 EEPROM 补丁 |
 
 输入允许 150 kHz–1340 MHz，仍须通过模式和能力校验。芯片标称范围与整机效果见[硬件事实](hardware.md#4-接收芯片与能力边界)。
 
@@ -168,12 +168,12 @@ Slot count 为 2–4 时自动守听全部已启用 Slot；减少数量保留隐
 
 左图箭头仍在 A，但 B 的 RX 与阶梯信号亮起，顶部 DW B 表示正在播放 B；A 广播暂时静音，左侧改为 STEP。右图已选中 B 并按 PTT 发射，B 显示 TX／MID，即 Medium 功率档；松键后恢复接收。此时 DW - 表示没有正在播放的接收音频，TX 以卡片标识为准。发射条件见[发射说明](#8-发射)，功率档不代表实测瓦数。
 
-- **常驻源**：SI4732／BK1080 广播，或 BK 的 SQ0 方案，只播放一路；选中的常驻源优先，否则第一个。
+- **常驻源**：SI4732 的 WFM／AM／LSB／USB、BK1080 广播，或 BK 的 SQ0 方案，只播放一路；选中的常驻源优先，否则第一个。
 - **事件源**：SQ 大于 0 的 BK 方案，平时轮流检查；确认信号后占用扬声器，广播暂时静音。
 - **先到先得**：一路讲话时其他事件不插入，也不被检查。讲话不限时；消失后静音停留 2 秒等回复，再恢复轮询和广播。
 - 箭头没有事件音频优先权。DW A/B/C/D 表示出声项，DW - 表示安静；MR 选中时标题可显示 MR。轮询不在卡片上反复闪动。
 
-事件源共用 BK，检查一次约 200 ms，频道越多发现越慢，短呼叫可能漏掉。SI 广播不被 BK 轮询重新调谐；常驻源也在 BK 上时，每圈检查会打断它，再回常驻频率放音 1 秒。多个广播 Slot 不能让同一芯片同时接收多个台。SSB 排除、重复方案去重；不足两个独立来源时不守听，只播放选中的 Slot，也不显示提示。例如 A、B 都是 FM 广播：只播放选中的那个台，切到另一个 Slot 才换台。
+事件源共用 BK，检查一次约 200 ms，频道越多发现越慢，短呼叫可能漏掉。SI 常驻源不被 BK 轮询重新调谐；SSB patch 也不会因 BK 音频接管而重新加载。常驻源也在 BK 上时，每圈检查会打断它，再回常驻频率放音 1 秒。多个广播或短波 Slot 不能让同一颗 SI 同时接收多个台，只保留选中的常驻源，否则保留第一路。重复方案去重；不足两个独立来源时不守听，只播放选中的 Slot，也不显示提示。例如 A、B 都是 FM 广播：只播放选中的那个台，切到另一个 Slot 才换台；A 为 7.074 MHz USB、B 为 438.500 MHz NFM 时，SI 持续接收 A，BK 守听 B，收到 B 后切换音频，结束后恢复 A。
 
 翻菜单、输入草稿、确认页和频道保存不暂停守听。实际调谐、切 Slot／来源、改 RX、Seek、PTT 会暂停并恢复相应方案，约 2 秒后继续。FC 单独借用 BK，广播可继续播放，但 FC 期间暂停 RDS 轮询。
 
@@ -243,14 +243,14 @@ Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留�
 | 提示 | 含义与下一步 |
 | --- | --- |
 | RX unavailable／RX -- | 无接收组合，检查频率和模式 |
-| SSB patch missing | 补丁未通过校验，默认固件不启用 SSB |
+| SSB patch missing | EEPROM 补丁未安装或未通过完整 CRC 校验 |
 | Tune failed／RX error | 调谐失败尝试恢复／恢复失败保持静音 |
 | Invalid value／Out of range／Band boundary | 修改输入或参数；量化后的频段冲突不提交 |
 | Fixed／No option | 固定带宽／没有其他可用选项 |
 | VFO only | 先 F→3 切回 VFO |
 | No saved channels／No channel memory／Channels full | 无记录／存储不可用／无空号 |
 | Save failed | 写入或校验失败，查看 Save status 后重试 |
-| DW: SSB off／DW: unavailable | 排除 SSB／不可用方案 |
+| DW: unavailable | 部分 Slot 的接收方案不可用；检查频率、模式与补丁 |
 | TX disabled／TX: NFM only | 检查对应 Slot 的 TX Enable 和模式 |
 | TX HW locked／TX uncalibrated／TX out of band | 无板级 TX／缺校准／实际 TX Hz 越界 |
 | TX: bad battery | 电压未知或越界 |

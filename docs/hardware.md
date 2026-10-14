@@ -225,7 +225,7 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 | `0x0800–0x0FFF` | UVR2 格式 9 双 1024 B 槽，已定义内容 825 B | 配置写入；CRC 与序号回读校验 |
 | `0xB000–0x113FF` | 用户频道：200 个 × 两份 64 B 副本（标记、序号、名称 16 B、RX、TX Shift／频差／Split、CRC32） | 频道写入；开机只读每份的 2 字节头部 |
 | `0x1E00–0x1FFF` | 原机校准备份范围。工具 [K5TOOL](https://github.com/qrp73/K5TOOL) 提供读取 `0x1E00` 长度 `0x0200`，并说明其用于校准；[k5prog](https://github.com/sq5bpf/k5prog) 也警告全片覆写的风险 | **默认绝不擦除或覆写**；先备份，不从其他设备复制射频校准 |
-| `[容量 - 8840, 容量)` | 沿用 Hawk5 的 SI4732 SSB patch 寻址规则及补丁长度（512 KiB 基线对应 `0x7DD78–0x7FFFF`），见 [settings.c](../src/core/settings.c) | 补丁不随固件打包；默认不可用，设置受信任全量 CRC 后校验使用；尾区只读，不等于 LOSEHU patch |
+| `[容量 - 8856, 容量)` | SI4732 SSB 资源：16 B `SSBP` 头位于 `0x7DD68–0x7DD77`，8840 B 数据位于 `0x7DD78–0x7FFFF`；见 [resource.h](../src/core/resource.h) | 补丁不随固件打包；由 `tools/resources.py` 通过正常固件 UART 安装、完整回读后重启，启动校验长度及全量 CRC；驱动只读加载，不等于 LOSEHU patch |
 | `0x3C228–0x3FFFF` | LOSEHU **2 Mbit** 固件的 15,832 B SI4732 patch 区 | 仅作为其他固件的布局参考，不自动识别为本项目的 patch |
 
 **原厂校准区不是可随意丢弃的旧软件兼容数据**。即使新固件不保留旧频道，也必须保留或通过可信设备备份维护射频校准。普通构建的 `UVR2` 不会主动覆写 `0x1E00–0x1FFF` 或补丁尾区；未来更换 EEPROM、改变用途或完整格式化时同样须保护。
