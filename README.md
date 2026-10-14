@@ -1,98 +1,23 @@
 # UVK6 Reborn
 
-Experimental fork of [Hawk5](https://github.com/fagci/hawk5) for the
-DP32G030-based Quansheng UV-K6, including radios modified with SI4732.
+面向泉盛 UV-K6 的开源固件，基于 [Hawk5](https://github.com/fagci/hawk5) 演进。
 
-The Radio main screen supports up to four independent A/B/C/D slots (two visible at once). Each slot can tune directly (VFO) or use a saved channel (MR), without discarding its VFO memories. The receiver supports
-NFM/WFM/AM/SSB modes, band presets, dual watch, user channels, UVR2
-persistence and receiver selection. **The default build enables BK4819 NFM
-TX and the PA** (136–174 / 400–470 MHz, factory calibration, per-slot
-`TX Enable` defaults Off); `make ENABLE_TX=0` builds a receive-only image
-and `make ENABLE_FC=0` drops F→4 frequency capture (about 1.3 KiB).
-Verify output power, deviation and PA shutdown into a dummy load, and only
-transmit where you are licensed to. See the
-[user manual](docs/user-manual.md) for current controls and the
-[implementation status](docs/refactor-progress.md) before testing.
+围绕频段、频率和明确解调模式操作，提供多 Slot 守听、频道保存、广播文字、搜台与频率捕获。项目持续开发中，使用前请阅读用户手册，备份设备数据。
 
-## Documentation
+## 文档
 
-- [重构进度](docs/refactor-progress.md)
-- [用户手册](docs/user-manual.md)
-- [硬件事实](docs/hardware.md)
-- [硬件验收清单](docs/hardware-validation.md)
-- [设计文档](docs/design.md)
+- [用户手册](docs/user-manual.md)：安装、按键、菜单和日常使用。
+- [设计文档](docs/design.md)：功能规则、数据模型和后续规划。
+- [开发文档](docs/development.md)：编译、刷机、源码、工具和验证。
+- [硬件事实](docs/hardware.md)：当前设备、芯片、按键和存储依据。
 
-## Build
+## 开始使用
 
-Requires an ARM GNU toolchain (`arm-none-eabi-gcc`), Python 3 and `crcmod`.
-CI pins Ubuntu 24.04's ARM GCC 13.2.rel1 package and checks the 60-KiB
-application partition; compiler versions other than the CI toolchain may
-produce a different Flash size. Run a full clean rebuild when changing flags.
+准备好编译环境后：
 
 ```sh
-git submodule update --init --recursive
-python3 -m pip install crcmod
 make
+make flash PORT=/dev/cu.usbserial-1420
 ```
 
-Output: `bin/firmware.bin` (raw) and `bin/firmware.packed.bin` (packed).
-Choose the file required by your actual flashing tool and bootloader; they
-are not interchangeable.
-
-Flash through the stock DP32G030 UV-K5/K6 Bootloader on macOS / Linux:
-
-```sh
-make flash PORT=/dev/cu.usbserial-1420  # Linux: PORT=/dev/ttyUSB0
-```
-
-Hold PTT while powering on to enter Bootloader. This builds and sends the raw
-image, waits for block acknowledgements and leaves EEPROM untouched. See
-[flashing instructions](tools/README.md#刷机) for recovery and serial-port details.
-
-Development scripts and the CHIRP driver are in [`tools/`](tools/README.md).
-Source directory responsibilities are described in [`src/`](src/README.md).
-
-## EEPROM and first boot
-
-**Back up your entire EEPROM before flashing**. LOSEHU HF and Hawk5 use
-different, incompatible settings/channel layouts. Firmware updates do not
-automatically migrate EEPROM content.
-
-- Unrecognized settings now enter the initialization screen **without
-  writing an EEPROM marker or rebooting repeatedly**.
-- EEPROM writes stay locked until a recognized UVK6 Reborn configuration is
-  loaded, or the user explicitly initializes: press `0`, then `1` to
-  confirm. **This writes within the two UVR2 configuration slots at
-  `0x0800–0x0FFF`, which may contain data from earlier firmware.**
-  Legacy settings are not automatically migrated. User channels use a
-  separate `0xB000–0x113FF` region. Do not confirm
-  before obtaining a backup and checking the EEPROM geometry.
-- The 4-Mbit / 512-KiB addressing mode assumes eight 64-KiB address banks
-  (`0xA0` through `0xAE`). Writes are limited to at most 32 bytes per chunk until hardware is verified;
-  **verify the actual EEPROM part and mapping on your board**.
-- The original Hawk5 SSB patch loader expects an 8840-byte patch at the end
-  of the selected EEPROM. LOSEHU HF places its SSB patch differently, so
-  **SSB will not work without additional patch migration and verification**.
-  A valid-looking patch header is insufficient: production SSB is disabled
-  until a trusted CRC32 of the entire installed image is supplied at build
-  time using `-DUVK6_SSB_PATCH_CRC32=0x...` (only after independent image
-  verification). A missing or mismatching patch is rejected.
-- A successful compilation is not evidence of hardware compatibility. See
-  the implementation status for outstanding hardware acceptance checks.
-
-## First hardware smoke test
-
-1. Save the LOSEHU firmware version, inspect the MCU/EEPROM part numbers,
-   and make a verified full EEPROM backup.
-2. Confirm the programmer/bootloader and the target MCU; do not flash a
-   binary intended for the PY32F071 platform.
-3. Boot and verify LCD, keypad and the initialization prompt. **Do not
-   confirm initialization yet**; check the EEPROM contents remain intact.
-4. After verifying storage mapping, initialize deliberately and test
-   BK4819 and SI4732 reception separately.
-5. Verify PTT restrictions, TX calibration, legal frequency limits and
-   RF hardware before performing any transmissions.
-
-Further work: validate actual EEPROM geometry, import the SSB patch to
-an explicitly reserved region, then extend the current single VFO to multiple watch frequencies
-over capability-driven receiver drivers.
+刷机前关机，按住 PTT 开机。串口路径按实际设备替换；环境依赖、镜像选择和失败恢复见[开发文档](docs/development.md)。

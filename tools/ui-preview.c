@@ -25,6 +25,14 @@ static void base(void) {
   PrintSmall(0,4,"RADIO");
   PrintSmallEx(108,4,POS_R,C_FILL,"F");DrawRect(115,0,12,5,C_FILL);
 }
+// Manual examples use current home-screen titles and explicit shortcut state.
+// Signal and battery data are examples; the cards use the firmware renderer.
+static void manualBase(const char *title, bool shortcut) {
+  base();
+  FillRect(0,0,114,7,C_CLEAR);
+  PrintSmall(0,4,title);
+  if (shortcut) PrintSmallEx(108,4,POS_R,C_FILL,"F");
+}
 int main(int argc, char **argv) {
   if (argc != 2) return 1;
   outputDirectory = argv[1];
@@ -99,6 +107,40 @@ int main(int argc, char **argv) {
     .band_name="FM Radio",.name=decoder.ps,.radio_text=decoder.text,
     .activity=UI_RADIO_CARD_RECEIVING,.signal_level=8,.signal_valid=true};
   UI_RadioCardRender(8,&v);UI_RadioCardRender(8,&v);snapshot("rds.pbm");
+  // Main-screen guide: frequencies, then RDS PS and an MR channel name.
+  v=(UI_RadioCardView){.id='A',.selected=true,.frequency_hz=103900000,
+    .step_hz=100000,.mode=RX_WFM,.band_name="FM Radio",
+    .activity=UI_RADIO_CARD_RECEIVING,.signal_valid=true,.signal_level=8};
+  second=(UI_RadioCardView){.id='B',.frequency_hz=438506250,.step_hz=12500,
+    .mode=RX_NFM,.band_name="70cm",.changed=true};
+  manualBase("DW A",true);
+  UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-frequency.pbm");
+  v.name="RADIO FM";
+  second.name="Local";second.band_name="CH 012";
+  second.frequency_hz=438500000;second.changed=false;
+  manualBase("DW A",false);
+  UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-name.pbm");
+  // A remains selected while B is heard; then B is selected and transmitting.
+  v.name=NULL;v.activity=UI_RADIO_CARD_IDLE;v.signal_valid=false;
+  second.name=NULL;second.band_name="70cm";
+  second.activity=UI_RADIO_CARD_RECEIVING;second.signal_valid=true;second.signal_level=11;
+  manualBase("DW B",false);
+  UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-watch.pbm");
+  v.selected=false;second.selected=true;
+  second.activity=UI_RADIO_CARD_TRANSMITTING;second.signal_valid=false;second.power_label="MID";
+  manualBase("DW -",false);
+  UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-tx.pbm");
+  // Drafts leave the original reception running until MENU accepts them.
+  v=(UI_RadioCardView){.id='A',.selected=true,.frequency_hz=438500000,
+    .step_hz=12500,.mode=RX_NFM,.band_name="70cm",.edit_text="438.6_",
+    .activity=UI_RADIO_CARD_RECEIVING,.signal_valid=true,.signal_level=8};
+  second=(UI_RadioCardView){.id='B',.frequency_hz=145500000,.step_hz=12500,
+    .mode=RX_NFM,.band_name="2m"};
+  manualBase("DW A",false);
+  UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-input.pbm");
+  v.band_name="CH 012";v.name="Local";v.edit_text="15_";v.edit_unit="CH";
+  manualBase("MR A",false);
+  UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-channel.pbm");
   // Spectrum: the slot card shows the cursor; noise, two carriers, peaks.
   Spectrum s;
   SPECTRUM_Start(&s,145500000,12500);
@@ -114,7 +156,7 @@ int main(int argc, char **argv) {
   v=(UI_RadioCardView){.id='A',.selected=true,.frequency_hz=SPECTRUM_Frequency(&s,s.cursor),
     .step_hz=12500,.mode=RX_NFM,.band_name="Span 1.600 MHz",.activity=UI_RADIO_CARD_RECEIVING,
     .signal_valid=true,.signal_level=9};
-  base();FillRect(0,0,114,7,C_CLEAR);PrintSmall(0,4,"Spectrum");
+  manualBase("Spectrum",false);
   UI_RadioCardRender(8,&v);UI_SpectrumRender(36,28,&s);snapshot("spectrum.pbm");
   return 0;
 }

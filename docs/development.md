@@ -122,6 +122,10 @@ python3 tools/bdf-to-gfx.py input.bdf output.h --name myFont --line 8
 
 muMatrix 源文件注明由 muwerk 的 mufont 生成；转换格式不意味着来源或授权信息可以删除。未来外部中文字库的安装、缓存与编码方案见设计文档。
 
+### SSB 补丁构建条件
+
+补丁不在固件中，默认 SSB 不可用。仅在独立核对 EEPROM 尾部的完整 8840 B 镜像后，才可在构建 DEFINES 中加入 `-DUVK6_SSB_PATCH_CRC32=0x...`；`SETTINGS_IsPatchPresent` 核对前缀和全量 CRC，驱动再只读加载。改变 DEFINES 仍需强制构建，不能只确认八字节头部就称补丁可用；不迁移其他固件的补丁地址。
+
 ### UI 预览
 
 ```sh
@@ -140,6 +144,17 @@ python3 tools/ui-preview.py --frames multi-ab multi-cd --output /tmp/multi-vfo.p
 | tx、seek、rds | 发射、搜台、实际解析器的模拟 RDS 数据 |
 | ab-a、ab-b、multi-ab、multi-cd | 选择与分页 |
 | watch-probe、watch-rx、error-short、error-long | 守听归属和短／长提示 |
+| manual-frequency、manual-name | 手册主屏：额外小数、预设差异、广播 PS／MR 名称 |
+| manual-watch、manual-tx | 手册活动：选中 A 而 B 接收、选中 B 发射 |
+| manual-input、manual-channel | 手册输入：MHz 频率草稿与 CH 频道号草稿 |
+
+手册截图采用当前卡片绘图代码、示例数据和对应主屏幕标题，不是实机采样。重新生成：
+
+```sh
+python3 tools/ui-preview.py --frames manual-frequency manual-name --output docs/images/manual-main.png
+python3 tools/ui-preview.py --frames manual-watch manual-tx --output docs/images/manual-activity.png
+python3 tools/ui-preview.py --frames manual-input manual-channel --output docs/images/manual-input.png
+```
 
 ### 其他工具与串口
 
@@ -152,12 +167,12 @@ python3 tools/ui-preview.py --frames multi-ab multi-cd --output /tmp/multi-vfo.p
 
 ## 5. Flash、RAM 与优化记录
 
-2026-10-14 在提交 **91dbf0f** 上强制构建默认 release（ARM GNU 15.3.rel1，ENABLE_TX=1、ENABLE_FC=1）：
+2026-10-14 在提交 **77a4274** 上强制构建默认 release（ARM GNU 15.3.rel1，ENABLE_TX=1、ENABLE_FC=1）：
 
 | 指标 | 测量 |
 | --- | ---: |
-| Flash | **54,352 / 61,440 B**，余 **7,088 B** |
-| 代码输入 | 47,902 B |
+| Flash | **54,444 / 61,440 B**，余 **6,996 B** |
+| 代码输入 | 47,994 B |
 | 只读输入（含字体和字符串） | 5,837 B |
 | RAM 初值 data | 372 B，亦占 Flash |
 | 静态 RAM | 6,092 B |
