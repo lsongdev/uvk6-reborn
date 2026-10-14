@@ -7,7 +7,8 @@ The Radio main screen supports up to four independent A/B/C/D slots (two visible
 NFM/WFM/AM/SSB modes, band presets, dual watch, user channels, UVR2
 persistence and receiver selection. **The default build enables BK4819 NFM
 TX and the PA** (136–174 / 400–470 MHz, factory calibration, per-slot
-`TX Enable` defaults Off); `make ENABLE_TX=0` builds a receive-only image.
+`TX Enable` defaults Off); `make ENABLE_TX=0` builds a receive-only image
+and `make ENABLE_FC=0` drops F→4 frequency capture (about 1.3 KiB).
 Verify output power, deviation and PA shutdown into a dummy load, and only
 transmit where you are licensed to. See the
 [user manual](docs/user-manual.md) for current controls and the

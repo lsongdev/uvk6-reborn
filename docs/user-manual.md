@@ -6,7 +6,7 @@
 
 默认启用 A/B 两个 Radio Slot，可在 Settings → Receive → Slot count 设置 1／2／3／4 项，每页显示两个。主屏幕不区分 VFO 或 MR；`F → 2(A/B)` 在启用的 Slot 间循环选择，`F → 3(VFO/MR)` 切换所选 Slot 的频率来源（直接调频或存储频道）。切到 MR 不覆盖原先的 VFO 频率和频段记忆，切回时恢复；可选双守听按每个 Slot 当前来源轮询，至少启用两个 Slot 才会运行。Slot 的 TX 设置和 Watch 资格独立，频段预设共享。首次初始化 A 为 145.500 MHz NFM、B 为 438.500 MHz NFM。固件根据频率、模式及探测到的芯片能力选择接收路径，无需手动选择芯片。模式为 `NFM / WFM / AM / LSB / USB`，没有 `Auto`。
 
-默认编译 **已开放 BK4819 NFM 发射与功放**：在当前 Slot 菜单把 `TX Enable` 设为 On 后按住 PTT 发射（初始均为 Off）。首次发射请接假负载核对功率与频偏，并只在有执照许可的频率发射；`make ENABLE_TX=0` 可生成仅接收固件。已支持命名频道和频道模式；`F → 4` 可启动 FC 频率捕获、`F → *` 可启动向前 Seek。旧扫描 / 频谱 / Loot 应用已从源码删除。
+默认编译 **已开放 BK4819 NFM 发射与功放**：在当前 Slot 菜单把 `TX Enable` 设为 On 后按住 PTT 发射（初始均为 Off）。首次发射请接假负载核对功率与频偏，并只在有执照许可的频率发射；`make ENABLE_TX=0` 可生成仅接收固件，`make ENABLE_FC=0` 可去掉 FC（`F → 4` 改为提示 `Not supported`，省约 1.3 KiB）。已支持命名频道和频道模式；`F → 4` 可启动 FC 频率捕获、`F → *` 可启动向前 Seek。旧扫描 / 频谱 / Loot 应用已从源码删除。
 
 ## 刷写固件
 

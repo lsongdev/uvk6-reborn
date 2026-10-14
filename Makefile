@@ -70,6 +70,8 @@ CFLAGS   := $(COMMON_FLAGS) $(OPTIMIZATION) \
 
 # BK4819 NFM transmit and PA control. ENABLE_TX=0 builds a receive-only image.
 ENABLE_TX ?= 1
+# F→4 frequency capture (FC). ENABLE_FC=0 drops it and frees about 1.3 KiB.
+ENABLE_FC ?= 1
 # One-off maintenance image: seeds an erased PA calibration table, RX-only.
 SEED_PA_CAL ?= 0
 ifeq ($(SEED_PA_CAL),1)
@@ -86,6 +88,7 @@ DEFINES  := -DGIT_HASH=\"$(GIT_HASH)\" \
             -DCMSIS_device_header=\"ARMCM0.h\" \
             -DARMCM0 \
             -DUVK6_ENABLE_TX=$(ENABLE_TX) \
+            -DUVK6_ENABLE_FC=$(ENABLE_FC) \
             -DUVK6_SEED_PA_CAL=$(SEED_PA_CAL)
 
 # Include paths
