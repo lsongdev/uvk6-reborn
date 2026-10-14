@@ -83,11 +83,16 @@ void captureUpdate(void) {
 }
 
 // While FC owns the keyboard every other action stays blocked; especially
-// never allow a digit to become a global shortcut.
+// never allow a digit to become a global shortcut. MENU adopts the reading
+// on screen (nothing yet: ignored), EXIT gives BK back unchanged.
 void captureKey(KEY_Code_t key, Key_State_t state) {
   if (key==KEY_PTT && state==KEY_RELEASED) RADIO_APP_PttRelease();
   if (state != KEY_RELEASED) return;
-  if (key==KEY_EXIT || key==KEY_MENU) cancelCapture(NULL);
+  RxPlan plan;
+  if (key==KEY_EXIT) cancelCapture(NULL);
+  else if (key==KEY_MENU) {
+    if (capture.last_hz && capturePlan(capture.last_hz, &plan)) adoptCapture(&plan);
+  }
   else if (key==KEY_SIDE1 || key==KEY_SIDE2) {
     RX_DEVICE_CaptureStop();
     CAPTURE_Start(&capture, (capture.scope+1u)%3u, Now());
