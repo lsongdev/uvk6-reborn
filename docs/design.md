@@ -147,9 +147,19 @@ FC 仅 VFO、BK 频率检测。core/capture 接收 BUSY／INVALID／SAMPLE，同
 
 ## 8. 后续规划
 
-以下未实现，不作为用户手册入口：可配置侧键、自动锁键、按键音、NOAA／VOX／呼叫频道快捷键、完整 RDS 字符集和中文显示、频道扫描组、超过四个 Slot。
+以下未实现，不作为用户手册入口：可配置侧键（方案见下）、自动锁键、按键音、NOAA／VOX／呼叫频道快捷键、完整 RDS 字符集和中文显示、频道扫描组、超过四个 Slot。
 
 中文计划应使用外部 EEPROM 字库与小缓存，先定义编码、资源清单／CRC、安装与升级工具、缺资源恢复，再设计中文输入。至少 12 px 字形所需高度要纳入 20 px 正文预算；不直接移植其他设备 SPI Flash 地址。512 KiB 外部容量可支持更大资源，但不增加 60 KiB MCU Flash 或 16 KiB RAM。
+
+### 可配置侧键（已定方案，待实现）
+
+- 两个侧键各开放短按、长按，共 4 项：Settings → Side keys → Side 1、Side 1 long、Side 2、Side 2 long，MENU／*／# 切换取值。
+- 动作与 F 快捷键共用主屏幕的一张动作表（None、Band、Mode、A/B、VFO/MR、FC、Power、Reverse、Seek、Spectrum、Monitor），新增动作只改一处。
+- 新增 Monitor：按住强开静噪，松开恢复，适合放在长按。
+- 默认值保持现有习惯：Side 1 = Band，Side 1 long = Monitor，Side 2 = Mode，Side 2 long = Spectrum。
+- 自定义只作用于主屏幕；FC、Seek、菜单、频谱页中侧键保持本地语义（如 FC 切换范围），键盘锁照常锁住侧键。
+- 偏好增加 4 字节，配置格式 9 → 10。提供只认格式 9 的升级读取并补默认侧键，避免用户设置被重置。
+- 预计 Flash 0.6–0.9 KB（Monitor 约 200–300 B）。
 
 增加 Slot 保存容量不增加同频芯片并行能力；更多 BK 事件仍需轮询，延迟与漏检增大。任何新 TX、资源写入或硬件参数必须保持明确边界，不能通过功能设置放开校准保护。
 
