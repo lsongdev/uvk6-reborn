@@ -66,23 +66,18 @@ static void buildCardView(uint8_t id, const char *inputText,
     .power_label = tx->power == TX_POWER_HIGH ? "HIGH" :
                    tx->power == TX_POWER_MEDIUM ? "MID" : "LOW",
   };
-  if (selected && capturePhase!=FC_OFF) {
+  if (selected && capturing) {
     view->name=view->radio_text=NULL;
-    view->header_message=capturePhase==FC_PREVIEW ? "FC Preview" : "FC detecting";
-    if (capturePhase==FC_PREVIEW) {
-      view->frequency_hz=capture.last_hz;
-      view->mode=RX_NFM;
-      view->step_hz=12500;
-    }
+    view->header_message="FC detecting";
   }
 }
 
 static void renderTitle(void) {
   char title[24];
   Text t = TEXT_Begin(title, sizeof(title));
-  if (capturePhase!=FC_OFF) {
+  if (capturing) {
     TEXT_Add(&t, capture.scope==CAPTURE_AUTO ? "FC Auto " : capture.scope==CAPTURE_VHF ? "FC VHF " : "FC UHF ");
-    TEXT_Add(&t, capturePhase==FC_PREVIEW ? "MENU:Use" : capture.range==CAPTURE_RANGE_VHF ? "VHF" : "UHF");
+    TEXT_Add(&t, capture.range==CAPTURE_RANGE_VHF ? "VHF" : "UHF");
     STATUSLINE_SetText(title);
   }
   else if (number.active) STATUSLINE_SetText(number.invalid ? "Invalid value" : inputTx ? "TX Frequency" : "RX Frequency");

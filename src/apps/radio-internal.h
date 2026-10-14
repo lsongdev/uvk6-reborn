@@ -43,7 +43,6 @@
 // RDS text belongs to the frequency it was received on.
 typedef struct { uint32_t frequency_hz; char ps[9], text[65]; } SlotLabel;
 
-typedef enum { FC_OFF, FC_DETECT, FC_PREVIEW } CapturePhase;
 
 // RX items share RadioParameterField order; changeValue passes them through.
 enum {
@@ -95,10 +94,10 @@ void finishSeek(bool found, uint32_t frequency_hz, const char *status);
 #endif
 extern CaptureRuntime capture;
 #if UVK6_ENABLE_FC
-extern CapturePhase capturePhase;
+extern bool capturing;
 #else
-// A constant phase lets every FC branch in the other modules fold away.
-#define capturePhase FC_OFF
+// A constant lets every FC branch in the other modules fold away.
+#define capturing false
 #endif
 void startCapture(void);
 void captureUpdate(void);

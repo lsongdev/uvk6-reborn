@@ -68,7 +68,7 @@ void __attribute__((noinline)) resetRds(void) {
 
 void RADIO_APP_deinit(void) {
   number.active = false;
-  if (capturePhase!=FC_OFF) cancelCapture(NULL);
+  if (capturing) cancelCapture(NULL);
   RADIO_APP_PttRelease();
   RADIO_APP_cancelShortcut();
   if (seek.active)
@@ -247,7 +247,7 @@ void RADIO_APP_init(void) {
 }
 
 bool RADIO_APP_isReceiving(void) {
-  return initialized && receivingSlot != UINT8_MAX && !WATCH_IsProbing(&watcher) && runtime.active && !seek.active && capturePhase!=FC_DETECT &&
+  return initialized && receivingSlot != UINT8_MAX && !WATCH_IsProbing(&watcher) && runtime.active && !seek.active && !capturing &&
          transmitter.mode == RADIO_RX;
 }
 
@@ -266,7 +266,7 @@ void RADIO_APP_update(void) {
   }
   if (transmitter.mode != RADIO_RX)
     return;
-  if (capturePhase!=FC_OFF) { captureUpdate(); return; }
+  if (capturing) { captureUpdate(); return; }
   seekUpdate();
   watchUpdate();
   uint8_t rdsSlot=receivingSlot;
@@ -317,7 +317,7 @@ static bool tuneExact(uint32_t frequency_hz, RadioParameters parameters) {
 // Reapply only the active receive plan. Global settings never rewrite VFOs
 // or presets, and the receive runtime remains responsible for recovery.
 bool RADIO_APP_ApplyRxSettings(void) {
-  if (capturePhase!=FC_OFF) cancelCapture(NULL);
+  if (capturing) cancelCapture(NULL);
   if (!initialized) return true;
   RxPlan plan;
   if (runtime.active) plan = runtime.current;
@@ -467,7 +467,7 @@ static void shortcutKey(KEY_Code_t key) {
 
 bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
   expireShortcut(Now());
-  if (capturePhase!=FC_OFF) {
+  if (capturing) {
     captureKey(key, state);
     return true;
   }

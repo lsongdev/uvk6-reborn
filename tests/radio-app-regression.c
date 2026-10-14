@@ -188,7 +188,7 @@ bool CHANNEL_STORE_Next(uint16_t number, bool up, uint16_t *next) {
 bool APPS_key(KEY_Code_t key, Key_State_t keyState) { (void)key; (void)keyState; return true; }
 
 static void setup(uint32_t frequency, RadioParameters values) {
-  capturePhase=FC_OFF;
+  capturing=false;
   captureStarts=captureStops=0; captureReply=CAPTURE_BUSY;
   number = (NumberInput){0};
   clockNow=100;
@@ -989,53 +989,40 @@ int main(void) {
   press(KEY_9);press(KEY_5);press(KEY_STAR);press(KEY_9);press(KEY_2);press(KEY_5);press(KEY_MENU);
   assert(!number.active && confirming && activeSlot.current.frequency_hz==100000000);
   press(KEY_EXIT);assert(!confirming && activeSlot.current.frequency_hz==100000000);
-  // F4 binds capture, not numeric input. Detection and preview own PTT/UI.
+  // F4 binds capture, not numeric input. Detection owns PTT/UI.
   setup(438500000,fm);
   RadioSlot fcOrigin=gDeviceConfig.radio.slots[0];
   unsigned fcSaves=saveRequests;
   press(KEY_F);press(KEY_4);
-  assert(capturePhase==FC_DETECT && !number.active && !functionPending);
+  assert(capturing && !number.active && !functionPending);
   assert(!RADIO_APP_isReceiving() && receivingSlot==UINT8_MAX && captureStarts==1);
   assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED));press(KEY_PTT);
   press(KEY_F);press(KEY_2);press(KEY_MENU); // Cancel while detecting.
-  assert(capturePhase==FC_OFF && selectedSlot==0 && !txFakePrepares);
+  assert(!capturing && selectedSlot==0 && !txFakePrepares);
   assert(!memcmp(&fcOrigin,&gDeviceConfig.radio.slots[0],sizeof(fcOrigin)) && saveRequests==fcSaves);
   press(KEY_F);press(KEY_4);
   clockNow+=500;RADIO_APP_update();clockNow+=500;RADIO_APP_update();
   assert(capture.range==CAPTURE_RANGE_UHF); // No-results Auto still advances.
-  captureReply=CAPTURE_SAMPLE;captureHz=438512340;
-  clockNow+=20;RADIO_APP_update();assert(capturePhase==FC_DETECT);
-  captureHz+=3000;clockNow+=20;RADIO_APP_update();
-  assert(capturePhase==FC_PREVIEW && RADIO_APP_isReceiving());
-  assert(runtime.current.frequency_hz==438500000 && activeSlot.current.frequency_hz==438500000);
-  assert(saveRequests==fcSaves && gReceiver.plan.frequency_hz==captureHz);
-  RADIO_APP_render();assert(drawn[0].frequency_hz==captureHz && drawn[0].mode==RX_NFM);
-  assert(!drawn[0].name && !drawn[0].radio_text);
-  assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED));press(KEY_PTT);assert(!txFakePrepares);
-  press(KEY_EXIT);assert(capturePhase==FC_OFF && gReceiver.plan.frequency_hz==438500000);
-  assert(saveRequests==fcSaves && !memcmp(&fcOrigin,&gDeviceConfig.radio.slots[0],sizeof(fcOrigin)));
-  // Preview adoption affects only the bound VFO and requests one save.
-  press(KEY_F);press(KEY_4);press(KEY_SIDE1);press(KEY_SIDE1); // UHF
-  assert(capture.scope==CAPTURE_UHF && capture.range==CAPTURE_RANGE_UHF);
-  clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();
-  assert(capturePhase==FC_PREVIEW);
+  RADIO_APP_render();assert(!strcmp(drawn[0].header_message,"FC detecting"));
+  // Two close samples tune the bound VFO directly: NFM, TX off, one save.
   gDeviceConfig.radio.slots[0].tx.enabled=activeSlot.tx.enabled=true;
   RadioSlot other=gDeviceConfig.radio.slots[1];
-  press(KEY_MENU);
-  assert(capturePhase==FC_OFF && runtime.current.frequency_hz==captureHz);
+  captureReply=CAPTURE_SAMPLE;captureHz=438512340;
+  clockNow+=20;RADIO_APP_update();assert(capturing);
+  captureHz+=3000;clockNow+=20;RADIO_APP_update();
+  assert(!capturing && RADIO_APP_isReceiving() && runtime.current.frequency_hz==captureHz);
+  assert(activeSlot.current.frequency_hz==captureHz && gReceiver.plan.frequency_hz==captureHz);
   assert(activeSlot.current.parameters.mode==RX_NFM && !activeSlot.current.parameters.rx_tone && !activeSlot.tx.enabled);
   assert(saveRequests==fcSaves+1 && !memcmp(&other,&gDeviceConfig.radio.slots[1],sizeof(other)));
-  // Timeout, application exit and same-frequency preview restore without writes.
+  // Timeout and application exit restore without writes.
   setup(145500000,fm);fcSaves=saveRequests;
   press(KEY_F);press(KEY_4);clockNow+=15000;RADIO_APP_update();
-  assert(capturePhase==FC_OFF && saveRequests==fcSaves && gReceiver.plan.frequency_hz==145500000);
+  assert(!capturing && saveRequests==fcSaves && gReceiver.plan.frequency_hz==145500000);
   RADIO_APP_render();assert(!strcmp(drawn[0].header_message,"FC timeout") && !drawn[1].header_message);
   assert(drawn[0].frequency_hz==145500000);
-  press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145500000;
-  clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();
-  assert(capturePhase==FC_PREVIEW);RADIO_APP_deinit();
-  assert(capturePhase==FC_OFF && saveRequests==fcSaves);
-  // SI/BK1080 origin remains committed through preview; cancel restores it.
+  press(KEY_F);press(KEY_4);RADIO_APP_deinit();
+  assert(!capturing && saveRequests==fcSaves);
+  // From SI/BK1080 the origin stays committed until a carrier is adopted.
   for (unsigned chip=0;chip<2;++chip) {
     setup(95900000,(RadioParameters){RX_WFM,100000,0,0});
     if (chip) {
@@ -1043,48 +1030,45 @@ int main(void) {
       request(95900000,activeSlot.current.parameters);
     }
     fcOrigin=gDeviceConfig.radio.slots[0];fcSaves=saveRequests;
-    press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145500000;
-    clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();
-    assert(capturePhase==FC_PREVIEW && gReceiver.plan.device == RX_DEVICE_BK);
+    press(KEY_F);press(KEY_4);
     unsigned reads=rdsReads;clockNow+=100;RADIO_APP_update();assert(rdsReads==reads);
     press(KEY_EXIT);
     assert(gReceiver.plan.device==(chip ? RX_DEVICE_BROADCAST : RX_DEVICE_SI) && gReceiver.plan.frequency_hz==95900000);
     assert(saveRequests==fcSaves && !memcmp(&fcOrigin,&gDeviceConfig.radio.slots[0],sizeof(fcOrigin)));
+    press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145500000;
+    clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();
+    assert(!capturing && gReceiver.plan.device==RX_DEVICE_BK && runtime.current.frequency_hz==145500000);
+    capabilities=(ReceiverCapabilities){true,false,true};captureReply=CAPTURE_BUSY;
   }
-  // Unsupported candidate cannot preview; failed preview and failed restore mute.
+  // An unsupported candidate is ignored; a failed tune restores the origin
+  // and never commits the candidate.
   setup(145500000,fm);fcSaves=saveRequests;
   press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=700000000;
-  clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();assert(capturePhase==FC_DETECT);
-  press(KEY_SIDE1);captureHz=145500000;failFrequency=captureHz;
+  clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();assert(capturing);
+  captureHz=145600000;failFrequency=captureHz;
   clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();
-  assert(capturePhase==FC_OFF && !runtime.active && receivingSlot==UINT8_MAX && saveRequests==fcSaves);
-  // Final adoption failure restores the origin and never commits the candidate.
-  setup(145500000,fm);fcSaves=saveRequests;
-  press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145600000;
-  clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();
-  assert(capturePhase==FC_PREVIEW);failFrequency=captureHz;press(KEY_MENU);
-  assert(capturePhase==FC_OFF && runtime.active && runtime.current.frequency_hz==145500000);
+  assert(!capturing && runtime.active && runtime.current.frequency_hz==145500000);
   assert(gDeviceConfig.radio.slots[0].current.frequency_hz==145500000 && saveRequests==fcSaves);
-  // A restart from preview forgets prior hits while retaining the committed origin.
-  failFrequency=0;press(KEY_F);press(KEY_4);
-  clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();assert(capturePhase==FC_PREVIEW);
-  press(KEY_SIDE2);assert(capturePhase==FC_DETECT && capture.scope==CAPTURE_VHF && !capture.hits);
+  // Side keys restart detection with the next scope and forget prior hits.
+  failFrequency=0;captureReply=CAPTURE_BUSY;press(KEY_F);press(KEY_4);
+  press(KEY_SIDE2);assert(capturing && capture.scope==CAPTURE_VHF && !capture.hits);
+  press(KEY_SIDE1);assert(capture.scope==CAPTURE_UHF && capture.range==CAPTURE_RANGE_UHF);
   press(KEY_EXIT);assert(runtime.current.frequency_hz==145500000 && saveRequests==fcSaves);
-  // Hidden VFOs can be the bound owner as well; F2 is swallowed until adoption.
+  // Hidden VFOs can be the bound owner as well; F2 is swallowed during FC.
   setup(145500000,fm);
   assert(RADIO_STATE_SetCount(&gDeviceConfig.radio,4));
   for (unsigned id=1;id<4;++id) {
     press(KEY_F);press(KEY_2);assert(selectedSlot==id);
     RadioSlot untouched=gDeviceConfig.radio.slots[0];fcSaves=saveRequests;
-    press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145600000+id*10000u;
-    clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();assert(capturePhase==FC_PREVIEW);
-    press(KEY_F);press(KEY_2);assert(selectedSlot==id);
-    press(KEY_MENU);
+    press(KEY_F);press(KEY_4);captureReply=CAPTURE_BUSY;
+    press(KEY_F);press(KEY_2);assert(selectedSlot==id && capturing);
+    captureReply=CAPTURE_SAMPLE;captureHz=145600000+id*10000u;
+    clockNow+=20;RADIO_APP_update();clockNow+=20;RADIO_APP_update();
     assert(gDeviceConfig.radio.slots[id].current.frequency_hz==captureHz && saveRequests==fcSaves+1);
     assert(!memcmp(&untouched,&gDeviceConfig.radio.slots[0],sizeof(untouched)));
   }
   // MR and input retain their existing controls; F4 never starts capture there.
   setup(145500000,fm);activeSlot.source=RADIO_SOURCE_CHANNEL;
-  press(KEY_F);press(KEY_4);assert(capturePhase==FC_OFF && !captureStarts);
+  press(KEY_F);press(KEY_4);assert(!capturing && !captureStarts);
   return 0;
 }
