@@ -3,13 +3,13 @@
 void CAPTURE_Start(CaptureRuntime *r, CaptureScope scope, uint32_t now) {
   *r = (CaptureRuntime){.scope=scope,
     .range=scope==CAPTURE_UHF ? CAPTURE_RANGE_UHF : CAPTURE_RANGE_VHF,
-    .started_at=now, .attempt_at=now};
+    .attempt_at=now};
 }
 
 CaptureAction CAPTURE_Update(CaptureRuntime *r, uint32_t now,
                              CaptureSample sample, uint32_t hz) {
+  // No session limit: FC runs until a stable pair or the user stops it.
   // Unsigned elapsed time also handles the millisecond clock wrapping.
-  if (now-r->started_at >= 15000u) return CAPTURE_TIMEOUT;
   if (sample==CAPTURE_BUSY && now-r->attempt_at < 500u) return CAPTURE_WAIT;
   if (sample==CAPTURE_SAMPLE) {
     uint32_t delta=hz>r->last_hz ? hz-r->last_hz : r->last_hz-hz;

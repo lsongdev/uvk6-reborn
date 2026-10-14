@@ -1008,12 +1008,15 @@ int main(void) {
   assert(activeSlot.current.frequency_hz==captureHz && gReceiver.plan.frequency_hz==captureHz);
   assert(activeSlot.current.parameters.mode==RX_NFM && !activeSlot.current.parameters.rx_tone && !activeSlot.tx.enabled);
   assert(saveRequests==fcSaves+1 && !memcmp(&other,&gDeviceConfig.radio.slots[1],sizeof(other)));
-  // Timeout and application exit restore without writes.
+  // Without a carrier FC keeps running; EXIT and application exit restore
+  // without writes.
   setup(145500000,fm);fcSaves=saveRequests;
-  press(KEY_F);press(KEY_4);clockNow+=15000;RADIO_APP_update();
+  press(KEY_F);press(KEY_4);
+  for (unsigned i=0;i<120;++i) { clockNow+=500;RADIO_APP_update(); }
+  assert(capturing && saveRequests==fcSaves);
+  press(KEY_EXIT);
   assert(!capturing && saveRequests==fcSaves && gReceiver.plan.frequency_hz==145500000);
-  RADIO_APP_render();assert(!strcmp(drawn[0].header_message,"FC timeout") && !drawn[1].header_message);
-  assert(drawn[0].frequency_hz==145500000);
+  RADIO_APP_render();assert(!drawn[0].header_message && drawn[0].frequency_hz==145500000);
   press(KEY_F);press(KEY_4);RADIO_APP_deinit();
   assert(!capturing && saveRequests==fcSaves);
   // From SI/BK1080 the origin stays committed until a carrier is adopted.
