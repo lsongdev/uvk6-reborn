@@ -2,6 +2,7 @@
 #include "apps/radio-internal.h"
 
 CaptureRuntime capture;
+#if UVK6_ENABLE_FC
 CapturePhase capturePhase;
 static uint32_t capturePollAt;
 
@@ -94,3 +95,9 @@ void captureKey(KEY_Code_t key, Key_State_t state) {
     captureAttempt();
   }
 }
+#else
+void startCapture(void) { notify("Not supported"); }
+void captureUpdate(void) {}
+void captureKey(KEY_Code_t key, Key_State_t state) { (void)key; (void)state; }
+void cancelCapture(const char *status) { (void)status; }
+#endif

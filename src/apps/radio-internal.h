@@ -89,9 +89,17 @@ void startSeek(void);
 void seekUpdate(void);
 void finishSeek(bool found, uint32_t frequency_hz, const char *status);
 
-// radio-capture.c
+// radio-capture.c. Set by the Makefile (ENABLE_FC); host tests keep FC.
+#ifndef UVK6_ENABLE_FC
+#define UVK6_ENABLE_FC 1
+#endif
 extern CaptureRuntime capture;
+#if UVK6_ENABLE_FC
 extern CapturePhase capturePhase;
+#else
+// A constant phase lets every FC branch in the other modules fold away.
+#define capturePhase FC_OFF
+#endif
 void startCapture(void);
 void captureUpdate(void);
 void captureKey(KEY_Code_t key, Key_State_t state);

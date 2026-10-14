@@ -30,6 +30,10 @@ jobs:
             libnewlib-arm-none-eabi=4.4.0.20231231-2
       - name: Install packer dependency
         run: python -m pip install crcmod
+      - name: Build optional-feature variants
+        run: |
+          make -B -j4 all ENABLE_FC=0
+          make -B -j4 all ENABLE_TX=0
       - name: Build firmware
         run: |
           arm-none-eabi-gcc --version | head -1

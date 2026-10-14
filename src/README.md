@@ -45,6 +45,6 @@ drivers/             BK4819、SI4732、BK1080、ST7565 与 DP32G030 外设
 - Cortex-M0 无硬件除法：避免有符号 `/`、`%`，否则会链接 468 B 的 `__divsi3`。
 - 不使用 printf：文本用 `core/text` 拼接（有界、自动截断），`Print*` 和 `STATUSLINE_SetText` 只接收现成字符串。
 
-`main.c` 负责硬件初始化，`apps/system.c` 的主循环调用 `RADIO_APP_TxSafetyUpdate()` 维护最高优先级的 PTT 安全释放，Radio 应用退到 Settings 也不会停止。默认构建开放 TX（`make ENABLE_TX=0` 为仅接收）。
+`main.c` 负责硬件初始化，`apps/system.c` 的主循环调用 `RADIO_APP_TxSafetyUpdate()` 维护最高优先级的 PTT 安全释放，Radio 应用退到 Settings 也不会停止。默认构建开放 TX 和 FC：`make ENABLE_TX=0` 为仅接收，`make ENABLE_FC=0` 去掉 FC 频率捕获。
 
 详细边界见 [Radio 架构](../docs/radio-architecture.md)。回归运行 `sh tests/run.sh`，ARM 构建运行 `make -B -j4 all`。
