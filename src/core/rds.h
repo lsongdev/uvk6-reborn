@@ -13,9 +13,14 @@ typedef struct {
   uint8_t text_ab, text_version, ps_seen, ps_confirmed;
   uint16_t text_seen, text_confirmed;
   uint8_t ps_pending[8], text_pending[64];
+  // Clock time (4A): local minute of the day, 0-1439. clock_new is set when
+  // two clean groups agree (equal or one minute apart); the owner clears it.
+  uint16_t clock, clock_pending; // clock_pending: minute + 1, 0 if none.
+  bool clock_new;
 } RdsDecoder;
 
 void RDS_Reset(RdsDecoder *decoder);
-// True only when visible PS/RadioText changes. Groups 0A/B and 2A/B.
+// True only when visible PS/RadioText changes. Groups 0A/B and 2A/B;
+// 4A clock time only sets clock_new.
 bool RDS_Feed(RdsDecoder *decoder, const RdsGroup *group);
 #endif

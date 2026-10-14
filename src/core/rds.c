@@ -77,6 +77,22 @@ bool RDS_Feed(RdsDecoder *d, const RdsGroup *g) {
     memcpy(d->text_pending+segment*size, data, size);
     d->text_seen |= bit;
     publishText(d, size);
+  } else if (type == 4 && !version && !g->errors[2] && !g->errors[3]) {
+    // MJD (17 bits), UTC hour and minute, local offset in half hours.
+    uint32_t mjd = (uint32_t)(b & 3) << 15 | g->blocks[2] >> 1;
+    unsigned hour = (g->blocks[2] & 1) << 4 | g->blocks[3] >> 12;
+    unsigned minute = (g->blocks[3] >> 6) & 63, offset = (g->blocks[3] & 31) * 30;
+    if (mjd && hour < 24 && minute < 60 && offset <= 14 * 60) {
+      // Unsigned only: a signed % would pull in the division library.
+      unsigned local = hour * 60 + minute + 1440;
+      uint16_t now = (uint16_t)((g->blocks[3] & 32 ? local - offset : local + offset) % 1440);
+      uint16_t last = d->clock_pending - 1;
+      if (d->clock_pending && (now == last || now == (last + 1u) % 1440u)) {
+        d->clock = now;
+        d->clock_new = true;
+      }
+      d->clock_pending = now + 1;
+    }
   }
   return strcmp(previousPs, d->ps) || strcmp(previousText, d->text);
 }

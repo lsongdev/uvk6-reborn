@@ -9,6 +9,7 @@
 #include "ui/battery-icon.h"
 #include "ui/graphics.h"
 #include "core/text.h"
+#include "radio/radio.h"
 #include <string.h>
 
 static uint8_t previousBatteryLevel = 255;
@@ -100,6 +101,20 @@ void STATUSLINE_render(void) {
     right = right > 6 ? right - 6 : 0;
   }
   uint8_t textWidth = right > 2 ? right - 2 : 0;
+  // RDS clock time centred; the title gives way, the right side never does.
+  uint16_t minute;
+  if (RADIO_Clock(&minute)) {
+    char clockText[6];
+    Text t = TEXT_Begin(clockText, sizeof(clockText));
+    TEXT_Number(&t, minute / 60u, 2, 10);
+    TEXT_Char(&t, ':');
+    TEXT_Number(&t, minute % 60u, 2, 10);
+    uint8_t half = UI_SmallTextWidth(clockText) / 2;
+    if (LCD_WIDTH / 2 + half + 2 <= right) {
+      PrintSmallEx(LCD_WIDTH / 2, BASE_Y, POS_C, C_FILL, clockText);
+      if (textWidth > LCD_WIDTH / 2 - half - 3) textWidth = LCD_WIDTH / 2 - half - 3;
+    }
+  }
   char selection[32];
   const char *text = statuslineText;
   if (gIsNumNavInput) {
