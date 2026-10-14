@@ -134,6 +134,22 @@ static void poll(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
   r->deadline=clockNow(ops,now)+WATCH_SETTLE_MS;
 }
 
+void WATCH_SuspendBk(WatchRuntime *r, bool suspend, uint32_t now, const WatchOperations *ops) {
+  if (!r || r->phase==WATCH_OFF || !ops || !ops->select || r->bk_suspended==suspend) return;
+  r->bk_suspended=suspend;
+  if (suspend) {
+    bool broadcast=r->has_background && !backgroundOnBk(r) && r->background_ready;
+    if (r->audio==WATCH_EVENT || r->phase==WATCH_HANG || (r->audio==WATCH_BACKGROUND && !broadcast)) {
+      const WatchTarget *quiet=r->audio==WATCH_BACKGROUND ? &r->background : &r->events[r->cursor];
+      if (broadcast) speaker(r,ops,&r->background,WATCH_BACKGROUND);
+      else speaker(r,ops,quiet,WATCH_QUIET);
+    }
+  }
+  r->visited=0;
+  r->phase=WATCH_POLL;
+  r->deadline=now;
+}
+
 void WATCH_Update(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
   if (!r || r->phase==WATCH_OFF || !ops || !ops->prepare || !ops->signal || !ops->select)
     return;
@@ -147,7 +163,7 @@ void WATCH_Update(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
     } else r->background_retry=clockNow(ops,now)+WATCH_RETRY_MS;
     return; // At most one hardware preparation per update.
   }
-  if ((int32_t)(now-r->deadline)<0) return;
+  if (r->bk_suspended || (int32_t)(now-r->deadline)<0) return;
   if (r->phase==WATCH_POLL || r->phase==WATCH_RETRY || r->phase==WATCH_HOME) {
     if (r->phase==WATCH_HOME) r->visited=0;
     poll(r,now,ops);

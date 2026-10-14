@@ -5,7 +5,6 @@ CaptureRuntime capture;
 #if UVK6_ENABLE_FC
 bool capturing;
 static uint32_t capturePollAt;
-static uint8_t keptSlot=UINT8_MAX; // Broadcast slot left playing during FC.
 
 // Runtime keeps the committed origin until a carrier is confirmed.
 static bool capturePlan(uint32_t hz, RxPlan *plan) {
@@ -17,9 +16,11 @@ static bool capturePlan(uint32_t hz, RxPlan *plan) {
 void cancelCapture(const char *status) {
   RX_DEVICE_CaptureStop();
   capturing=false;
-  if (keptSlot!=UINT8_MAX) { // The broadcast never stopped: nothing to restore.
+  if (watcher.phase!=WATCH_OFF) { // BK slots rejoin the watch.
+    suspendWatchBk(false);
+  } else if (gReceiver.plan.device!=RX_DEVICE_BK) { // The broadcast never stopped.
     runtime.active=true;
-    receivingSlot=keptSlot;
+    receivingSlot=selectedSlot;
   } else if (!applyReceiver(NULL, &runtime.current)) {
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
     status="RX error";
@@ -27,20 +28,20 @@ void cancelCapture(const char *status) {
     runtime.active=true;
     receivingSlot=selectedSlot;
   }
-  keptSlot=UINT8_MAX;
-  delayWatch();
+  if (watcher.phase==WATCH_OFF) delayWatch();
   message=NULL;
   if (status) notify(status);
   gRedrawScreen=true;
 }
 
+// FC borrows BK alone: a receiver on BK goes quiet, a broadcast chip plays on.
 static void captureAttempt(void) {
-  if (keptSlot==UINT8_MAX) {
+  if (gReceiver.plan.device==RX_DEVICE_BK) {
     RECEIVER_Mute();
     receivingSlot=UINT8_MAX;
     resetRds();
   }
-  RX_DEVICE_CaptureStart(capture.range, keptSlot!=UINT8_MAX ? RX_DEVICE_BK : gReceiver.plan.device);
+  RX_DEVICE_CaptureStart(capture.range, RX_DEVICE_BK);
   capturing=true;
   capturePollAt=Now();
   message=NULL;
@@ -49,19 +50,9 @@ static void captureAttempt(void) {
 
 void startCapture(void) {
   if (activeSlot.source!=RADIO_SOURCE_VFO) { notify("VFO only"); return; }
-  // FC only needs BK: a broadcast already on (the watch background, or the
-  // selected slot itself) keeps playing.
-  WatchTarget keep={.id=UINT8_MAX};
-  if (watcher.phase!=WATCH_OFF && watcher.background_ready &&
-      watcher.background.plan.device!=RX_DEVICE_BK)
-    keep=watcher.background;
-  else if (watcher.phase==WATCH_OFF && runtime.active && runtime.current.device!=RX_DEVICE_BK &&
-           receivingSlot==selectedSlot)
-    keep=(WatchTarget){selectedSlot, runtime.current};
-  keptSlot=keep.id;
-  if (keptSlot!=UINT8_MAX) {
-    if (watcher.phase!=WATCH_OFF) yieldWatch(&keep);
-  } else if (!runtime.active || !pauseWatch()) return;
+  // FC borrows BK: BK slots leave the watch until FC ends, broadcasts go on.
+  if (watcher.phase!=WATCH_OFF) suspendWatchBk(true);
+  else if (!runtime.active) return;
   CAPTURE_Start(&capture, CAPTURE_AUTO, Now());
   captureAttempt();
 }
@@ -71,7 +62,6 @@ void startCapture(void) {
 static void adoptCapture(const RxPlan *plan) {
   RX_DEVICE_CaptureStop();
   capturing=false;
-  keptSlot=UINT8_MAX; // Tuning the VFO hands the speaker to BK.
   if (!apply(plan)) { cancelCapture("Tune failed"); return; }
   activeSlot.tx.enabled=false;
   activeSlot.channel_number=0;
