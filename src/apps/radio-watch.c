@@ -78,7 +78,7 @@ static const WatchOperations watchOperations={
   .prepare=watchPrepare,.select=watchSelect,.now=watchNow
 };
 void watchUpdate(void) {
-  if (capturePhase!=FC_OFF || number.active || CHANNEL_MANAGER_Active() || inMenu || confirming || seek.active || functionPending ||
+  if (capturing || number.active || CHANNEL_MANAGER_Active() || inMenu || confirming || seek.active || functionPending ||
       txBusy()) return;
   if (!gDeviceConfig.radio.watch_enabled || gDeviceConfig.radio.slot_count < 2) {
     watchStatus=NULL;

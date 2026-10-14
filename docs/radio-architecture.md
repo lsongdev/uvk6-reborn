@@ -40,7 +40,7 @@ RadioSlot.source
 | --- | --- | --- |
 | `radio.c` | Slot、VFO/MR 解析、调谐事务、RDS 标签、按键分派 | `apply`、`request`、`notify`、选中/接收 Slot、`runtime` |
 | `radio-seek.c` | Seek 状态机：BK/BK1080 逐步检测，SI 用芯片 Seek，单次回绕 | `startSeek`、`seekUpdate`、`finishSeek` |
-| `radio-capture.c` | FC：BK4819 频率捕获、自动/VHF/UHF、临时试听 | `startCapture`、`captureUpdate`、`captureKey` |
+| `radio-capture.c` | FC：BK4819 频率捕获、自动/VHF/UHF、确认后直接调谐 | `startCapture`、`captureUpdate`、`captureKey` |
 | `radio-watch.c` | 双守听：同芯片轮询、异芯片并行；暂停时恢复主接收 | `watchUpdate`、`pauseWatch`、`delayWatch` |
 | `radio-tx.c` | PTT、忙碌禁发、电压/松键/TOT 安全、TX 设置 | `pttKey`、`txBusy`、`changeTxPower` |
 | `radio-menu.c` | Slot 菜单（项目枚举与 `RadioParameterField` 对齐） | `menuKey`、`renderMenu` |
