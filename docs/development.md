@@ -122,9 +122,16 @@ python3 tools/bdf-to-gfx.py input.bdf output.h --name myFont --line 8
 
 muMatrix 源文件注明由 muwerk 的 mufont 生成；转换格式不意味着来源或授权信息可以删除。未来外部中文字库的安装、缓存与编码方案见设计文档。
 
-### SSB 补丁构建条件
+### SSB 补丁安装与校验
 
-补丁不在固件中，默认 SSB 不可用。仅在独立核对 EEPROM 尾部的完整 8840 B 镜像后，才可在构建 DEFINES 中加入 `-DUVK6_SSB_PATCH_CRC32=0x...`；`SETTINGS_IsPatchPresent` 核对前缀和全量 CRC，驱动再只读加载。改变 DEFINES 仍需强制构建，不能只确认八字节头部就称补丁可用；不迁移其他固件的补丁地址。
+补丁不在固件中，通过正常运行固件的 UART 安装到 EEPROM 尾部，无需构建 CRC 宏。当前资源为 `resources/si4735/patch_init.h`，8840 B，CRC32 为 `0xf9c0f474`；数据位于 `0x7DD78–0x7FFFF`，前方 16 B 为 `SSBP` 资源头（长度、CRC）。工具先清除资源头、写入数据，最后写头并全量回读，成功后重启刷新能力检测。`SETTINGS_IsPatchPresent` 校验资源头和全部数据，驱动只读加载到 SI；不能只检查前缀，也不自动迁移其他固件的补丁布局。
+
+```sh
+python3 tools/resources.py --port /dev/cu.usbserial-1410 ssb-write
+python3 tools/resources.py --port /dev/cu.usbserial-1410 ssb-verify
+```
+
+安装时使用普通开机状态，非 Bootloader；About → SSB patch 应显示 Present。SSB 可作为 SI 常驻源与 BK 守听并行，音频切换不重载 patch；SSB Seek 仍不支持。
 
 ### UI 预览
 

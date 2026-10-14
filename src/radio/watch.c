@@ -109,7 +109,6 @@ void watchUpdate(void) {
       if (result!=RX_OK) {
         watchStatus="DW: unavailable"; continue;
       }
-      if (!WATCH_Eligible(&plan)) { watchStatus="DW: SSB off"; continue; }
       targets[count++]=(WatchTarget){id,plan};
     }
     if (!WATCH_Start(&watcher,targets,count,selectedSlot,Now())) {

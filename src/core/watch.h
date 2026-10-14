@@ -4,7 +4,7 @@
 
 // Multi-slot watch over every enabled slot. Sources are split by behaviour,
 // not by chip:
-// - one background (a broadcast chip, or a BK channel with squelch 0) plays
+// - one background (SI including SSB, BK1080, or BK with squelch 0) plays
 //   whenever nothing else talks; the selected slot wins, else the first;
 // - squelched BK channels are events: polled in turn, and the first one with
 //   a confirmed signal takes the speaker until it ends plus a hang time.
@@ -41,7 +41,6 @@ typedef struct {
 #define WATCH_RETRY_MS 2000u
 #define WATCH_SAMPLE_MS 50u
 
-bool WATCH_Eligible(const RxPlan *plan);
 bool WATCH_IsBackground(const RxPlan *plan);
 bool WATCH_SameReceiver(const RxPlan *a, const RxPlan *b);
 // False when fewer than two distinct sources remain to watch.

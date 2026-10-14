@@ -886,6 +886,24 @@ int main(void) {
   assert(RADIO_STATE_SetCount(&gDeviceConfig.radio,3));
   assert(RADIO_STATE_SetCount(&gDeviceConfig.radio,2));
   assert(gDeviceConfig.radio.slots[2].current.frequency_hz==145512500); // Hidden state remains.
+  // A patched USB slot stays audible while BK polls, and returns after a
+  // talk without retuning SI. Both reported shortwave frequencies work.
+  const uint32_t ssbFrequencies[]={7074000u,14074000u};
+  for (unsigned i=0;i<2;++i) {
+    setup(ssbFrequencies[i],(RadioParameters){RX_USB,10,3000,0,0});
+    unsigned ssbApplies=applied, ssbSaves=saveRequests;
+    for (unsigned j=0;j<15;++j) { update();clockNow+=50; }
+    assert(watcher.has_background && watcher.background.id==0 && watcher.count==1);
+    assert(!RADIO_WatchStatus() && receivingSlot==0 && gReceiver.open);
+    assert(runtime.current.frequency_hz==ssbFrequencies[i] && runtime.current.parameters.mode==RX_USB);
+    watchSecondSignalFrequency=438500000;
+    for (unsigned j=0;j<20;++j) { update();clockNow+=50; }
+    assert(receivingSlot==1 && gReceiver.open && selectedSlot==0);
+    watchSecondSignalFrequency=0;
+    for (unsigned j=0;j<50;++j) { update();clockNow+=50; }
+    assert(receivingSlot==0 && gReceiver.open && applied==ssbApplies && saveRequests==ssbSaves);
+  }
+
   // Broadcast background + BK event: the broadcast plays while B is quiet,
   // even when it is the selected slot; a talk on B takes the speaker.
   setup(95900000,(RadioParameters){RX_WFM,100000,0,0,0});

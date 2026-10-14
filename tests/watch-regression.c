@@ -3,7 +3,7 @@
 #include <assert.h>
 
 static uint32_t now;
-static unsigned prepares, samples, selects;
+static unsigned prepares, siPrepares, samples, selects;
 static bool talking[RADIO_SLOT_CAPACITY], prepareOK=true, signalOK=true, selectOK=true;
 static uint8_t bkTuned=UINT8_MAX, heard=UINT8_MAX; // UINT8_MAX: speaker silent.
 static uint32_t prepareLatency;
@@ -11,6 +11,7 @@ static bool prepare(void *unused, const WatchTarget *t) {
   (void)unused; ++prepares; now+=prepareLatency;
   if (!prepareOK) return false;
   if (t->plan.device==RX_DEVICE_BK) bkTuned=t->id;
+  if (t->plan.device==RX_DEVICE_SI) ++siPrepares;
   return true;
 }
 static bool signal(void *unused, const RxPlan *plan, bool *found) {
@@ -30,7 +31,7 @@ static const WatchOperations ops={.prepare=prepare,.signal=signal,.select=select
 static void tick(WatchRuntime *r, uint32_t elapsed) { now+=elapsed; WATCH_Update(r,now,&ops); }
 static void run(WatchRuntime *r, uint32_t ms) { for (uint32_t t=0; t<ms; t+=10) tick(r,10); }
 static void reset(void) {
-  now=1000; prepares=samples=selects=0; prepareLatency=0;
+  now=1000; prepares=siPrepares=samples=selects=0; prepareLatency=0;
   prepareOK=signalOK=selectOK=true; bkTuned=heard=UINT8_MAX;
   for (unsigned i=0;i<RADIO_SLOT_CAPACITY;++i) talking[i]=false;
 }
@@ -46,7 +47,7 @@ int main(void) {
   WatchTarget a=bk(0,145500000,4), b=bk(1,438500000,4), c=bk(2,446000000,4);
   WatchTarget fm=si(3,95900000), fm2=si(1,103900000);
 
-  // Start: at least two distinct sources; duplicates, SSB and extra
+  // Start: at least two distinct sources; duplicates and extra
   // backgrounds collapse.
   WatchTarget pair[]={a,b};
   assert(!WATCH_Start(&r,pair,1,UINT8_MAX,now));
@@ -56,8 +57,6 @@ int main(void) {
   assert(!WATCH_Start(&r,dup,2,UINT8_MAX,now)); // Step is not a distinct receive path.
   dup[1].plan.parameters.rx_tone=1;
   assert(WATCH_Start(&r,dup,2,UINT8_MAX,now)); // A different tone is.
-  dup[1].plan.parameters.mode=RX_USB;
-  assert(!WATCH_Start(&r,dup,2,UINT8_MAX,now));
   WatchTarget radios[]={fm,fm2};
   assert(!WATCH_Start(&r,radios,2,UINT8_MAX,now)); // Only one background plays.
   WatchTarget four[]={a,b,c,fm};
@@ -129,6 +128,26 @@ int main(void) {
   tick(&r,0); assert(!r.background_ready && heard==UINT8_MAX);
   prepareOK=true; tick(&r,10); assert(bkTuned==0 && !r.background_ready);
   run(&r,WATCH_RETRY_MS); assert(r.background_ready && heard==3);
+
+  // SSB is a continuous SI background, never a polled target. BK audio
+  // takeovers and hang expiry leave its frequency and patch untouched.
+  const uint32_t ssbFrequencies[]={7074000u,14074000u};
+  for (RxMode mode=RX_LSB; mode<=RX_USB; ++mode) {
+    for (unsigned i=0; i<2; ++i) {
+      reset();
+      WatchTarget ssb=si(0,ssbFrequencies[i]);
+      ssb.plan.parameters=(RadioParameters){mode,10,3000,0,0};
+      WatchTarget sources[]={ssb,b};
+      assert(WATCH_Start(&r,sources,2,0,now));
+      tick(&r,0);
+      assert(heard==0 && siPrepares==1 && r.background.plan.frequency_hz==ssbFrequencies[i]);
+      run(&r,5000); assert(heard==0 && siPrepares==1);
+      talking[1]=true; run(&r,WATCH_SETTLE_MS+WATCH_VERIFY_MS+50);
+      assert(heard==1 && siPrepares==1);
+      talking[1]=false; run(&r,WATCH_SAMPLE_MS+WATCH_HANG_MS+50);
+      assert(heard==0 && siPrepares==1);
+    }
+  }
 
   // BK background (squelch 0): heard between rounds of event checks.
   reset();

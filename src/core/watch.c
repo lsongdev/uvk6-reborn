@@ -1,10 +1,6 @@
 #include "core/watch.h"
 
-bool WATCH_Eligible(const RxPlan *p) {
-  // SSB mode/patch handoffs need measured latency before enabling polling.
-  return p && p->parameters.mode != RX_LSB && p->parameters.mode != RX_USB;
-}
-// Continuous sound: a broadcast chip, or a BK channel whose squelch is off.
+// Continuous sound: SI (including SSB), BK1080, or a BK channel with SQ0.
 bool WATCH_IsBackground(const RxPlan *p) {
   return p && (p->device != RX_DEVICE_BK || !p->parameters.squelch);
 }
@@ -25,13 +21,13 @@ bool WATCH_Start(WatchRuntime *r, const WatchTarget *targets, uint8_t count,
   for (uint8_t i=0; i<count; ++i) {
     const WatchTarget *t=&targets[i];
     if (t->id>=RADIO_SLOT_CAPACITY) return false;
-    if (!WATCH_Eligible(&t->plan) || !WATCH_IsBackground(&t->plan)) continue;
+    if (!WATCH_IsBackground(&t->plan)) continue;
     if (!next.has_background || t->id==selected_id) next.background=*t;
     next.has_background=true;
   }
   for (uint8_t i=0; i<count; ++i) {
     const WatchTarget *t=&targets[i];
-    if (!WATCH_Eligible(&t->plan) || WATCH_IsBackground(&t->plan)) continue;
+    if (WATCH_IsBackground(&t->plan)) continue;
     bool duplicate=false;
     for (uint8_t j=0; j<next.count; ++j)
       duplicate |= WATCH_SameReceiver(&t->plan,&next.events[j].plan);
