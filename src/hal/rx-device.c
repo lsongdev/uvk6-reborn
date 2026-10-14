@@ -388,3 +388,17 @@ bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found) {
   }
   return false;
 }
+
+uint8_t RX_DEVICE_SignalLevel(const RxPlan *plan, uint16_t rssi) {
+  enum { SEGMENTS = 14 };
+  uint8_t level = 0;
+  if (plan->device == RX_DEVICE_BK) {
+    if (rssi) {
+      int16_t dBm = Rssi2DBm(rssi) + BK4819_GetAttenuation();
+      level = DBm2S(dBm, plan->frequency_hz >= 300000000u);
+    }
+  } else {
+    level = ConvertDomain(rssi, 0, 75, 0, SEGMENTS);
+  }
+  return level > SEGMENTS ? SEGMENTS : level;
+}

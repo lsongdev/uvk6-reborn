@@ -31,15 +31,15 @@ esac
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/radio-app-regression.c src/apps/channel-manager.c src/core/tuning.c src/ui/number-input.c src/core/dcs.c src/core/text.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/watch.c src/core/tx-model.c src/core/tx-runtime.c src/core/seek.c src/core/capture.c \
-  src/core/rds.c src/core/rds-receiver.c src/ui/components/frequency.c "$dead_strip" -o "$test_binary"
+  tests/radio-app-regression.c src/core/tuning.c src/ui/number-input.c src/core/dcs.c src/core/text.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/watch.c src/core/tx-model.c src/core/tx-runtime.c src/core/seek.c src/core/capture.c \
+  src/core/rds.c src/core/rds-receiver.c src/ui/frequency.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 # ENABLE_FC=0 must keep compiling: FC branches fold to a constant phase.
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include -DUVK6_ENABLE_FC=0 -fsyntax-only \
-  src/apps/radio.c src/apps/radio-capture.c src/apps/radio-view.c src/apps/radio-watch.c \
-  src/apps/radio-seek.c src/apps/radio-tx.c src/apps/radio-menu.c
+  src/radio/radio.c src/radio/capture.c src/radio/watch.c src/radio/seek.c src/radio/tx.c \
+  src/screens/home.c src/screens/slot-menu.c src/screens/save-channel.c
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
@@ -94,8 +94,8 @@ esac
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/radio-card-regression.c src/ui/graphics.c src/ui/components/radio-card.c \
-  src/ui/components/signal.c src/ui/components/frequency.c src/core/radio-model.c src/core/text.c "$dead_strip" -o "$test_binary"
+  tests/radio-card-regression.c src/ui/graphics.c src/ui/radio-card.c \
+  src/ui/signal.c src/ui/frequency.c src/core/radio-model.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/rds-regression.c \
   src/core/rds.c src/core/rds-receiver.c -o "$test_binary"
@@ -107,6 +107,8 @@ esac
   tests/text-regression.c src/core/dcs.c src/core/text.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/font-regression.c -o "$test_binary"
+"$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/screen-regression.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections tests/menu-regression.c src/ui/number-input.c src/core/text.c \
   src/ui/numnav.c src/core/measurements.c "$dead_strip" -o "$test_binary"
@@ -133,7 +135,7 @@ esac
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/channels-regression.c src/core/channel-store.c src/core/radio-model.c src/core/tx-model.c \
-  src/ui/graphics.c src/ui/components/frequency.c src/core/text.c "$dead_strip" -o "$test_binary"
+  src/ui/graphics.c src/ui/frequency.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/channel-store-regression.c \
   src/core/radio-model.c src/core/tx-model.c -o "$test_binary"

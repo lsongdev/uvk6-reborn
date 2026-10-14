@@ -1,5 +1,11 @@
 # Flash 占用审计与优化
 
+## 2026-10-14 Radio 控制器与页面栈
+
+Flash **54,816 / 61,440 B**，RAM **6,352 / 16,384 B**。相对 `79b0e4a`：Flash −568 B，RAM +40 B（6 层页面栈，Slot 菜单自带 TX 频率输入）。`ENABLE_FC=0` 为 53,532 B，`ENABLE_TX=0` 为 53,208 B。
+
+旧的应用注册表、`RADIO_APP_` 入口与 Radio 内部的菜单／保存子状态机被去掉：射频由常驻的 `radio/` 控制器运行，页面在 `screens/` 中入栈出栈，`ui/` 只剩纯绘制工具。20 个卡片预览帧和设置菜单截图与改动前逐字节一致。
+
 ## 2026-10-14 FC 编译开关（当前工作区）
 
 默认 `ENABLE_FC=1`：Flash **55,004 / 61,440 B**（LTO 布局 +4 B），RAM 7,144 B。`make ENABLE_FC=0`：Flash **53,660 B**（−1,344 B），RAM 7,128 B；链接结果中不再有任何 capture 符号。关闭时 `capturePhase` 是常量 `FC_OFF`，其他模块的 FC 分支在编译期折叠掉，`F → 4` 提示 `Not supported`。CI 同时构建 `ENABLE_FC=0` 与 `ENABLE_TX=0` 变体。

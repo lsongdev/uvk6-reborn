@@ -1,6 +1,6 @@
 // Real Settings, preferences, input and framebuffer; only hardware/storage mocked.
 #include "../src/core/settings.c"
-#include "../src/apps/settings.c"
+#include "../src/screens/settings.c"
 #include "../src/ui/menu.c"
 #include <assert.h>
 #include <stdio.h>
@@ -28,36 +28,39 @@ bool DEVICE_SavePreferences(const ConfigPreferences *next) {
   if (!saveWorks) return false;
   gDeviceConfig.preferences=*next; ++saves; return true;
 }
-bool RADIO_APP_ApplyRxSettings(void) { ++reapplications; return applyWorks; }
+bool RADIO_ApplyRxSettings(void) { ++reapplications; return applyWorks; }
 static unsigned slotChanges;
-void RADIO_APP_SlotsChanged(void) { ++slotChanges; }
+void RADIO_SlotsChanged(void) { ++slotChanges; }
 ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
 TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) { (void)frequency_hz; return (TxCapabilities){0}; }
 TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
 uint32_t EEPROM_DetectSize(void) { return 524288; }
-static AppType_t lastApp;
-void APPS_run(AppType_t app) { assert(app==APP_BANDS || app==APP_CHANNELS); lastApp=app; ++appRuns; }
+const Screen bandsScreen = {0}, channelsScreen = {0};
+static const Screen *lastScreen;
+void SCREEN_Push(const Screen *screen) {
+  assert(screen==&bandsScreen || screen==&channelsScreen); lastScreen=screen; ++appRuns;
+}
 void STATUSLINE_SetText(const char *text) { TEXT_Copy(title,sizeof(title),text); }
-static void press(KEY_Code_t key) {
-  bool handled=SETTINGS_key(key,KEY_RELEASED);
-  if (!handled) fprintf(stderr,"Unhandled key %u in %s at %u\n",key,active_menu ? active_menu->title : "none",active_menu ? active_menu->i : 0);
+static void press(KEY_Code_t k) {
+  bool handled=key(k,KEY_RELEASED);
+  if (!handled) fprintf(stderr,"Unhandled key %u in %s at %u\n",k,active_menu ? active_menu->title : "none",active_menu ? active_menu->i : 0);
   assert(handled);
 }
 static void capture(void) {
   memset(gFrameBuffer,0,sizeof(gFrameBuffer));
-  SETTINGS_render(); PrintSmall(3,5,title);
+  render(); PrintSmall(3,5,title);
   assert(panelCount<ARRAY_SIZE(panels));
   memcpy(panels[panelCount++],gFrameBuffer,sizeof(gFrameBuffer));
 }
-static void enter(KEY_Code_t index) { press(index); press(KEY_MENU); }
+static void choose(KEY_Code_t index) { press(index); press(KEY_MENU); }
 int main(int argc, char **argv) {
   RADIO_STATE_Default(&gDeviceConfig.radio);
   capabilities=(ReceiverCapabilities){.si=true,.ssb_patch=true};
-  SETTINGS_init(); capture();
-  enter(KEY_1); capture(); // Display directly contains contrast and all light settings.
+  enter(); capture();
+  choose(KEY_1); capture(); // Display directly contains contrast and all light settings.
   assert(active_menu==&displayMenu && menu_stack_top==1 && active_menu->num_items==5);
   press(KEY_EXIT);
-  enter(KEY_2); capture(); // Receive
+  choose(KEY_2); capture(); // Receive
   press(KEY_2);press(KEY_STAR);capture(); // SQL delay is editable directly within Receive.
   assert(active_menu==&receiveMenu && menu_stack_top==1);
   press(KEY_4);capture(); // SI hardware option also stays in Receive.
@@ -66,9 +69,9 @@ int main(int argc, char **argv) {
   press(KEY_STAR); assert(requests==before && !strcmp(notice,"No SI4732"));
   capabilities.si=true;
   press(KEY_EXIT);
-  enter(KEY_3); capture(); // Transmit
-  press(KEY_EXIT); enter(KEY_5); capture(); // Battery
-  enter(KEY_3);
+  choose(KEY_3); capture(); // Transmit
+  press(KEY_EXIT); choose(KEY_5); capture(); // Battery
+  choose(KEY_3);
   assert(active_menu==&batteryMenu && number.active && menu_stack_top==1 && !appRuns);
   assert(!strcmp(number.text,"8.24"));
   press(KEY_7);press(KEY_STAR);press(KEY_8);press(KEY_6);
@@ -85,19 +88,19 @@ int main(int argc, char **argv) {
   assert(saves==1 && gDeviceConfig.preferences.battery_calibration==2100);
   assert(!strcmp(notice,"Save failed")); saveWorks=true;
   press(KEY_MENU);press(KEY_4);press(KEY_MENU);assert(number.active && number.invalid && saves==1);
-  assert(SETTINGS_key(KEY_EXIT,KEY_LONG_PRESSED));assert(!number.active && saves==1);
-  press(KEY_EXIT); enter(KEY_7); // Channels opens the channel list.
-  assert(lastApp==APP_CHANNELS && active_menu==&settingsMenu);
-  enter(KEY_8); capture(); // About is last and also holds the former System items.
+  assert(key(KEY_EXIT,KEY_LONG_PRESSED));assert(!number.active && saves==1);
+  press(KEY_EXIT); choose(KEY_7); // Channels opens the channel list.
+  assert(lastScreen==&channelsScreen && active_menu==&settingsMenu);
+  choose(KEY_8); capture(); // About is last and also holds the former System items.
   assert(active_menu==&aboutMenu && menu_stack_top==1 && active_menu->num_items==9);
   assert(menuItems[ARRAY_SIZE(menuItems)-1].submenu==&aboutMenu);
-  enter(KEY_9); capture(); // Reset confirmation
+  choose(KEY_9); capture(); // Reset confirmation
   press(KEY_EXIT); assert(!resetConfirm && saves==1);
-  enter(KEY_9);press(KEY_MENU);assert(saves==2 && !resetConfirm);
+  choose(KEY_9);press(KEY_MENU);assert(saves==2 && !resetConfirm);
   assert(gDeviceConfig.preferences.battery_calibration==2100);
   // A failed reapplication restores the prior engineering preferences.
   gDeviceConfig.preferences.sql_open_time=3;
-  applyWorks=false;SETTINGS_deinit();
+  applyWorks=false;leave();
   assert(gDeviceConfig.preferences.sql_open_time==oldOpen && reapplications==2);
   MENU_Deinit();assert(!number.active);
   if(argc==2) {

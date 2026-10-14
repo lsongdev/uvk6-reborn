@@ -7,7 +7,7 @@
 #include "hal/systick.h"
 #include "hal/uart.h"
 #include "drivers/dp32g030/gpio.h"
-#include "apps/system.h"
+#include "system.h"
 #include "core/device-config.h"
 
 void Main(void) {

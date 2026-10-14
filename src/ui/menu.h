@@ -48,6 +48,8 @@ void MENU_EditNumber(uint32_t min, uint32_t max, uint32_t scale, uint32_t value,
 void MENU_Init(Menu *main_menu);
 void MENU_Deinit();
 void MENU_Render(void);
+// The current menu's title, or the edit's validation message.
+const char *MENU_Title(void);
 bool MENU_HandleInput(KEY_Code_t key, Key_State_t state);
 bool MENU_Back(void);
 bool MENU_IsActive();

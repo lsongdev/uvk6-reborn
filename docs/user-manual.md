@@ -253,14 +253,14 @@ Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mi
 
 | 变更内容 | 核对的实现入口 | 本手册需同步的内容 |
 | --- | --- | --- |
-| 启用应用、按键、键盘锁 | [apps.c](../src/apps/apps.c)、[system.c](../src/apps/system.c)、[Makefile](../Makefile) | 功能范围、主界面按键 |
-| Slot 操作、确认、频率显示 | [radio.c](../src/apps/radio.c)、[radio-menu.c](../src/apps/radio-menu.c)、[radio-view.c](../src/apps/radio-view.c) | 快速开始、单位、参数菜单、提示 |
-| Seek、FC、守听、PTT | [radio-seek.c](../src/apps/radio-seek.c)、[radio-capture.c](../src/apps/radio-capture.c)、[radio-watch.c](../src/apps/radio-watch.c)、[radio-tx.c](../src/apps/radio-tx.c) | 快捷键、提示、发射限制 |
+| 页面栈、按键、键盘锁 | [screen.c](../src/screens/screen.c)、[system.c](../src/system.c)、[Makefile](../Makefile) | 功能范围、主界面按键 |
+| Slot 操作、确认、频率显示 | [radio.c](../src/radio/radio.c)、[slot-menu.c](../src/screens/slot-menu.c)、[home.c](../src/screens/home.c) | 快速开始、单位、参数菜单、提示 |
+| Seek、FC、守听、PTT | [seek.c](../src/radio/seek.c)、[capture.c](../src/radio/capture.c)、[watch.c](../src/radio/watch.c)、[tx.c](../src/radio/tx.c) | 快捷键、提示、发射限制 |
 | 输入解析与按键 | [number-input.c](../src/ui/number-input.c) | 输入单位、示例、确认和取消 |
 | 频段、默认值、模式与能力 | [radio-model.c](../src/core/radio-model.c)、[radio-state.c](../src/core/radio-state.c) | 频段表、模式及接收路径 |
-| 初始化、保存格式与字段 | [reset.c](../src/apps/reset.c)、[device-config.c](../src/core/device-config.c)、[config-store.h](../src/core/config-store.h) | 首次开机、保存、全局持久化 |
-| 频段草稿与预设保存 | [bands.c](../src/apps/bands.c) | 编辑器入口、取消、恢复默认值、保存结果 |
-| 菜单与全局参数 | [settings.c](../src/apps/settings.c)、[menu.c](../src/ui/menu.c)、[settings.c（core）](../src/core/settings.c) | 菜单路径、操作和持久化限制 |
+| 初始化、保存格式与字段 | [reset.c](../src/screens/reset.c)、[device-config.c](../src/core/device-config.c)、[config-store.h](../src/core/config-store.h) | 首次开机、保存、全局持久化 |
+| 频段草稿与预设保存 | [bands.c](../src/screens/bands.c) | 编辑器入口、取消、恢复默认值、保存结果 |
+| 菜单与全局参数 | [settings.c](../src/screens/settings.c)、[menu.c](../src/ui/menu.c)、[settings.c（core）](../src/core/settings.c) | 菜单路径、操作和持久化限制 |
 | 接收失败、发射许可与设备适配 | [rx-runtime.c](../src/core/rx-runtime.c)、[receiver.c](../src/core/receiver.c)、[rx-device.c](../src/hal/rx-device.c) | 错误提示、接收路径、PTT 行为 |
 
 发布前核对：侧键 1 / 2、锁键、跨频段恢复、输入单位与量化确认、初始化确认、掉电保存、发射限制。代码或主机测试支持的结论与实机验证结果分别记录；手册更新日期表示核对时间，不是硬件验收日期。

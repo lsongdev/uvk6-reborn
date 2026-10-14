@@ -1,5 +1,5 @@
 // Render real firmware UI into host-only framebuffer snapshots.
-#include "ui/components/radio-card.h"
+#include "ui/radio-card.h"
 #include "ui/graphics.h"
 #include "core/rds.h"
 #include <stdio.h>

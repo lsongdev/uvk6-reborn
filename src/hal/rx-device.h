@@ -15,6 +15,9 @@ void RX_DEVICE_SetAudio(RxDevice device, bool open);
 // One RSSI/squelch sample of the tuned chip. Squelch includes the NFM tone.
 // Returns false when the chip did not answer (then *open is false).
 bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open);
+// Signal strength 0..14 from a sampled RSSI: approximate S units on BK4819,
+// relative strength on the broadcast chips.
+uint8_t RX_DEVICE_SignalLevel(const RxPlan *plan, uint16_t rssi);
 void RX_DEVICE_StopChip(RxDevice device);
 bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found);
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo);

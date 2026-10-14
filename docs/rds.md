@@ -13,7 +13,7 @@
 1. `drivers/si473x/si473x.c` 设置 RDS 接收、FIFO 门限 1 组和最多 1～2 位纠错门限；`SI47XX_ReadRDS` 检查电源、模式、I2C 应答、CTS 和 ERR，将 13 字节响应转换为块、错误等级、同步和 FIFO 状态。失败不修改调用者的输出。
 2. `hal/rx-device.c` 将芯片返回的数据适配为与芯片协议无关的 `RdsPacket`。
 3. `core/rds-receiver.c` 管理轮询及过期，`core/rds.c` 只处理 RDS 数据组和文本，均不依赖硬件或 UI。
-4. `apps/radio.c` 按实际成功应用的接收方案启停 RDS，把 PS/RadioText 送给卡片组件；文本变化时才请求重绘。
+4. `radio/radio.c` 按实际成功应用的接收方案启停 RDS，经 `RADIO_SlotStatus` 把 PS/RadioText 交给主屏幕卡片；文本变化时才请求重绘。
 
 ## 完整性与生命周期
 

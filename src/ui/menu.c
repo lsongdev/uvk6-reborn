@@ -2,7 +2,6 @@
 #include "hal/uart.h"
 #include "ui/graphics.h"
 #include "core/text.h"
-#include "ui/statusline.h"
 #include "core/measurements.h"
 #include "ui/numnav.h"
 #include <stdbool.h>
@@ -60,9 +59,6 @@ static void renderItem(uint16_t index, uint8_t i) {
 }
 
 static void init() {
-  if (strlen(active_menu->title)) {
-    STATUSLINE_SetText(active_menu->title);
-  }
 
   if (active_menu->y < MENU_Y)
     active_menu->y = MENU_Y;
@@ -104,7 +100,6 @@ void MENU_Deinit() { NUMNAV_Deinit(); number.active = false; active_menu = NULL;
 void MENU_Render(void) {
   if (!active_menu || !active_menu->num_items)
     return;
-  STATUSLINE_SetText(number.active && number.invalid ? "Invalid value" : active_menu->title);
 
   uint8_t itemsShow = active_menu->height / active_menu->itemHeight;
 
@@ -185,6 +180,10 @@ static bool handleUpDownNavigation(KEY_Code_t key, bool hasItems) {
 }
 
 bool MENU_IsActive() { return active_menu; }
+const char *MENU_Title(void) {
+  if (!active_menu) return "";
+  return number.active && number.invalid ? "Invalid value" : active_menu->title;
+}
 
 bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
   if (!active_menu || !active_menu->num_items) {

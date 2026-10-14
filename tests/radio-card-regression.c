@@ -1,7 +1,7 @@
 // Real framebuffer rendering: stateless cards, reserved tail column, no scrolling.
 // The body is always large: the name if there is one, else the frequency.
-#include "ui/components/radio-card.h"
-#include "ui/components/frequency.h"
+#include "ui/radio-card.h"
+#include "ui/frequency.h"
 #include "ui/graphics.h"
 #include <assert.h>
 #include <string.h>
