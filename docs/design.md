@@ -118,7 +118,7 @@ PTT→确定选中或回话对象→停止守听并恢复对象方案→必要�
 
 ## 6. RDS、Seek 与 FC
 
-RDS 链路为 SI 命令→HAL 的 RdsPacket→纯解析器／轮询器→Slot 标签→卡片。支持 PI、0A/0B PS、2A/2B RadioText；每个段须两次一致，PS 四段齐全才发布，RT 收齐结束符前连续段或全部段才发布。块错误、PI 改变、RT A/B／格式改变、溢出均有明确清理策略。
+RDS 链路为 SI 命令→HAL 的 RdsPacket→纯解析器／轮询器→Slot 标签→卡片。支持 PI、0A/0B PS、2A/2B RadioText 和 4A 时钟（CT）；每个段须两次一致，PS 四段齐全才发布，RT 收齐结束符前连续段或全部段才发布。块错误、PI 改变、RT A/B／格式改变、溢出均有明确清理策略。CT 只用 C、D 块无纠错的组，按电台的半小时偏移换成当地时间；两组相同或相差一分钟才采用，MJD 为 0、时分越界的忽略。控制器记下采用时的运行计时，状态栏居中显示 时:分，不显示日期；没有 RTC，关机即丢失。
 
 进入 SI WFM 先等 300 ms、清 FIFO，每 100 ms 最多读四组；读失败停止本轮。连续 15 秒无有效同步数据则过期。实际重调谐重置解析器，单纯广播／BK 音频路由不重置。缓存按 Slot、频率隔离，不持久化；MR 正文优先频道名。ASCII 扩展映射为 ?，控制字符转空格，RT 回车结束；不实现完整字符集、RT+、时钟、AF。命令与 BLE 错误等级依据 [Skyworks AN332](https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN332.pdf)，分组文本参考 [AN243](https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN243.pdf)。
 

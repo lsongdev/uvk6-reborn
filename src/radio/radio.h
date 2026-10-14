@@ -68,6 +68,9 @@ const char *RADIO_WatchStatus(void);      // Why watch is not running, else NULL
 bool RADIO_IsReceiving(void);
 bool RADIO_IsWatching(void);
 uint8_t RADIO_Heard(void);                // Slot on the speaker, UINT8_MAX if none.
+// Local time from RDS clock time, kept running by the uptime counter until
+// power-off; false before any station sent it. minute: 0-1439.
+bool RADIO_Clock(uint16_t *minute);
 
 typedef enum {
   RADIO_ACTIVITY_IDLE, RADIO_ACTIVITY_RECEIVING, RADIO_ACTIVITY_TRANSMITTING,

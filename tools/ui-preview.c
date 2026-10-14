@@ -119,6 +119,7 @@ int main(int argc, char **argv) {
   second.name="Local";second.band_name="CH 012";
   second.frequency_hz=438500000;second.changed=false;
   manualBase("DW A",false);
+  PrintSmallEx(64,4,POS_C,C_FILL,"20:30"); // RDS clock time, centred.
   UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-name.pbm");
   // A remains selected while B is heard; then B is selected and transmitting.
   v.name=NULL;v.activity=UI_RADIO_CARD_IDLE;v.signal_valid=false;

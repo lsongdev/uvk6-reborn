@@ -23,6 +23,12 @@ static void rt(RdsDecoder *d, const uint8_t *text, unsigned length, bool version
     twice(d,g);
   }
 }
+// 4A clock time: MJD, UTC hour:minute and a signed half-hour offset.
+static RdsGroup ct(uint32_t mjd, unsigned hour, unsigned minute, int halfHours) {
+  unsigned offset = halfHours < 0 ? 32u | (unsigned)-halfHours : (unsigned)halfHours;
+  return group(0x4000 | (mjd >> 15 & 3), (uint16_t)(mjd << 1 | hour >> 4),
+               (uint16_t)((hour & 15) << 12 | minute << 6 | offset));
+}
 static RdsPacket packets[32];
 static unsigned count, at, reads, clears;
 static bool readOk=true;
@@ -37,6 +43,23 @@ static bool readPacket(void *unused, RdsPacket *packet, bool clear) {
 
 int main(void) {
   RdsDecoder d={0};
+  // One clock group is not trusted; the next minute (or a repeat) is.
+  RdsGroup g=ct(60600,23,59,16);
+  assert(!RDS_Feed(&d,&g) && !d.clock_new);
+  g=ct(60601,0,0,16);RDS_Feed(&d,&g);
+  assert(d.clock_new && d.clock==8*60); // 00:00 UTC +8 h.
+  d.clock_new=false;RDS_Feed(&d,&g);assert(d.clock_new && d.clock==8*60);
+  // Negative offsets wrap to the previous day.
+  RDS_Reset(&d);g=ct(60601,2,30,-6);RDS_Feed(&d,&g);RDS_Feed(&d,&g);
+  assert(d.clock_new && d.clock==23*60+30);
+  // A jump, an error in C/D, 4B, or an invalid time/MJD is never published.
+  RDS_Reset(&d);g=ct(60601,10,0,0);RDS_Feed(&d,&g);
+  g=ct(60601,10,5,0);RDS_Feed(&d,&g);assert(!d.clock_new);
+  g.errors[3]=1;RDS_Feed(&d,&g);assert(!d.clock_new);
+  g.errors[3]=0;g.blocks[1]|=0x800;RDS_Feed(&d,&g);assert(!d.clock_new);
+  RDS_Reset(&d);g=ct(0,10,0,0);RDS_Feed(&d,&g);RDS_Feed(&d,&g);assert(!d.clock_new);
+  g=ct(60601,24,0,0);RDS_Feed(&d,&g);RDS_Feed(&d,&g);assert(!d.clock_new);
+  RDS_Reset(&d);
   // A single observation of each PS segment must not publish a name.
   for (unsigned i=0; i<4; ++i) {
     RdsGroup g=group(i,0xffff,0x4141);
@@ -46,7 +69,7 @@ int main(void) {
   ps(&d,"RADIO FM",false);
   assert(!strcmp(d.ps,"RADIO FM"));
   // 0B uses D for PS, irrespective of the C block quality.
-  RdsGroup g=group(0x800,0,0x5241);g.errors[2]=3;
+  g=group(0x800,0,0x5241);g.errors[2]=3;
   assert(!RDS_Feed(&d,&g));
   ps(&d,"NEW FM  ",true);
   assert(!strcmp(d.ps,"NEW FM"));

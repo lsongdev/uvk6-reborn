@@ -12,6 +12,8 @@ RxPlan pending;
 bool confirming;
 const char *message;
 static uint32_t messageAt;
+static uint32_t clockAt; // Uptime when the RDS minute began; 0: no clock.
+static uint16_t clockMinute;
 static UserChannel channelCache[RADIO_SLOT_CAPACITY];
 static bool channelCacheValid[RADIO_SLOT_CAPACITY];
 static uint8_t channelCacheNumber[RADIO_SLOT_CAPACITY];
@@ -61,6 +63,12 @@ void notify(const char *text) {
 void RADIO_Notify(const char *text) { notify(text); }
 const char *RADIO_Notice(void) { return message; }
 const char *RADIO_WatchStatus(void) { return watchStatus; }
+
+bool RADIO_Clock(uint16_t *minute) {
+  if (!clockAt) return false;
+  *minute = (uint16_t)((clockMinute + (Now() - clockAt) / 60000u) % 1440u);
+  return true;
+}
 
 static const char *unavailable(RxResult result) {
   return result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable";
@@ -297,6 +305,12 @@ void RADIO_Update(void) {
       memcpy(label->ps, rds.decoder.ps, sizeof(rds.decoder.ps));
       memcpy(label->text, rds.decoder.text, sizeof(rds.decoder.text));
     }
+    gRedrawScreen = true;
+  }
+  if (rds.decoder.clock_new) {
+    rds.decoder.clock_new = false;
+    clockMinute = rds.decoder.clock;
+    clockAt = now | 1u;
     gRedrawScreen = true;
   }
 }
