@@ -188,6 +188,8 @@ python3 tools/ui-preview.py --frames manual-input manual-channel --output docs/i
 
 这是一次构建快照，不是运行栈峰值或最新 CI 声明。以后只在本节更新资源基线，用户手册与硬件事实不复制随功能变化的数字。源码或工具链变化须重新测量。
 
+链接后 Makefile 检查 ELF 符号：出现有符号 32 位除法（__aeabi_idiv／idivmod，约 460 B）、64 位除法、软浮点、printf 或 malloc 时构建失败并删除 ELF。最常见的来源是 uint8_t／uint16_t 被提升为 int 后再 / 或 %，写成 x % 60u 这类无符号运算即可；常量除数通常被编译成乘法，不一定触发。
+
 LTO 的 Main、homeRender、applyPlan 等符号含内联子调用，不等于原文件的体积。字符串池合并后不能按名字归因某函数。分支数用于审视复杂度，Flash 优化看实际机器码和数据；拆文件、删已被 GC 剔除的源码不保证省空间。无符号或表驱动也不天然更小。
 
 已完成的优化与审计收尾：
