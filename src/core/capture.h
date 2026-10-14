@@ -6,9 +6,9 @@
 typedef enum { CAPTURE_AUTO, CAPTURE_VHF, CAPTURE_UHF } CaptureScope;
 typedef enum { CAPTURE_RANGE_VHF, CAPTURE_RANGE_UHF } CaptureRange;
 typedef enum { CAPTURE_BUSY, CAPTURE_INVALID, CAPTURE_SAMPLE } CaptureSample;
-typedef enum { CAPTURE_WAIT, CAPTURE_RESTART, CAPTURE_FOUND, CAPTURE_TIMEOUT } CaptureAction;
+typedef enum { CAPTURE_WAIT, CAPTURE_RESTART, CAPTURE_FOUND } CaptureAction;
 typedef struct {
-  uint32_t started_at, attempt_at, last_hz;
+  uint32_t attempt_at, last_hz;
   CaptureScope scope;
   CaptureRange range;
   uint8_t hits, attempts;

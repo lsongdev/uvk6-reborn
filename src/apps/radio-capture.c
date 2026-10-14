@@ -68,8 +68,7 @@ void captureUpdate(void) {
   RxPlan plan;
   if (sample==CAPTURE_SAMPLE && !capturePlan(hz, &plan)) sample=CAPTURE_INVALID;
   CaptureAction action=CAPTURE_Update(&capture, Now(), sample, hz);
-  if (action==CAPTURE_TIMEOUT) cancelCapture("FC timeout");
-  else if (action==CAPTURE_RESTART) captureAttempt();
+  if (action==CAPTURE_RESTART) captureAttempt();
   else if (action==CAPTURE_FOUND) adoptCapture(&plan);
 }
 

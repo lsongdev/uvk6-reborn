@@ -30,7 +30,9 @@ int main(void) {
   assert(r.range==CAPTURE_RANGE_UHF);
   assert(CAPTURE_Update(&r,398,CAPTURE_BUSY,0)==CAPTURE_WAIT);
   assert(CAPTURE_Update(&r,399,CAPTURE_BUSY,0)==CAPTURE_RESTART);
-  assert(CAPTURE_Update(&r,14898,CAPTURE_BUSY,0)==CAPTURE_RESTART);
-  assert(CAPTURE_Update(&r,14899,CAPTURE_SAMPLE,438500000)==CAPTURE_TIMEOUT);
+  // No session limit: a minute in, detection still restarts and confirms.
+  assert(CAPTURE_Update(&r,60000,CAPTURE_BUSY,0)==CAPTURE_RESTART);
+  assert(CAPTURE_Update(&r,60100,CAPTURE_SAMPLE,438500000)==CAPTURE_RESTART);
+  assert(CAPTURE_Update(&r,60300,CAPTURE_SAMPLE,438501000)==CAPTURE_FOUND);
   return 0;
 }
