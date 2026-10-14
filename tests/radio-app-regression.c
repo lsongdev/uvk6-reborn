@@ -1003,12 +1003,15 @@ int main(void) {
   press(KEY_F);press(KEY_4);
   clockNow+=500;RADIO_APP_update();clockNow+=500;RADIO_APP_update();
   assert(capture.range==CAPTURE_RANGE_UHF); // No-results Auto still advances.
-  RADIO_APP_render();assert(!strcmp(drawn[0].header_message,"FC detecting"));
+  // Live view: range in the header, scope as the mode, no reading yet.
+  RADIO_APP_render();assert(!strcmp(drawn[0].header_message,"FC UHF"));
+  assert(!strcmp(drawn[0].mode_text,"Auto") && !strcmp(drawn[0].edit_text,"---"));
   // Two close samples tune the bound VFO directly: NFM, TX off, one save.
   gDeviceConfig.radio.slots[0].tx.enabled=activeSlot.tx.enabled=true;
   RadioSlot other=gDeviceConfig.radio.slots[1];
   captureReply=CAPTURE_SAMPLE;captureHz=438512340;
   clockNow+=20;RADIO_APP_update();assert(capturing);
+  RADIO_APP_render();assert(drawn[0].frequency_hz==438512340 && !drawn[0].edit_text);
   captureHz+=3000;clockNow+=20;RADIO_APP_update();
   assert(!capturing && RADIO_APP_isReceiving() && runtime.current.frequency_hz==captureHz);
   assert(activeSlot.current.frequency_hz==captureHz && gReceiver.plan.frequency_hz==captureHz);

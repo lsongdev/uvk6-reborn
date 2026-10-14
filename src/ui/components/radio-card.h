@@ -13,10 +13,11 @@ typedef struct {
   RxMode mode;
   UI_RadioCardActivity activity;
   const char *band_name, *power_label;
-  const char *name;       // Channel name or RDS PS: shown above the frequency.
+  const char *name;       // Channel name or RDS PS: shown large in the body.
   const char *radio_text; // RDS RT: replaces the band in the header.
   const char *edit_text;  // Native MHz draft; owns the body while editing.
   const char *header_message; // Temporarily replaces band text in the black header.
+  const char *mode_text;  // Replaces the mode name, e.g. the FC scope.
   char id;
   bool selected, changed, signal_valid;
   uint8_t signal_level; // Existing 0..14 relative/S mapping, rendered as 8 bars.
