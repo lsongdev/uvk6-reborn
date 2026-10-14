@@ -1269,9 +1269,13 @@ int main(void) {
   press(KEY_STAR);assert(spectrum.step_hz==25000 && spectrum.center_hz==145512500 && spectrum.cursor==64);
   press(KEY_F);press(KEY_F);assert(spectrum.step_hz==6250);
   press(KEY_F);assert(spectrum.step_hz==6250); // Finest already.
+  // F→5 opens the same screen from the main screen.
+  press(KEY_EXIT);press(KEY_F);press(KEY_5);
+  assert(SCREEN_Top()==&spectrumScreen && spectrumOn && !functionPending);
+  press(KEY_STAR);press(KEY_F);press(KEY_F);
   // Covered by settings: reception returns; uncovered: the sweep restarts.
-  SCREEN_Push(&otherScreen);assert(!spectrumOn && spectrumStops==1 && RADIO_IsReceiving());
-  SCREEN_Pop();assert(spectrumOn && spectrumStarts==2);
+  SCREEN_Push(&otherScreen);assert(!spectrumOn && spectrumStops==2 && RADIO_IsReceiving());
+  SCREEN_Pop();assert(spectrumOn && spectrumStarts==3);
   // EXIT leaves the slot as it was; MENU tunes it to the cursor.
   press(KEY_EXIT);assert(SCREEN_Top()==&homeScreen && !spectrumOn);
   assert(activeSlot.current.frequency_hz==145500000 && RADIO_IsReceiving());
