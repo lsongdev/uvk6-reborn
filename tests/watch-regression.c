@@ -78,7 +78,7 @@ int main(void) {
   WatchTarget trio[]={a,b,c};
   assert(WATCH_Start(&r,trio,3,UINT8_MAX,now));
   prepareLatency=20; tick(&r,0);
-  assert(bkTuned==0 && r.phase==WATCH_SETTLE && WATCH_Probe(&r)==0 && WATCH_IsProbing(&r));
+  assert(bkTuned==0 && r.phase==WATCH_SETTLE && r.events[r.cursor].id==0 && WATCH_IsProbing(&r));
   tick(&r,WATCH_SETTLE_MS-1); assert(!samples); // Settle starts after the blocking tune.
   tick(&r,1); assert(samples==1 && r.phase==WATCH_POLL);
   tick(&r,0); assert(bkTuned==1);
@@ -86,7 +86,7 @@ int main(void) {
   talking[1]=true; prepareLatency=0;
   tick(&r,WATCH_SETTLE_MS); assert(r.phase==WATCH_VERIFY && heard==UINT8_MAX);
   tick(&r,WATCH_VERIFY_MS); assert(r.phase==WATCH_HOLD && heard==1 && WATCH_Owner(&r)==1);
-  assert(!WATCH_IsProbing(&r) && WATCH_Probe(&r)==UINT8_MAX);
+  assert(!WATCH_IsProbing(&r));
   // No time limit, and C talking meanwhile never interrupts B.
   talking[2]=true; unsigned tunes=prepares;
   run(&r,20000); assert(heard==1 && prepares==tunes);

@@ -64,10 +64,11 @@ static void save(void) {
   if (notify) notify("Saved");
 }
 
-// Overwriting offers the old name, a new channel starts empty.
+// Overwriting offers the old name; a new channel offers the caller's name
+// (e.g. the RDS station name), else starts empty.
 static void askName(void) {
   UserChannel old;
-  nameDraft[0] = '\0';
+  memcpy(nameDraft, draft.name, sizeof(nameDraft));
   if (CHANNEL_STORE_Load(target, &old)) memcpy(nameDraft, old.name, sizeof(nameDraft));
   active = false;
   overwriteConfirm = false;

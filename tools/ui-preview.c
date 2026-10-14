@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
   base();FillRect(100,0,10,5,C_CLEAR);
   UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("multi-cd.pbm");
   v.id='A';v.frequency_hz=145500000;
-  second.id='B';second.frequency_hz=438500000;second.activity=UI_RADIO_CARD_WATCHING;
+  second.id='B';second.frequency_hz=438500000;second.activity=UI_RADIO_CARD_IDLE;
   base();FillRect(0,0,110,5,C_CLEAR);PrintSmall(0,4,"DW B");
   UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("watch-probe.pbm");
   second.activity=UI_RADIO_CARD_RECEIVING;second.signal_valid=true;second.signal_level=11;

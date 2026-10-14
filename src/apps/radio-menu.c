@@ -16,6 +16,14 @@ static void changeValue(bool up) {
       .rx = activeSlot.current.parameters,
       .tx = activeSlot.tx,
     };
+    // A broadcast's RDS station name (PS) is the default name to edit.
+    const SlotLabel *label = &labels[selectedSlot];
+    if (label->frequency_hz == channel.frequency_hz && label->ps[0]) {
+      Text t = TEXT_Begin(channel.name, sizeof(channel.name));
+      TEXT_Add(&t, label->ps);
+      for (size_t n = strlen(channel.name); n && channel.name[n-1] == ' '; --n)
+        channel.name[n-1] = '\0'; // PS is space-padded to 8 characters.
+    }
     CHANNEL_MANAGER_StartSave(selectedSlot,
         stored->source == RADIO_SOURCE_CHANNEL ? stored->channel_number : 0, &channel);
     return;

@@ -5,7 +5,7 @@
 // Receiver state is explicit; a valid RSSI alone does not mean squelch is open.
 typedef enum {
   UI_RADIO_CARD_IDLE, UI_RADIO_CARD_RECEIVING, UI_RADIO_CARD_TRANSMITTING,
-  UI_RADIO_CARD_SEEKING, UI_RADIO_CARD_WATCHING, UI_RADIO_CARD_UNAVAILABLE, UI_RADIO_CARD_FAULT
+  UI_RADIO_CARD_SEEKING, UI_RADIO_CARD_UNAVAILABLE, UI_RADIO_CARD_FAULT
 } UI_RadioCardActivity;
 // Everything one card shows; the card keeps no state and never animates.
 typedef struct {
