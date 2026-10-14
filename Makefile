@@ -44,6 +44,7 @@ CC       := $(TOOLCHAIN_PREFIX)gcc
 LD       := $(TOOLCHAIN_PREFIX)gcc
 OBJCOPY  := $(TOOLCHAIN_PREFIX)objcopy
 SIZE     := $(TOOLCHAIN_PREFIX)size
+NM       := $(TOOLCHAIN_PREFIX)nm
 PYTHON   ?= python3
 PORT     ?=
 
@@ -113,6 +114,10 @@ LDFLAGS  := $(COMMON_FLAGS) $(OPTIMIZATION) \
             -Wl,--print-memory-usage \
             -Wl,-Map=$(OBJ_DIR)/output.map
 
+# Library code the firmware must not pull in: signed 32-bit division (~460 B),
+# 64-bit division, soft float, printf, heap. The link fails if any appears.
+FORBIDDEN_HELPERS := ^(__aeabi_(idiv|idivmod|ldivmod|uldivmod|[fd][a-z0-9]+)|__(div|mod)[sd]i3|__u(div|mod)di3|.*printf|malloc)$$
+
 # =============================================================================
 # Build Configuration
 # =============================================================================
@@ -155,6 +160,13 @@ $(TARGET).bin: $(TARGET) tools/fw-pack.py
 $(TARGET): $(OBJS) | $(BIN_DIR)
 	@echo "Linking..."
 	$(LD) $(LDFLAGS) $^ -o $@
+	@bad=$$($(NM) -j $@ | grep -E '$(FORBIDDEN_HELPERS)'); \
+	if [ -n "$$bad" ]; then \
+		echo "error: costly runtime helpers linked:" $$bad; \
+		echo "  Signed / or % (often a uint8_t/uint16_t promoted to int): use unsigned operands, e.g. x % 60u."; \
+		echo "  64-bit division, float or printf: avoid them; see docs/development.md §5."; \
+		rm -f $@; exit 1; \
+	fi
 	@echo ""
 	$(SIZE) $@
 	arm-none-eabi-nm --size-sort -r $(BIN_DIR)/$(PROJECT_NAME) | head -20
