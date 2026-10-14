@@ -11,7 +11,7 @@
 //   radio-view.c    cards, title and confirmation rendering
 #include "apps/radio.h"
 #include "hal/display.h"
-#include "external/printf/printf.h"
+#include "core/text.h"
 #include "ui/menu.h"
 #include "core/receiver.h"
 #include "core/misc.h"

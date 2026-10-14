@@ -1,6 +1,7 @@
 #include "apps/textinput.h"
 #include "hal/display.h"
 #include "ui/graphics.h"
+#include "core/text.h"
 #include "apps/apps.h"
 #include <string.h>
 
@@ -202,11 +203,15 @@ void TEXTINPUT_render(void) {
 
   DrawHLine(8, INPUT_Y, LCD_WIDTH - 16, C_FILL);
 
-  PrintSmallEx(LCD_WIDTH - 8, INPUT_Y + 5, POS_R, C_FILL, "%u/%u", charCount,
-               gTextInputSize);
+  Text count = TEXT_Begin(String, sizeof(String));
+  TEXT_Number(&count, charCount, 1, 10);
+  TEXT_Char(&count, '/');
+  TEXT_Number(&count, gTextInputSize, 1, 10);
+  PrintSmallEx(LCD_WIDTH - 8, INPUT_Y + 5, POS_R, C_FILL, String);
 
   for (size_t i = 0; i < charCount; ++i) {
-    PrintMedium(8 + i * (CHAR_W + 1), 8 + 12, "%c", inputField[i]);
+    char glyph[2] = {inputField[i], 0};
+    PrintMedium(8 + i * (CHAR_W + 1), 8 + 12, glyph);
   }
 
   uint8_t rowStrlen = 0;
@@ -225,12 +230,14 @@ void TEXTINPUT_render(void) {
       const uint8_t line = y + 3;
       const uint8_t yPos = line * 8 + 12;
 
-      PrintMedium(xPos, yPos, "%u", idx + 1);
+      char key[2] = {'1' + idx, 0};
+      PrintMedium(xPos, yPos, key);
       FillRect(xPos - 1, yPos - 6, 7, 8, C_INVERT);
 
       if (currentRow) {
         if (idx < rowStrlen) {
-          PrintMedium(xPos + 10, line * 8 + 12, "%c", currentRow[idx]);
+          char glyph[2] = {currentRow[idx], 0};
+          PrintMedium(xPos + 10, line * 8 + 12, glyph);
         }
       } else {
         strcpy(String, currentSet[idx]);

@@ -60,10 +60,10 @@ def main():
             sources = ['tools/ui-preview.c', 'src/ui/graphics.c', 'src/ui/components/radio-card.c',
                        'src/ui/components/frequency.c',
                        'src/core/rds.c',
-                       'src/ui/components/signal.c', 'src/core/radio-model.c', 'src/external/printf/printf.c']
+                       'src/ui/components/signal.c', 'src/core/radio-model.c', 'src/core/text.c']
             command = shlex.split(os.environ.get('CC', 'cc')) + [
                 '-Isrc', '-std=c2x', '-ffunction-sections', '-fdata-sections',
-                '-Wno-incompatible-pointer-types', '-DPRINTF_INCLUDE_CONFIG_H', '-Isrc/config',
+                '-Wno-incompatible-pointer-types',
                 '-Isrc/external/CMSIS_5/CMSIS/Core/Include',
                 '-Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include',
                 *sources, '-Wl,-dead_strip' if sys.platform == 'darwin' else '-Wl,--gc-sections',

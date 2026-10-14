@@ -39,7 +39,9 @@ static void buildCardView(uint8_t id, const char *inputText,
   const char *header = radioBands[config->active_band].name;
   const char *channelName = NULL;
   if (channelMode) {
-    snprintf(channelHeader, sizeof(storage->header), "CH %03u", stored->channel_number);
+    Text t = TEXT_Begin(channelHeader, sizeof(storage->header));
+    TEXT_Add(&t, "CH ");
+    TEXT_Number(&t, stored->channel_number, 3, 10);
     header = channelHeader;
     channelName = effectiveOk && channel->name[0] ? channel->name : channelHeader;
     if (!effectiveOk) { channelName = NULL; header = "Channel unavailable"; }
@@ -76,9 +78,13 @@ static void buildCardView(uint8_t id, const char *inputText,
 }
 
 static void renderTitle(void) {
-  if (capturePhase!=FC_OFF) STATUSLINE_SetText("FC %s %s",
-      capture.scope==CAPTURE_AUTO ? "Auto" : capture.scope==CAPTURE_VHF ? "VHF" : "UHF",
-      capturePhase==FC_PREVIEW ? "MENU:Use" : capture.range==CAPTURE_RANGE_VHF ? "VHF" : "UHF");
+  char title[24];
+  Text t = TEXT_Begin(title, sizeof(title));
+  if (capturePhase!=FC_OFF) {
+    TEXT_Add(&t, capture.scope==CAPTURE_AUTO ? "FC Auto " : capture.scope==CAPTURE_VHF ? "FC VHF " : "FC UHF ");
+    TEXT_Add(&t, capturePhase==FC_PREVIEW ? "MENU:Use" : capture.range==CAPTURE_RANGE_VHF ? "VHF" : "UHF");
+    STATUSLINE_SetText(title);
+  }
   else if (number.active) STATUSLINE_SetText(number.invalid ? "Invalid value" : inputTx ? "TX Frequency" : "RX Frequency");
   else if (inMenu || confirming || activeSlot.source == RADIO_SOURCE_CHANNEL ||
            (gDeviceConfig.radio.watch_enabled && gDeviceConfig.radio.slot_count > 1)) {
@@ -87,18 +93,30 @@ static void renderTitle(void) {
                       gDeviceConfig.radio.slot_count > 1;
     const char *mode = inMenu || confirming ? "VFO" :
         activeSlot.source == RADIO_SOURCE_CHANNEL ? "MR" : "DW";
-    char id = watchTitle ? (receivingSlot<RADIO_SLOT_CAPACITY ?
-              'A'+receivingSlot : '-') : 'A'+selectedSlot;
-    STATUSLINE_SetText("%s %c", mode, id);
+    TEXT_Add(&t, mode);
+    TEXT_Char(&t, ' ');
+    TEXT_Char(&t, watchTitle ? (receivingSlot<RADIO_SLOT_CAPACITY ?
+              'A'+receivingSlot : '-') : 'A'+selectedSlot);
+    STATUSLINE_SetText(title);
   } else STATUSLINE_SetText("RADIO");
 }
 
 static void renderConfirmation(void) {
-  char frequencyText[16];
-  const char *unit = UI_FormatFrequency(pending.frequency_hz, frequencyText);
-  PrintMediumEx(2, 18, POS_L, C_FILL, "Apply %s?", rxModeNames[pending.parameters.mode]);
-  PrintMediumEx(2, 30, POS_L, C_FILL, "%s %s", frequencyText, unit);
-  PrintSmall(2, 40, "BW %u Hz STEP %u Hz", pending.parameters.bandwidth_hz, pending.parameters.step_hz);
+  char line[32];
+  Text t = TEXT_Begin(line, sizeof(line));
+  TEXT_Add(&t, "Apply ");
+  TEXT_Add(&t, rxModeNames[pending.parameters.mode]);
+  TEXT_Char(&t, '?');
+  PrintMedium(2, 18, line);
+  UI_FrequencyText(pending.frequency_hz, line);
+  PrintMedium(2, 30, line);
+  t = TEXT_Begin(line, sizeof(line));
+  TEXT_Add(&t, "BW ");
+  TEXT_Number(&t, pending.parameters.bandwidth_hz, 1, 10);
+  TEXT_Add(&t, " Hz STEP ");
+  TEXT_Number(&t, pending.parameters.step_hz, 1, 10);
+  TEXT_Add(&t, " Hz");
+  PrintSmall(2, 40, line);
   PrintSmall(2, 57, "MENU: apply  EXIT: cancel");
 }
 

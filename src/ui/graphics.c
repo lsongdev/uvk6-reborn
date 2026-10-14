@@ -9,8 +9,6 @@
 static Cursor cursor;
 static int16_t textClipLeft = 0, textClipRight = LCD_WIDTH;
 
-static const GFXfont *const fonts[] = {&TomThumb, &MuMatrix8ptRegular};
-
 void UI_ClearStatus(void) { FillRect(0, 0, LCD_WIDTH, 7, C_CLEAR); }
 void UI_ClearScreen(void) {
   FillRect(0, 7, LCD_WIDTH, LCD_HEIGHT - 7, C_CLEAR);
@@ -160,48 +158,31 @@ void write(uint8_t c, uint8_t tsx, uint8_t tsy, bool wrap, Color col,
 }
 
 static void printStr(const GFXfont *f, uint8_t x, uint8_t y, Color col,
-                     TextPos pos, const char *fmt, va_list args) {
-  char buf[64];
-  vsnprintf(buf, 64, fmt, args);
+                     TextPos pos, const char *text) {
   int16_t x1, y1;
   uint16_t w, h;
-  getTextBounds(buf, x, y, &x1, &y1, &w, &h, f);
+  getTextBounds(text, x, y, &x1, &y1, &w, &h, f);
   cursor.x = pos == POS_C ? x - (w >> 1) : pos == POS_R ? x - w : x;
   cursor.y = y;
-  for (char *p = buf; *p; p++)
-    write(*p, 1, 1, 1, col, f);
+  for (; *text; text++)
+    write(*text, 1, 1, 1, col, f);
 }
 
-// One generated pair per text font keeps the variadic wrappers identical.
-#define P(n, i)                                                                \
-  void Print##n(uint8_t x, uint8_t y, const char *f, ...) {                    \
-    va_list a;                                                                 \
-    va_start(a, f);                                                            \
-    printStr(fonts[i], x, y, C_FILL, POS_L, f, a);                             \
-    va_end(a);                                                                 \
-  }
-#define PX(n, i)                                                               \
-  void Print##n##Ex(uint8_t x, uint8_t y, TextPos p, Color c, const char *f,   \
-                    ...) {                                                     \
-    va_list a;                                                                 \
-    va_start(a, f);                                                            \
-    printStr(fonts[i], x, y, c, p, f, a);                                      \
-    va_end(a);                                                                 \
-  }
-
-P(Small, 0)
-PX(Small, 0)
-P(Medium, 1)
-PX(Medium, 1)
-
-void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos p, Color c,
-                    const char *f, ...) {
-  va_list a;
-  va_start(a, f);
-  printStr(&Symbols, x, y, c, p, f, a);
-  va_end(a);
+void PrintSmall(uint8_t x, uint8_t y, const char *text) {
+  printStr(&TomThumb, x, y, C_FILL, POS_L, text);
 }
-
+void PrintSmallEx(uint8_t x, uint8_t y, TextPos p, Color c, const char *text) {
+  printStr(&TomThumb, x, y, c, p, text);
+}
+void PrintMedium(uint8_t x, uint8_t y, const char *text) {
+  printStr(&MuMatrix8ptRegular, x, y, C_FILL, POS_L, text);
+}
+void PrintMediumEx(uint8_t x, uint8_t y, TextPos p, Color c, const char *text) {
+  printStr(&MuMatrix8ptRegular, x, y, c, p, text);
+}
+void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos p, Color c, const char *text) {
+  printStr(&Symbols, x, y, c, p, text);
+}
 
 static uint16_t textWidth(const char *text, const GFXfont *font) {
   uint16_t width = 0;

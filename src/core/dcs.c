@@ -16,7 +16,7 @@
 
 #include "core/dcs.h"
 #include "core/tone.h"
-#include "external/printf/printf.h"
+#include "core/text.h"
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
@@ -65,11 +65,15 @@ uint32_t DCS_GetGolayCodeWord(DCS_CodeType_t CodeType, uint8_t Option) {
 
 
 void TONE_Format(RadioTone tone, char text[24]) {
-  if (!TONE_Valid(tone)) { snprintf(text,24,"Invalid"); return; }
-  if (!tone) snprintf(text,24,"Off");
+  Text t = TEXT_Begin(text,24);
+  if (!TONE_Valid(tone)) TEXT_Add(&t,"Invalid");
+  else if (!tone) TEXT_Add(&t,"Off");
   else if (TONE_Type(tone) == CODE_TYPE_CONTINUOUS_TONE) {
     uint16_t hz10 = CTCSS_Options[TONE_Code(tone)];
-    snprintf(text,24,"%u.%u Hz",hz10/10,hz10%10);
-  } else snprintf(text,24,"D%03o%c",DCS_Options[TONE_Code(tone)],
-    TONE_Type(tone) == CODE_TYPE_DIGITAL ? 'N' : 'I');
+    TEXT_Number(&t,hz10/10,1,10); TEXT_Char(&t,'.');
+    TEXT_Number(&t,hz10%10,1,10); TEXT_Add(&t," Hz");
+  } else {
+    TEXT_Char(&t,'D'); TEXT_Number(&t,DCS_Options[TONE_Code(tone)],3,8);
+    TEXT_Char(&t,TONE_Type(tone) == CODE_TYPE_DIGITAL ? 'N' : 'I');
+  }
 }

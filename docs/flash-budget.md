@@ -1,6 +1,16 @@
 # Flash 占用审计与优化
 
-## 2026-10-14 卡片改用中字、去掉滚动（当前工作区）
+## 2026-10-14 去掉 printf（当前工作区）
+
+ARM GNU 15.3.rel1、release `-Os`／LTO、默认开放 TX：Flash **55,884 / 61,440 B**，余 **5,556 B**；链接 RAM **7,128 / 16,384 B**。相对卡片改造后的 `aab2da4`：Flash −1,332 B，RAM −32 B。
+
+- 删除 mpaland/printf 子模块（`_vsnprintf` 1,072 B、`_ntoa_long` 444 B 等）及 `src/config/printf_config.h`。
+- 新增 `core/text`（`TEXT_Begin`／`Add`／`Char`／`Number`／`Copy`）：有界拼接、十进制或八进制补零，约 150 B。
+- `Print*`、`STATUSLINE_SetText` 改为直接接收字符串，不再是可变参数；`printStr` 不再需要 64 B 栈缓冲。
+- 删除只在 `DEBUG` 宏下工作的 UART 日志（`Log`、`LogC`、`UART_printf`）和空文件 `core/misc.c`。
+- 验证：`tests/text-regression.c` 对照 libc `snprintf` 检查数字宽度／进制和全部 259 个亚音选项文本；20 个卡片预览帧和设置菜单 10 屏截图与改动前逐字节一致。
+
+## 2026-10-14 卡片改用中字、去掉滚动（aab2da4）
 
 ARM GNU 15.3.rel1、release `-Os`／LTO、默认开放 TX：Flash **57,216 / 61,440 B**，余 **4,224 B**；链接 RAM **7,160 / 16,384 B**。相对 `8708a23`：Flash −2,148 B，RAM −160 B。
 
@@ -10,7 +20,7 @@ ARM GNU 15.3.rel1、release `-Os`／LTO、默认开放 TX：Flash **57,216 / 61,
 | 卡片无状态 | 删除频率／名称按时间轮换、正文与横条两个滚动器、名称拼接缓冲和文本指纹；`UI_RadioCardState` 四份共 160 B RAM 一并删除 |
 | 提示时长固定 | 横条提示统一约 2.5 秒，不再按滚动长度延长 |
 
-同一轮摸底的其余候选（未实施）：printf 约 1,548 B（`_vsnprintf` 1,072 B + `_ntoa_long` 444 B 等），替换后预计净省约 1.2 KB；FC 实测 1,328 B，可做编译开关；字形表去掉 16 位位图偏移约省 0.4 KB；273 条字符串共 2,678 B，合并近义错误提示约省 0.4–0.6 KB。
+同一轮摸底的其余候选（未实施）：FC 实测 1,328 B，可做编译开关；字形表去掉 16 位位图偏移约省 0.4 KB；273 条字符串共 2,678 B，合并近义错误提示约省 0.4–0.6 KB。
 
 ## 2026-10-13 结构重构（当前 main）
 

@@ -1,5 +1,5 @@
 #include "ui/number-input.h"
-#include "external/printf/printf.h"
+#include "core/text.h"
 #include <string.h>
 
 static bool parse(const NumberInput *input, uint32_t *value) {
@@ -29,10 +29,12 @@ void NUMBER_Begin(NumberInput *input, uint32_t min, uint32_t max,
                          .replace=prefill};
   for (uint32_t n=scale; n>1; n/=10) ++input->decimals;
   if (prefill) {
-    if (input->decimals)
-      snprintf(input->text, sizeof(input->text), "%u.%0*u", (unsigned)(value/scale),
-               input->decimals, (unsigned)(value%scale));
-    else snprintf(input->text, sizeof(input->text), "%u", (unsigned)value);
+    Text t = TEXT_Begin(input->text, sizeof(input->text));
+    TEXT_Number(&t, value/scale, 1, 10);
+    if (input->decimals) {
+      TEXT_Char(&t, '.');
+      TEXT_Number(&t, value%scale, input->decimals, 10);
+    }
     input->length = strlen(input->text);
   }
 }
@@ -89,5 +91,7 @@ NumberInputResult NUMBER_Key(NumberInput *input, KEY_Code_t key,
 }
 
 void NUMBER_Text(const NumberInput *input, char out[18]) {
-  snprintf(out, 18, "%s_", input->text);
+  Text t = TEXT_Begin(out, 18);
+  TEXT_Add(&t, input->text);
+  TEXT_Char(&t, '_');
 }

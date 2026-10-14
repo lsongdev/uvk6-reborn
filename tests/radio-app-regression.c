@@ -13,10 +13,7 @@
 Receiver gReceiver;
 bool gRedrawScreen;
 static char statusText[32];
-void STATUSLINE_SetText(const char *pattern, ...) {
-  va_list args; va_start(args, pattern);
-  vsnprintf(statusText, sizeof(statusText), pattern, args); va_end(args);
-}
+void STATUSLINE_SetText(const char *text) { TEXT_Copy(statusText, sizeof(statusText), text); }
 static UI_RadioCardView drawn[RADIO_SLOT_CAPACITY];
 static unsigned drawCount;
 void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view) {
@@ -25,13 +22,16 @@ void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view) {
   drawn[id]=*view; ++drawCount;
 }
 uint8_t UI_SMeterLevel(void) { return 8; }
-void PrintSmall(uint8_t x, uint8_t y, const char *pattern, ...) {
+void PrintSmall(uint8_t x, uint8_t y, const char *pattern) {
   (void)x; (void)y; (void)pattern;
 }
-void PrintSmallEx(uint8_t x, uint8_t y, TextPos pos, Color c, const char *pattern, ...) {
+void PrintSmallEx(uint8_t x, uint8_t y, TextPos pos, Color c, const char *pattern) {
   (void)x; (void)y; (void)pos; (void)c; (void)pattern;
 }
-void PrintMediumEx(uint8_t x, uint8_t y, TextPos pos, Color c, const char *pattern, ...) {
+void PrintMedium(uint8_t x, uint8_t y, const char *pattern) {
+  (void)x; (void)y; (void)pattern;
+}
+void PrintMediumEx(uint8_t x, uint8_t y, TextPos pos, Color c, const char *pattern) {
   (void)x; (void)y; (void)pos; (void)c; (void)pattern;
 }
 static ReceiverCapabilities capabilities = {true, false, true};
@@ -114,9 +114,6 @@ bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear) {
 void DISPLAY_Blit(void) {}
 void FillRect(int16_t x, int16_t y, int16_t w, int16_t h, Color color) {
   (void)x; (void)y; (void)w; (void)h; (void)color;
-}
-void PrintMediumBoldEx(uint8_t x, uint8_t y, TextPos pos, Color color, const char *format, ...) {
-  (void)x; (void)y; (void)pos; (void)color; (void)format;
 }
 void DEVICE_RequestSave(void) { ++saveRequests; }
 static uint32_t failFrequency;

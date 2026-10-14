@@ -1,6 +1,5 @@
 #include "drivers/dp32g030/uart.h"
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
-#include "external/printf/printf.h"
 #include "drivers/dp32g030/dma.h"
 #include "drivers/dp32g030/gpio.h"
 #include "drivers/dp32g030/syscon.h"
@@ -414,42 +413,3 @@ void UART_HandleCommand(void) {
   }
 }
 
-
-void UART_printf(const char *str, ...) {
-  char text[128];
-  va_list va;
-  va_start(va, str);
-  int length = vsnprintf(text, sizeof(text), str, va);
-  va_end(va);
-  if (length <= 0) return;
-  uint32_t written = (uint32_t)length < sizeof(text)
-      ? (uint32_t)length : sizeof(text) - 1u;
-  UART_Send(text, written);
-}
-
-// #define DEBUG 1
-
-#ifdef DEBUG
-void Log(const char *pattern, ...) {
-  char text[128];
-  va_list args;
-  va_start(args, pattern);
-  vsnprintf(text, sizeof(text), pattern, args);
-  va_end(args);
-  UART_printf("%+10u %s\n", Now(), text);
-}
-void LogC(LogColor c, const char *pattern, ...) {
-  char text[128];
-  va_list args;
-  va_start(args, pattern);
-  vsnprintf(text, sizeof(text), pattern, args);
-  va_end(args);
-  UART_printf("%+10u \033[%um%s\033[%um\n", Now(), c, text, LOG_C_RESET);
-}
-#else
-void Log(const char *pattern, ...) { (void)pattern; }
-void LogC(LogColor c, const char *pattern, ...) {
-  (void)c;
-  (void)pattern;
-}
-#endif

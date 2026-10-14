@@ -1,6 +1,7 @@
 #include "apps/channel-manager.h"
 #include "apps/apps.h"
 #include "apps/textinput.h"
+#include "core/text.h"
 #include "hal/display.h"
 #include "core/channel-store.h"
 #include "ui/graphics.h"
@@ -84,8 +85,11 @@ void CHANNEL_MANAGER_StartSave(uint8_t slot, uint16_t current_number,
 bool CHANNEL_MANAGER_Active(void) { return active; }
 
 static void save(void) {
-  if (!draft.name[0])
-    snprintf(draft.name, sizeof(draft.name), "CH %03u", target);
+  if (!draft.name[0]) {
+    Text t = TEXT_Begin(draft.name, sizeof(draft.name));
+    TEXT_Add(&t, "CH ");
+    TEXT_Number(&t, target, 3, 10);
+  }
   if (!CHANNEL_STORE_Save(target, &draft)) {
     if (notify) notify("Channel save failed");
     return;
@@ -122,15 +126,20 @@ bool CHANNEL_MANAGER_Render(void) {
   if (!active) return false;
   UserChannel old;
   bool occupied = CHANNEL_STORE_Load(target, &old);
-  char frequency[16];
+  char line[24];
+  Text t = TEXT_Begin(line, sizeof(line));
   STATUSLINE_SetText(overwriteConfirm ? "Overwrite CH" : "Save channel");
-  PrintMediumEx(2, 18, POS_L, C_FILL, "%s CH %03u?",
-                overwriteConfirm ? "Overwrite" : "Save to", target);
-  PrintMediumEx(2, 31, POS_L, C_FILL, "%s",
+  TEXT_Add(&t, overwriteConfirm ? "Overwrite CH " : "Save to CH ");
+  TEXT_Number(&t, target, 3, 10);
+  TEXT_Char(&t, '?');
+  PrintMediumEx(2, 18, POS_L, C_FILL, line);
+  PrintMediumEx(2, 31, POS_L, C_FILL,
                 occupied ? (old.name[0] ? old.name : "(unnamed)")
                          : (draft.name[0] ? draft.name : "New channel"));
-  const char *unit = UI_FormatFrequency(draft.frequency_hz, frequency);
-  PrintSmallEx(126, 42, POS_R, C_FILL, "RX %s %s", frequency, unit);
+  t = TEXT_Begin(line, sizeof(line));
+  TEXT_Add(&t, "RX ");
+  UI_FrequencyText(draft.frequency_hz, t.at);
+  PrintSmallEx(126, 42, POS_R, C_FILL, line);
   PrintSmallEx(2, 57, POS_L, C_FILL,
                overwriteConfirm ? "MENU: overwrite  EXIT: back"
                                 : "UP/DOWN: slot  MENU: select");

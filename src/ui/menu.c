@@ -1,6 +1,7 @@
 #include "ui/menu.h"
 #include "hal/uart.h"
 #include "ui/graphics.h"
+#include "core/text.h"
 #include "ui/statusline.h"
 #include "core/measurements.h"
 #include "ui/numnav.h"
@@ -29,7 +30,7 @@ void MENU_EditNumber(uint32_t min, uint32_t max, uint32_t scale,
 }
 
 
-static void (*renderFn)(uint8_t x, uint8_t y, const char *pattern, ...);
+static void (*renderFn)(uint8_t x, uint8_t y, const char *text);
 
 // Вспомогательная функция для вычисления правой границы
 static inline uint8_t getMenuRightEdge(void) {
@@ -43,14 +44,14 @@ static void renderItem(uint16_t index, uint8_t i) {
   const uint8_t by = y + active_menu->itemHeight -
                      (active_menu->itemHeight >= MENU_ITEM_H ? 3 : 2);
 
-  renderFn(3, by, "%s", item->name);
+  renderFn(3, by, item->name);
   if (item->submenu)
     PrintSmallEx(ex - 7, by, POS_R, C_FILL, ">");
 
   if (item->get_value_text) {
     char value_buf[32];
     item->get_value_text(item, value_buf, sizeof(value_buf));
-    PrintSmallEx(ex - 7 - (item->submenu ? 8 : 0), by, POS_R, C_FILL, "%s", value_buf);
+    PrintSmallEx(ex - 7 - (item->submenu ? 8 : 0), by, POS_R, C_FILL, value_buf);
   }
 }
 
@@ -122,12 +123,15 @@ void MENU_Render(void) {
 
     active_menu->render_item(idx, i);
     if (isActive && number.active) {
-      char draft[18]; NUMBER_Text(&number, draft);
+      char draft[24]; NUMBER_Text(&number, draft);
       FillRect(active_menu->x, y, ex-4, active_menu->itemHeight, C_CLEAR);
-      PrintSmallEx(3, y+active_menu->itemHeight-3, POS_L, C_FILL, "%s",
+      PrintSmallEx(3, y+active_menu->itemHeight-3, POS_L, C_FILL,
                    numberRange ? (numberEnd ? "End" : "Start") :
                    active_menu->items ? active_menu->items[idx].name : "Value");
-      PrintSmallEx(ex-7, y+active_menu->itemHeight-3, POS_R, C_FILL, "%s %s", draft, numberUnit);
+      Text t = TEXT_Begin(draft + strlen(draft), sizeof(draft) - strlen(draft));
+      TEXT_Char(&t, ' ');
+      TEXT_Add(&t, numberUnit);
+      PrintSmallEx(ex-7, y+active_menu->itemHeight-3, POS_R, C_FILL, draft);
     }
 
     if (isActive) {

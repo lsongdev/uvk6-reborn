@@ -10,25 +10,19 @@
 #include "hal/scheduler.h"
 #include "ui/components/battery.h"
 #include "ui/graphics.h"
+#include "core/text.h"
 #include <string.h>
 
 static uint8_t previousBatteryLevel = 255;
 static bool showBattery = true;
 
 static uint32_t lastEepromWrite = 0;
-static uint32_t lastTickerUpdate = 0;
-
 static char statuslineText[32] = {0};
-static char statuslineTicker[32] = {0};
 
-void STATUSLINE_SetText(const char *pattern, ...) {
-  char statuslineTextNew[32] = {0};
-  va_list args;
-  va_start(args, pattern);
-  vsnprintf(statuslineTextNew, 31, pattern, args);
-  va_end(args);
-  if (strcmp(statuslineText, statuslineTextNew)) {
-    strcpy(statuslineText, statuslineTextNew);
+void STATUSLINE_SetText(const char *text) {
+  if (strncmp(statuslineText, text, sizeof(statuslineText) - 1)) {
+    Text t = TEXT_Begin(statuslineText, sizeof(statuslineText));
+    TEXT_Add(&t, text);
     gRedrawScreen = true;
   }
 }
@@ -54,10 +48,6 @@ void STATUSLINE_update(void) {
     lastEepromWrite = gEepromWrite = false;
     gRedrawScreen = true;
   }
-
-  if (Now() - lastTickerUpdate > 5000) {
-    statuslineTicker[0] = '\0';
-  }
 }
 
 void STATUSLINE_render(void) {
@@ -71,25 +61,21 @@ void STATUSLINE_render(void) {
                                           : previousBatteryLevel;
   if (bars > 10) bars = 10;
   char batteryText[16];
-  uint16_t batteryWidth;
-  switch (gDeviceConfig.preferences.battery_style) {
-  case BAT_PERCENT:
-    snprintf(batteryText, sizeof(batteryText), "%u%%", gBatteryPercent);
-    batteryWidth = UI_SmallTextWidth(batteryText);
-    if (showBattery)
-      PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_FILL, "%s", batteryText);
-    break;
-  case BAT_VOLTAGE:
-    snprintf(batteryText, sizeof(batteryText), "%u.%02uV",
-             gBatteryVoltage / 100, gBatteryVoltage % 100);
-    batteryWidth = UI_SmallTextWidth(batteryText);
-    if (showBattery)
-      PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_FILL, "%s", batteryText);
-    break;
-  default:
-    batteryWidth = 13;
-    if (showBattery) UI_Battery(bars);
-    break;
+  Text battery = TEXT_Begin(batteryText, sizeof(batteryText));
+  uint8_t style = gDeviceConfig.preferences.battery_style;
+  if (style == BAT_PERCENT) {
+    TEXT_Number(&battery, gBatteryPercent, 1, 10);
+    TEXT_Char(&battery, '%');
+  } else if (style == BAT_VOLTAGE) {
+    TEXT_Number(&battery, gBatteryVoltage / 100, 1, 10);
+    TEXT_Char(&battery, '.');
+    TEXT_Number(&battery, gBatteryVoltage % 100, 2, 10);
+    TEXT_Char(&battery, 'V');
+  }
+  uint16_t batteryWidth = batteryText[0] ? UI_SmallTextWidth(batteryText) : 13;
+  if (showBattery) {
+    if (batteryText[0]) PrintSmallEx(LCD_WIDTH - 1, BASE_Y, POS_R, C_FILL, batteryText);
+    else UI_Battery(bars);
   }
 
   char icons[8] = {'\0'};
@@ -112,14 +98,16 @@ void STATUSLINE_render(void) {
     PrintSmallEx(iconsRight, BASE_Y, POS_R, C_FILL, "F");
     iconsRight -= 8;
   }
-  PrintSymbolsEx(iconsRight, BASE_Y, POS_R, C_FILL, "%s", icons);
+  PrintSymbolsEx(iconsRight, BASE_Y, POS_R, C_FILL, icons);
 
   uint16_t iconWidth = UI_SymbolsTextWidth(icons);
   uint8_t textWidth = iconWidth + 2 < iconsRight ? iconsRight - iconWidth - 2 : 0;
   char selection[32];
-  const char *text = statuslineTicker[0] == '\0' ? statuslineText : statuslineTicker;
+  const char *text = statuslineText;
   if (gIsNumNavInput) {
-    snprintf(selection, sizeof(selection), "Select: %s", gNumNavInput);
+    Text t = TEXT_Begin(selection, sizeof(selection));
+    TEXT_Add(&t, "Select: ");
+    TEXT_Add(&t, gNumNavInput);
     text = selection;
   }
   UI_SmallTextWindow(0, BASE_Y, textWidth, text, 0);

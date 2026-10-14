@@ -12,7 +12,7 @@ static bool failed;
 void RESET_Init(void) {
   confirm = failed = false;
   gDeviceConfig.preferences.keylock = false;
-  STATUSLINE_SetText("%s", EEPROM_DetectType() < EEPROM_UNKNOWN
+  STATUSLINE_SetText(EEPROM_DetectType() < EEPROM_UNKNOWN
                                  ? EEPROM_TYPE_NAMES[EEPROM_DetectType()]
                                  : "EEPROM unknown");
 }

@@ -11,7 +11,7 @@
 #include "ui/menu.h"
 #include "ui/graphics.h"
 #include "ui/statusline.h"
-#include "external/printf/printf.h"
+#include "core/text.h"
 
 static const char *notice;
 static bool resetConfirm;
@@ -19,7 +19,7 @@ static uint8_t oldOpen, oldClose, oldBoundary;
 
 static void getValue(const MenuItem *item, char *out, uint8_t size) {
   if (item->setting == SETTING_SI4732POWEROFF && !RECEIVER_Capabilities().si) {
-    snprintf(out,size,"No SI"); return;
+    TEXT_Copy(out,size,"No SI"); return;
   }
   SETTINGS_GetValueText(item->setting,out,size);
 }
@@ -59,8 +59,9 @@ static const MenuItem displayItems[] = {
 MENU_DEF(displayMenu,"Display",displayItems);
 
 static void getRadioValue(const MenuItem *item, char *out, uint8_t size) {
-  if (!item->setting) snprintf(out,size,"%u",gDeviceConfig.radio.slot_count);
-  else snprintf(out,size,"%s",gDeviceConfig.radio.watch_enabled ? "On" : "Off");
+  Text t = TEXT_Begin(out,size);
+  if (!item->setting) TEXT_Number(&t,gDeviceConfig.radio.slot_count,1,10);
+  else TEXT_Add(&t,gDeviceConfig.radio.watch_enabled ? "On" : "Off");
 }
 static void changeRadioValue(const MenuItem *item, bool up) {
   notice = NULL;
@@ -99,7 +100,7 @@ static bool openBands(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
 static void getSaveStatus(const MenuItem *item, char *out, uint8_t size) {
   (void)item;
   static const char *names[] = {"Read only","Saved","Pending","Failed"};
-  snprintf(out,size,"%s",names[DEVICE_GetSaveStatus()]);
+  TEXT_Copy(out,size,names[DEVICE_GetSaveStatus()]);
 }
 static bool saveNow(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
@@ -113,7 +114,7 @@ static void getTxStatus(const MenuItem *item, char *out, uint8_t size) {
   TxPolicy policy = TX_DEVICE_Policy();
   const char *status = !capability.available ? "HW locked" :
       !capability.power_mask ? "Uncalibrated" : !policy.authorized ? "Not allowed" : "Ready";
-  snprintf(out,size,"%s",status);
+  TEXT_Copy(out,size,status);
 }
 static bool resetPreferences(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
@@ -122,19 +123,20 @@ static bool resetPreferences(const MenuItem *item, KEY_Code_t key, Key_State_t s
 }
 static void getInfo(const MenuItem *item, char *out, uint8_t size) {
   ReceiverCapabilities capabilities = RECEIVER_Capabilities();
+  Text t = TEXT_Begin(out,size);
   switch (item->setting) {
   case 0:
 #ifdef GIT_HASH
-    snprintf(out,size,"%s",GIT_HASH);
+    TEXT_Add(&t,GIT_HASH);
 #else
-    snprintf(out,size,"dev");
+    TEXT_Add(&t,"dev");
 #endif
     break;
-  case 1: snprintf(out,size,"%u KiB",(unsigned)(SETTINGS_GetEEPROMSize()/1024u)); break;
-  case 2: snprintf(out,size,"UVR2 %u",CONFIG_STORE_FORMAT); break;
-  case 3: snprintf(out,size,"%s",capabilities.si ? "Present" : "Missing"); break;
-  case 4: snprintf(out,size,"%s",capabilities.broadcast ? "Present" : "Missing"); break;
-  default: snprintf(out,size,"%s",capabilities.ssb_patch ? "Present" : "Missing"); break;
+  case 1: TEXT_Number(&t,SETTINGS_GetEEPROMSize()/1024u,1,10); TEXT_Add(&t," KiB"); break;
+  case 2: TEXT_Add(&t,"UVR2 "); TEXT_Number(&t,CONFIG_STORE_FORMAT,1,10); break;
+  case 3: TEXT_Add(&t,capabilities.si ? "Present" : "Missing"); break;
+  case 4: TEXT_Add(&t,capabilities.broadcast ? "Present" : "Missing"); break;
+  default: TEXT_Add(&t,capabilities.ssb_patch ? "Present" : "Missing"); break;
   }
 }
 static const MenuItem aboutItems[] = {
@@ -195,5 +197,5 @@ void SETTINGS_render(void) {
     return;
   }
   MENU_Render();
-  if (notice) STATUSLINE_SetText("%s",notice);
+  if (notice) STATUSLINE_SetText(notice);
 }

@@ -9,6 +9,7 @@
 #include "apps/radio.h"
 #include "apps/bands.h"
 #include "apps/textinput.h"
+#include <stddef.h>
 
 #define APPS_STACK_SIZE 8
 
@@ -67,10 +68,9 @@ bool APPS_key(KEY_Code_t Key, Key_State_t state) {
 
 void APPS_init(AppType_t app) {
 
-  STATUSLINE_SetText("%s", apps[app].name);
+  STATUSLINE_SetText(apps[app].name);
   gRedrawScreen = true;
 
-  LogC(LOG_C_YELLOW, "[APP] Init %s", apps[app].name);
   if (apps[app].init) {
     apps[app].init();
   }
@@ -90,7 +90,6 @@ void APPS_render(void) {
 }
 
 void APPS_deinit(void) {
-  LogC(LOG_C_YELLOW, "[APP] Deinit %s", apps[gCurrentApp].name);
   MENU_Deinit();
   if (apps[gCurrentApp].deinit) {
     apps[gCurrentApp].deinit();
@@ -124,7 +123,7 @@ bool APPS_exit(void) {
 
   APPS_init(gCurrentApp);
 
-  STATUSLINE_SetText("%s", apps[gCurrentApp].name);
+  STATUSLINE_SetText(apps[gCurrentApp].name);
   gRedrawScreen = true;
   return true;
 }

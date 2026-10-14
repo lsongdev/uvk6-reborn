@@ -7,7 +7,7 @@
 #include "hal/backlight.h"
 #include "hal/display.h"
 #include "hal/eeprom.h"
-#include "external/printf/printf.h"
+#include "core/text.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -97,11 +97,12 @@ void SETTINGS_IncDecValue(Setting id, bool up) {
 void SETTINGS_GetValueText(Setting id, char *out, uint8_t size) {
   uint32_t value = SETTINGS_GetValue(id);
   const char *text = NULL;
+  Text t = TEXT_Begin(out,size);
   switch (id) {
   case SETTING_BACKLIGHT:
     if (!value) text = "Off";
     else if (value == 6) text = "Always";
-    else { snprintf(out,size,"%u s",BL_TIME_VALUES[value]); return; }
+    else { TEXT_Number(&t,BL_TIME_VALUES[value],1,10); TEXT_Add(&t," s"); return; }
     break;
   case SETTING_SI4732POWEROFF: text = value ? "Power off" : "Mute"; break;
   case SETTING_BOUND240_280: text = value ? "280 MHz" : "240 MHz"; break;
@@ -116,16 +117,19 @@ void SETTINGS_GetValueText(Setting id, char *out, uint8_t size) {
   case SETTING_KEYLOCK:
   case SETTING_TX_BUSY_LOCK: text = value ? "On" : "Off"; break;
   case SETTING_SQLOPENTIME:
-  case SETTING_SQLCLOSETIME: snprintf(out,size,"Level %u",(unsigned)value); return;
-  case SETTING_CONTRAST: snprintf(out,size,"%d",(int)value-8); return;
-  case SETTING_TX_TIMEOUT: snprintf(out,size,"%u s",(unsigned)value); return;
+  case SETTING_SQLCLOSETIME: TEXT_Add(&t,"Level "); TEXT_Number(&t,value,1,10); return;
+  case SETTING_CONTRAST: // Stored 0..15, shown centred on 0.
+    if (value < 8) TEXT_Char(&t,'-');
+    TEXT_Number(&t,value < 8 ? 8-value : value-8,1,10); return;
+  case SETTING_TX_TIMEOUT: TEXT_Number(&t,value,1,10); TEXT_Add(&t," s"); return;
   case SETTING_BATTERYCALIBRATION: {
     uint32_t voltage = BATTERY_GetPreciseVoltage(value);
-    snprintf(out,size,"%u.%02u V",(unsigned)(voltage/10000u),(unsigned)((voltage/100u)%100u)); return;
+    TEXT_Number(&t,voltage/10000u,1,10); TEXT_Char(&t,'.');
+    TEXT_Number(&t,voltage/100u%100u,2,10); TEXT_Add(&t," V"); return;
   }
-  default: snprintf(out,size,"%u",(unsigned)value); return;
+  default: TEXT_Number(&t,value,1,10); return;
   }
-  snprintf(out,size,"%s",text);
+  TEXT_Add(&t,text);
 }
 bool SETTINGS_ResetPreferences(void) {
   ConfigPreferences next = CONFIG_DEFAULT_PREFERENCES;

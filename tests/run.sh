@@ -14,11 +14,11 @@ case "$(uname -s)" in
   *) dead_strip=-Wl,--gc-sections ;;
 esac
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
-  -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
-  -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Wno-incompatible-pointer-types \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/receiver-regression.c tests/number-input-regression.c src/ui/number-input.c \
-  src/core/radio-model.c src/external/printf/printf.c "$dead_strip" -o "$test_binary"
+  src/core/radio-model.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "$test_binary" --bk1080
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
@@ -28,15 +28,15 @@ esac
   src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
-  -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
-  -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Wno-incompatible-pointer-types \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/radio-app-regression.c src/apps/channel-manager.c src/core/tuning.c src/ui/number-input.c src/core/dcs.c src/external/printf/printf.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/watch.c src/core/tx-model.c src/core/tx-runtime.c src/core/seek.c src/core/capture.c \
+  tests/radio-app-regression.c src/apps/channel-manager.c src/core/tuning.c src/ui/number-input.c src/core/dcs.c src/core/text.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/watch.c src/core/tx-model.c src/core/tx-runtime.c src/core/seek.c src/core/capture.c \
   src/core/rds.c src/core/rds-receiver.c src/ui/components/frequency.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
-  -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
-  -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Wno-incompatible-pointer-types \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/si-regression.c "$dead_strip" -o "$test_binary"
 "$test_binary"
@@ -46,10 +46,10 @@ esac
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/bk1080-regression.c "$dead_strip" -o "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
-  -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
-  -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Wno-incompatible-pointer-types \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/rx-device-regression.c src/core/dcs.c src/external/printf/printf.c "$dead_strip" -o "$test_binary"
+  tests/rx-device-regression.c src/core/dcs.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/tuning-regression.c \
   src/core/tuning.c src/core/radio-state.c src/core/radio-model.c -o "$test_binary"
@@ -58,13 +58,13 @@ esac
   src/core/watch.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
-  -Wno-missing-field-initializers -DPRINTF_INCLUDE_CONFIG_H -Isrc/config \
+  -Wno-missing-field-initializers \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/tx-device-regression.c src/core/dcs.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
-  -Wno-missing-field-initializers -DPRINTF_INCLUDE_CONFIG_H -Isrc/config \
+  -Wno-missing-field-initializers \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/tx-disabled-regression.c "$dead_strip" -o "$test_binary"
@@ -82,37 +82,40 @@ esac
   src/core/radio-state.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
-  -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
-  -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Wno-incompatible-pointer-types \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/band-editor-regression.c src/core/config-store.c src/core/radio-model.c src/core/radio-state.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
-  -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
-  -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Wno-incompatible-pointer-types \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/radio-card-regression.c src/ui/graphics.c src/ui/components/radio-card.c \
-  src/ui/components/signal.c src/ui/components/frequency.c src/core/radio-model.c src/external/printf/printf.c "$dead_strip" -o "$test_binary"
+  src/ui/components/signal.c src/ui/components/frequency.c src/core/radio-model.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/rds-regression.c \
   src/core/rds.c src/core/rds-receiver.c -o "$test_binary"
 "$test_binary"
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -DPRINTF_INCLUDE_CONFIG_H -Isrc/config \
-  tests/tone-regression.c src/drivers/bk4819/css.c src/core/dcs.c src/external/printf/printf.c -o "$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
+  tests/tone-regression.c src/drivers/bk4819/css.c src/core/dcs.c src/core/text.c -o "$test_binary"
 "$test_binary"
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections tests/menu-regression.c src/ui/number-input.c src/external/printf/printf.c \
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
+  tests/text-regression.c src/core/dcs.c src/core/text.c -o "$test_binary"
+"$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections tests/menu-regression.c src/ui/number-input.c src/core/text.c \
   src/ui/numnav.c src/core/measurements.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
-  -Wno-incompatible-pointer-types -DPRINTF_INCLUDE_CONFIG_H \
-  -Isrc/config -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Wno-incompatible-pointer-types \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/settings-regression.c src/core/measurements.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
-  -DPRINTF_INCLUDE_CONFIG_H -Isrc/config \
+  \
   -Wno-missing-field-initializers tests/settings-inline-regression.c src/ui/number-input.c src/ui/numnav.c \
-  src/core/measurements.c src/core/radio-state.c src/core/radio-model.c src/ui/graphics.c src/external/printf/printf.c "$dead_strip" -o "$test_binary"
+  src/core/measurements.c src/core/radio-state.c src/core/radio-model.c src/ui/graphics.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/device-config-regression.c \
   src/core/config-store.c src/core/radio-state.c src/core/radio-model.c -o "$test_binary"

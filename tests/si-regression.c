@@ -64,7 +64,6 @@ void TIMER_DelayUs(uint32_t delay) { (void)delay; }
 void SYS_DelayMs(uint32_t delay) { (void)delay; }
 void GPIO_ClearBit(volatile uint32_t *reg, uint8_t bit) { (void)reg; (void)bit; }
 void GPIO_SetBit(volatile uint32_t *reg, uint8_t bit) { (void)reg; (void)bit; }
-void Log(const char *pattern, ...) { (void)pattern; }
 bool SETTINGS_IsPatchPresent(void) { return patchPresent; }
 uint32_t SETTINGS_GetEEPROMSize(void) { return 32768; }
 int EEPROM_ReadBuffer(uint32_t address, void *buffer, uint16_t size) {

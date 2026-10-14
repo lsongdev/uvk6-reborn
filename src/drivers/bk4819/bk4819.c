@@ -4,7 +4,6 @@
 #include "hal/system.h"
 #include "hal/systick.h"
 #include "hal/uart.h"
-#include "external/printf/printf.h"
 #include "drivers/dp32g030/gpio.h"
 #include "drivers/dp32g030/portcon.h"
 #include "core/misc.h"
