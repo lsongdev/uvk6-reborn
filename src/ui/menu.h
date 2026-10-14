@@ -42,9 +42,9 @@ typedef struct Menu {
   uint8_t height;
 } Menu;
 
-void MENU_EditNumber(uint32_t min, uint32_t max, uint32_t scale,
-                     uint32_t first, uint32_t second, bool range,
-                     const char *unit, void (*accept)(uint32_t, uint32_t));
+// Edit the selected item's value in place; accept receives native units.
+void MENU_EditNumber(uint32_t min, uint32_t max, uint32_t scale, uint32_t value,
+                     const char *unit, void (*accept)(uint32_t value));
 void MENU_Init(Menu *main_menu);
 void MENU_Deinit();
 void MENU_Render(void);
