@@ -7,7 +7,7 @@
 // format version change, never reinterpretation of an old byte array.
 #define RADIO_STATE_BANDS 9
 #define RADIO_SLOT_CAPACITY 4
-#define RADIO_WATCH_LIMIT 2 // Dual watch always pairs slots A and B.
+#define RADIO_WATCH_LIMIT RADIO_SLOT_CAPACITY // Every enabled slot is watched.
 #define RADIO_SLOT_VISIBLE 2
 
 typedef enum { RADIO_SOURCE_VFO, RADIO_SOURCE_CHANNEL } RadioSource;

@@ -1,6 +1,6 @@
 # UVK6 Reborn 用户手册
 
-更新于 2026-10-13，依据 Radio 主应用、RadioSlot 与双守听实现。本文描述当前可达的界面与操作；后续设计见 [design.md](design.md)，实现与验收进度见 [refactor-progress.md](refactor-progress.md)。代码行为与实机接收效果分开判断，硬件依据见 [hardware.md](hardware.md)。
+更新于 2026-10-13，依据 Radio 主应用、RadioSlot 与多路守听实现。本文描述当前可达的界面与操作；后续设计见 [design.md](design.md)，实现与验收进度见 [refactor-progress.md](refactor-progress.md)。代码行为与实机接收效果分开判断，硬件依据见 [hardware.md](hardware.md)。
 
 ## 当前功能范围
 
@@ -34,7 +34,7 @@
 2. 短按侧键 1，或短按 `F` 再短按 `1(Band)`，依次切换内置快捷频段。
 3. 短按侧键 2，或短按 `F` 再短按 `0(FM)`，循环切换当前频率可用的模式。
 4. 按 `▲ / ▼` 按当前步进调频，按住可连续调节。
-5. 短按 `MENU` 修改模式、步进、带宽、静噪、RX Tone 或守听资格；按 `EXIT` 返回。
+5. 短按 `MENU` 修改模式、步进、带宽、静噪、RX Tone 或发射参数；按 `EXIT` 返回。
 
 成功调谐后约 1.5 秒安排保存，连续修改会延后保存。关机前留出写入时间；主界面调谐没有保存成功提示；频段编辑器有明确的保存结果。
 
@@ -110,7 +110,7 @@ VFO 标识后的 `*` 表示当前模式、步进、带宽或静噪与该频段�
 
 ## 频率输入
 
-频率直接在选中 VFO 的原频率位置输入，另一行保持显示；输入草稿不会调谐或保存。输入始终以 **MHz** 为单位，即使主界面当前显示 kHz。光标用下划线表示，编辑期间暂停名称／RDS 切换和双守听。
+频率直接在选中 VFO 的原频率位置输入，另一行保持显示；输入草稿不会调谐或保存。输入始终以 **MHz** 为单位，即使主界面当前显示 kHz。光标用下划线表示，编辑期间暂停守听。
 
 | 操作 | 按键 |
 | --- | --- |
@@ -191,7 +191,7 @@ TX Frequency 在菜单当前行原地编辑，进入时显示当前值，首个�
 | Display → Light time | Off／5、10、20、60、120 秒／Always；Off 不触发点亮，Always 保持亮灯 |
 | Display → Brightness／Idle light | 点亮／待机亮度，0～15；待机亮度不高于点亮亮度，降低点亮亮度时自动限制待机亮度 |
 | Display → Light on RX | Off 不由信号触发；Timed 收到有效信号后按 Light time 熄灯；Receiving 接收音频期间保持亮灯、音频关闭后熄灯。Light time 的 Off／Always 优先 |
-| Receive → Slot count | Slot 数量 1–4；2 个及以上时自动对 A、B 双守听 |
+| Receive → Slot count | Slot 数量 1–4；2 个及以上时自动守听全部 Slot |
 | Receive → SQL open delay／SQL close delay | BK4819 静噪打开／关闭时序档位，分别 Level 0～7／0～3；暂不标注未核实的毫秒数 |
 | Receive → SI4732 idle | Mute 静音待机／Power off 断电；下次离开 SI 接收路径生效。无 SI 时显示 No SI4732，不能编辑 |
 | Receive → Filter split | 240／280 MHz，BK 接收滤波切换频率；属于硬件工程设置 |
@@ -251,7 +251,7 @@ Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mi
 | --- | --- | --- |
 | 启用应用、按键、键盘锁 | [apps.c](../src/apps/apps.c)、[system.c](../src/apps/system.c)、[Makefile](../Makefile) | 功能范围、主界面按键 |
 | Slot 操作、确认、频率显示 | [radio.c](../src/apps/radio.c)、[radio-menu.c](../src/apps/radio-menu.c)、[radio-view.c](../src/apps/radio-view.c) | 快速开始、单位、参数菜单、提示 |
-| Seek、FC、双守听、PTT | [radio-seek.c](../src/apps/radio-seek.c)、[radio-capture.c](../src/apps/radio-capture.c)、[radio-watch.c](../src/apps/radio-watch.c)、[radio-tx.c](../src/apps/radio-tx.c) | 快捷键、提示、发射限制 |
+| Seek、FC、守听、PTT | [radio-seek.c](../src/apps/radio-seek.c)、[radio-capture.c](../src/apps/radio-capture.c)、[radio-watch.c](../src/apps/radio-watch.c)、[radio-tx.c](../src/apps/radio-tx.c) | 快捷键、提示、发射限制 |
 | 输入解析与按键 | [number-input.c](../src/ui/number-input.c) | 输入单位、示例、确认和取消 |
 | 频段、默认值、模式与能力 | [radio-model.c](../src/core/radio-model.c)、[radio-state.c](../src/core/radio-state.c) | 频段表、模式及接收路径 |
 | 初始化、保存格式与字段 | [reset.c](../src/apps/reset.c)、[device-config.c](../src/core/device-config.c)、[config-store.h](../src/core/config-store.h) | 首次开机、保存、全局持久化 |
@@ -265,15 +265,21 @@ Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mi
 
 当前 UVR2 格式为 8，记录内容 818 B，双 1024 B 配置槽位于 `0x0800–0x0FFF`。配置格式 7 可保留四项 VFO 和全局设置；旧频道记录不迁移。用户频道单独写入双副本区 `0xB000–0xDFFF`。原厂校准与补丁仍只读。旧固件不读取新槽，降级可能恢复升级前状态。
 
-## VFO 数量与双守听
+## Slot 数量与多路守听
 
-在 `Settings → Receive → VFO count` 设置 2／3／4。F→2 循环，四项为 A→B→C→D→A；页面自动保持选中项可见。减少数量不删除隐藏项频率／参数；隐藏当前项时回到 A。
+在 `Settings → Receive → Slot count` 设置 1–4。F→2 循环，四项为 A→B→C→D→A；页面自动保持选中项可见。减少数量不删除隐藏项频率／参数；隐藏当前项时回到 A。
 
-双守听没有开关：Slot count 为 2 及以上时固定守听 A 和 B（C/D 不参与），只想听一路时把 Slot count 设为 1。固件轮流检查两项，发现信号并再次确认后打开音频。箭头保持操作归属，状态栏 DW A/B/C/D 表示实际接收归属，含当前页之外的项。
+**守听没有开关**：Slot count 为 2 及以上时守听全部已启用的 Slot；只想听一路就把 Slot count 设为 1。规则如下：
 
-调谐、菜单、输入、搜索和 PTT 暂停守听、恢复选中项，手动操作后约 2 秒再继续；守听不会把后台频率保存为选中项或改变 PTT 归属。连续驻留当前最多 3 秒，随后检查另一项，期间可能短暂中断音频；信号消失则静音等待约 600 ms，支持恢复。SQ0 不会把纯噪声视为守听命中。
+- **常驻源**（广播，或静噪为 0 的频道）一直有声音，只放一路：选中的那个优先，否则第一个。
+- **事件源**（静噪大于 0 的对讲／中继／航空频道）平时安静，轮流检查；有人讲话就插入，广播暂时静音。
+- **先到先得**：一路正在出声时，其他频道有人讲话也不插入。
+- **讲话不限时**；讲完后在该频道静音停留 2 秒等回复，之后广播恢复、继续轮询。
+- 选中箭头只表示 PTT／菜单／调谐归属，没有音频优先权。标题 `DW A/B/C/D` 显示正在出声的 Slot，全部安静时为 `DW -`；正在检查的卡片左侧显示 DW。
 
-首批 SSB 不参与轮询，仍可手动接收。有效独立目标不足两个时保持主接收，并显示 DW: same channel／unavailable／SSB off。稳定等待、亚音判定及跨芯片音频效果仍待设备验证。详见 [多 VFO 与双守听](multi-vfo-design.md)。
+**性能提示**：所有事件源共用一颗 BK4819，只能逐个检查，每个约 200 ms。频道越多，轮一圈越慢，短促的呼叫可能漏掉；一路正在出声时其他频道不检查。广播在 SI4732 上时不受轮询影响；若常驻源是静噪为 0 的 BK 频道，每轮检查都会让它断音约「事件频道数 × 200 ms」。是否开到 4 路请按需取舍。
+
+调谐、菜单、输入、搜索、FC 和 PTT 暂停守听、恢复选中项，手动操作后约 2 秒再继续；守听不会把后台频率保存为选中项或改变 PTT 归属。SQ0 不会把纯噪声当作事件命中。SSB 不参与守听（`DW: SSB off`）；只剩一个独立来源时不守听（`DW: one source`）；方案不可用显示 `DW: unavailable`。检测门槛与漏检率仍待设备验证。详见 [多 VFO 与多路守听](multi-vfo-design.md)。
 
 顶部状态栏在 VFO、设置及其他页面共用同一布局：电池按全局 Show charge 设置显示图标、百分比或电压，状态图标按电池实际宽度靠右排列，标题在剩余宽度内裁剪；低电量闪烁时仍保留电池占位。F 前缀提示仅在 VFO 等待快捷键时出现。
 
@@ -287,4 +293,3 @@ FC 只能捕获近处（约数米内）正在发射的强信号，例如另一�
 
 PTT 发射已接入 BK4819 NFM 实际 HAL；初始化默认 TX Enable 仍为 Off，需在当前 VFO 菜单启用。Same／独立 TX 频率及 TX Tone 均进入发射方案，F→6 选择功率档。松开 PTT、超时或供电异常先关闭功放，再恢复原 RX；默认构建已开放，尚未用仪表测量射频输出。实现与校准布局见[PTT 发射链路](tx-design.md)。
 
-双守听自动按芯片分流：SI4732 广播和 BK4819 对讲分别保持接收，信号检测不反复调谐或打断广播，只切换扬声器音频。选中 A 且 A 有信号时，B 不插入；选中 B 时，B 的有效信号抢占后台 A，B 信号结束后静音等待 1 秒再返回 A。两个频率使用同一芯片时仍需轮询；当前选中项有效接收不按 3 秒强制切走。并行 SI 静音期间继续更新自己的 RDS。该路径已通过主机模拟，尚未在设备上验收。
