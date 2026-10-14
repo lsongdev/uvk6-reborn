@@ -71,12 +71,14 @@ static void renderActivity(uint8_t y, const UI_RadioCardView *view) {
   UI_SmallTextWindow(2, y+24, 26, lower, 0);
 }
 
-static void renderHeader(uint8_t y, const UI_RadioCardView *view) {
+// The header frequency is shown while the body carries a name.
+static void renderHeader(uint8_t y, const UI_RadioCardView *view, const char *frequency) {
   const char *mode = (unsigned)view->mode < RX_MODE_COUNT ? rxModeNames[view->mode] : "--";
-  const char *text = view->header_message && *view->header_message ? view->header_message :
+  bool notice = view->header_message && *view->header_message;
+  const char *text = notice ? view->header_message :
                      view->radio_text && *view->radio_text ? view->radio_text :
                      view->band_name ? view->band_name : "";
-  uint8_t modeLeft = LCD_WIDTH-UI_SmallTextWidth(mode);
+  uint8_t right = LCD_WIDTH-UI_SmallTextWidth(mode)-3;
   if (view->selected) {
     DrawVLine(1, y+1, 5, C_FILL);
     DrawVLine(2, y+2, 3, C_FILL);
@@ -85,40 +87,46 @@ static void renderHeader(uint8_t y, const UI_RadioCardView *view) {
   char id[2] = {view->id ? view->id : 'A', 0};
   PrintSmall(5, y+5, id);
   if (view->changed) PrintSmall(10, y+5, "*");
-  UI_SmallTextWindow(BAND_X, y+5, modeLeft-3-BAND_X, text, 0);
   PrintSmallEx(LCD_WIDTH, y+5, POS_R, C_FILL, mode);
+  // A notice is brief and takes the frequency's place until it expires.
+  if (frequency && !notice) {
+    PrintSmallEx(right, y+5, POS_R, C_FILL, frequency);
+    right -= UI_SmallTextWidth(frequency)+3;
+  }
+  UI_SmallTextWindow(BAND_X, y+5, right > BAND_X ? right-BAND_X : 0, text, 0);
   FillRect(0, y, LCD_WIDTH, 8, C_INVERT);
 }
 
 void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view) {
   if (!view || y+UI_RADIO_CARD_HEIGHT > LCD_HEIGHT) return;
   FillRect(0, y, LCD_WIDTH, UI_RADIO_CARD_HEIGHT, C_CLEAR);
-  renderHeader(y, view);
-  renderActivity(y, view);
-  char frequency[16], head[24];
+  char frequency[20], head[24];
   const char *unit = UI_FormatFrequency(view->frequency_hz, frequency);
-  bool tuning = view->edit_text || view->activity == UI_RADIO_CARD_SEEKING;
   if (view->edit_text) {
     Text t = TEXT_Begin(frequency, sizeof(frequency));
     TEXT_Add(&t, view->edit_text);
     unit = "MHz";
   }
-  if (!tuning && view->name && *view->name) {
-    // Name over frequency, both medium and right-aligned to TEXT_RIGHT.
-    const char *rest = fit(view->name, UI_MediumTextWidth, TEXT_RIGHT-BODY_X, head);
-    uint16_t width = UI_MediumTextWidth(head);
-    UI_MediumTextWindow(TEXT_RIGHT-width, y+16, width, head, 0);
-    UI_SmallTextWindow(TAIL_X, y+16, LCD_WIDTH-TAIL_X, rest, 0);
-    width = UI_MediumTextWidth(frequency);
-    UI_MediumTextWindow(TEXT_RIGHT-width, y+26, width, frequency, 0);
-    PrintSmallEx(LCD_WIDTH, y+26, POS_R, C_FILL, unit);
-    return;
+  bool tuning = view->edit_text || view->activity == UI_RADIO_CARD_SEEKING;
+  bool named = !tuning && view->name && *view->name;
+  if (named) { // Compact "438.500MHz" for the header.
+    Text t = TEXT_Begin(frequency + strlen(frequency), sizeof(frequency) - strlen(frequency));
+    TEXT_Add(&t, unit);
   }
-  // Frequency alone: large digits; extra decimals or draft digits stack
-  // small above the unit, keeping their end (the cursor) in view.
-  const char *rest = fit(frequency, UI_LargeTextWidth, TEXT_RIGHT-BODY_X, head);
+  renderHeader(y, view, named ? frequency : NULL);
+  renderActivity(y, view);
+  // Large body text: the name, or else the frequency. What does not fit
+  // continues small in the column above the unit, then the edge clips.
+  const char *body = named ? view->name : frequency;
+  const char *rest = fit(body, UI_LargeTextWidth, TEXT_RIGHT-BODY_X, head);
   uint16_t width = UI_LargeTextWidth(head), tail = UI_SmallTextWidth(rest);
   UI_LargeTextWindow(TEXT_RIGHT-width, y+22, width, head, 0);
+  if (named) {
+    UI_SmallTextWindow(TAIL_X, y+13, LCD_WIDTH-TAIL_X, rest, 0);
+    return;
+  }
+  // Extra decimals right-align over the unit; a long draft keeps its end
+  // (the cursor) in view.
   if (tail <= LCD_WIDTH-TAIL_X) UI_SmallTextWindow(LCD_WIDTH-tail, y+13, tail, rest, 0);
   else UI_SmallTextWindow(TAIL_X, y+13, LCD_WIDTH-TAIL_X, rest, tail-(LCD_WIDTH-TAIL_X));
   PrintSmallEx(LCD_WIDTH, y+22, POS_R, C_FILL, unit);

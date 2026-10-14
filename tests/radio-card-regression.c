@@ -1,4 +1,5 @@
 // Real framebuffer rendering: stateless cards, reserved tail column, no scrolling.
+// The body is always large: the name if there is one, else the frequency.
 #include "ui/components/radio-card.h"
 #include "ui/components/frequency.h"
 #include "ui/graphics.h"
@@ -65,31 +66,39 @@ int main(void) {
   assert(leftmost(17,32) >= 30 && ink(124,128,16,23));
   view.edit_text=NULL;
 
-  // Name over frequency, both medium and right-aligned to the same edge.
-  view.frequency_hz=438500000;view.name="Repeater";render(8,&view);
-  assert(ink(30,113,17,25) && ink(30,113,28,36) && !ink(113,128,16,25));
-  unsigned nameLeft=leftmost(17,25);
-  view.name="My Channnnnnnnnnnnnel";render(8,&view);
-  assert(leftmost(17,25) < nameLeft && ink(115,128,17,25) && !ink(113,115,16,36));
-  // Seeking and editing always show the large frequency.
+  // A name takes the large body; the frequency moves into the header.
+  view.frequency_hz=438500000;view.name=NULL;render(8,&view);
   memcpy(saved,gFrameBuffer,sizeof(saved));
+  view.name="RPT";render(8,&view);
+  bool header=false;
+  for (unsigned x=60;x<113;++x) for (unsigned y=8;y<16;++y)
+    header |= GetPixel(x,y) != !!(saved[y/8][x]&(1<<(y%8)));
+  assert(header && ink(30,113,17,32) && !ink(113,128,16,32)); // No unit in the body.
+  unsigned nameLeft=leftmost(17,32);
+  view.name="My Channnnnnnnnnnnnel";render(8,&view);
+  assert(leftmost(17,32) < nameLeft && leftmost(17,32) >= 30);
+  assert(ink(115,128,16,23) && !ink(113,115,16,36) && !ink(115,128,24,32));
+  // Seeking and editing always show the large frequency with its unit.
   view.activity=UI_RADIO_CARD_SEEKING;render(8,&view);
-  assert(!ink(115,128,17,25) && ink(30,113,17,32));
+  assert(ink(115,128,24,32));
   view.activity=UI_RADIO_CARD_IDLE;
 
-  // Header: status message over RT over band; mode stays at the right edge.
+  // Header: status message over RT over band; a notice also takes the
+  // header frequency's place, the mode stays at the right edge.
   view.name="RADIO FM";view.radio_text="Music and news at the top of the hour";
   render(8,&view);memcpy(saved,gFrameBuffer,sizeof(saved));
   view.radio_text=NULL;render(8,&view);
   bool differs=false;
-  for (unsigned x=14;x<100;++x) for (unsigned y=8;y<16;++y)
+  for (unsigned x=14;x<60;++x) for (unsigned y=8;y<16;++y)
     differs |= GetPixel(x,y) != !!(saved[y/8][x]&(1<<(y%8)));
   assert(differs);
   sameRows(16,36); // RT never touches the body.
-  view.radio_text="RT";view.header_message="Channel store unavailable: please retry";
+  view.radio_text="RT";view.header_message="No channel memory";
   render(8,&view);memcpy(saved,gFrameBuffer,sizeof(saved));
   view.radio_text=NULL;render(8,&view);
   sameRows(0,64);
+  view.name=NULL;render(8,&view);
+  sameRows(8,16); // With a notice the header is the same named or not.
 
   // Second row and bounds.
   render(36,&view);
