@@ -78,30 +78,24 @@ void STATUSLINE_render(void) {
     else UI_Battery(bars);
   }
 
+  // Title on the left; everything else right-aligned, steady state nearest
+  // the battery and transient state further left: [F][EEPROM] [SI][lock] bat.
   char icons[8] = {'\0'};
   uint8_t idx = 0;
-
-  if (gEepromWrite) {
-    icons[idx++] = SYM_EEPROM_W;
-  }
-
-  if (gReceiver.plan.device == RX_DEVICE_BROADCAST || isSi4732On) {
+  if (gEepromWrite) icons[idx++] = SYM_EEPROM_W;
+  if (gReceiver.plan.device == RX_DEVICE_BROADCAST || isSi4732On)
     icons[idx++] = SYM_BROADCAST;
-  }
+  if (gDeviceConfig.preferences.keylock) icons[idx++] = SYM_LOCK;
 
-  if (gDeviceConfig.preferences.keylock) {
-    icons[idx++] = SYM_LOCK;
-  }
-
-  uint8_t iconsRight = batteryWidth + 4 < LCD_WIDTH ? LCD_WIDTH - 1 - batteryWidth - 3 : 0;
-  if (gCurrentApp == APP_RADIO && RADIO_APP_isShortcutPending()) {
-    PrintSmallEx(iconsRight, BASE_Y, POS_R, C_FILL, "F");
-    iconsRight -= 8;
-  }
-  PrintSymbolsEx(iconsRight, BASE_Y, POS_R, C_FILL, icons);
-
+  uint8_t right = batteryWidth + 4 < LCD_WIDTH ? LCD_WIDTH - 1 - batteryWidth - 3 : 0;
   uint16_t iconWidth = UI_SymbolsTextWidth(icons);
-  uint8_t textWidth = iconWidth + 2 < iconsRight ? iconsRight - iconWidth - 2 : 0;
+  PrintSymbolsEx(right, BASE_Y, POS_R, C_FILL, icons);
+  if (iconWidth) right = iconWidth + 2 < right ? right - iconWidth - 2 : 0;
+  if (gCurrentApp == APP_RADIO && RADIO_APP_isShortcutPending()) {
+    PrintSmallEx(right, BASE_Y, POS_R, C_FILL, "F");
+    right = right > 6 ? right - 6 : 0;
+  }
+  uint8_t textWidth = right > 2 ? right - 2 : 0;
   char selection[32];
   const char *text = statuslineText;
   if (gIsNumNavInput) {
