@@ -288,6 +288,21 @@ int main(void) {
   press(KEY_SIDE2); assert(!strcmp(message,"VFO only"));
   assert(applied==mrApplies && saveRequests==mrSaves &&
          activeSlot.current.frequency_hz==mrFrequency);
+  // Digits in MR enter a channel number in the body, like a frequency.
+  fakeChannels[150] = (UserChannel){.name="FAR",.frequency_hz=145500000,.rx=testRx};
+  fakeChannelUsed[150] = true;
+  press(KEY_1);press(KEY_5);assert(keypad.active && keypadChannel);
+  SCREEN_Render();
+  press(KEY_0);press(KEY_MENU);
+  assert(!keypad.active && gDeviceConfig.radio.slots[0].channel_number==150);
+  assert(activeSlot.current.frequency_hz==145500000 && activeSlot.source==RADIO_SOURCE_CHANNEL);
+  press(KEY_7);press(KEY_MENU);
+  assert(!strcmp(message,"Channel unavailable") && gDeviceConfig.radio.slots[0].channel_number==150);
+  press(KEY_0);press(KEY_MENU);assert(keypad.active && keypad.invalid); // Below 1.
+  press(KEY_EXIT);press(KEY_EXIT);assert(!keypad.active);
+  press(KEY_1);press(KEY_2);press(KEY_MENU);
+  assert(gDeviceConfig.radio.slots[0].channel_number==12 && activeSlot.current.frequency_hz==mrFrequency);
+  fakeChannelUsed[150] = false;
   press(KEY_F);press(KEY_3);assert(activeSlot.source==RADIO_SOURCE_VFO);
   memset(fakeChannelUsed,0,sizeof(fakeChannelUsed));
   // A broadcast's RDS station name is the suggested name for a new channel.
@@ -297,6 +312,13 @@ int main(void) {
   press(KEY_MENU);assert(!strcmp(gTextinputText,"LOVE959")); // Trailing PS padding trimmed.
   gTextInputCallback();
   assert(fakeChannelUsed[1] && !strcmp(fakeChannels[1].name,"LOVE959"));
+  memset(fakeChannelUsed,0,sizeof(fakeChannelUsed));SCREEN_Reset(&homeScreen);
+  // Without a PS the frequency is offered; an emptied name falls back to it.
+  labels[0].ps[0]=0;
+  openMenu(MENU_SAVE_CHANNEL);press(KEY_MENU);press(KEY_MENU);
+  assert(!strcmp(gTextinputText,"95.900MHz"));
+  gTextinputText[0]=0;gTextInputCallback();
+  assert(fakeChannelUsed[1] && !strcmp(fakeChannels[1].name,"95.900MHz"));
   memset(fakeChannelUsed,0,sizeof(fakeChannelUsed));SCREEN_Reset(&homeScreen);
   // A channel deleted in Settings → Channels sends its slot back to VFO,
   // and returning to the main screen retunes it.

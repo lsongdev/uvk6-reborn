@@ -14,7 +14,8 @@
 #include "ui/number-input.h"
 #include "screens/statusline.h"
 
-static NumberInput keypad;      // Frequency entry on the selected card.
+static NumberInput keypad;      // Frequency (VFO) or channel (MR) entry.
+static bool keypadChannel;      // The draft is a channel number.
 static bool functionPending;    // F was pressed; the next key is a shortcut.
 static uint32_t functionAt;
 
@@ -56,6 +57,7 @@ static void buildCard(uint8_t id, const char *draft, const RadioSlotStatus *s,
   *view = (UI_RadioCardView){
     .id = 'A'+id, .selected = selected,
     .edit_text = selected && keypad.active ? draft : NULL,
+    .edit_unit = selected && keypad.active && keypadChannel ? "CH" : NULL,
     .frequency_hz = s->frequency_hz,
     .mode = p->mode, .band_name = band,
     .changed = s->modified, .step_hz = p->step_hz,
@@ -169,7 +171,9 @@ static void shortcutKey(KEY_Code_t key) {
 
 static void keypadKey(KEY_Code_t key, Key_State_t state) {
   uint32_t value;
-  if (NUMBER_Key(&keypad, key, state, &value) == NUMBER_ACCEPTED) RADIO_TuneTo(value);
+  if (NUMBER_Key(&keypad, key, state, &value) == NUMBER_ACCEPTED) {
+    if (keypadChannel) RADIO_TuneChannel((uint16_t)value); else RADIO_TuneTo(value);
+  }
   gRedrawScreen = true;
 }
 
@@ -221,10 +225,10 @@ static bool homeKey(KEY_Code_t key, Key_State_t state) {
   case KEY_EXIT: break; // The main screen has nothing to close.
   default:
     if (key > KEY_9) return false;
-    if (RADIO_Selected()->source == RADIO_SOURCE_CHANNEL) { RADIO_Notify("VFO only"); break; }
-    NUMBER_Begin(&keypad, RADIO_MIN_HZ, RADIO_MAX_HZ, 1000000u, 0, false);
-    uint32_t unused;
-    NUMBER_Key(&keypad, key, state, &unused);
+    keypadChannel = RADIO_Selected()->source == RADIO_SOURCE_CHANNEL;
+    if (keypadChannel) NUMBER_Begin(&keypad, 1, USER_CHANNEL_COUNT, 1, 0, false);
+    else NUMBER_Begin(&keypad, RADIO_MIN_HZ, RADIO_MAX_HZ, 1000000u, 0, false);
+    keypadKey(key, state);
     break;
   }
   return true;

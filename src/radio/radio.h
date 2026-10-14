@@ -25,6 +25,7 @@ void RADIO_NextBand(void);
 void RADIO_NextMode(void);
 void RADIO_SwitchSlot(void);
 void RADIO_SwitchSource(void);            // VFO ↔ MR.
+void RADIO_TuneChannel(uint16_t number);  // Into MR on that channel.
 const RxPlan *RADIO_PendingTune(void);    // NULL when nothing awaits confirmation.
 void RADIO_ConfirmTune(bool accept);
 
