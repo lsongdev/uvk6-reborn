@@ -1,3 +1,4 @@
+#include "core/resource.h"
 #include "drivers/si473x/si473x.h"
 #include "drivers/dp32g030/gpio.h"
 #include "core/misc.h"
@@ -78,10 +79,10 @@ static bool SI47XX_downloadPatch(void) {
 
   uint8_t buf[64]; // 64 is optimal, more has no sense
   const uint16_t BUF_SIZE = ARRAY_SIZE(buf);
-  const uint32_t PATCH_START = SETTINGS_GetEEPROMSize() - PATCH_SIZE;
+  const uint32_t PATCH_START = RESOURCE_SsbPatchAddress(SETTINGS_GetEEPROMSize());
 
-  for (uint16_t offset = 0; offset < PATCH_SIZE; offset += BUF_SIZE) {
-    const uint32_t rest = PATCH_SIZE - offset;
+  for (uint16_t offset = 0; offset < RESOURCE_SSB_PATCH_BYTES; offset += BUF_SIZE) {
+    const uint32_t rest = RESOURCE_SSB_PATCH_BYTES - offset;
     const uint32_t eepromN = rest > BUF_SIZE ? BUF_SIZE : rest;
     if (EEPROM_ReadBuffer(PATCH_START + offset, buf, eepromN) != 0)
       return false;

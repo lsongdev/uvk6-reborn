@@ -58,7 +58,6 @@ extern const char *EEPROM_TYPE_NAMES[7];
 extern const uint32_t EEPROM_SIZES[7];
 extern const uint16_t PAGE_SIZES[7];
 
-#define PATCH_SIZE 8840 // Hawk5 SSB patch, verified by CRC before use.
 
 extern uint8_t BL_TIME_VALUES[7];
 extern const char *BL_SQL_MODE_NAMES[3];

@@ -11,3 +11,4 @@ cache.db
 *.log
 *.log.bak
 __pycache__/
+backups/
