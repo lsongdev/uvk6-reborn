@@ -130,6 +130,11 @@ esac
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/backlight-regression.c "$dead_strip" -o "$test_binary"
 "$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
+  tests/channels-regression.c src/core/channel-store.c src/core/radio-model.c src/core/tx-model.c \
+  src/ui/graphics.c src/ui/components/frequency.c src/core/text.c "$dead_strip" -o "$test_binary"
+"$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/channel-store-regression.c \
   src/core/radio-model.c src/core/tx-model.c -o "$test_binary"
 "$test_binary"

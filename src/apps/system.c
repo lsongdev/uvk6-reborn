@@ -163,6 +163,8 @@ void SYS_Main() {
       radioTimer = Now();
     }
 
+    // Radio keeps receiving and watching under any other screen.
+    if (gCurrentApp != APP_RADIO) RADIO_APP_update();
     APPS_update();
 
     // common: render 2 times per second minimum

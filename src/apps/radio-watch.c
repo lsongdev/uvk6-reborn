@@ -11,6 +11,7 @@ void __attribute__((noinline)) delayWatch(void) {
 }
 
 bool RADIO_APP_isWatching(void) { return watcher.phase!=WATCH_OFF; }
+void RADIO_APP_SlotsChanged(void) { (void)pauseWatch(); }
 
 static bool restorePrimary(void) {
   RxPlan plan;

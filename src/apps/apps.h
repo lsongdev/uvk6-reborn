@@ -11,6 +11,7 @@ typedef enum {
   APP_RADIO,
   APP_SETTINGS,
   APP_BANDS,       // Internal editor launched from Settings.
+  APP_CHANNELS,    // Channel list launched from Settings.
   APP_TEXTINPUT,   // Internal channel-name editor.
   APP_RESET,       // Initialization when configuration is absent.
   APPS_COUNT,

@@ -68,6 +68,7 @@ static void changeSlotCount(const MenuItem *item, bool up) {
   notice = NULL;
   uint8_t count=IncDecU(gDeviceConfig.radio.slot_count,1,RADIO_SLOT_CAPACITY+1u,up);
   if (!RADIO_STATE_SetCount(&gDeviceConfig.radio,count)) return;
+  RADIO_APP_SlotsChanged();
   DEVICE_RequestSave();
 }
 static const MenuItem receiveItems[] = {
@@ -137,22 +138,24 @@ static void getInfo(const MenuItem *item, char *out, uint8_t size) {
   default: TEXT_Add(&t,capabilities.ssb_patch ? "Present" : "Missing"); break;
   }
 }
+static bool openChannels(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
+  (void)item;
+  if (key != KEY_MENU || state != KEY_RELEASED) return false;
+  APPS_run(APP_CHANNELS); return true;
+}
 static const MenuItem aboutItems[] = {
     {"Firmware",0,getInfo}, {"EEPROM",1,getInfo}, {"Config",2,getInfo},
     {"SI4732",3,getInfo}, {"BK1080",4,getInfo}, {"SSB patch",5,getInfo},
-};
-MENU_DEF(aboutMenu,"About",aboutItems);
-static const MenuItem systemItems[] = {
     {"TX status",.get_value_text=getTxStatus},
     {"Save status",.get_value_text=getSaveStatus,.action=saveNow},
     {"Reset prefs",.action=resetPreferences},
 };
-MENU_DEF(systemMenu,"System",systemItems);
+MENU_DEF(aboutMenu,"About",aboutItems);
 static const MenuItem menuItems[] = {
     {"Display",.submenu=&displayMenu}, {"Receive",.submenu=&receiveMenu},
     {"Transmit",.submenu=&transmitMenu}, VALUE("Lock PTT too",SETTING_PTT_LOCK),
     {"Battery",.submenu=&batteryMenu}, {"Band presets",.action=openBands},
-    {"System",.submenu=&systemMenu}, {"About",.submenu=&aboutMenu},
+    {"Channels",.action=openChannels}, {"About",.submenu=&aboutMenu},
 };
 MENU_DEF(settingsMenu,"Settings",menuItems);
 
