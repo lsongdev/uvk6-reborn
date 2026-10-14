@@ -2,14 +2,14 @@
 #include "../src/ui/menu.c"
 #include <assert.h>
 
-void STATUSLINE_SetText(const char *pattern, ...) { (void)pattern; }
-void PrintSmall(uint8_t x, uint8_t y, const char *pattern, ...) {
+void STATUSLINE_SetText(const char *text) { (void)text; }
+void PrintSmall(uint8_t x, uint8_t y, const char *pattern) {
   (void)x; (void)y; (void)pattern;
 }
-void PrintMedium(uint8_t x, uint8_t y, const char *pattern, ...) {
+void PrintMedium(uint8_t x, uint8_t y, const char *pattern) {
   (void)x; (void)y; (void)pattern;
 }
-void PrintSmallEx(uint8_t x, uint8_t y, TextPos pos, Color color, const char *pattern, ...) {
+void PrintSmallEx(uint8_t x, uint8_t y, TextPos pos, Color color, const char *pattern) {
   (void)x; (void)y; (void)pos; (void)color; (void)pattern;
 }
 void FillRect(int16_t x, int16_t y, int16_t w, int16_t h, Color color) {

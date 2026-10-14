@@ -1,5 +1,4 @@
 #include "drivers/si473x/si473x.h"
-#include "external/printf/printf.h"
 #include "drivers/dp32g030/gpio.h"
 #include "core/misc.h"
 #include "core/settings.h"
@@ -240,7 +239,6 @@ bool SI47XX_PatchPowerUp() {
   SYS_DelayMs(60);
 
   if (!SI47XX_downloadPatch()) {
-    Log("[SI] SSB patch missing or failed");
     RST_LOW;
     isSi4732On = false;
     return false;
@@ -368,7 +366,6 @@ void SI47XX_PowerDown() {
 }
 
 bool SI47XX_SwitchMode(SI47XX_MODE mode) {
-  Log("[SI] mode %u -> %u", si4732mode, mode);
   if (si4732mode == mode && isSi4732On)
     return true;
   bool wasSSB = isSi4732On && SI47XX_IsSSB();

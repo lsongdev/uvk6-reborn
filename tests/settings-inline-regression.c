@@ -34,9 +34,7 @@ TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) { (void)frequency_h
 TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
 uint32_t EEPROM_DetectSize(void) { return 524288; }
 void APPS_run(AppType_t app) { assert(app==APP_BANDS); ++appRuns; }
-void STATUSLINE_SetText(const char *pattern, ...) {
-  va_list args; va_start(args,pattern); vsnprintf(title,sizeof(title),pattern,args); va_end(args);
-}
+void STATUSLINE_SetText(const char *text) { TEXT_Copy(title,sizeof(title),text); }
 static void press(KEY_Code_t key) {
   bool handled=SETTINGS_key(key,KEY_RELEASED);
   if (!handled) fprintf(stderr,"Unhandled key %u in %s at %u\n",key,active_menu ? active_menu->title : "none",active_menu ? active_menu->i : 0);
@@ -44,7 +42,7 @@ static void press(KEY_Code_t key) {
 }
 static void capture(void) {
   memset(gFrameBuffer,0,sizeof(gFrameBuffer));
-  SETTINGS_render(); PrintSmall(3,5,"%s",title);
+  SETTINGS_render(); PrintSmall(3,5,title);
   assert(panelCount<ARRAY_SIZE(panels));
   memcpy(panels[panelCount++],gFrameBuffer,sizeof(gFrameBuffer));
 }

@@ -43,6 +43,7 @@ drivers/             BK4819、SI4732、BK1080、ST7565 与 DP32G030 外设
 - MR 频道只解析为临时有效状态，不覆盖 Slot 的 VFO 记忆；切回 VFO 恢复原状态。
 - 纯逻辑层（`core/tuning`、`radio-model`、`watch`、`seek`、`capture`）不访问 EEPROM、显示、时钟或 HAL。
 - Cortex-M0 无硬件除法：避免有符号 `/`、`%`，否则会链接 468 B 的 `__divsi3`。
+- 不使用 printf：文本用 `core/text` 拼接（有界、自动截断），`Print*` 和 `STATUSLINE_SetText` 只接收现成字符串。
 
 `main.c` 负责硬件初始化，`apps/system.c` 的主循环调用 `RADIO_APP_TxSafetyUpdate()` 维护最高优先级的 PTT 安全释放，Radio 应用退到 Settings 也不会停止。默认构建开放 TX（`make ENABLE_TX=0` 为仅接收）。
 

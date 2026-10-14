@@ -26,7 +26,6 @@ SRC := $(SRC_DIR)/main.c \
        $(wildcard $(SRC_DIR)/apps/*.c)
 
 OBJS := $(OBJ_DIR)/hal/start.o \
-        $(OBJ_DIR)/external/printf/printf.o \
         $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 # =============================================================================
@@ -82,8 +81,7 @@ DEBUG_FLAGS   := -g3 -DDEBUG -Og
 RELEASE_FLAGS := -g0 -DNDEBUG
 
 # Defines
-DEFINES  := -DPRINTF_INCLUDE_CONFIG_H \
-            -DGIT_HASH=\"$(GIT_HASH)\" \
+DEFINES  := -DGIT_HASH=\"$(GIT_HASH)\" \
             -DTIME_STAMP=\"$(BUILD_TIME)\" \
             -DCMSIS_device_header=\"ARMCM0.h\" \
             -DARMCM0 \
@@ -91,7 +89,7 @@ DEFINES  := -DPRINTF_INCLUDE_CONFIG_H \
             -DUVK6_SEED_PA_CAL=$(SEED_PA_CAL)
 
 # Include paths
-INC_DIRS := -I./src -I./src/config \
+INC_DIRS := -I./src \
             -I./src/external/CMSIS_5/CMSIS/Core/Include \
             -I./src/external/CMSIS_5/Device/ARM/ARMCM0/Include
 

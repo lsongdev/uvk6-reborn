@@ -3,6 +3,7 @@
 #include "core/device-config.h"
 #include "core/receiver.h"
 #include "ui/graphics.h"
+#include "core/text.h"
 #include "ui/statusline.h"
 
 static uint8_t selected, field;
@@ -109,28 +110,25 @@ void BANDS_render(void) {
   uint8_t count = editing ? FIELD_COUNT : radioBandCount;
   for (uint8_t row = 0; row < 4 && start+row < count; ++row) {
     uint8_t i = start+row, y = 18+row*11;
-    PrintMediumEx(2, y, POS_L, C_FILL, "%s", editing ? labels[i] : radioBands[i].name);
+    PrintMediumEx(2, y, POS_L, C_FILL, editing ? labels[i] : radioBands[i].name);
     if (!editing) {
-      PrintSmallEx(124, y, POS_R, C_FILL, "%s", rxModeNames[gDeviceConfig.radio.presets[i].mode]);
+      PrintSmallEx(124, y, POS_R, C_FILL, rxModeNames[gDeviceConfig.radio.presets[i].mode]);
     } else if (i == RADIO_FIELD_MODE) {
-      PrintSmallEx(124, y, POS_R, C_FILL, "%s", rxModeNames[draft.mode]);
-    } else if (i == RADIO_FIELD_STEP) {
-      PrintSmallEx(124, y, POS_R, C_FILL, "%u Hz", draft.step_hz);
-    } else if (i == RADIO_FIELD_BANDWIDTH) {
-      if (draft.mode == RX_WFM)
-        PrintSmallEx(124, y, POS_R, C_FILL, "Fixed");
-      else
-        PrintSmallEx(124, y, POS_R, C_FILL, "%u Hz", draft.bandwidth_hz);
-    } else if (i == RADIO_FIELD_SQUELCH) {
-      PrintSmallEx(124, y, POS_R, C_FILL, "%u", draft.squelch);
-    } else if (i == RADIO_FIELD_RX_TONE) {
-      char toneText[24];
-      TONE_Format(draft.rx_tone, toneText);
-      PrintSmallEx(124,y,POS_R,C_FILL,"%s",toneText);
+      PrintSmallEx(124, y, POS_R, C_FILL, rxModeNames[draft.mode]);
+    } else {
+      char value[24];
+      Text t = TEXT_Begin(value, sizeof(value));
+      if (i == RADIO_FIELD_STEP || (i == RADIO_FIELD_BANDWIDTH && draft.mode != RX_WFM)) {
+        TEXT_Number(&t, i == RADIO_FIELD_STEP ? draft.step_hz : draft.bandwidth_hz, 1, 10);
+        TEXT_Add(&t, " Hz");
+      } else if (i == RADIO_FIELD_BANDWIDTH) TEXT_Add(&t, "Fixed");
+      else if (i == RADIO_FIELD_SQUELCH) TEXT_Number(&t, draft.squelch, 1, 10);
+      else if (i == RADIO_FIELD_RX_TONE) TONE_Format(draft.rx_tone, value);
+      PrintSmallEx(124, y, POS_R, C_FILL, value);
     }
     if (i == index)
       FillRect(0, y-8, 128, 11, C_INVERT);
   }
   if (message)
-    PrintSmall(2, 61, "%s", message);
+    PrintSmall(2, 61, message);
 }

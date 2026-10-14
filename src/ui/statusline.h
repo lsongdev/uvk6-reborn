@@ -5,6 +5,6 @@
 
 void STATUSLINE_update();
 void STATUSLINE_render();
-void STATUSLINE_SetText(const char *pattern, ...);
+void STATUSLINE_SetText(const char *text);
 
 #endif /* end of include guard: STATUSLINE_H */

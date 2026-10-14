@@ -121,9 +121,7 @@ static void processKeyboard() {
 }
 
 void initDisplay() {
-  LogC(LOG_C_BRIGHT_WHITE, "DISPLAY");
   DISPLAY_Init(true, gDeviceConfig.preferences.contrast);
-  LogC(LOG_C_BRIGHT_WHITE, "BACKLIGHT");
   BACKLIGHT_Init();
 }
 
@@ -148,10 +146,8 @@ void SYS_Main() {
     STATUSLINE_render();
     DISPLAY_Blit();
 
-    LogC(LOG_C_BRIGHT_WHITE, "LOAD BANDS");
     // Built-in frequency profiles no longer depend on EEPROM band records.
 
-    LogC(LOG_C_BRIGHT_WHITE, "RUN DEFAULT APP");
     APPS_run(APP_RADIO);
   }
 

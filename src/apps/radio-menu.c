@@ -77,7 +77,6 @@ static void changeValue(bool up) {
 
 static const char *menuValue(uint8_t item, char out[24]) {
   const RadioParameters *rx = &activeSlot.current.parameters;
-  char frequency[16];
   uint32_t hz;
   switch (item) {
   case MENU_RX_MODE: return rxModeNames[rx->mode];
@@ -85,7 +84,11 @@ static const char *menuValue(uint8_t item, char out[24]) {
   case MENU_RX_BANDWIDTH:
     if (rx->mode == RX_WFM) return "Fixed";
     hz = rx->bandwidth_hz; break;
-  case MENU_RX_SQUELCH: snprintf(out,24,"%u",rx->squelch); return out;
+  case MENU_RX_SQUELCH: {
+    Text t = TEXT_Begin(out, 24);
+    TEXT_Number(&t, rx->squelch, 1, 10);
+    return out;
+  }
   case MENU_RX_TONE:
     if (rx->mode != RX_NFM) return "NFM only";
     TONE_Format(rx->rx_tone,out); return out;
@@ -105,8 +108,7 @@ static const char *menuValue(uint8_t item, char out[24]) {
   case MENU_CHANNEL_SAVE: return "Choose CH";
   default: return "";
   }
-  const char *unit = UI_FormatFrequency(hz,frequency);
-  snprintf(out,24,"%s %s",frequency,unit);
+  UI_FrequencyText(hz, out);
   return out;
 }
 
@@ -120,9 +122,9 @@ void renderMenu(void) {
   for (uint8_t i = first; i < MENU_ITEM_COUNT && i < first+5; ++i) {
     uint8_t y = 17+(i-first)*11;
     if (i == MENU_TX_FREQUENCY && number.active) PrintSmallEx(2, y, POS_L, C_FILL, "TX Freq");
-    else PrintMediumEx(2, y, POS_L, C_FILL, "%s", names[i]);
+    else PrintMediumEx(2, y, POS_L, C_FILL, names[i]);
     char value[24];
-    PrintSmallEx(124, y, POS_R, C_FILL, "%s", menuValue(i, value));
+    PrintSmallEx(124, y, POS_R, C_FILL, menuValue(i, value));
     if (i == menuIndex)
       FillRect(0, y-7, 128, 10, C_INVERT);
   }

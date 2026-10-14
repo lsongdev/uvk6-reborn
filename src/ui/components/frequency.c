@@ -1,6 +1,8 @@
 #include "ui/components/frequency.h"
 #include "core/receiver.h"
 #include "core/measurements.h"
+#include "core/text.h"
+#include <string.h>
 
 const char *UI_FormatFrequency(uint32_t frequency_hz, char text[16]) {
   bool khz = frequency_hz < 1000000;
@@ -11,12 +13,20 @@ const char *UI_FormatFrequency(uint32_t frequency_hz, char text[16]) {
     divisor /= 10;
     ++decimals;
   }
-  if (decimals)
-    snprintf(text, 16, "%u.%0*u", frequency_hz / unit, (int)decimals,
-             frequency_hz % unit / divisor);
-  else
-    snprintf(text, 16, "%u", frequency_hz / unit);
+  Text t = TEXT_Begin(text, 16);
+  TEXT_Number(&t, frequency_hz / unit, 1, 10);
+  if (decimals) {
+    TEXT_Char(&t, '.');
+    TEXT_Number(&t, frequency_hz % unit / divisor, decimals, 10);
+  }
   return khz ? "kHz" : "MHz";
+}
+
+void UI_FrequencyText(uint32_t frequency_hz, char text[20]) {
+  const char *unit = UI_FormatFrequency(frequency_hz, text);
+  Text t = TEXT_Begin(text + strlen(text), 20 - strlen(text));
+  TEXT_Char(&t, ' ');
+  TEXT_Add(&t, unit);
 }
 
 

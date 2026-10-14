@@ -3,7 +3,6 @@
 #define GRAPHICS_H
 
 #include "hal/display.h"
-#include "external/printf/printf.h"
 #include "ui/gfxfont.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -58,15 +57,11 @@ void DrawHLine(int16_t x, int16_t y, int16_t w, Color color);
 void DrawRect(int16_t x, int16_t y, int16_t w, int16_t h, Color color);
 void FillRect(int16_t x, int16_t y, int16_t w, int16_t h, Color color);
 
-void PrintSmall(uint8_t x, uint8_t y, const char *pattern, ...);
-void PrintMedium(uint8_t x, uint8_t y, const char *pattern, ...);
-
-void PrintSmallEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
-                  const char *pattern, ...);
-void PrintMediumEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
-                   const char *pattern, ...);
-void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
-                    const char *pattern, ...);
+void PrintSmall(uint8_t x, uint8_t y, const char *text);
+void PrintMedium(uint8_t x, uint8_t y, const char *text);
+void PrintSmallEx(uint8_t x, uint8_t y, TextPos posLCR, Color color, const char *text);
+void PrintMediumEx(uint8_t x, uint8_t y, TextPos posLCR, Color color, const char *text);
+void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color, const char *text);
 uint16_t UI_SymbolsTextWidth(const char *text);
 uint16_t UI_SmallTextWidth(const char *text);
 void UI_SmallTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
