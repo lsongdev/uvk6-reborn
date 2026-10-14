@@ -41,7 +41,9 @@
 #include <string.h>
 
 // RDS text belongs to the frequency it was received on.
-typedef struct { uint32_t frequency_hz; char ps[9], text[65]; } SlotLabel;
+// rt_until: a new RadioText owns the whole card header until then (0: no).
+typedef struct { uint32_t frequency_hz, rt_until; char ps[9], text[65]; } SlotLabel;
+#define RADIO_RT_SHOW_MS 10000u
 
 
 // RX items share RadioParameterField order; changeValue passes them through.

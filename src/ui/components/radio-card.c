@@ -88,8 +88,10 @@ static void renderHeader(uint8_t y, const UI_RadioCardView *view,
   char id[2] = {view->id ? view->id : 'A', 0};
   PrintSmall(5, y+5, id);
   if (view->changed) PrintSmall(10, y+5, "*");
-  // A notice is brief and takes the frequency's place until it expires.
-  const char *corner = frequency ? (notice ? NULL : frequency) : mode;
+  // A notice or a fresh RadioText is brief and takes the header frequency's
+  // place too, so it can be read in full.
+  bool takeover = notice || (view->radio_text && *view->radio_text);
+  const char *corner = frequency ? (takeover ? NULL : frequency) : mode;
   if (corner) {
     PrintSmallEx(right, y+5, POS_R, C_FILL, corner);
     right -= UI_SmallTextWidth(corner)+3;

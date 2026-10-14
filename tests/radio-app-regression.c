@@ -107,10 +107,14 @@ bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear) {
   ++rdsReads;
   *packet=(RdsPacket){0};
   if (clear) { ++rdsClears; return true; }
-  if (rdsAvailable && rdsIndex<8) {
+  // Eight PS groups ("AAAAAAAA"), then RadioText "Hi RT" as two 2A
+  // segments, each sent twice for confirmation.
+  static const uint16_t rt[2][2]={{0x4869,0x2052},{0x540d,0x2020}};
+  if (rdsAvailable && rdsIndex<12) {
     packet->synchronized=true;
-    packet->fifo_used=8-rdsIndex;
-    packet->group=(RdsGroup){.blocks={0x40a7,rdsIndex%4,0,0x4141}};
+    packet->fifo_used=12-rdsIndex;
+    packet->group=rdsIndex<8 ? (RdsGroup){.blocks={0x40a7,rdsIndex%4,0,0x4141}} :
+        (RdsGroup){.blocks={0x40a7,0x2000|(rdsIndex%2),rt[rdsIndex%2][0],rt[rdsIndex%2][1]}};
     ++rdsIndex;
   }
   return true;
@@ -868,6 +872,10 @@ int main(void) {
   assert(receivingSlot==0 && gReceiver.open && labels[1].ps[0] && !labels[0].ps[0]);
   assert(rdsReads && rdsClears && saveRequests==parallelSaves);
   RADIO_APP_render();assert(drawn[1].name && drawn[1].name[0]);
+  // A new RadioText owns B's header for 10 s, then band and frequency return.
+  assert(labels[1].text[0] && labels[1].rt_until && drawn[1].radio_text);
+  rdsAvailable=false;clockNow+=RADIO_RT_SHOW_MS;RADIO_APP_update();RADIO_APP_render();
+  assert(!labels[1].rt_until && !drawn[1].radio_text && labels[1].text[0]);
   // PTT stops every watched chip and restores the selected RX plan.
   txFakeVerified=true;activeSlot.tx.enabled=gDeviceConfig.radio.slots[0].tx.enabled=true;
   assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED) && transmitter.mode==RADIO_TX);

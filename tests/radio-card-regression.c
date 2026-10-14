@@ -94,6 +94,10 @@ int main(void) {
     differs |= GetPixel(x,y) != !!(saved[y/8][x]&(1<<(y%8)));
   assert(differs);
   sameRows(16,36); // RT never touches the body.
+  // A RadioText also takes the header frequency's place.
+  view.radio_text="Music";render(8,&view);memcpy(saved,gFrameBuffer,sizeof(saved));
+  view.frequency_hz=145500000;render(8,&view);sameRows(8,16);
+  view.frequency_hz=438500000;
   view.radio_text="RT";view.header_message="No channel memory";
   render(8,&view);memcpy(saved,gFrameBuffer,sizeof(saved));
   view.radio_text=NULL;render(8,&view);
