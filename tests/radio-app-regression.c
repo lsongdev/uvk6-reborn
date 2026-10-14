@@ -6,10 +6,12 @@
 #include "../src/radio/capture.c"
 #include "../src/radio/watch.c"
 #include "../src/radio/tx.c"
+#include "../src/radio/spectrum.c"
 #include "../src/screens/screen.c"
 #include "../src/screens/home.c"
 #include "../src/screens/slot-menu.c"
 #include "../src/screens/save-channel.c"
+#include "../src/screens/spectrum.c"
 #include <assert.h>
 
 Receiver gReceiver;
@@ -89,6 +91,17 @@ CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
   assert(range==captureRange); *hz=captureHz; return captureReply;
 }
 void RX_DEVICE_CaptureStop(void) { ++captureStops; }
+static unsigned spectrumStarts, spectrumStops, spectrumTunes;
+static uint32_t spectrumTuned;
+static uint16_t spectrumRssi = 100;
+void RX_DEVICE_SpectrumStart(RxDevice previous) { (void)previous; ++spectrumStarts; }
+void RX_DEVICE_SpectrumTune(uint32_t hz) { spectrumTuned = hz; ++spectrumTunes; }
+uint16_t RX_DEVICE_SpectrumRssi(void) { return spectrumRssi; }
+void RX_DEVICE_SpectrumStop(void) { ++spectrumStops; }
+static unsigned graphs;
+void UI_SpectrumRender(uint8_t y, uint8_t height, const Spectrum *s) {
+  assert(y == 8 + UI_RADIO_CARD_HEIGHT && y + height == LCD_HEIGHT && s); ++graphs;
+}
 bool RX_DEVICE_SeekNative(const RxPlan *plan) {
   return plan->device == RX_DEVICE_SI &&
          (plan->parameters.mode == RX_WFM || plan->parameters.mode == RX_AM);
@@ -210,6 +223,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   SCREEN_Reset(&homeScreen);
   capturing=false;
   captureStarts=captureStops=0; captureReply=CAPTURE_BUSY;
+  spectrumOn=false; spectrumStarts=spectrumStops=spectrumTunes=0; spectrumRssi=100;
   keypad = txInput = (NumberInput){0};
   clockNow=100;
   rdsReads=rdsClears=rdsIndex=0;
@@ -750,6 +764,7 @@ int main(void) {
   press(KEY_MENU);assert(gDeviceConfig.radio.slots[0].tx.tone==1);
   press(KEY_F);assert(gDeviceConfig.radio.slots[0].tx.tone==0);
   // Reset to defaults: the band preset comes back, frequency and TX stay.
+  press(KEY_DOWN);assert(menuIndex==MENU_SPECTRUM);
   press(KEY_DOWN);assert(menuIndex==MENU_RESET);
   activeSlot.current.parameters.squelch=9;
   press(KEY_MENU);
@@ -1236,5 +1251,40 @@ int main(void) {
   // MR and input retain their existing controls; F4 never starts capture there.
   setup(145500000,fm);activeSlot.source=RADIO_SOURCE_CHANNEL;
   press(KEY_F);press(KEY_4);assert(!capturing && !captureStarts);
+
+  // Spectrum: opened from the slot menu, the card follows the cursor.
+  setup(145500000,fm);
+  openMenu(MENU_SPECTRUM);press(KEY_MENU);
+  assert(SCREEN_Top()==&spectrumScreen && spectrumOn && spectrumStarts==1);
+  assert(spectrum.step_hz==12500 && spectrum.center_hz==145500000 && !RADIO_IsReceiving());
+  update();assert(spectrumTuned==144700000 && spectrumTunes==1); // 64 steps below.
+  update();assert(spectrumTunes==1); // Still settling.
+  for (unsigned i=0;i<SPECTRUM_POINTS;++i) { clockNow+=2; update(); }
+  assert(spectrum.level[0]==50 && spectrum.level[127]==50 && spectrum.next==0);
+  spectrumRssi=0;clockNow+=2;update();assert(spectrum.level[0]==1); // Measured, even at zero.
+  RadioSlotStatus spec;
+  RADIO_SlotStatus(0,&spec);assert(spec.frequency_hz==145500000 && spec.receiving);
+  press(KEY_UP);RADIO_SlotStatus(0,&spec);assert(spec.frequency_hz==145512500);
+  SCREEN_Render();assert(graphs==1 && drawn[0].step_hz==12500 && !strcmp(drawn[0].band_name,"Span 1.600 MHz"));
+  press(KEY_STAR);assert(spectrum.step_hz==25000 && spectrum.center_hz==145512500 && spectrum.cursor==64);
+  press(KEY_F);press(KEY_F);assert(spectrum.step_hz==6250);
+  press(KEY_F);assert(spectrum.step_hz==6250); // Finest already.
+  // Covered by settings: reception returns; uncovered: the sweep restarts.
+  SCREEN_Push(&otherScreen);assert(!spectrumOn && spectrumStops==1 && RADIO_IsReceiving());
+  SCREEN_Pop();assert(spectrumOn && spectrumStarts==2);
+  // EXIT leaves the slot as it was; MENU tunes it to the cursor.
+  press(KEY_EXIT);assert(SCREEN_Top()==&homeScreen && !spectrumOn);
+  assert(activeSlot.current.frequency_hz==145500000 && RADIO_IsReceiving());
+  openMenu(MENU_SPECTRUM);press(KEY_MENU);press(KEY_DOWN);press(KEY_DOWN);press(KEY_MENU);
+  assert(SCREEN_Top()==&homeScreen && !spectrumOn && activeSlot.current.frequency_hz==145475000);
+  assert(gDeviceConfig.radio.slots[0].current.frequency_hz==145475000 && RADIO_IsReceiving());
+  // Points BK cannot receive are recorded empty without tuning.
+  setup(18300000,(RadioParameters){RX_AM,5000,5000,0}); // 17.9..18.7 MHz.
+  openMenu(MENU_SPECTRUM);press(KEY_MENU);
+  update();assert(spectrum.next==16 && spectrumTuned==18000000 && !spectrum.level[0] && !spectrum.level[15]);
+  // MR can look but not tune.
+  setup(145500000,fm);activeSlot.source=gDeviceConfig.radio.slots[0].source=RADIO_SOURCE_CHANNEL;
+  openMenu(MENU_SPECTRUM);press(KEY_MENU);press(KEY_UP);press(KEY_MENU);
+  assert(!spectrumOn && activeSlot.current.frequency_hz==145500000 && !strcmp(message,"VFO only"));
   return 0;
 }

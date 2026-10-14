@@ -83,6 +83,37 @@ CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
   return CAPTURE_SAMPLE;
 }
 
+#if UVK6_ENABLE_SPECTRUM
+static bool spectrumVhf;
+void RX_DEVICE_SpectrumStart(RxDevice previous) {
+  leave(previous);
+  RX_DEVICE_InvalidateBk();
+  uint16_t bandwidth = 0;
+  (void)BK4819_BandwidthFromHz(12000, &bandwidth);
+  BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_RX_ENABLE, true);
+  BK4819_RX_TurnOn();
+  BK4819_SetRxMode(false);
+  BK4819_ExitSubAu();
+  BK4819_SetFilterBandwidth(bandwidth);
+  BK4819_SetAGC(AUTO_GAIN_INDEX);
+  spectrumVhf = true;
+  BK4819_SelectFilterEx(FILTER_VHF);
+  BK4819_SetAF(BK4819_AF_MUTE);
+  BK4819_ToggleAFDAC(false);
+}
+void RX_DEVICE_SpectrumTune(uint32_t frequency_hz) {
+  uint32_t frequency = frequency_hz / 10u;
+  bool vhf = frequency < SETTINGS_GetFilterBound();
+  if (vhf != spectrumVhf) {
+    BK4819_SelectFilterEx(vhf ? FILTER_VHF : FILTER_UHF);
+    spectrumVhf = vhf;
+  }
+  BK4819_TuneTo(frequency, true);
+}
+uint16_t RX_DEVICE_SpectrumRssi(void) { return BK4819_GetRSSI(); }
+void RX_DEVICE_SpectrumStop(void) { RX_DEVICE_InvalidateBk(); }
+#endif
+
 static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
   if (!plan || plan->frequency_hz < RADIO_MIN_HZ ||
       plan->frequency_hz > RADIO_MAX_HZ ||

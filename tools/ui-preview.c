@@ -2,6 +2,7 @@
 #include "ui/radio-card.h"
 #include "ui/graphics.h"
 #include "core/rds.h"
+#include "ui/spectrum.h"
 #include <stdio.h>
 #include <assert.h>
 uint8_t gFrameBuffer[8][128];
@@ -98,5 +99,22 @@ int main(int argc, char **argv) {
     .band_name="FM Radio",.name=decoder.ps,.radio_text=decoder.text,
     .activity=UI_RADIO_CARD_RECEIVING,.signal_level=8,.signal_valid=true};
   UI_RadioCardRender(8,&v);UI_RadioCardRender(8,&v);snapshot("rds.pbm");
+  // Spectrum: the slot card shows the cursor; noise, two carriers, peaks.
+  Spectrum s;
+  SPECTRUM_Start(&s,145500000,12500);
+  for (unsigned sweep=0;sweep<4;++sweep)
+    for (unsigned i=0;i<SPECTRUM_POINTS;++i) {
+      unsigned level=40+((i*7u+sweep*3u)%5u);
+      if (i>=30&&i<=33) level+= sweep==0 ? 30 : 4;   // Gone: the peak stays.
+      if (i>=79&&i<=83) level+=38-(i>81?i-81:81-i)*8; // A strong carrier.
+      if (i==100) level+=14;
+      SPECTRUM_Record(&s,(uint8_t)level);
+    }
+  s.cursor=81;s.next=56;
+  v=(UI_RadioCardView){.id='A',.selected=true,.frequency_hz=SPECTRUM_Frequency(&s,s.cursor),
+    .step_hz=12500,.mode=RX_NFM,.band_name="Span 1.600 MHz",.activity=UI_RADIO_CARD_RECEIVING,
+    .signal_valid=true,.signal_level=9};
+  base();FillRect(0,0,114,7,C_CLEAR);PrintSmall(0,4,"Spectrum");
+  UI_RadioCardRender(8,&v);UI_SpectrumRender(36,28,&s);snapshot("spectrum.pbm");
   return 0;
 }

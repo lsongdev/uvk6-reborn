@@ -31,7 +31,7 @@ esac
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/radio-app-regression.c src/core/tuning.c src/ui/number-input.c src/core/dcs.c src/core/text.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/watch.c src/core/tx-model.c src/core/tx-runtime.c src/core/seek.c src/core/capture.c \
+  tests/radio-app-regression.c src/core/tuning.c src/ui/number-input.c src/core/dcs.c src/core/text.c src/core/radio-model.c src/core/radio-state.c src/core/rx-runtime.c src/core/watch.c src/core/tx-model.c src/core/tx-runtime.c src/core/seek.c src/core/capture.c src/core/spectrum.c \
   src/core/rds.c src/core/rds-receiver.c src/ui/frequency.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 # ENABLE_FC=0 must keep compiling: FC branches fold to a constant phase.
@@ -39,7 +39,12 @@ esac
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include -DUVK6_ENABLE_FC=0 -fsyntax-only \
   src/radio/radio.c src/radio/capture.c src/radio/watch.c src/radio/seek.c src/radio/tx.c \
-  src/screens/home.c src/screens/slot-menu.c src/screens/save-channel.c
+  src/radio/spectrum.c src/screens/home.c src/screens/slot-menu.c src/screens/save-channel.c \
+  src/screens/spectrum.c src/ui/spectrum.c
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include -DUVK6_ENABLE_SPECTRUM=0 -fsyntax-only \
+  src/radio/radio.c src/radio/spectrum.c src/radio/watch.c src/screens/slot-menu.c
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
@@ -144,6 +149,8 @@ esac
   src/drivers/bk4819/rx.c -o "$test_binary"
 "$test_binary"
 
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/spectrum-regression.c src/core/spectrum.c -o "$test_binary"
+"$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/capture-regression.c src/core/capture.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/bk-capture-regression.c src/drivers/bk4819/capture.c -o "$test_binary"

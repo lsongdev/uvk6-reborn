@@ -1,6 +1,7 @@
 // Per-slot menu: RX parameters, TX settings, reset and Save as channel.
 #include "screens/slot-menu.h"
 #include "screens/save-channel.h"
+#include "screens/spectrum.h"
 #include "radio/radio.h"
 #include "core/text.h"
 #include "core/tone.h"
@@ -47,6 +48,9 @@ static void menuChangeValue(bool up) {
     setTx(tx); return;
   case MENU_TX_OFFSET: beginTxInput(); return;
   case MENU_TX_TONE: tx.tone = TONE_Next(tx.tone, up); setTx(tx); return;
+#if UVK6_ENABLE_SPECTRUM
+  case MENU_SPECTRUM: SCREEN_Pop(); SCREEN_Push(&spectrumScreen); return;
+#endif
   case MENU_RESET: RADIO_ResetToPreset(); return;
   case MENU_SAVE_CHANNEL: SAVE_CHANNEL_Open(); return;
   default: RADIO_AdjustRx((RadioParameterField)menuIndex, up); return;
@@ -94,6 +98,9 @@ static void menuRender(void) {
   static const char *const names[] = {
     "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone",
     "TX Enable", "TX Power", "TX Shift", "TX Offset", "TX Tone",
+#if UVK6_ENABLE_SPECTRUM
+    "Spectrum",
+#endif
     "Reset to defaults", "Save as channel"
   };
   _Static_assert(sizeof(names)/sizeof(names[0]) == MENU_ITEM_COUNT,

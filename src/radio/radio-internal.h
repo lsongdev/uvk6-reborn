@@ -71,6 +71,14 @@ extern bool capturing;
 void captureUpdate(void);
 void cancelCapture(const char *status);
 
+// spectrum.c
+#if UVK6_ENABLE_SPECTRUM
+extern bool spectrumOn;
+#else
+#define spectrumOn false
+#endif
+void spectrumUpdate(void);
+
 // watch.c
 extern WatchRuntime watcher;
 extern const char *watchStatus;
