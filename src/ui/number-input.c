@@ -93,5 +93,4 @@ NumberInputResult NUMBER_Key(NumberInput *input, KEY_Code_t key,
 void NUMBER_Text(const NumberInput *input, char out[18]) {
   Text t = TEXT_Begin(out, 18);
   TEXT_Add(&t, input->text);
-  TEXT_Char(&t, '_');
 }

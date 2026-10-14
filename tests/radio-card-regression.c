@@ -62,7 +62,7 @@ int main(void) {
   assert(leftmost(17,32) >= 30 && ink(115,128,16,23)); // 1339.99 + 998
   assert(!ink(0,128,36,64)); // A card never draws outside its 28 rows.
   // Drafts keep their end (the cursor) visible in the tail column.
-  view.edit_text="1340.000001_";render(8,&view);
+  view.edit_text="1340.000001";render(8,&view);
   assert(leftmost(17,32) >= 30 && ink(124,128,16,23));
   view.edit_text=NULL;
 
