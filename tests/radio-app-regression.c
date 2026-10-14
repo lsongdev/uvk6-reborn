@@ -1081,7 +1081,7 @@ int main(void) {
   unsigned noVisits=concurrentPrepares;
   update();assert(watcher.phase==WATCH_OFF && concurrentPrepares==noVisits);
   SCREEN_Render();assert(!strcmp(statusText,"DW A"));
-  assert(!strcmp(drawn[0].header_message,"DW: one source") && !drawn[1].header_message);
+  assert(!drawn[0].header_message && !drawn[1].header_message); // Expected: no notice.
   for (unsigned i=0;i<10;++i) { clockNow+=100;update(); }
   assert(concurrentPrepares==noVisits);
   // Tune/sample errors back off; the primary restore is attempted only once.

@@ -114,7 +114,7 @@ void watchUpdate(void) {
     }
     if (!WATCH_Start(&watcher,targets,count,selectedSlot,Now())) {
       // Duplicates and extra broadcasts collapse: one source is not a watch.
-      if (count>=2) watchStatus="DW: one source";
+      // Expected (e.g. two FM broadcasts), so the user manual explains it.
       watchDelay=true; watchResumeAt=Now()+WATCH_RETRY_MS; return;
     }
     RECEIVER_Mute(); // Watch owns the speaker from here.
