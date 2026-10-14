@@ -53,9 +53,12 @@ TxPolicy TX_DEVICE_Policy(void) {
 bool TX_DEVICE_PttPressed(void) { return txFakePttPressed; }
 bool TX_DEVICE_VoltageValid(void) { return txFakeVoltageValid; }
 void TX_DEVICE_Disable(void) { ++txFakeDisables; }
+static uint32_t txFakeHz;
 bool TX_DEVICE_Prepare(const TxPlan *plan) {
   ++txFakePrepares;
-  assert(plan->frequency_hz == 438500000u && plan->power == TX_POWER_LOW);
+  // Every scenario transmits in 438.5/438.6 at low power; talkback picks which.
+  txFakeHz = plan->frequency_hz;
+  assert((txFakeHz == 438500000u || txFakeHz == 438600000u) && plan->power == TX_POWER_LOW);
   return txFakePrepareOK;
 }
 bool TX_DEVICE_Enable(void) { ++txFakeEnables; return txFakeEnableOK; }
@@ -198,7 +201,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   concurrentPrepares=audioSelects=chipStops=0;
   initialized = inMenu = confirming = false;
   menuIndex = 0;
-  WATCH_Stop(&watcher); watchDelay=false; watchResumeAt=0;
+  WATCH_Stop(&watcher); watchDelay=false; watchResumeAt=0; watchStatus=NULL;
   functionPending = false;
   selectedSlot = inputSlot = 0;
   receivingSlot = UINT8_MAX;
@@ -814,6 +817,22 @@ int main(void) {
   for(unsigned i=0;i<15;++i) { RADIO_APP_update();clockNow+=50; }
   assert(WATCH_Owner(&watcher)==0 && gReceiver.open);
 
+  // Menus leave watch running: with BK A selected, B's broadcast keeps
+  // playing in the slot menu; only an RX edit there pauses watch.
+  setup(438500000,fm);
+  assert(RADIO_STATE_Set(&gDeviceConfig.radio,1,95900000,(RadioParameters){RX_WFM,100000,0,0,0}));
+  for(unsigned i=0;i<10;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(WATCH_Owner(&watcher)==1 && gReceiver.open);
+  unsigned menuStops=chipStops;
+  press(KEY_MENU);assert(inMenu);
+  for(unsigned i=0;i<10;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(WATCH_Owner(&watcher)==1 && gReceiver.open && chipStops==menuStops);
+  menuIndex=MENU_RX_STEP;press(KEY_MENU);
+  assert(watcher.phase==WATCH_OFF && chipStops==menuStops+2);
+  press(KEY_EXIT);press(KEY_EXIT);assert(!inMenu);
+  clockNow+=2000;for(unsigned i=0;i<10;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(WATCH_Owner(&watcher)==1 && gReceiver.open);
+
   // RDS stays live on the SI background while a BK talk owns the speaker.
   setup(438500000,fm);
   assert(RADIO_STATE_Set(&gDeviceConfig.radio,1,100000000,
@@ -850,30 +869,57 @@ int main(void) {
   assert(concurrentPrepares==afterManual);
   clockNow++;RADIO_APP_update();assert(watcher.phase==WATCH_SETTLE);
   RADIO_APP_deinit();assert(watcher.phase==WATCH_OFF && receivingSlot==0);
-  // PTT preempts a background talk and uses A's plan, never B's carrier.
+  // Talkback: PTT during B's talk answers B with B's own TX settings, and
+  // never transmits on the selected A instead.
   setup(438500000,fm);
   assert(RADIO_STATE_Set(&gDeviceConfig.radio,1,438600000,fm));
   watchSignalFrequency=438600000;
   RADIO_APP_update();clockNow+=180;RADIO_APP_update();RADIO_APP_update();
   clockNow+=180;RADIO_APP_update();clockNow+=80;RADIO_APP_update();assert(receivingSlot==1);
   gDeviceConfig.radio.slots[0].tx.enabled=activeSlot.tx.enabled=true;txFakeVerified=true;
-  assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED) && transmitter.mode==RADIO_TX);
-  assert(watcher.phase==WATCH_OFF && selectedSlot==0 && transmitter.previous_rx.frequency_hz==438500000);
+  assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED) && transmitter.mode==RADIO_RX);
+  assert(!strcmp(message,"TX disabled") && !txFakePrepares); // B's TX is off: refuse.
+  assert(watcher.phase==WATCH_OFF && selectedSlot==0 && receivingSlot==1);
+  RADIO_APP_PttRelease();
+  gDeviceConfig.radio.slots[1].tx=(TxConfig){true,TX_POWER_LOW,0,0};
+  clockNow+=2000;RADIO_APP_update();clockNow+=180;RADIO_APP_update();RADIO_APP_update();
+  clockNow+=180;RADIO_APP_update();clockNow+=80;RADIO_APP_update();
+  assert(watcher.phase==WATCH_HOLD && receivingSlot==1);
+  // A's TX is now off: transmitting proves B's own settings are used.
+  gDeviceConfig.radio.slots[0].tx.enabled=activeSlot.tx.enabled=false;
+  assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED) && transmitter.mode==RADIO_TX && txSlot==1);
+  assert(txFakeHz==438600000 && watcher.phase==WATCH_OFF && selectedSlot==0);
+  assert(transmitter.previous_rx.frequency_hz==438600000);
+  RADIO_APP_render();
+  assert(drawn[1].activity==UI_RADIO_CARD_TRANSMITTING && !strcmp(drawn[1].power_label,"LOW"));
+  assert(drawn[0].selected && drawn[0].activity!=UI_RADIO_CARD_TRANSMITTING);
+  RADIO_APP_PttRelease();assert(runtime.current.frequency_hz==438600000 && receivingSlot==1);
+  // The reply window counts too: B has just stopped talking.
+  clockNow+=2000;RADIO_APP_update();clockNow+=180;RADIO_APP_update();RADIO_APP_update();
+  clockNow+=180;RADIO_APP_update();clockNow+=80;RADIO_APP_update();
+  watchSignalFrequency=0;clockNow+=50;RADIO_APP_update();assert(watcher.phase==WATCH_HANG);
+  assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED) && txSlot==1 && transmitter.mode==RADIO_TX);
+  RADIO_APP_PttRelease();
+  // With nobody talking, PTT stays on the selected slot.
+  gDeviceConfig.radio.slots[0].tx.enabled=activeSlot.tx.enabled=true;
+  clockNow+=2000;RADIO_APP_update();assert(watcher.phase==WATCH_SETTLE);
+  assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED) && txSlot==0 && transmitter.mode==RADIO_TX);
+  assert(txFakeHz==438500000 && transmitter.previous_rx.frequency_hz==438500000);
   RADIO_APP_PttRelease();assert(runtime.current.frequency_hz==438500000 && receivingSlot==0);
-  // BCL samples A after restoring from B; cleared audio state is irrelevant.
+  // BCL samples the talkback slot after restoring it.
   for (unsigned scenario=0; scenario<4; ++scenario) {
     setup(438500000,fm);txFakeVerified=true;
-    gDeviceConfig.radio.slots[0].tx.enabled=activeSlot.tx.enabled=true;
+    gDeviceConfig.radio.slots[1].tx.enabled=true;
     assert(RADIO_STATE_Set(&gDeviceConfig.radio,1,438600000,fm));
     watchSignalFrequency=438600000;
     RADIO_APP_update();clockNow+=180;RADIO_APP_update();RADIO_APP_update();
     clockNow+=180;RADIO_APP_update();clockNow+=80;RADIO_APP_update();
     assert(receivingSlot==1 && watcher.phase==WATCH_HOLD);
     gDeviceConfig.preferences.tx_busy_lockout=1;
-    watchSignalFrequency=scenario==0 ? 438500000 : 0;
+    watchSignalFrequency=scenario==0 ? 438600000 : 0;
     watchSignalOK=scenario!=2;
     assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED));
-    assert(pttPending && receivingSlot==0 && !txFakePrepares);
+    assert(pttPending && receivingSlot==1 && txSlot==1 && !txFakePrepares);
     // Neither repeated PTT nor other controls may change the pending plan.
     assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED));
     press(KEY_UP);assert(activeSlot.current.frequency_hz==438500000);

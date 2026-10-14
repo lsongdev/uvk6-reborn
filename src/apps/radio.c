@@ -133,6 +133,7 @@ void stopReceiver(void *unused) {
 }
 
 bool apply(const RxPlan *plan) {
+  (void)pauseWatch(); // Retuning owns the chips; watch resumes 2 s later.
   bool needsSsb = plan->parameters.mode == RX_LSB || plan->parameters.mode == RX_USB;
   bool wasSsb = runtime.active && (runtime.current.parameters.mode == RX_LSB ||
                                   runtime.current.parameters.mode == RX_USB);
@@ -165,6 +166,7 @@ bool apply(const RxPlan *plan) {
 }
 
 void request(uint32_t target, RadioParameters values) {
+  (void)pauseWatch();
   RxPlan plan;
   RxResult result = RADIO_MODEL_Plan(target, values, RECEIVER_Capabilities(), &plan);
   if (result == RX_OUT_OF_RANGE || result == RX_INVALID_PARAMETERS) {
@@ -292,6 +294,7 @@ void RADIO_APP_update(void) {
 }
 
 static bool tuneDirect(const RxPlan *plan) {
+  (void)pauseWatch();
   RxTuneResult result = RX_RuntimeTune(&runtime, plan,
                                        applyReceiver, stopReceiver, NULL);
   if (result != RX_APPLIED) {
@@ -485,8 +488,6 @@ bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
   }
   if (txBusy())
     return true;
-  if ((state==KEY_RELEASED || state==KEY_LONG_PRESSED || state==KEY_LONG_PRESSED_CONT) &&
-      !pauseWatch()) return true;
   if (CHANNEL_MANAGER_HandleKey(key, state)) {
     gRedrawScreen = true;
     return true;

@@ -43,6 +43,7 @@ void finishSeek(bool found, uint32_t frequency_hz, const char *status) {
 }
 
 void startSeek(void) {
+  if (!pauseWatch()) return;
   if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
     notify("VFO only");
     return;

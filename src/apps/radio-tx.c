@@ -2,6 +2,11 @@
 #include "apps/radio-internal.h"
 
 TxRuntime transmitter;
+uint8_t txSlot;
+static TxConfig replyTx;
+static const TxConfig *txConfig(void) {
+  return txSlot==selectedSlot ? &activeSlot.tx : &replyTx;
+}
 static void startTransmit(void);
 static bool pttPending;
 static uint32_t pttCheckAt;
@@ -31,7 +36,7 @@ static bool txRestore(void *unused, const RxPlan *plan) {
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
     return false;
   }
-  receivingSlot = selectedSlot;
+  receivingSlot = txSlot;
   resetRds();
   return true;
 }
@@ -62,7 +67,7 @@ void RADIO_APP_TxSafetyUpdate(void) {
   if (pttPending && (int32_t)(Now()-pttCheckAt) >= 0) {
     pttPending = false;
     bool busy = false;
-    if (!runtime.active || receivingSlot != selectedSlot ||
+    if (!runtime.active || receivingSlot != txSlot ||
         !RX_DEVICE_WatchSignal(&runtime.current, &busy)) {
       transmitter.wait_release = true;
       notify("TX busy/locked");
@@ -111,10 +116,11 @@ static void startTransmit(void) {
     notify("TX busy/locked");
     return;
   }
-  TxCapabilities capability = TX_DEVICE_Capabilities(activeSlot.tx.frequency_hz ? activeSlot.tx.frequency_hz : runtime.current.frequency_hz);
+  const TxConfig *tx = txConfig();
+  TxCapabilities capability = TX_DEVICE_Capabilities(tx->frequency_hz ? tx->frequency_hz : runtime.current.frequency_hz);
   TxPolicy policy = TX_DEVICE_Policy();
   TxPlan planned;
-  TxResult result = TX_MODEL_Plan(&runtime.current, &activeSlot.tx,
+  TxResult result = TX_MODEL_Plan(&runtime.current, tx,
                                  &capability, &policy, &planned);
   // The board policy and target-frequency calibration authorize TX independently of RX.
   if (result == TX_OK && !TX_DEVICE_VoltageValid()) {
@@ -149,7 +155,15 @@ void pttKey(Key_State_t state) {
   if (state != KEY_PRESSED || pttPending || transmitter.wait_release ||
       transmitter.mode != RADIO_RX)
     return;
-  if (!pauseWatch()) return;
+  // Talkback: during a watched talk or its reply window PTT answers that
+  // slot with its own TX settings; otherwise it transmits on the selection.
+  WatchTarget reply;
+  RadioSlot effective;
+  bool talkback = WATCH_Talk(&watcher, &reply) && reply.id != selectedSlot &&
+                  effectiveSlot(reply.id, &effective, NULL);
+  if (!(talkback ? pauseWatchTo(&reply) : pauseWatch())) return;
+  txSlot = talkback ? reply.id : selectedSlot;
+  if (talkback) replyTx = effective.tx;
   if (CHANNEL_MANAGER_Active() || !txReady()) {
     notify("TX busy/locked");
     return;

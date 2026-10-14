@@ -108,6 +108,7 @@ extern WatchRuntime watcher;
 extern const char *watchStatus;
 void watchUpdate(void);
 bool pauseWatch(void);
+bool pauseWatchTo(const WatchTarget *target);
 void delayWatch(void);
 
 // radio-tx.c
@@ -117,6 +118,7 @@ void pttKey(Key_State_t state);
 bool setTxFrequency(uint32_t value);
 extern const char *const txPowerNames[3]; // Indexed by TxPower.
 bool changeTxPower(bool up);
+extern uint8_t txSlot; // Slot PTT transmits on: selected, or a talkback reply.
 
 // radio-menu.c
 bool menuKey(KEY_Code_t key, Key_State_t state);
