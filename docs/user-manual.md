@@ -184,9 +184,9 @@ TX Offset / TX Freq 在菜单当前行原地编辑，单位 MHz，进入时显�
 
 长按 `MENU` 进入 `Settings`。`▲ / ▼` 选择，`MENU` 进入子菜单，`* / #` 增减值，`EXIT` 返回上层并最终退出。
 
-根菜单依次为 `Display`、`Receive`、`Transmit`、`Lock PTT too`、`Battery`、`Band presets`、`System`、`About`。Display 和 Receive 直接显示参数，不再进入 Backlight、Squelch、Hardware 子菜单；About 固定放在根菜单最后一项。普通设置修改后无需按 MENU 保存，EXIT 返回不会撤销。
+根菜单依次为 `Display`、`Receive`、`Transmit`、`Lock PTT too`、`Battery`、`Band presets`、`Channels`、`About`（原 System 的三项已并入 About）。进入设置、频段编辑或文本输入时，主界面的接收和守听在后台继续运行，广播不会中断。Display 和 Receive 直接显示参数，不再进入 Backlight、Squelch、Hardware 子菜单；About 固定放在根菜单最后一项。普通设置修改后无需按 MENU 保存，EXIT 返回不会撤销。
 
-[菜单帧缓冲预览](images/settings-menu.png)（上排：根菜单、显示、接收、静噪参数、SI4732 参数；下排：发射、电池、系统、设备信息、恢复确认）。
+[菜单帧缓冲预览](images/settings-menu.png)（上排：根菜单、显示、接收、静噪参数、SI4732 参数；下排：发射、电池、设备信息、恢复确认）。
 
 | 菜单路径 | 含义与操作 |
 | --- | --- |
@@ -206,10 +206,11 @@ TX Offset / TX Freq 在菜单当前行原地编辑，单位 MHz，进入时显�
 | Battery → Charge curve | 1600／2200／3500 电压百分比估算曲线，不是电池容量检测 |
 | Battery → Cal voltage | 按 MENU 在当前行输入实测电压，5.00～8.60 V；首个数字替换草稿，MENU 提交，长按 EXIT 取消。最终校准系数也须合法，保存成功后才采用新值 |
 | Band presets | 频段默认接收参数编辑器，保留独立草稿与 Save 操作 |
-| About | 固件版本、EEPROM 容量、配置格式、SI4732／BK1080 与 SSB 补丁状态，只读 |
-| System → TX status | 当前发射硬件及许可状态，只读；显示所选目标频率的板级支持／校准状态，Ready 不等于已测量 RF 输出 |
-| System → Save status | Saved／Pending／Failed／Read only；按 MENU 立即保存或重试，写入失败保留待保存状态 |
-| System → Reset prefs | 显示恢复范围；MENU 确认、EXIT 取消。只在写入成功后恢复显示、按键、发射保护和电量显示等偏好 |
+| Channels | 已保存频道列表：▲／▼ 浏览（跳过空号，不循环），`MENU` 改名，`*` 删除（再按 `MENU` 确认，`EXIT` 取消），`EXIT` 返回。修改参数请在某个 Slot 里选中该频道（MR），改完后用 `Save as channel` 覆盖。删除某个 Slot 正在使用的频道时，该 Slot 回到 VFO |
+| About | 固件版本、EEPROM 容量、配置格式、SI4732／BK1080 与 SSB 补丁状态，只读；其后为 TX status、Save status、Reset prefs |
+| About → TX status | 当前发射硬件及许可状态，只读；显示所选目标频率的板级支持／校准状态，Ready 不等于已测量 RF 输出 |
+| About → Save status | Saved／Pending／Failed／Read only；按 MENU 立即保存或重试，写入失败保留待保存状态 |
+| About → Reset prefs | 显示恢复范围；MENU 确认、EXIT 取消。只在写入成功后恢复显示、按键、发射保护和电量显示等偏好 |
 
 退出设置应用时重新应用修改过的静噪时序与滤波边界；失败回退这些工程参数并尝试恢复接收，主界面显示 Tune failed／RX error。减少 VFO 数量时按现有状态约束返回有效项。SI 待机方式在路径切换时使用，发射保护在下次 PTT 使用。
 

@@ -29,11 +29,14 @@ bool DEVICE_SavePreferences(const ConfigPreferences *next) {
   gDeviceConfig.preferences=*next; ++saves; return true;
 }
 bool RADIO_APP_ApplyRxSettings(void) { ++reapplications; return applyWorks; }
+static unsigned slotChanges;
+void RADIO_APP_SlotsChanged(void) { ++slotChanges; }
 ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
 TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) { (void)frequency_hz; return (TxCapabilities){0}; }
 TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
 uint32_t EEPROM_DetectSize(void) { return 524288; }
-void APPS_run(AppType_t app) { assert(app==APP_BANDS); ++appRuns; }
+static AppType_t lastApp;
+void APPS_run(AppType_t app) { assert(app==APP_BANDS || app==APP_CHANNELS); lastApp=app; ++appRuns; }
 void STATUSLINE_SetText(const char *text) { TEXT_Copy(title,sizeof(title),text); }
 static void press(KEY_Code_t key) {
   bool handled=SETTINGS_key(key,KEY_RELEASED);
@@ -83,14 +86,14 @@ int main(int argc, char **argv) {
   assert(!strcmp(notice,"Save failed")); saveWorks=true;
   press(KEY_MENU);press(KEY_4);press(KEY_MENU);assert(number.active && number.invalid && saves==1);
   assert(SETTINGS_key(KEY_EXIT,KEY_LONG_PRESSED));assert(!number.active && saves==1);
-  press(KEY_EXIT); enter(KEY_7); capture(); // System
-  assert(active_menu==&systemMenu && active_menu->num_items==3);
-  press(KEY_EXIT); enter(KEY_8); capture(); // About is last at the root.
-  assert(active_menu==&aboutMenu && menu_stack_top==1);
+  press(KEY_EXIT); enter(KEY_7); // Channels opens the channel list.
+  assert(lastApp==APP_CHANNELS && active_menu==&settingsMenu);
+  enter(KEY_8); capture(); // About is last and also holds the former System items.
+  assert(active_menu==&aboutMenu && menu_stack_top==1 && active_menu->num_items==9);
   assert(menuItems[ARRAY_SIZE(menuItems)-1].submenu==&aboutMenu);
-  press(KEY_EXIT); enter(KEY_7); enter(KEY_3); capture(); // Reset confirmation
+  enter(KEY_9); capture(); // Reset confirmation
   press(KEY_EXIT); assert(!resetConfirm && saves==1);
-  enter(KEY_3);press(KEY_MENU);assert(saves==2 && !resetConfirm);
+  enter(KEY_9);press(KEY_MENU);assert(saves==2 && !resetConfirm);
   assert(gDeviceConfig.preferences.battery_calibration==2100);
   // A failed reapplication restores the prior engineering preferences.
   gDeviceConfig.preferences.sql_open_time=3;

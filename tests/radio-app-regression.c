@@ -275,6 +275,18 @@ int main(void) {
          activeSlot.current.frequency_hz==mrFrequency);
   press(KEY_F);press(KEY_3);assert(activeSlot.source==RADIO_SOURCE_VFO);
   memset(fakeChannelUsed,0,sizeof(fakeChannelUsed));
+  // A channel deleted in Settings → Channels sends its slot back to VFO,
+  // and returning to the main screen retunes it.
+  setup(145500000, testRx);
+  fakeChannels[12] = (UserChannel){.name="TEST",.frequency_hz=438500000,.rx=testRx};
+  fakeChannelUsed[12] = true;
+  press(KEY_F);press(KEY_3);assert(activeSlot.source==RADIO_SOURCE_CHANNEL);
+  RADIO_APP_deinit();
+  fakeChannelUsed[12] = false;RADIO_APP_ChannelsChanged();
+  assert(gDeviceConfig.radio.slots[0].source==RADIO_SOURCE_VFO && !gDeviceConfig.radio.slots[0].channel_number);
+  RADIO_APP_init();
+  assert(activeSlot.source==RADIO_SOURCE_VFO && runtime.current.frequency_hz==145500000);
+  memset(fakeChannelUsed,0,sizeof(fakeChannelUsed));
   RadioParameters fm = {RX_NFM, 12500, 12000, 4};
   setup(438500000, fm);
   press(KEY_F);press(KEY_0);
@@ -916,7 +928,11 @@ int main(void) {
   unsigned afterManual=concurrentPrepares;clockNow+=1999;RADIO_APP_update();
   assert(concurrentPrepares==afterManual);
   clockNow++;RADIO_APP_update();assert(watcher.phase==WATCH_SETTLE);
-  RADIO_APP_deinit();assert(watcher.phase==WATCH_OFF && receivingSlot==0);
+  // Other screens (settings, text input) leave reception and watch running.
+  RADIO_APP_deinit();assert(watcher.phase==WATCH_SETTLE);
+  clockNow+=WATCH_SETTLE_MS;RADIO_APP_update();assert(watcher.phase!=WATCH_OFF);
+  // A slot count change rebuilds the watch group.
+  RADIO_APP_SlotsChanged();assert(watcher.phase==WATCH_OFF && receivingSlot==0);
   // Talkback: PTT during B's talk answers B with B's own TX settings, and
   // never transmits on the selected A instead.
   setup(438500000,fm);

@@ -14,7 +14,7 @@
 
 ## 建议菜单
 
-根菜单依次为 Display（显示）、Receive（接收）、Transmit（发射）、Lock PTT too、Battery（电池）、Band presets（频段预设）、System（系统）、About（关于）。单项设置直接显示；Display 与 Receive 内的背光、静噪和接收硬件参数不再增加一层子菜单，超过五项时滚动。About 固定为根菜单最后一项，System 保留 TX status、Save status 和 Reset prefs。未来按键设置增加后再评估分组。屏幕沿用英文，中文名称用于设计与手册；实际排版核对名称与右侧值的宽度，避免挤压。
+根菜单依次为 Display（显示）、Receive（接收）、Transmit（发射）、Lock PTT too、Battery（电池）、Band presets（频段预设）、Channels（频道列表）、About（关于，2026-10-14 起包含原 System 的 TX status、Save status、Reset prefs）。单项设置直接显示；Display 与 Receive 内的背光、静噪和接收硬件参数不再增加一层子菜单，超过五项时滚动。About 固定为根菜单最后一项，System 保留 TX status、Save status 和 Reset prefs。未来按键设置增加后再评估分组。屏幕沿用英文，中文名称用于设计与手册；实际排版核对名称与右侧值的宽度，避免挤压。
 
 | 路径／屏幕名称 | 设置内容与范围 | 默认策略／生效时机 | 实施范围 |
 | --- | --- | --- | --- |

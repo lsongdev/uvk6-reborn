@@ -66,14 +66,16 @@ void __attribute__((noinline)) resetRds(void) {
   RDS_ReceiverReset(&rds, Now());
 }
 
+// Leaving the main screen (settings, band editor, text input) ends what its
+// keys drive, but reception and watch keep running in the background.
 void RADIO_APP_deinit(void) {
   number.active = false;
+  inMenu = confirming = false;
   if (capturing) cancelCapture(NULL);
   RADIO_APP_PttRelease();
   RADIO_APP_cancelShortcut();
   if (seek.active)
     finishSeek(false, 0, NULL);
-  (void)pauseWatch();
 }
 
 static void expireShortcut(uint32_t now) {
@@ -224,10 +226,26 @@ void beginFrequencyInput(bool tx) {
                1000000u, initial, tx);
 }
 
+void RADIO_APP_ChannelsChanged(void) {
+  for (uint8_t id = 0; id < RADIO_SLOT_CAPACITY; ++id) {
+    RadioSlot *slot = &gDeviceConfig.radio.slots[id];
+    channelCacheValid[id] = false;
+    if (slot->source == RADIO_SOURCE_CHANNEL && !CHANNEL_STORE_IsOccupied(slot->channel_number)) {
+      slot->source = RADIO_SOURCE_VFO;
+      slot->channel_number = 0;
+      DEVICE_RequestSave();
+    }
+  }
+  (void)pauseWatch(); // Watch plans may name a changed channel.
+}
+
 void RADIO_APP_init(void) {
   RADIO_APP_cancelShortcut();
+  // Returning from another screen keeps reception as it is, unless the
+  // selection or the selected slot's source changed meanwhile.
   if (initialized && selectedSlot==gDeviceConfig.radio.selected_slot &&
-      selectedSlot<gDeviceConfig.radio.slot_count) return;
+      selectedSlot<gDeviceConfig.radio.slot_count &&
+      activeSlot.source==gDeviceConfig.radio.slots[selectedSlot].source) return;
   initialized = true;
   transmitter = (TxRuntime){0};
   CHANNEL_MANAGER_Init(notify, channelSaved);
@@ -259,6 +277,7 @@ static bool readRds(void *unused, RdsPacket *packet, bool clear_fifo) {
 }
 
 void RADIO_APP_update(void) {
+  if (!initialized) return; // Not yet started (e.g. the EEPROM reset page).
   uint32_t now = Now();
   expireShortcut(now);
   RADIO_APP_TxSafetyUpdate(); // Also permit deterministic host/UI unit tests.

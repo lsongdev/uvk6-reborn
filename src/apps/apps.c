@@ -8,6 +8,7 @@
 #include "apps/settings.h"
 #include "apps/radio.h"
 #include "apps/bands.h"
+#include "apps/channels.h"
 #include "apps/textinput.h"
 #include <stddef.h>
 
@@ -50,6 +51,7 @@ const AppType_t appsAvailableToRun[RUN_APPS_COUNT] = {APP_RADIO, APP_SETTINGS};
 // Only the minimal radio, input, settings and explicit reset remain reachable.
 const App apps[APPS_COUNT] = {
     [APP_BANDS] = {"Bands", BANDS_init, NULL, BANDS_render, BANDS_key, NULL},
+    [APP_CHANNELS] = {"Channels", CHANNELS_init, NULL, CHANNELS_render, CHANNELS_key, NULL},
     [APP_NONE] = {"None", NULL, NULL, NULL, NULL, NULL},
     [APP_SETTINGS] = {"Settings", SETTINGS_init, NULL, SETTINGS_render,
                       SETTINGS_key, SETTINGS_deinit},
