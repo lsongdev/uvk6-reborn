@@ -30,8 +30,7 @@ static void changeValue(const MenuItem *item, bool up) {
   }
   SETTINGS_IncDecValue(item->setting,up);
 }
-static void doCalibrate(uint32_t value, uint32_t unused) {
-  (void)unused;
+static void doCalibrate(uint32_t value) {
   uint16_t calibration = BATTERY_GetCal(value*100u);
   if (calibration < 1900 || calibration > 2154) { notice="Invalid value"; return; }
   ConfigPreferences next = gDeviceConfig.preferences;
@@ -42,7 +41,7 @@ static bool calibrate(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
   if (state != KEY_RELEASED || key != KEY_MENU) return false;
   uint32_t voltage = BATTERY_GetPreciseVoltage(gDeviceConfig.preferences.battery_calibration);
-  MENU_EditNumber(500,860,100,voltage/100u,0,false,"V",doCalibrate);
+  MENU_EditNumber(500,860,100,voltage/100u,"V",doCalibrate);
   return true;
 }
 #define VALUE(name, id) {name, id, getValue, changeValue}

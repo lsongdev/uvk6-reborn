@@ -15,17 +15,13 @@ static uint8_t menu_stack_top = 0;
 
 static Menu *active_menu = NULL;
 static NumberInput number;
-static uint32_t numberFirst, numberSecond;
-static bool numberRange, numberEnd;
 static const char *numberUnit;
-static void (*numberAccept)(uint32_t, uint32_t);
+static void (*numberAccept)(uint32_t);
 
-void MENU_EditNumber(uint32_t min, uint32_t max, uint32_t scale,
-                     uint32_t first, uint32_t second, bool range,
-                     const char *unit, void (*accept)(uint32_t, uint32_t)) {
+void MENU_EditNumber(uint32_t min, uint32_t max, uint32_t scale, uint32_t value,
+                     const char *unit, void (*accept)(uint32_t)) {
   NUMNAV_Deinit();
-  NUMBER_Begin(&number, min, max, scale, first, true);
-  numberRange = range; numberEnd = false; numberSecond = second;
+  NUMBER_Begin(&number, min, max, scale, value, true);
   numberUnit = unit; numberAccept = accept;
 }
 
@@ -48,7 +44,15 @@ static void renderItem(uint16_t index, uint8_t i) {
   if (item->submenu)
     PrintSmallEx(ex - 7, by, POS_R, C_FILL, ">");
 
-  if (item->get_value_text) {
+  // An item being edited keeps its row; only the value becomes the draft.
+  if (number.active && index == active_menu->i) {
+    char draft[24];
+    NUMBER_Text(&number, draft);
+    Text t = TEXT_Begin(draft + strlen(draft), sizeof(draft) - strlen(draft));
+    TEXT_Char(&t, ' ');
+    TEXT_Add(&t, numberUnit);
+    PrintSmallEx(ex - 7, by, POS_R, C_FILL, draft);
+  } else if (item->get_value_text) {
     char value_buf[32];
     item->get_value_text(item, value_buf, sizeof(value_buf));
     PrintSmallEx(ex - 7 - (item->submenu ? 8 : 0), by, POS_R, C_FILL, value_buf);
@@ -122,18 +126,6 @@ void MENU_Render(void) {
     const uint8_t y = active_menu->y + i * active_menu->itemHeight;
 
     active_menu->render_item(idx, i);
-    if (isActive && number.active) {
-      char draft[24]; NUMBER_Text(&number, draft);
-      FillRect(active_menu->x, y, ex-4, active_menu->itemHeight, C_CLEAR);
-      PrintSmallEx(3, y+active_menu->itemHeight-3, POS_L, C_FILL,
-                   numberRange ? (numberEnd ? "End" : "Start") :
-                   active_menu->items ? active_menu->items[idx].name : "Value");
-      Text t = TEXT_Begin(draft + strlen(draft), sizeof(draft) - strlen(draft));
-      TEXT_Char(&t, ' ');
-      TEXT_Add(&t, numberUnit);
-      PrintSmallEx(ex-7, y+active_menu->itemHeight-3, POS_R, C_FILL, draft);
-    }
-
     if (isActive) {
       FillRect(active_menu->x, y, ex - 4, active_menu->itemHeight, C_INVERT);
     }
@@ -202,17 +194,7 @@ bool MENU_HandleInput(KEY_Code_t key, Key_State_t state) {
   if (number.active) {
     uint32_t value;
     NumberInputResult result = NUMBER_Key(&number, key, state, &value);
-    if (result == NUMBER_ACCEPTED) {
-      if (numberRange && !numberEnd) {
-        numberFirst = value; numberEnd = true;
-        NUMBER_Begin(&number, number.min, number.max, number.scale, numberSecond, true);
-      } else {
-        uint32_t first = numberRange ? numberFirst : value;
-        uint32_t second = numberRange ? value : 0;
-        if (numberRange && first > second) { uint32_t tmp=first; first=second; second=tmp; }
-        if (numberAccept) numberAccept(first, second);
-      }
-    }
+    if (result == NUMBER_ACCEPTED && numberAccept) numberAccept(value);
     return true;
   }
   // Numeric input owns MENU/PTT until accepted, before item actions.

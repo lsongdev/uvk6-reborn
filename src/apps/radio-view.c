@@ -54,8 +54,8 @@ static void buildCardView(uint8_t id, const char *inputText,
     .changed = modified, .step_hz = p->step_hz,
     .name = channelMode ? channelName : textValid ? labels[id].ps : NULL,
     .radio_text = textValid ? labels[id].text : NULL,
-    .header_message = selected && !number.active ? (message ? message :
-        watchStatus) : NULL,
+    .header_message = !selected ? NULL : number.active ? (number.invalid ? "Invalid value" : NULL) :
+        message ? message : watchStatus,
     .signal_valid = receiving, .signal_level = receiving ? UI_SMeterLevel() : 0,
     .activity = id==txSlot && transmitter.mode==RADIO_TX ? UI_RADIO_CARD_TRANSMITTING :
       id==txSlot && transmitter.mode==RADIO_FAULT ? UI_RADIO_CARD_FAULT :
@@ -80,8 +80,7 @@ static void buildCardView(uint8_t id, const char *inputText,
 static void renderTitle(void) {
   char title[24];
   Text t = TEXT_Begin(title, sizeof(title));
-  if (number.active) STATUSLINE_SetText(number.invalid ? "Invalid value" : inputTx ? "TX Frequency" : "RX Frequency");
-  else if (inMenu || confirming || activeSlot.source == RADIO_SOURCE_CHANNEL ||
+  if (inMenu || confirming || activeSlot.source == RADIO_SOURCE_CHANNEL ||
            gDeviceConfig.radio.slot_count > 1) {
     bool watchTitle = !inMenu && !confirming &&
                       activeSlot.source != RADIO_SOURCE_CHANNEL &&
