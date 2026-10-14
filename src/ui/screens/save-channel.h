@@ -1,6 +1,6 @@
-#ifndef SCREENS_SAVE_CHANNEL_H
-#define SCREENS_SAVE_CHANNEL_H
-#include "screens/screen.h"
+#ifndef UI_SCREENS_SAVE_CHANNEL_H
+#define UI_SCREENS_SAVE_CHANNEL_H
+#include "ui/screens/screen.h"
 
 // Save as channel: choose a number (MR offers its own channel, VFO the first
 // empty one), confirm an overwrite, then name it in text input and save.

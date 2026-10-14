@@ -1,5 +1,5 @@
 // T9-style text entry for names: digits pick a letter row, then a letter.
-#include "screens/text-input.h"
+#include "ui/screens/text-input.h"
 #include "hal/display.h"
 #include "ui/graphics.h"
 #include "core/text.h"

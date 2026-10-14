@@ -1,4 +1,4 @@
-#include "screens/spectrum.h"
+#include "ui/screens/spectrum.h"
 #include "radio/radio.h"
 #include "core/text.h"
 #include "ui/frequency.h"

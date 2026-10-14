@@ -1,4 +1,4 @@
-#include "screens/statusline.h"
+#include "ui/screens/statusline.h"
 #include "core/device-config.h"
 #include "hal/eeprom.h"
 #include "drivers/si473x/si473x.h"

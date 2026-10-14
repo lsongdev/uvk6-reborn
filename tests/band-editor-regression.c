@@ -1,5 +1,5 @@
 // Exercise draft cancellation, isolated persistence and capability filtering.
-#include "../src/screens/bands.c"
+#include "../src/ui/screens/bands.c"
 #include <assert.h>
 
 DeviceConfig gDeviceConfig;

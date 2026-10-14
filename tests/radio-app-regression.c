@@ -7,11 +7,11 @@
 #include "../src/radio/watch.c"
 #include "../src/radio/tx.c"
 #include "../src/radio/spectrum.c"
-#include "../src/screens/screen.c"
-#include "../src/screens/home.c"
-#include "../src/screens/slot-menu.c"
-#include "../src/screens/save-channel.c"
-#include "../src/screens/spectrum.c"
+#include "../src/ui/screens/screen.c"
+#include "../src/ui/screens/home.c"
+#include "../src/ui/screens/slot-menu.c"
+#include "../src/ui/screens/save-channel.c"
+#include "../src/ui/screens/spectrum.c"
 #include <assert.h>
 
 Receiver gReceiver;

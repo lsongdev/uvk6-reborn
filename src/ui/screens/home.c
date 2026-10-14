@@ -1,7 +1,7 @@
 // Main screen: slot cards, title, tune confirmation and the key map.
-#include "screens/home.h"
-#include "screens/slot-menu.h"
-#include "screens/spectrum.h"
+#include "ui/screens/home.h"
+#include "ui/screens/slot-menu.h"
+#include "ui/screens/spectrum.h"
 #include "radio/radio.h"
 #include "core/device-config.h"
 #include "core/text.h"
@@ -13,7 +13,7 @@
 #include "ui/radio-card.h"
 #include "ui/graphics.h"
 #include "ui/number-input.h"
-#include "screens/statusline.h"
+#include "ui/screens/statusline.h"
 
 static NumberInput keypad;      // Frequency (VFO) or channel (MR) entry.
 static bool keypadChannel;      // The draft is a channel number.

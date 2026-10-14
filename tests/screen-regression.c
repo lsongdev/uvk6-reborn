@@ -1,5 +1,5 @@
 // Screen stack: enter/leave order, the root stays, keys go to the top only.
-#include "../src/screens/screen.c"
+#include "../src/ui/screens/screen.c"
 #include <assert.h>
 #include <string.h>
 

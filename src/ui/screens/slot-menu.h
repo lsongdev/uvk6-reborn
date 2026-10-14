@@ -1,6 +1,6 @@
-#ifndef SCREENS_SLOT_MENU_H
-#define SCREENS_SLOT_MENU_H
-#include "screens/screen.h"
+#ifndef UI_SCREENS_SLOT_MENU_H
+#define UI_SCREENS_SLOT_MENU_H
+#include "ui/screens/screen.h"
 #include "core/spectrum.h"
 
 // Per-slot menu: RX parameters, TX settings, Reset to defaults and Save as
