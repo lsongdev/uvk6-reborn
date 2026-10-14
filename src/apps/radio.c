@@ -156,7 +156,6 @@ bool apply(const RxPlan *plan) {
   if (activeSlot.source == RADIO_SOURCE_VFO) {
     // TX edits are committed independently from the receive draft.
     activeSlot.tx = gDeviceConfig.radio.slots[selectedSlot].tx;
-    activeSlot.watch = gDeviceConfig.radio.slots[selectedSlot].watch;
     gDeviceConfig.radio.slots[selectedSlot] = activeSlot;
   }
   resetLabel(plan->frequency_hz);

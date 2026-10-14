@@ -7,7 +7,7 @@
 // format version change, never reinterpretation of an old byte array.
 #define RADIO_STATE_BANDS 9
 #define RADIO_SLOT_CAPACITY 4
-#define RADIO_WATCH_LIMIT 2
+#define RADIO_WATCH_LIMIT 2 // Dual watch always pairs slots A and B.
 #define RADIO_SLOT_VISIBLE 2
 
 typedef enum { RADIO_SOURCE_VFO, RADIO_SOURCE_CHANNEL } RadioSource;
@@ -25,20 +25,17 @@ typedef struct {
   BandState current;
   BandState bands[RADIO_STATE_BANDS];
   TxConfig tx;
-  bool watch;
   RadioSource source;
   uint8_t channel_number;
 } RadioSlot;
 
 typedef struct {
   uint8_t slot_count, selected_slot;
-  bool watch_enabled;
   RadioSlot slots[RADIO_SLOT_CAPACITY];
   RadioParameters presets[RADIO_STATE_BANDS];
 } RadioUserState;
 
 bool RADIO_STATE_SetCount(RadioUserState *state, uint8_t count);
-bool RADIO_STATE_SetWatch(RadioUserState *state, uint8_t id, bool enabled);
 uint8_t RADIO_STATE_NextSlot(const RadioUserState *state);
 uint8_t RADIO_STATE_VisibleFirst(const RadioUserState *state);
 bool RADIO_STATE_Default(RadioUserState *state);

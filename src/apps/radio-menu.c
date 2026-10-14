@@ -21,16 +21,8 @@ static void changeValue(bool up) {
         &channel);
     return;
   }
-  if (gDeviceConfig.radio.slots[selectedSlot].source == RADIO_SOURCE_CHANNEL &&
-      menuIndex != MENU_RX_WATCH) {
+  if (gDeviceConfig.radio.slots[selectedSlot].source == RADIO_SOURCE_CHANNEL) {
     notify("VFO only");
-    return;
-  }
-  if (menuIndex==MENU_RX_WATCH) {
-    bool enabled=!gDeviceConfig.radio.slots[selectedSlot].watch;
-    if (!RADIO_STATE_SetWatch(&gDeviceConfig.radio,selectedSlot,enabled))
-      notify("DW: max 2");
-    else DEVICE_RequestSave();
     return;
   }
   if (menuIndex == MENU_RX_MODE) {
@@ -92,7 +84,6 @@ static const char *menuValue(uint8_t item, char out[24]) {
   case MENU_RX_TONE:
     if (rx->mode != RX_NFM) return "NFM only";
     TONE_Format(rx->rx_tone,out); return out;
-  case MENU_RX_WATCH: return gDeviceConfig.radio.slots[selectedSlot].watch ? "On" : "Off";
   case MENU_TX_ENABLE: return activeSlot.tx.enabled ? "On" : "Off";
   case MENU_TX_POWER: {
     return txPowerNames[activeSlot.tx.power <= TX_POWER_HIGH ? activeSlot.tx.power : 0];
@@ -113,7 +104,7 @@ static const char *menuValue(uint8_t item, char out[24]) {
 
 void renderMenu(void) {
   static const char *const names[] = {
-    "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone", "RX Watch", "TX Enable", "TX Power", "TX Frequency", "TX Tone", "Name", "Save"
+    "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone", "TX Enable", "TX Power", "TX Frequency", "TX Tone", "Name", "Save"
   };
   _Static_assert(sizeof(names)/sizeof(names[0]) == MENU_ITEM_COUNT,
                  "Every VFO menu item needs a label");

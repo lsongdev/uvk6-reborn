@@ -55,9 +55,9 @@ int main(int argc, char **argv) {
   assert(active_menu==&displayMenu && menu_stack_top==1 && active_menu->num_items==5);
   press(KEY_EXIT);
   enter(KEY_2); capture(); // Receive
-  press(KEY_3);press(KEY_STAR);capture(); // SQL delay is editable directly within Receive.
+  press(KEY_2);press(KEY_STAR);capture(); // SQL delay is editable directly within Receive.
   assert(active_menu==&receiveMenu && menu_stack_top==1);
-  press(KEY_5);capture(); // SI hardware option also stays in Receive.
+  press(KEY_4);capture(); // SI hardware option also stays in Receive.
   unsigned before=requests;
   capabilities.si=false;
   press(KEY_STAR); assert(requests==before && !strcmp(notice,"No SI4732"));

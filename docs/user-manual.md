@@ -1,10 +1,10 @@
-# UVK6 Reborn 中文用户手册
+# UVK6 Reborn 用户手册
 
 更新于 2026-10-13，依据 Radio 主应用、RadioSlot 与双守听实现。本文描述当前可达的界面与操作；后续设计见 [design.md](design.md)，实现与验收进度见 [refactor-progress.md](refactor-progress.md)。代码行为与实机接收效果分开判断，硬件依据见 [hardware.md](hardware.md)。
 
 ## 当前功能范围
 
-默认启用 A/B 两个 Radio Slot，可在 Settings → Receive → Slot count 设置 1／2／3／4 项，每页显示两个。主屏幕不区分 VFO 或 MR；`F → 2(A/B)` 在启用的 Slot 间循环选择，`F → 3(VFO/MR)` 切换所选 Slot 的频率来源（直接调频或存储频道）。切到 MR 不覆盖原先的 VFO 频率和频段记忆，切回时恢复；可选双守听按每个 Slot 当前来源轮询，至少启用两个 Slot 才会运行。Slot 的 TX 设置和 Watch 资格独立，频段预设共享。首次初始化 A 为 145.500 MHz NFM、B 为 438.500 MHz NFM。固件根据频率、模式及探测到的芯片能力选择接收路径，无需手动选择芯片。模式为 `NFM / WFM / AM / LSB / USB`，没有 `Auto`。
+默认启用 A/B 两个 Radio Slot，可在 Settings → Receive → Slot count 设置 1／2／3／4 项，每页显示两个。主屏幕不区分 VFO 或 MR；`F → 2(A/B)` 在启用的 Slot 间循环选择，`F → 3(VFO/MR)` 切换所选 Slot 的频率来源（直接调频或存储频道）。切到 MR 不覆盖原先的 VFO 频率和频段记忆，切回时恢复；启用两个及以上 Slot 时自动对 A、B 双守听（按各自当前来源），单 Slot 不守听。Slot 的 TX 设置独立，频段预设共享。首次初始化 A 为 145.500 MHz NFM、B 为 438.500 MHz NFM。固件根据频率、模式及探测到的芯片能力选择接收路径，无需手动选择芯片。模式为 `NFM / WFM / AM / LSB / USB`，没有 `Auto`。
 
 默认编译 **已开放 BK4819 NFM 发射与功放**：在当前 Slot 菜单把 `TX Enable` 设为 On 后按住 PTT 发射（初始均为 Off）。首次发射请接假负载核对功率与频偏，并只在有执照许可的频率发射；`make ENABLE_TX=0` 可生成仅接收固件，`make ENABLE_FC=0` 可去掉 FC（`F → 4` 改为提示 `Not supported`，省约 1.3 KiB）。已支持命名频道和频道模式；`F → 4` 可启动 FC 频率捕获、`F → *` 可启动向前 Seek。旧扫描 / 频谱 / Loot 应用已从源码删除。
 
@@ -145,7 +145,7 @@ NFM 是对讲机窄带 FM，WFM 是广播宽带 FM。95.925 MHz 上从 WFM 切�
 
 短按 `MENU` 打开菜单；`▲ / ▼` 选择项目，`*` 增加 / 向后切换，`#` 减少 / 向前切换，`MENU` 与 `*` 相同。`RX Mode` 项的三个修改键均向后循环。`EXIT` 返回主界面；修改成功后立即生效，返回不会撤销。
 
-菜单不设分组标题，直接使用 RX／TX 项目前缀，并将同类项连续排列：RX Mode、RX Step、RX Bandwidth、RX Squelch、RX Tone、RX Watch、TX Enable、TX Power、TX Frequency、TX Tone。项目统一左对齐、数值右对齐，当前选中项整行反白。每屏最多五项，超出后滚动；Monitor 已移除，列表末尾为 `Name` 与 `Save`。Name 编辑最多 10 个字符的频道名称草稿；Save 选择频道编号，空槽直接保存，已有频道需再次按 MENU 确认覆盖。
+菜单不设分组标题，直接使用 RX／TX 项目前缀，并将同类项连续排列：RX Mode、RX Step、RX Bandwidth、RX Squelch、RX Tone、TX Enable、TX Power、TX Frequency、TX Tone。项目统一左对齐、数值右对齐，当前选中项整行反白。每屏最多五项，超出后滚动；Monitor 已移除，列表末尾为 `Name` 与 `Save`。Name 编辑最多 10 个字符的频道名称草稿；Save 选择频道编号，空槽直接保存，已有频道需再次按 MENU 确认覆盖。
 
 | 项目 | 含义 |
 | --- | --- |
@@ -158,7 +158,6 @@ NFM 是对讲机窄带 FM，WFM 是广播宽带 FM。95.925 MHz 上从 WFM 切�
 | `TX Power` | Low / Medium / High，使用对应原厂校准档；缺少校准的档位拒绝发射 |
 | `TX Frequency` | Same 跟随当前 RX，或独立 TX 频率；MENU／* 原地编辑，# 恢复 Same |
 | `TX Tone` | Off、CTCSS、DCS 正码／反码，独立于 RX Tone 保存 |
-| `RX Watch` | 是否加入守听组，最多两项 On；需开启 Receive → Dual watch 才运行 |
 | `Name` | 编辑频道名称草稿；需要按 Save 写入频道 |
 | `Save` | 选择频道编号；空槽保存，已占用频道需确认覆盖。写入后回读校验 |
 
@@ -192,7 +191,7 @@ TX Frequency 在菜单当前行原地编辑，进入时显示当前值，首个�
 | Display → Light time | Off／5、10、20、60、120 秒／Always；Off 不触发点亮，Always 保持亮灯 |
 | Display → Brightness／Idle light | 点亮／待机亮度，0～15；待机亮度不高于点亮亮度，降低点亮亮度时自动限制待机亮度 |
 | Display → Light on RX | Off 不由信号触发；Timed 收到有效信号后按 Light time 熄灯；Receiving 接收音频期间保持亮灯、音频关闭后熄灯。Light time 的 Off／Always 优先 |
-| Receive → VFO count／Dual watch | VFO 数量与双守听总开关，具体参与项仍在各 VFO 的 RX Watch 中选择 |
+| Receive → Slot count | Slot 数量 1–4；2 个及以上时自动对 A、B 双守听 |
 | Receive → SQL open delay／SQL close delay | BK4819 静噪打开／关闭时序档位，分别 Level 0～7／0～3；暂不标注未核实的毫秒数 |
 | Receive → SI4732 idle | Mute 静音待机／Power off 断电；下次离开 SI 接收路径生效。无 SI 时显示 No SI4732，不能编辑 |
 | Receive → Filter split | 240／280 MHz，BK 接收滤波切换频率；属于硬件工程设置 |
@@ -268,13 +267,13 @@ Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mi
 
 ## VFO 数量与双守听
 
-在 `Settings → Receive → VFO count` 设置 2／3／4。F→2 循环，四项为 A→B→C→D→A；页面自动保持选中项可见。减少数量不删除隐藏项频率／参数，但关闭其 Watch；隐藏当前项时回到 A。
+在 `Settings → Receive → VFO count` 设置 2／3／4。F→2 循环，四项为 A→B→C→D→A；页面自动保持选中项可见。减少数量不删除隐藏项频率／参数；隐藏当前项时回到 A。
 
-`Receive → Dual watch` 默认 Off。每个 VFO 菜单 `RX Watch` 默认 A/B On、C/D Off，最多两项参与；先关闭旧项再打开新项。开启总开关后，固件轮流检查两项，发现信号并再次确认后打开音频。箭头保持操作归属，状态栏 DW A/B/C/D 表示实际接收归属，含当前页之外的项。
+双守听没有开关：Slot count 为 2 及以上时固定守听 A 和 B（C/D 不参与），只想听一路时把 Slot count 设为 1。固件轮流检查两项，发现信号并再次确认后打开音频。箭头保持操作归属，状态栏 DW A/B/C/D 表示实际接收归属，含当前页之外的项。
 
 调谐、菜单、输入、搜索和 PTT 暂停守听、恢复选中项，手动操作后约 2 秒再继续；守听不会把后台频率保存为选中项或改变 PTT 归属。连续驻留当前最多 3 秒，随后检查另一项，期间可能短暂中断音频；信号消失则静音等待约 600 ms，支持恢复。SQ0 不会把纯噪声视为守听命中。
 
-首批 SSB 不参与轮询，仍可手动接收。有效独立目标不足两个时保持主接收，并显示 DW: select 2／same channel／unavailable／SSB off。稳定等待、亚音判定及跨芯片音频效果仍待设备验证。详见 [多 VFO 与双守听](multi-vfo-design.md)。
+首批 SSB 不参与轮询，仍可手动接收。有效独立目标不足两个时保持主接收，并显示 DW: same channel／unavailable／SSB off。稳定等待、亚音判定及跨芯片音频效果仍待设备验证。详见 [多 VFO 与双守听](multi-vfo-design.md)。
 
 顶部状态栏在 VFO、设置及其他页面共用同一布局：电池按全局 Show charge 设置显示图标、百分比或电压，状态图标按电池实际宽度靠右排列，标题在剩余宽度内裁剪；低电量闪烁时仍保留电池占位。F 前缀提示仅在 VFO 等待快捷键时出现。
 

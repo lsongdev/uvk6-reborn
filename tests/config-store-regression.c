@@ -265,12 +265,11 @@ int main(void) {
   // Format6 upgrades retain both VFOs, B selection, tones, shared presets.
   assert(encodeV6(&original,30,record));
   assert(CONFIG_Decode(record,CONFIG_LEGACY_SLOT_SIZE,&loaded,&sequence) && sequence==30);
-  assert(loaded.radio.selected_slot==1 && loaded.radio.slot_count==2 && !loaded.radio.watch_enabled);
+  assert(loaded.radio.selected_slot==1 && loaded.radio.slot_count==2);
   assert(loaded.radio.slots[0].tx.tone==258 && loaded.radio.slots[1].tx.tone==155);
   assert(loaded.radio.slots[1].current.frequency_hz==438550000);
   assert(loaded.radio.slots[2].current.frequency_hz==radioBands[5].initial_hz);
   assert(loaded.radio.slots[3].current.parameters.rx_tone==155);
-  assert(loaded.radio.slots[0].watch && loaded.radio.slots[1].watch && !loaded.radio.slots[2].watch);
   assert(!CONFIG_Decode(record,RECORD_BYTES,&loaded,NULL)); // Wrong record length is not a migration.
   // Keep both old slots untouched during migration, including interrupted writes.
   memset(&memory,0xff,sizeof(memory));memory.writes=0;memory.write_limit=-1;
@@ -281,26 +280,24 @@ int main(void) {
   memory.write_limit=-1;assert(CONFIG_Save(&io,&loaded,&sequence) && sequence==31);
   assert(!memcmp(memory.bytes+CONFIG_LEGACY_SLOT_SIZE,record,CONFIG_LEGACY_SLOT_SIZE));
   assert(CONFIG_Load(&io,&loaded,&sequence) && sequence==31);
-  // Enable four slots and save an offscreen selection, independent TX and watch set.
+  // Enable four slots and save an offscreen selection and independent TX.
   assert(RADIO_STATE_SetCount(&loaded.radio,4));
   assert(RADIO_STATE_Set(&loaded.radio,2,145750000,(RadioParameters){RX_NFM,25000,14000,5,50}));
   assert(RADIO_STATE_Set(&loaded.radio,3,439250000,(RadioParameters){RX_NFM,12500,12000,4,155}));
   loaded.radio.slots[3].tx=(TxConfig){true,TX_POWER_HIGH,439350000,50};
-  assert(RADIO_STATE_SetWatch(&loaded.radio,0,false));
-  assert(RADIO_STATE_SetWatch(&loaded.radio,3,true));
-  assert(!RADIO_STATE_SetWatch(&loaded.radio,2,true));
-  loaded.radio.selected_slot=3;loaded.radio.watch_enabled=true;
+  loaded.radio.selected_slot=3;
   assert(CONFIG_Save(&io,&loaded,&sequence) && sequence==32);
   assert(CONFIG_Load(&io,&original,&sequence) && sequence==32);
-  assert(original.radio.slot_count==4 && original.radio.selected_slot==3 && original.radio.watch_enabled);
+  assert(original.radio.slot_count==4 && original.radio.selected_slot==3);
   assert(original.radio.slots[2].current.frequency_hz==145750000);
   assert(original.radio.slots[3].tx.frequency_hz==439350000 && original.radio.slots[3].tx.tone==50);
-  assert(original.radio.slots[1].watch && original.radio.slots[3].watch && !original.radio.slots[0].watch);
-  original.radio.slots[2].watch=true;assert(!CONFIG_Encode(&original,1,record));
-  original.radio.slots[2].watch=false;assert(RADIO_STATE_SetCount(&original.radio,2));
-  assert(original.radio.selected_slot==0 && !original.radio.slots[3].watch);
+  assert(RADIO_STATE_SetCount(&original.radio,2));
+  assert(original.radio.selected_slot==0);
   assert(original.radio.slots[3].current.frequency_hz==439250000);
-  assert(CONFIG_Encode(&original,1,record));
+  // The former watch switches are written as 0 and old 0/1 values still load.
+  assert(CONFIG_Encode(&original,1,record) && !record[18] && !record[20]);
+  record[18]=record[20]=1;put32(record+HEADER_CRC,crc32(record,RECORD_BYTES));
+  assert(CONFIG_Decode(record,RECORD_BYTES,&loaded,NULL));
   record[18]=2;put32(record+HEADER_CRC,crc32(record,RECORD_BYTES));
   assert(!CONFIG_Decode(record,RECORD_BYTES,&loaded,NULL));
   assert(CONFIG_Encode(&original,1,record));record[20]=2;

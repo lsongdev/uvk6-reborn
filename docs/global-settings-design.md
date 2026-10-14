@@ -24,7 +24,7 @@
 | Display → Idle light | 待机亮度，沿用 0～15 档；限制 ≤ 工作亮度 | 默认 0；即时更新待机状态 | 首批 |
 | Display → Light on RX | Off／Timed／Receiving | 默认 Timed；解释为信号触发续时／随接收关闭，而非解调模式 | 首批 |
 | Receive → VFO count | 2／3／4 | 默认 2；减少数量保留隐藏项，关闭隐藏 Watch，必要时选择 A | 首批 |
-| Receive → Dual watch | Off／On | 默认 Off；退出菜单后恢复调度，仍最多两项参与 | 首批 |
+| ~~Receive → Dual watch~~ | — | 2026-10-14 删除：两个及以上 Slot 时固定守听 A、B | — |
 | Receive → SQL open delay | BK4819 静噪开启时序，硬件代码 0～7 | 默认 1；退出菜单重新应用当前接收方案 | 首批 |
 | Receive → SQL close delay | BK4819 静噪关闭时序，硬件代码 0～3 | 默认 1；同上 | 首批 |
 | Receive → SI4732 idle | Mute／Power off，离开 SI 接收路径时的策略 | 默认 Mute；下一次离开 SI 路径生效 | 首批；无 SI 时不可编辑 |

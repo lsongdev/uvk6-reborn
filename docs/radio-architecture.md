@@ -4,7 +4,7 @@
 
 ## 概念
 
-- **RadioSlot（A/B/C/D）**：独立工作位置，最多四项、每页显示两项。含各频段 VFO 记忆、当前来源、MR 频道编号、TX 配置及 Watch 资格。
+- **RadioSlot（A/B/C/D）**：独立工作位置，最多四项、每页显示两项。含各频段 VFO 记忆、当前来源、MR 频道编号与 TX 配置。双守听固定为 A、B。
 - **RadioSource**：`RADIO_SOURCE_VFO`（直接调谐）或 `RADIO_SOURCE_CHANNEL`（MR 频道）。
 - **RxMode**：NFM、WFM、AM、LSB、USB，是解调模式，与来源无关。
 - **RadioBand**：频段表（LW、MW、SW、FM Radio、Airband、2m、70cm 及 VHF/UHF 兜底），覆盖 150 kHz–1.34 GHz 全部频率，窄频段优先。

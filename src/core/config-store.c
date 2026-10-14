@@ -96,11 +96,11 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
   bytes[6] = RADIO_SLOT_CAPACITY;
   *p++ = config->radio.slot_count;
   *p++ = config->radio.selected_slot;
-  *p++ = config->radio.watch_enabled;
+  *p++ = 0; // Former Dual watch switch; watch now always pairs A and B.
   for (uint8_t id=0; id<RADIO_SLOT_CAPACITY; ++id) {
     const RadioSlot *slot = &config->radio.slots[id];
     *p++ = slot->active_band;
-    *p++ = slot->watch;
+    *p++ = 0; // Former per-slot RX Watch.
     p = encodeBand6(p, &slot->current);
     for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
       p = encodeBand6(p, &slot->bands[i]);
@@ -166,14 +166,14 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
     candidate.radio.selected_slot = *p++;
     if (fourVfos) {
       if (*p>1) return false;
-      candidate.radio.watch_enabled = *p++;
+      ++p; // Former Dual watch switch, ignored.
     }
     for (uint8_t id=0; id<records; ++id) {
       RadioSlot *slot = &candidate.radio.slots[id];
       slot->active_band = *p++;
       if (fourVfos) {
         if (*p>1) return false;
-        slot->watch = *p++;
+        ++p; // Former per-slot RX Watch, ignored.
       }
       p = decodeBand6(p, &slot->current);
       for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
@@ -230,10 +230,8 @@ bool CONFIG_Decode(const uint8_t *bytes, uint16_t size, DeviceConfig *config,
       slot->tx.tone = get16(p); p += 2;
       slot->tx.frequency_hz = get32(p);
     } // Format 4 defaults the new fields to Off/Same.
-    for (uint8_t id=1; id<RADIO_SLOT_CAPACITY; ++id) {
+    for (uint8_t id=1; id<RADIO_SLOT_CAPACITY; ++id)
       RADIO_STATE_InitSlot(&candidate.radio, id, id%2 ? 6 : 5);
-      candidate.radio.slots[id].watch = id<2;
-    }
   }
   if (!valid(&candidate))
     return false;
