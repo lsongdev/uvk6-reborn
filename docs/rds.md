@@ -2,7 +2,7 @@
 
 2026-10-13：实际接收归属的 VFO 在 **SI4732 接收路径 + WFM 模式** 下轮询 RDS。BK4819 的 NFM/AM、SI4732 的 AM/SSB 和 BK1080 接收路径不读取 RDS。
 
-当前支持 PI 电台识别码、0A/0B 的 8 字符 Programme Service（PS）电台名，以及 2A 的最多 64 字符、2B 的最多 32 字符 RadioText。PS 作为名称显示在卡片正文，频率在其下方；RadioText 占用该卡片的黑底横条，替换频段名。两者都不滚动，放不下的部分裁掉。没有 PS 时正文只显示大号频率。布局见 [VFO 首屏布局](ui-layout.md)。VFO 自定义名称编辑尚未实现。
+当前支持 PI 电台识别码、0A/0B 的 8 字符 Programme Service（PS）电台名，以及 2A 的最多 64 字符、2B 的最多 32 字符 RadioText。PS 作为名称以大字显示在卡片正文，频率移到横条右侧；RadioText 占用横条左侧，替换频段名。两者都不滚动，放不下的部分裁掉。没有 PS 时正文只显示大号频率。布局见 [VFO 首屏布局](ui-layout.md)。VFO 自定义名称编辑尚未实现。
 
 ![当前频率与名称布局](images/vfo-states.png)
 
