@@ -43,8 +43,8 @@ int main(void) {
   policy.ranges[0].upper_hz=145500000;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
   policy.ranges[0].upper_hz=148000000;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
-  cfg.power = (TxPower)255;
-  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_UNCALIBRATED);
+  cfg.power = (TxPower)255; // A corrupt level is an invalid configuration.
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
   assert(plan.frequency_hz == 0);
   cfg.power = TX_POWER_LOW;
   rx.parameters.step_hz = 0;
@@ -59,33 +59,46 @@ int main(void) {
   rx.frequency_hz = 145500000u;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
 
-  cfg.frequency_hz=146500000;cfg.tone=155;
+  // Split: an absolute TX frequency, never changing RX.
+  cfg.shift=TX_SHIFT_SPLIT;cfg.split_hz=146500000;cfg.tone=155;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
   assert(plan.frequency_hz==146500000 && plan.tone==155);
-  assert(rx.frequency_hz==145500000); // Split TX never changes RX.
-  cfg.frequency_hz=438500000;
+  assert(rx.frequency_hz==145500000);
+  cfg.split_hz=438500000;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
   assert(plan.frequency_hz==0);
-  cfg.frequency_hz=700000000;
+  cfg.split_hz=700000000;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
-  cfg.frequency_hz=146500001;
+  cfg.split_hz=146500001;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
-  cfg.frequency_hz=0;cfg.tone=259;
+  cfg.split_hz=0; // Unset split transmits on RX.
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK && plan.frequency_hz==145500000);
+  // Repeater shift: +/- offset from RX, the offset kept across shifts.
+  cfg.shift=TX_SHIFT_PLUS;cfg.offset_hz=600000;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK && plan.frequency_hz==146100000);
+  cfg.shift=TX_SHIFT_MINUS;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK && plan.frequency_hz==144900000);
+  cfg.offset_hz=200000000; // Beyond the limit, and below 0 Hz for MINUS.
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
-  cfg.tone=0;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
+  assert(!TX_MODEL_Frequency(&cfg,145500000));
+  cfg.offset_hz=600005;assert(!TX_MODEL_ConfigValid(&cfg));
+  cfg.offset_hz=600000;cfg.shift=TX_SHIFT_COUNT;assert(!TX_MODEL_ConfigValid(&cfg));
+  cfg.shift=TX_SHIFT_OFF;cfg.tone=259;
+  assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_HW_FAULT);
+  cfg.tone=0;assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK && plan.frequency_hz==145500000);
 
   // Each calibrated level and each disjoint board range is checked independently.
   hw.power_mask=7;
   policy.count=2;policy.ranges[1]=(TxFrequencyRange){400000000u,470000000u};
-  cfg.frequency_hz=438500000;cfg.power=TX_POWER_HIGH;
+  cfg.shift=TX_SHIFT_SPLIT;cfg.split_hz=438500000;cfg.power=TX_POWER_HIGH;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK && plan.power==TX_POWER_HIGH);
   cfg.power=TX_POWER_MEDIUM;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK && plan.power==TX_POWER_MEDIUM);
-  cfg.frequency_hz=300000000;
+  cfg.split_hz=300000000;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
-  cfg.frequency_hz=470000000;
+  cfg.split_hz=470000000;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OUT_OF_BAND);
-  cfg.frequency_hz=0;cfg.power=TX_POWER_LOW;
+  cfg.shift=TX_SHIFT_OFF;cfg.power=TX_POWER_LOW;
   assert(TX_MODEL_Plan(&rx,&cfg,&hw,&policy,&plan)==TX_OK);
 
   TxOperations ops = {NULL,mute,prepare,enable,disable,restore};

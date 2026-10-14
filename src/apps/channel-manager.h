@@ -12,9 +12,8 @@ typedef void (*ChannelManagerSaved)(uint8_t slot, uint16_t number,
                                    const UserChannel *channel);
 
 void CHANNEL_MANAGER_Init(ChannelManagerNotify notify, ChannelManagerSaved saved);
-void CHANNEL_MANAGER_LoadName(uint8_t slot, uint16_t number);
-const char *CHANNEL_MANAGER_Name(uint8_t slot);
-void CHANNEL_MANAGER_StartName(uint8_t slot, uint16_t current_number);
+// Save as channel: choose a number (confirming an overwrite), name it, save.
+// current_number is the slot's channel, offered first when it exists.
 void CHANNEL_MANAGER_StartSave(uint8_t slot, uint16_t current_number,
                                const UserChannel *channel);
 bool CHANNEL_MANAGER_Active(void);

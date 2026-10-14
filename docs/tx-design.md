@@ -19,7 +19,7 @@ TX 镜像 Flash **61,368 / 61,440 B**（ARM GNU 15.3.rel1），余 72 B；仅接
 - 当前 VFO 菜单 `TX Enable` 设为 On 后，按住 PTT 发射，松开恢复该 VFO 的完整接收方案。已有配置与初始化默认仍为 Off，不自动打开所有 VFO 的 TX Enable。
 - 仅 NFM、BK4819 接收路径允许申请发射。WFM、AM、LSB、USB 和 SI4732／BK1080 路径拒绝，不自动变更模式。
 - 整机发射策略为 `136 ≤ f < 174 MHz` 和 `400 ≤ f < 470 MHz`，目标频率须满足 10 Hz 栅格。使用两个明确的频率区间，不采用 BK 芯片的整个接收范围，也不允许两个区间之间的频率。
-- `TX Frequency` 为 Same 或独立频率，范围检查和校准按实际 TX Hz 执行；RX 频率保持不变。`TX Tone` 支持 Off、CTCSS、DCS 正／反码。
+- `TX Shift`：Off（同频）、+／-（接收 ± 频差，最大 100 MHz）、Split（独立发射频率，未设置时同频）；`TX_MODEL_Frequency` 统一求出实际发射频率，范围检查和校准按它执行；RX 频率保持不变。`TX Tone` 支持 Off、CTCSS、DCS 正／反码。
 - Low／Medium／High 使用对应的本机原厂校准档，`F → 6` 循环选择；某档记录缺失或读取失败时，该档拒绝执行。
 - 保留忙碌禁止发射、锁键时的 PTT 锁和 TOT（默认 120 秒）。PTT 归属选中 VFO，不跟随双守听后台音频。发射期间停止调频、搜台、捕获、守听和 RDS 操作。
 

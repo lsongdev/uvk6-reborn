@@ -66,7 +66,6 @@ static void adoptCapture(const RxPlan *plan) {
   activeSlot.tx.enabled=false;
   activeSlot.channel_number=0;
   gDeviceConfig.radio.slots[selectedSlot]=activeSlot;
-  CHANNEL_MANAGER_LoadName(selectedSlot, 0);
   delayWatch();
 }
 

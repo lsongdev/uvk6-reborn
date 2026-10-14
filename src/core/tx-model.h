@@ -3,10 +3,16 @@
 #include "core/radio-model.h"
 
 typedef enum { TX_POWER_LOW, TX_POWER_MEDIUM, TX_POWER_HIGH } TxPower;
+// Where TX sits relative to RX: same, repeater offset up/down, or split.
+typedef enum { TX_SHIFT_OFF, TX_SHIFT_PLUS, TX_SHIFT_MINUS, TX_SHIFT_SPLIT,
+               TX_SHIFT_COUNT } TxShift;
+#define TX_OFFSET_MAX_HZ 100000000u
 typedef struct {
   bool enabled;
   TxPower power;
-  uint32_t frequency_hz; // Zero follows RX (Same); otherwise independent Hz.
+  TxShift shift;
+  uint32_t offset_hz; // Used by + and -; kept while another shift is chosen.
+  uint32_t split_hz;  // Absolute TX Hz used by Split; zero means not set.
   RadioTone tone;
 } TxConfig;
 
@@ -42,6 +48,9 @@ static inline bool TX_MODEL_FrequencyValid(uint32_t hz) {
      (hz >= 840000000u && hz <= 1300000000u)));
 }
 
+bool TX_MODEL_ConfigValid(const TxConfig *config);
+// TX Hz for an RX Hz under the shift; zero when it cannot apply.
+uint32_t TX_MODEL_Frequency(const TxConfig *config, uint32_t rx_hz);
 TxResult TX_MODEL_Plan(const RxPlan *rx, const TxConfig *config,
                        const TxCapabilities *capabilities,
                        const TxPolicy *policy, TxPlan *out);

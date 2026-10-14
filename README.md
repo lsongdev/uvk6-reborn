@@ -65,7 +65,7 @@ automatically migrate EEPROM content.
   confirm. **This writes within the two UVR2 configuration slots at
   `0x0800–0x0FFF`, which may contain data from earlier firmware.**
   Legacy settings are not automatically migrated. User channels use a
-  separate `0xB000–0xDFFF` region. Do not confirm
+  separate `0xB000–0x113FF` region. Do not confirm
   before obtaining a backup and checking the EEPROM geometry.
 - The 4-Mbit / 512-KiB addressing mode assumes eight 64-KiB address banks
   (`0xA0` through `0xAE`). Writes are limited to at most 32 bytes per chunk until hardware is verified;

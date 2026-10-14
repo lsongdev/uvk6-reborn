@@ -1,5 +1,19 @@
 #include "core/tx-model.h"
 
+bool TX_MODEL_ConfigValid(const TxConfig *c) {
+  return c && (unsigned)c->power <= TX_POWER_HIGH && (unsigned)c->shift < TX_SHIFT_COUNT &&
+         TONE_Valid(c->tone) && !(c->offset_hz % 10u) && c->offset_hz <= TX_OFFSET_MAX_HZ &&
+         TX_MODEL_FrequencyValid(c->split_hz);
+}
+uint32_t TX_MODEL_Frequency(const TxConfig *c, uint32_t rx) {
+  switch (c->shift) {
+  case TX_SHIFT_PLUS: return rx + c->offset_hz;
+  case TX_SHIFT_MINUS: return c->offset_hz < rx ? rx - c->offset_hz : 0;
+  case TX_SHIFT_SPLIT: return c->split_hz ? c->split_hz : rx;
+  default: return rx;
+  }
+}
+
 TxResult TX_MODEL_Plan(const RxPlan *rx, const TxConfig *config,
                        const TxCapabilities *capabilities,
                        const TxPolicy *policy, TxPlan *out) {
@@ -7,9 +21,9 @@ TxResult TX_MODEL_Plan(const RxPlan *rx, const TxConfig *config,
   if (out) *out = (TxPlan){0};
   if (!rx || !config || !capabilities || !policy || !out)
     return TX_HW_FAULT;
-  if (!TONE_Valid(config->tone) || !TX_MODEL_FrequencyValid(config->frequency_hz))
+  if (!TX_MODEL_ConfigValid(config))
     return TX_HW_FAULT;
-  uint32_t frequency = config->frequency_hz ? config->frequency_hz : rx->frequency_hz;
+  uint32_t frequency = TX_MODEL_Frequency(config, rx->frequency_hz);
   if (!config->enabled)
     return TX_DISABLED;
   if (rx->parameters.mode != RX_NFM || rx->device != RX_DEVICE_BK)
@@ -22,9 +36,7 @@ TxResult TX_MODEL_Plan(const RxPlan *rx, const TxConfig *config,
   if (!((rx->frequency_hz >= 18000000u && rx->frequency_hz <= 660000000u) ||
         (rx->frequency_hz >= 840000000u && rx->frequency_hz <= 1300000000u)))
     return TX_OUT_OF_BAND;
-  if (!TX_MODEL_FrequencyValid(frequency)) return TX_OUT_OF_BAND;
-  if ((unsigned)config->power > TX_POWER_HIGH)
-    return TX_UNCALIBRATED;
+  if (!frequency || !TX_MODEL_FrequencyValid(frequency)) return TX_OUT_OF_BAND;
   if (!capabilities->available || !policy->authorized)
     return TX_UNVERIFIED_HARDWARE;
   if (!policy->count || policy->count > TX_RANGE_CAPACITY) return TX_OUT_OF_BAND;
