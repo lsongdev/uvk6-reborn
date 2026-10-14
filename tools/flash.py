@@ -19,9 +19,10 @@ def xor(data):
     return bytes(value ^ KEY[i % len(KEY)] for i, value in enumerate(data))
 
 
-def packet(payload):
+def packet(payload, obfuscate=True):
     crc = struct.pack('<H', binascii.crc_hqx(payload, 0))
-    return b'\xab\xcd' + struct.pack('<H', len(payload)) + xor(payload + crc) + b'\xdc\xba'
+    body = payload + crc
+    return b'\xab\xcd' + struct.pack('<H', len(payload)) + (xor(body) if obfuscate else body) + b'\xdc\xba'
 
 
 def validate_image(image):
@@ -52,8 +53,8 @@ class Bootloader:
     def close(self):
         os.close(self.fd)
 
-    def send(self, payload):
-        data = packet(payload)
+    def send(self, payload, obfuscate=True):
+        data = packet(payload, obfuscate)
         deadline = time.monotonic() + 3
         while data:
             remaining = deadline - time.monotonic()
@@ -67,7 +68,7 @@ class Bootloader:
                 raise OSError('Serial connection closed')
             data = data[count:]
 
-    def receive(self, deadline):
+    def receive(self, deadline, obfuscate=True):
         while time.monotonic() < deadline:
             start = self.buffer.find(b'\xab\xcd')
             if start >= 0:
@@ -82,7 +83,8 @@ class Bootloader:
                         del self.buffer[:size + 8]
                         if frame[-2:] != b'\xdc\xba':
                             continue
-                        decoded = xor(frame[4:4 + size + 2])
+                        body = frame[4:4 + size + 2]
+                        decoded = xor(body) if obfuscate else body
                         payload = decoded[:-2]
                         crc = int.from_bytes(decoded[-2:], 'little')
                         # Stock bootloader replies append literal, un-XORed

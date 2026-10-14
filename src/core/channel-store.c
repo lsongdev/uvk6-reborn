@@ -1,4 +1,6 @@
 #include "core/channel-store.h"
+#include "core/crc32.h"
+#include "core/resource.h"
 #include "core/radio-model.h"
 #include "core/config-store.h"
 #include "hal/eeprom.h"
@@ -29,14 +31,7 @@ static uint16_t get16(const uint8_t *p) { return (uint16_t)p[0] | (uint16_t)p[1]
 static uint32_t get32(const uint8_t *p) { return get16(p) | (uint32_t)get16(p + 2) << 16; }
 static void put16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
 static void put32(uint8_t *p, uint32_t v) { put16(p, (uint16_t)v); put16(p + 2, (uint16_t)(v >> 16)); }
-static uint32_t crc32(const uint8_t *p) {
-  uint32_t crc = 0xffffffffu;
-  for (uint8_t i = 0; i < CRC_AT; ++i) {
-    crc ^= p[i];
-    for (uint8_t b = 0; b < 8; ++b) crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
-  }
-  return ~crc;
-}
+static uint32_t crc32(const uint8_t *p) { return ~CRC32_Update(CRC32_INIT, p, CRC_AT); }
 static uint32_t address(uint16_t number, uint8_t copy) {
   return CHANNEL_STORE_BASE +
       (((uint32_t)number - 1u) * CHANNEL_STORE_COPY_COUNT + copy) * RECORD;
@@ -114,7 +109,7 @@ static bool same(const UserChannel *a, const UserChannel *b) {
 
 bool CHANNEL_STORE_Init(void) {
   initialized = false;
-  if (EEPROM_DetectSize() < CHANNEL_STORE_END + PATCH_SIZE) return false;
+  if (EEPROM_DetectSize() < CHANNEL_STORE_END + RESOURCE_TAIL_BYTES) return false;
   memset(occupied, 0, sizeof(occupied));
   memset(newer, 0, sizeof(newer));
   for (uint16_t n = 1; n <= USER_CHANNEL_COUNT; ++n) {

@@ -155,6 +155,20 @@ bool EEPROM_TryWriteBuffer(uint32_t address, const uint8_t *pBuffer, uint16_t si
          writeUnchecked(address, pBuffer, size);
 }
 
+bool EEPROM_WriteResource(uint32_t address, const uint8_t *pBuffer, uint16_t size) {
+  uint8_t back[32];
+  if (!writes_enabled || !EEPROM_ResourceWriteAllowed(address, size, EEPROM_DetectSize()) ||
+      !writeUnchecked(address, pBuffer, size))
+    return false;
+  for (uint16_t at = 0; at < size; at += sizeof(back)) { // Read back.
+    uint16_t n = (uint16_t)(size - at);
+    if (n > sizeof(back)) n = sizeof(back);
+    if (EEPROM_ReadBuffer(address + at, back, n) != 0 || memcmp(back, pBuffer + at, n) != 0)
+      return false;
+  }
+  return true;
+}
+
 #if UVK6_SEED_PA_CAL
 // One-off maintenance build for a radio whose factory calibration was erased.
 // Seeds only empty VHF/UHF PA rows (0x1ED0 + band*16, Low/Mid/High x 3

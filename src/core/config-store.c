@@ -1,4 +1,5 @@
 #include "core/config-store.h"
+#include "core/crc32.h"
 #include <string.h>
 
 // Record: "UVR2", format, band count, slot capacity, pad, sequence, CRC32,
@@ -30,15 +31,12 @@ static uint16_t get16(const uint8_t *p) {
 static uint32_t get32(const uint8_t *p) {
   return (uint32_t)get16(p) | ((uint32_t)get16(p+2) << 16);
 }
+// The CRC field itself counts as zeros.
 static uint32_t crc32(const uint8_t *bytes, uint16_t size) {
-  uint32_t crc = 0xffffffffu;
-  for (unsigned i = 0; i < size; ++i) {
-    uint8_t value = i >= HEADER_CRC && i < HEADER_CRC+4 ? 0 : bytes[i];
-    crc ^= value;
-    for (unsigned bit = 0; bit < 8; ++bit)
-      crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
-  }
-  return ~crc;
+  static const uint8_t zero[4];
+  uint32_t crc = CRC32_Update(CRC32_INIT, bytes, HEADER_CRC);
+  crc = CRC32_Update(crc, zero, sizeof(zero));
+  return ~CRC32_Update(crc, bytes + HEADER_CRC + 4, size - HEADER_CRC - 4u);
 }
 static uint8_t *encodeBand(uint8_t *p, const BandState *band) {
   put32(p, band->frequency_hz);

@@ -3,6 +3,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 python3 tests/flash-regression.py
+python3 tests/resources-regression.py
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
   tests/uart-protocol-regression.c src/hal/uart-protocol.c -o /tmp/uvk6-uart-protocol-test
 /tmp/uvk6-uart-protocol-test
@@ -49,7 +50,7 @@ esac
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/si-regression.c "$dead_strip" -o "$test_binary"
+  tests/si-regression.c src/core/resource.c src/core/crc32.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
@@ -86,14 +87,14 @@ esac
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/rx-runtime-regression.c \
   src/core/rx-runtime.c -o "$test_binary"
 "$test_binary"
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/config-store-regression.c \
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/config-store-regression.c src/core/crc32.c src/core/resource.c \
   src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/band-editor-regression.c src/core/config-store.c src/core/radio-model.c src/core/radio-state.c src/core/tx-model.c "$dead_strip" -o "$test_binary"
+  tests/band-editor-regression.c src/core/config-store.c src/core/crc32.c src/core/radio-model.c src/core/radio-state.c src/core/tx-model.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
@@ -122,15 +123,15 @@ esac
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/settings-regression.c src/core/measurements.c "$dead_strip" -o "$test_binary"
+  tests/settings-regression.c src/core/measurements.c src/core/crc32.c src/core/resource.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   \
-  -Wno-missing-field-initializers tests/settings-inline-regression.c src/ui/number-input.c src/ui/numnav.c \
+  -Wno-missing-field-initializers tests/settings-inline-regression.c src/core/crc32.c src/core/resource.c src/ui/number-input.c src/ui/numnav.c \
   src/core/measurements.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c src/ui/graphics.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/device-config-regression.c \
-  src/core/config-store.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/device-config-regression.c src/core/resource.c \
+  src/core/config-store.c src/core/crc32.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
@@ -139,10 +140,10 @@ esac
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/channels-regression.c src/core/channel-store.c src/core/radio-model.c src/core/tx-model.c \
+  tests/channels-regression.c src/core/channel-store.c src/core/crc32.c src/core/resource.c src/core/radio-model.c src/core/tx-model.c \
   src/ui/graphics.c src/ui/frequency.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/channel-store-regression.c \
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/channel-store-regression.c src/core/crc32.c src/core/resource.c \
   src/core/radio-model.c src/core/tx-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/bk-rx-mode-regression.c \

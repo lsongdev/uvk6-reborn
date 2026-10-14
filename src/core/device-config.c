@@ -1,5 +1,6 @@
 #include "core/device-config.h"
 #include "core/channel-store.h"
+#include "core/resource.h"
 #include "hal/eeprom.h"
 #include "hal/scheduler.h"
 #include "core/settings.h"
@@ -24,7 +25,7 @@ static bool writeStorage(void *context, uint32_t address, const void *data,
 static ConfigStore storage(void) {
   uint32_t size = EEPROM_DetectSize();
   return (ConfigStore){.read = readStorage, .write = writeStorage,
-      .capacity = size, .reserved_tail = size >= 32768 ? PATCH_SIZE : 0};
+      .capacity = size, .reserved_tail = RESOURCE_SsbPatchAddress(size) ? RESOURCE_TAIL_BYTES : 0};
 }
 bool DEVICE_Load(void) {
   gDeviceConfigReady = false;

@@ -157,6 +157,26 @@ typedef struct {
   } Data;
 } REPLY_051D_t;
 
+// Resource write (tools/resources.py): the firmware accepts only addresses
+// in the resource tail and replies after reading the bytes back.
+typedef struct {
+  Header_t Header;
+  uint32_t Offset;
+  uint8_t Size;
+  uint8_t Padding[3];
+  uint32_t Timestamp;
+  uint8_t Data[128];
+} CMD_0570_t;
+
+typedef struct {
+  Header_t Header;
+  struct {
+    uint32_t Offset;
+    uint8_t Ok;
+    uint8_t Padding[3];
+  } Data;
+} REPLY_0570_t;
+
 typedef struct {
   Header_t Header;
   struct {
@@ -287,6 +307,17 @@ static void CMD_051B(const uint8_t *pBuffer) {
   SendReply(&Reply, pCmd->Size + 8 + 4);
 }
 
+static void CMD_0570(const uint8_t *pBuffer) {
+  const CMD_0570_t *pCmd = (const CMD_0570_t *)pBuffer;
+  REPLY_0570_t Reply = {0};
+  if (pCmd->Timestamp != Timestamp) return;
+  Reply.Header.ID = 0x0571;
+  Reply.Header.Size = sizeof(Reply.Data);
+  Reply.Data.Offset = pCmd->Offset;
+  Reply.Data.Ok = EEPROM_WriteResource(pCmd->Offset, pCmd->Data, pCmd->Size);
+  SendReply(&Reply, sizeof(Reply));
+}
+
 static void CMD_052F(const uint8_t *pBuffer) {
   const CMD_052F_t *pCmd = (const CMD_052F_t *)pBuffer;
 
@@ -404,6 +435,11 @@ void UART_HandleCommand(void) {
     // VERSION, BL OFF
   case 0x052F:
     CMD_052F(UART_Command.Buffer);
+    break;
+
+    // RESOURCE WRITE
+  case 0x0570:
+    CMD_0570(UART_Command.Buffer);
     break;
 
     // RESET

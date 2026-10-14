@@ -45,6 +45,17 @@ int main(void) {
   assert(EEPROM_WriteAllowed(CHANNEL_STORE_BASE, CHANNEL_STORE_RECORD_BYTES));
   assert(!EEPROM_WriteAllowed(CHANNEL_STORE_END-1, 2));
   assert(!EEPROM_WriteAllowed(UINT32_MAX, 64));
+  // Resources: only the tail of a large part, never via the normal guard.
+  const uint32_t cap = 524288u, tail = cap - RESOURCE_TAIL_BYTES;
+  assert(!EEPROM_WriteAllowed(tail, 16));
+  assert(EEPROM_ResourceWriteAllowed(tail, 16, cap));
+  assert(EEPROM_ResourceWriteAllowed(cap - 128, 128, cap));
+  assert(!EEPROM_ResourceWriteAllowed(cap - 127, 128, cap));
+  assert(!EEPROM_ResourceWriteAllowed(tail - 1, 2, cap));
+  assert(!EEPROM_ResourceWriteAllowed(0x1e00, 16, cap)); // Calibration stays out.
+  assert(!EEPROM_ResourceWriteAllowed(CONFIG_STORE_BASE, 16, cap));
+  assert(!EEPROM_ResourceWriteAllowed(8192 - 16, 16, 8192)); // Small parts: none.
+  assert(RESOURCE_SsbPatchAddress(cap) == 0x7DD78u);
 
   // Round trip of every field family, including the TX shift.
   DeviceConfig original, loaded;
