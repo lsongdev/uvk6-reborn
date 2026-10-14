@@ -1,5 +1,7 @@
 #include "core/tx-model.h"
 
+const char *const txPowerNames[TX_POWER_HIGH + 1] = {"Low", "Medium", "High"};
+
 bool TX_MODEL_ConfigValid(const TxConfig *c) {
   return c && (unsigned)c->power <= TX_POWER_HIGH && (unsigned)c->shift < TX_SHIFT_COUNT &&
          TONE_Valid(c->tone) && !(c->offset_hz % 10u) && c->offset_hz <= TX_OFFSET_MAX_HZ &&

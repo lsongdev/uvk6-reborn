@@ -142,6 +142,15 @@ static void homeRender(void) {
 
 // --- Keys -------------------------------------------------------------------
 
+static void cycleTxPower(void) {
+  static char text[20]; // Outlives the call: the notice keeps the pointer.
+  if (!RADIO_CycleTxPower(true)) return;
+  Text t = TEXT_Begin(text, sizeof(text));
+  TEXT_Add(&t, "TX Power: ");
+  TEXT_Add(&t, txPowerNames[RADIO_Selected()->tx.power]);
+  RADIO_Notify(text);
+}
+
 static void shortcutKey(KEY_Code_t key) {
   HOME_CancelShortcut();
   switch (key) {
@@ -150,7 +159,7 @@ static void shortcutKey(KEY_Code_t key) {
   case KEY_2: RADIO_SwitchSlot(); break;
   case KEY_3: RADIO_SwitchSource(); break;
   case KEY_4: RADIO_StartCapture(); break;
-  case KEY_6: RADIO_CycleTxPower(true); break;
+  case KEY_6: cycleTxPower(); break;
   case KEY_STAR: RADIO_StartSeek(); break;
   default:
     if (key != KEY_F && key != KEY_EXIT) RADIO_Notify("Not supported");

@@ -92,16 +92,10 @@ bool RADIO_SetTx(const TxConfig *tx) {
   return true;
 }
 
-void RADIO_CycleTxPower(bool up) {
-  static const char *const names[] = {"Low", "Medium", "High"};
-  static char text[20]; // Outlives the call: the notice keeps the pointer.
+bool RADIO_CycleTxPower(bool up) {
   TxConfig tx = activeSlot.tx;
   tx.power = (TxPower)((tx.power + (up ? 1u : 2u)) % 3u);
-  if (!RADIO_SetTx(&tx)) return;
-  Text t = TEXT_Begin(text, sizeof(text));
-  TEXT_Add(&t, "TX Power: ");
-  TEXT_Add(&t, names[tx.power]);
-  notify(text);
+  return RADIO_SetTx(&tx);
 }
 
 static bool txReady(void) {

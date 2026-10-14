@@ -34,7 +34,7 @@ uint8_t RADIO_SelectedId(void);
 void RADIO_AdjustRx(RadioParameterField field, bool up);
 void RADIO_ResetToPreset(void);
 bool RADIO_SetTx(const TxConfig *tx);     // False (and a notice) when refused.
-void RADIO_CycleTxPower(bool up);      // Low → Medium → High, with a notice.
+bool RADIO_CycleTxPower(bool up);      // Low ↔ Medium ↔ High; false when refused.
 
 // Features that own RF while they run.
 void RADIO_StartSeek(void);
