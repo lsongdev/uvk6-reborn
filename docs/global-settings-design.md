@@ -79,7 +79,7 @@ SI4732 idle 是下一次路径切换策略；TX 保护项在下一次 PTT 获取
 
 | 模块 | 职责 |
 | --- | --- |
-| `apps/settings.c` | 静态菜单分组、输入动作、简短值文本和能力提示；不直接操作射频寄存器 |
+| `screens/settings.c` | 静态菜单分组、输入动作、简短值文本和能力提示；不直接操作射频寄存器 |
 | `core/settings.h/.c` | 可编辑偏好的 ID、范围及选项，`SETTINGS_SetValue(id, value)` 校验并返回是否接受；同值不写入，接收硬件生效由设置应用退出动作处理 |
 | `core/device-config.c` | 唯一的延迟保存计时、dirty／失败状态和重试；移除 exportPreferences 与重复的旧保存计时 |
 | `core/config-store.c` | 默认值、字段校验、版本解码、显式字节编码和双槽提交；不调用硬件 |
@@ -113,7 +113,7 @@ SI4732 idle 是下一次路径切换策略；TX 保护项在下一次 PTT 获取
 
 ## 源码依据
 
-- 现有菜单：[apps/settings.c](../src/apps/settings.c)、五行渲染及按键：[ui/menu.c](../src/ui/menu.c)。
+- 现有菜单：[screens/settings.c](../src/screens/settings.c)、五行渲染及按键：[ui/menu.c](../src/ui/menu.c)。
 - 旧状态与范围：[core/settings.c](../src/core/settings.c)、原生字段及版本：[config-store.h](../src/core/config-store.h)、默认与编码校验：[config-store.c](../src/core/config-store.c)。
 - 导入／导出与延迟保存：[device-config.c](../src/core/device-config.c)；静噪缓存和 SI 离开策略：[rx-device.c](../src/hal/rx-device.c)。
-- 键盘锁语义：[system.c](../src/apps/system.c)；当前功能编译范围：[Makefile](../Makefile)。
+- 键盘锁语义：[system.c](../src/system.c)；当前功能编译范围：[Makefile](../Makefile)。

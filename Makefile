@@ -22,8 +22,9 @@ SRC := $(SRC_DIR)/main.c \
        $(wildcard $(SRC_DIR)/hal/*.c) \
        $(wildcard $(SRC_DIR)/drivers/*/*.c) \
        $(wildcard $(SRC_DIR)/ui/*.c) \
-       $(wildcard $(SRC_DIR)/ui/components/*.c) \
-       $(wildcard $(SRC_DIR)/apps/*.c)
+       $(wildcard $(SRC_DIR)/radio/*.c) \
+       $(wildcard $(SRC_DIR)/screens/*.c) \
+       $(SRC_DIR)/system.c
 
 OBJS := $(OBJ_DIR)/hal/start.o \
         $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)

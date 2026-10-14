@@ -1,9 +1,10 @@
 #include "hal/keyboard.h"
 #include "drivers/dp32g030/gpio.h"
 #include "hal/scheduler.h"
-#include "apps/system.h"
 #include "hal/gpio.h"
 #include "hal/systick.h"
+
+static void postKey(KEY_Code_t key, Key_State_t state);
 
 static SystemMessages n;
 
@@ -85,13 +86,13 @@ static void HandlePttKey(void) {
 
   if (mKeyPtt) {
     if (mPrevStatePtt == KEY_RELEASED) {
-      SYS_MsgKey(KEY_PTT, KEY_PRESSED);
+      postKey(KEY_PTT, KEY_PRESSED);
       mPrevStatePtt = KEY_PRESSED;
       mPttLongPressTimer = currentTick;
     } else if (mPrevStatePtt == KEY_PRESSED) {
       uint32_t elapsedTime = currentTick - mPttLongPressTimer;
       if (elapsedTime >= LONG_PRESS_TIME) {
-        SYS_MsgKey(KEY_PTT, KEY_LONG_PRESSED);
+        postKey(KEY_PTT, KEY_LONG_PRESSED);
         mPttLongPressTimer = 0;
         mPrevStatePtt = KEY_LONG_PRESSED;
         mPttLongPressRepeatTimer = currentTick;
@@ -101,18 +102,18 @@ static void HandlePttKey(void) {
       uint32_t elapsedTime = currentTick - mPttLongPressRepeatTimer;
       if (elapsedTime >= LONG_PRESS_REPEAT_TIME) {
         mPttLongPressRepeatTimer = currentTick;
-        SYS_MsgKey(KEY_PTT, KEY_LONG_PRESSED_CONT);
+        postKey(KEY_PTT, KEY_LONG_PRESSED_CONT);
         mPrevStatePtt = KEY_LONG_PRESSED_CONT;
       }
     }
   } else {
     if (mPrevStatePtt != KEY_RELEASED) {
       if (mPrevStatePtt == KEY_PRESSED) {
-        SYS_MsgKey(KEY_PTT, KEY_RELEASED);
+        postKey(KEY_PTT, KEY_RELEASED);
       }
       if (mPrevStatePtt == KEY_LONG_PRESSED ||
           mPrevStatePtt == KEY_LONG_PRESSED_CONT) {
-        SYS_MsgKey(KEY_PTT, KEY_RELEASED);
+        postKey(KEY_PTT, KEY_RELEASED);
       }
 
       mPttLongPressTimer = 0;
@@ -168,7 +169,8 @@ void KEYBOARD_Poll(void) {
   ResetKeyboardPins();
 }
 
-void SYS_MsgKey(KEY_Code_t key, Key_State_t state) {
+// Latches the key event read by KEYBOARD_GetKey.
+static void postKey(KEY_Code_t key, Key_State_t state) {
   n.message = MSG_KEYPRESSED;
   n.key = key;
   n.state = state;
@@ -179,7 +181,7 @@ void KEYBOARD_CheckKeys(void) {
 
   if (mKeyPressed != KEY_INVALID) {
     if (mPrevKeyState == KEY_RELEASED) {
-      SYS_MsgKey(mKeyPressed, KEY_PRESSED);
+      postKey(mKeyPressed, KEY_PRESSED);
       mPrevKeyState = KEY_PRESSED;
 
       mLongPressTimer = currentTick;
@@ -187,7 +189,7 @@ void KEYBOARD_CheckKeys(void) {
     } else if (mPrevKeyState == KEY_PRESSED) {
       uint32_t elapsedTime = currentTick - mLongPressTimer;
       if (elapsedTime >= LONG_PRESS_TIME) {
-        SYS_MsgKey(mKeyPressed, KEY_LONG_PRESSED);
+        postKey(mKeyPressed, KEY_LONG_PRESSED);
         mLongPressTimer = 0;
         mPrevKeyState = KEY_LONG_PRESSED;
         mLongPressRepeatTimer = currentTick;
@@ -197,7 +199,7 @@ void KEYBOARD_CheckKeys(void) {
       uint32_t elapsedTime = currentTick - mLongPressRepeatTimer;
       if (elapsedTime >= LONG_PRESS_REPEAT_TIME) {
         mLongPressRepeatTimer = currentTick;
-        SYS_MsgKey(mKeyPressed, KEY_LONG_PRESSED_CONT);
+        postKey(mKeyPressed, KEY_LONG_PRESSED_CONT);
         mPrevKeyState = KEY_LONG_PRESSED_CONT;
       }
     }
@@ -205,12 +207,12 @@ void KEYBOARD_CheckKeys(void) {
     if (mPrevKeyState != KEY_RELEASED) {
       if (mPrevKeyState != KEY_LONG_PRESSED &&
           mPrevKeyState != KEY_LONG_PRESSED_CONT) {
-        SYS_MsgKey(mPrevKeyPressed, KEY_RELEASED);
+        postKey(mPrevKeyPressed, KEY_RELEASED);
       }
 
       if (mPrevKeyState == KEY_LONG_PRESSED_CONT &&
           (mPrevKeyPressed == KEY_UP || mPrevKeyPressed == KEY_DOWN)) {
-        SYS_MsgKey(mPrevKeyPressed, KEY_RELEASED);
+        postKey(mPrevKeyPressed, KEY_RELEASED);
       }
 
       mLongPressTimer = 0;

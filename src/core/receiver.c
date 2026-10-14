@@ -7,7 +7,7 @@
 #include "hal/led.h"
 #include "hal/rx-device.h"
 #include "hal/tx-device.h"
-#include "ui/graphics.h"
+#include "hal/display.h"
 
 Receiver gReceiver;
 

@@ -58,7 +58,7 @@
 
 ## 实现与验证
 
-`src/ui/components/radio-card.c` 只有一个入口 `UI_RadioCardRender(y, view)`：接收 `UI_RadioCardView`，不保存任何状态，不访问接收器全局状态。活动状态显式传入，不以 RSSI 有效推断静噪已打开。
+`src/ui/radio-card.c` 只有一个入口 `UI_RadioCardRender(y, view)`：接收 `UI_RadioCardView`，不保存任何状态，不访问接收器全局状态。活动状态显式传入，不以 RSSI 有效推断静噪已打开。
 
 `tests/radio-card-regression.c` 验证：×2 加粗宽度、三种频率长度的尾部挪移、输入草稿末尾可见、名称与频率对齐、长名称溢出到小字栏、保留间隔列、Seek 强制显示频率、横条优先级、RT 不影响正文、重复绘制像素一致和越界不绘制。
 

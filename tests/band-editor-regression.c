@@ -1,5 +1,5 @@
 // Exercise draft cancellation, isolated persistence and capability filtering.
-#include "../src/apps/bands.c"
+#include "../src/screens/bands.c"
 #include <assert.h>
 
 DeviceConfig gDeviceConfig;
@@ -9,12 +9,12 @@ static unsigned saves, exits;
 static ReceiverCapabilities capabilities = {true, false, true};
 bool DEVICE_SaveNow(void) { ++saves; return saveWorks; }
 ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
-bool APPS_exit(void) { ++exits; return true; }
-static void press(KEY_Code_t key) { assert(BANDS_key(key, KEY_RELEASED)); }
+bool SCREEN_Pop(void) { ++exits; return true; }
+static void press(KEY_Code_t k) { assert(key(k, KEY_RELEASED)); }
 
 int main(void) {
   CONFIG_Default(&gDeviceConfig);
-  BANDS_init();
+  enter();
   assert(selected == 5 && !editing);
   press(KEY_DOWN); // 70cm.
   press(KEY_MENU);
@@ -84,7 +84,7 @@ int main(void) {
   // Editor follows B and only updates shared presets, not either VFO.
   gDeviceConfig.radio.selected_slot=1;
   gDeviceConfig.radio.slots[1].current.parameters.squelch=8;
-  BANDS_init();assert(selected==6);press(KEY_MENU);field=FIELD_CURRENT;
+  enter();assert(selected==6);press(KEY_MENU);field=FIELD_CURRENT;
   press(KEY_MENU);assert(draft.squelch==8);
   field=FIELD_SAVE;press(KEY_MENU);assert(gDeviceConfig.radio.presets[6].squelch==8);
   assert(gDeviceConfig.radio.slots[0].current.parameters.squelch==7);

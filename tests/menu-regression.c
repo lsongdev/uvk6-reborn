@@ -2,7 +2,6 @@
 #include "../src/ui/menu.c"
 #include <assert.h>
 
-void STATUSLINE_SetText(const char *text) { (void)text; }
 void PrintSmall(uint8_t x, uint8_t y, const char *pattern) {
   (void)x; (void)y; (void)pattern;
 }

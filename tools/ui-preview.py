@@ -57,10 +57,10 @@ def main():
         with tempfile.TemporaryDirectory(prefix='uvk6-ui-preview-') as temp:
             directory = Path(temp)
             binary = directory / 'preview'
-            sources = ['tools/ui-preview.c', 'src/ui/graphics.c', 'src/ui/components/radio-card.c',
-                       'src/ui/components/frequency.c',
+            sources = ['tools/ui-preview.c', 'src/ui/graphics.c', 'src/ui/radio-card.c',
+                       'src/ui/frequency.c',
                        'src/core/rds.c',
-                       'src/ui/components/signal.c', 'src/core/radio-model.c', 'src/core/text.c']
+                       'src/ui/signal.c', 'src/core/radio-model.c', 'src/core/text.c']
             command = shlex.split(os.environ.get('CC', 'cc')) + [
                 '-Isrc', '-std=c2x', '-ffunction-sections', '-fdata-sections',
                 '-Wno-incompatible-pointer-types',
