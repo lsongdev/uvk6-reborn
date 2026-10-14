@@ -60,7 +60,6 @@ static void buildCardView(uint8_t id, const char *inputText,
     .activity = id==txSlot && transmitter.mode==RADIO_TX ? UI_RADIO_CARD_TRANSMITTING :
       id==txSlot && transmitter.mode==RADIO_FAULT ? UI_RADIO_CARD_FAULT :
       selected && seek.active ? UI_RADIO_CARD_SEEKING :
-      WATCH_Probe(&watcher)==id ? UI_RADIO_CARD_WATCHING :
       receiving && gReceiver.open ? UI_RADIO_CARD_RECEIVING :
       (channelMode && !effectiveOk) || (selected && !runtime.active) ? UI_RADIO_CARD_UNAVAILABLE : UI_RADIO_CARD_IDLE,
     .power_label = tx->power == TX_POWER_HIGH ? "HIGH" :

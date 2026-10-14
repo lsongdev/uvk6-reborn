@@ -52,10 +52,6 @@ uint8_t WATCH_Owner(const WatchRuntime *r) {
   return r->audio==WATCH_EVENT ? r->events[r->cursor].id :
          r->audio==WATCH_BACKGROUND ? r->background.id : UINT8_MAX;
 }
-uint8_t WATCH_Probe(const WatchRuntime *r) {
-  return r && (r->phase==WATCH_SETTLE || r->phase==WATCH_VERIFY) ?
-         r->events[r->cursor].id : UINT8_MAX;
-}
 bool WATCH_Talk(const WatchRuntime *r, WatchTarget *target) {
   if (!r || (r->phase!=WATCH_HOLD && r->phase!=WATCH_HANG)) return false;
   if (target) *target=r->events[r->cursor];

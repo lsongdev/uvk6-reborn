@@ -51,8 +51,6 @@ void WATCH_Stop(WatchRuntime *runtime);
 void WATCH_Update(WatchRuntime *runtime, uint32_t now, const WatchOperations *ops);
 // Slot owning the speaker, or UINT8_MAX while everything is quiet.
 uint8_t WATCH_Owner(const WatchRuntime *runtime);
-// Event slot being checked but not yet heard, or UINT8_MAX.
-uint8_t WATCH_Probe(const WatchRuntime *runtime);
 bool WATCH_IsProbing(const WatchRuntime *runtime);
 // Take every BK slot out of the watch (an event talk or a BK background
 // goes quiet) while a broadcast background keeps playing; resuming puts

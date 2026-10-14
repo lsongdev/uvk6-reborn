@@ -57,8 +57,6 @@ static void renderActivity(uint8_t y, const UI_RadioCardView *view) {
     upper = "TX"; lower = view->power_label ? view->power_label : "--"; break;
   case UI_RADIO_CARD_SEEKING:
     upper = "SEEK"; lower = ">"; break;
-  case UI_RADIO_CARD_WATCHING:
-    upper = "DW"; lower = "--"; break;
   case UI_RADIO_CARD_UNAVAILABLE:
     upper = "RX"; lower = "--"; break;
   case UI_RADIO_CARD_FAULT:

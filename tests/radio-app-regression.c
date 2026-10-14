@@ -275,6 +275,14 @@ int main(void) {
          activeSlot.current.frequency_hz==mrFrequency);
   press(KEY_F);press(KEY_3);assert(activeSlot.source==RADIO_SOURCE_VFO);
   memset(fakeChannelUsed,0,sizeof(fakeChannelUsed));
+  // A broadcast's RDS station name is the suggested name for a new channel.
+  setup(95900000,(RadioParameters){RX_WFM,100000,0,0,0});
+  labels[0].frequency_hz=95900000;memcpy(labels[0].ps,"LOVE959 ",9);
+  inMenu=true;menuIndex=MENU_SAVE_CHANNEL;press(KEY_MENU);assert(CHANNEL_MANAGER_Active());
+  press(KEY_MENU);assert(!strcmp(gTextinputText,"LOVE959")); // Trailing PS padding trimmed.
+  gTextInputCallback();
+  assert(fakeChannelUsed[1] && !strcmp(fakeChannels[1].name,"LOVE959"));
+  memset(fakeChannelUsed,0,sizeof(fakeChannelUsed));inMenu=false;
   // A channel deleted in Settings → Channels sends its slot back to VFO,
   // and returning to the main screen retunes it.
   setup(145500000, testRx);
@@ -913,9 +921,9 @@ int main(void) {
   setup(145500000,fm);
   watchSignalFrequency=438500000;unsigned watchSaves=saveRequests;
   RADIO_APP_update();assert(watcher.phase==WATCH_SETTLE && !RADIO_APP_isReceiving());
-  RADIO_APP_render();assert(drawn[0].activity==UI_RADIO_CARD_WATCHING && !strcmp(statusText,"DW -"));
+  RADIO_APP_render();assert(drawn[0].activity==UI_RADIO_CARD_IDLE && !strcmp(statusText,"DW -"));
   clockNow+=180;RADIO_APP_update();assert(watcher.phase==WATCH_POLL);
-  RADIO_APP_update();assert(WATCH_Probe(&watcher)==1 && selectedSlot==0);
+  RADIO_APP_update();assert(watcher.events[watcher.cursor].id==1 && selectedSlot==0);
   clockNow+=180;RADIO_APP_update();assert(watcher.phase==WATCH_VERIFY);
   clockNow+=80;RADIO_APP_update();assert(watcher.phase==WATCH_HOLD && RADIO_APP_isReceiving());
   assert(gReceiver.open && receivingSlot==1);
