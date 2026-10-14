@@ -70,6 +70,7 @@
 | F→2（A/B） | 在已启用 Slot 间循环 |
 | F→3（VFO/MR） | 切换当前 Slot 的 VFO／频道来源 |
 | F→4（FC） | 捕获附近强载波频率 |
+| F→5（Spectrum） | 打开频谱，与 Slot 菜单 → Spectrum 相同 |
 | F→6（H/M/L） | VFO 功率 Low→Medium→High→Low，保存并提示 |
 | F→0（FM） | 循环当前频率可用的明确解调模式 |
 | F→*（Scan） | 当前频段向前搜台 Seek |
