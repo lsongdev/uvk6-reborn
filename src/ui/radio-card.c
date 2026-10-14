@@ -130,7 +130,7 @@ void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view) {
     return;
   }
   // Extra decimals right-align over the unit; a long draft keeps its end
-  // (the cursor) in view.
+  // (the latest digit) in view.
   if (tail <= LCD_WIDTH-TAIL_X) UI_SmallTextWindow(LCD_WIDTH-tail, y+13, tail, rest, 0);
   else UI_SmallTextWindow(TAIL_X, y+13, LCD_WIDTH-TAIL_X, rest, tail-(LCD_WIDTH-TAIL_X));
   PrintSmallEx(LCD_WIDTH, y+22, POS_R, C_FILL, unit);

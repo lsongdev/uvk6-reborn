@@ -50,10 +50,10 @@ int main(int argc, char **argv) {
   UI_RadioCardRender(8+UI_RADIO_CARD_HEIGHT,&second);snapshot("name.pbm");
   snapshot("dual.pbm");
   // A frequency draft owns the body; its end stays visible above the unit.
-  second.edit_text="1340.000001_";
+  second.edit_text="1340.000001";
   UI_RadioCardRender(8+UI_RADIO_CARD_HEIGHT,&second);snapshot("tuned.pbm");
   // An MR channel number draft uses the same body with a CH unit.
-  second.band_name="CH 012";second.edit_text="15_";second.edit_unit="CH";
+  second.band_name="CH 012";second.edit_text="15";second.edit_unit="CH";
   UI_RadioCardRender(8+UI_RADIO_CARD_HEIGHT,&second);snapshot("channel.pbm");
   // First-release A/B: only the selected row owns RX and valid signal.
   base();FillRect(100,0,10,5,C_CLEAR);
@@ -132,13 +132,13 @@ int main(int argc, char **argv) {
   UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-tx.pbm");
   // Drafts leave the original reception running until MENU accepts them.
   v=(UI_RadioCardView){.id='A',.selected=true,.frequency_hz=438500000,
-    .step_hz=12500,.mode=RX_NFM,.band_name="70cm",.edit_text="438.6_",
+    .step_hz=12500,.mode=RX_NFM,.band_name="70cm",.edit_text="438.6",
     .activity=UI_RADIO_CARD_RECEIVING,.signal_valid=true,.signal_level=8};
   second=(UI_RadioCardView){.id='B',.frequency_hz=145500000,.step_hz=12500,
     .mode=RX_NFM,.band_name="2m"};
   manualBase("DW A",false);
   UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-input.pbm");
-  v.band_name="CH 012";v.name="Local";v.edit_text="15_";v.edit_unit="CH";
+  v.band_name="CH 012";v.name="Local";v.edit_text="15";v.edit_unit="CH";
   manualBase("MR A",false);
   UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-channel.pbm");
   // Spectrum: the slot card shows the cursor; noise, two carriers, peaks.
