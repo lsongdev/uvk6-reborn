@@ -22,7 +22,7 @@ BK4819 REG32 写 `0x0245` 开启 0.2 秒频率检测，`0x0244` 关闭。REG0D b
 
 - 轮询 20 ms；单次尝试上限 500 ms，使用无符号 elapsed 处理计时回绕。2026-10-14 起不设会话超时：没有稳定结果就一直检测、实时显示读数，直到确认或手动退出。长时间检测只是让 BK4819 持续处于接收／测频状态，不发射，对芯片无额外损耗，耗电与一直接收相当。
 - 同一滤波范围连续两次有效值差 **≤3,000 Hz**，采用最新值。无效结果或尝试超时清 hits；正常 BUSY 轮询不清候选。
-- Auto 每个范围最多两次尝试，让同范围有机会确认；无结果也推进，换范围时清 hits。固定范围重复检测，直到稳定或会话超时。
+- Auto 每个范围最多两次尝试，让同范围有机会确认；无结果也推进，换范围时清 hits。固定范围重复检测，直到稳定或手动退出。
 - HAL 检查原始值乘十溢出／整机上限和 Filter split。应用用 `RADIO_MODEL_Plan` 验证 NFM、BK、范围空洞和量化后的值完全相同；不直接把 27-bit 寄存器上限当成整机接收能力。
 
 表示单位不是准确度承诺；晶振偏差、短发射、多信号和滤波路径效果需要实测。
@@ -33,7 +33,7 @@ BK4819 REG32 写 `0x0245` 开启 0.2 秒频率检测，`0x0244` 关闭。REG0D b
 | --- | --- |
 | `drivers/bk4819/capture.c` | 检测启动／关闭、原始寄存器读数；驱动单位 10 Hz |
 | `hal/rx-device.*` | 旧芯片离开、BK 接收基线、滤波范围、Hz 转换、停止与缓存失效 |
-| `core/capture.*` | 两次稳定、有界尝试、Auto 轮换与会话超时；没有硬件或配置依赖 |
+| `core/capture.*` | 两次稳定、有界尝试与 Auto 轮换；没有硬件或配置依赖 |
 | `apps/radio-capture.c` | 资源独占、模型校验、采用／恢复、按键和显示 |
 
 核心 API 是 `CAPTURE_Start` / `CAPTURE_Update`，接收 BUSY／INVALID／SAMPLE，输出 WAIT／RESTART／FOUND／TIMEOUT。应用管理 OFF／DETECT／PREVIEW 生命周期，核心不持有芯片或用户状态。HAL 使用 `RX_DEVICE_CaptureStart` / `CapturePoll` / `CaptureStop`；BK 串行写没有 ACK，Start 没有虚构硬件成功返回值。
@@ -53,7 +53,7 @@ stateDiagram-v2
     [*] --> Detect: F4，VFO 接收可用
     Detect --> Detect: 重试／Auto 轮换
     Detect --> Idle: 两次稳定，调谐 VFO 成功
-    Detect --> Restore: EXIT／MENU／超时／调谐失败／离开应用
+    Detect --> Restore: EXIT／MENU／调谐失败／离开应用
     Restore --> Idle: 原方案恢复
     Restore --> Fault: 静音，清接收归属
 ```
