@@ -109,7 +109,7 @@ static void poll(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
   if (backgroundOnBk(r) && (!r->count || r->visited>=r->count)) { home(r,now,ops); return; }
   uint8_t n=0;
   for (; n<r->count; ++n) {
-    uint8_t i=(uint8_t)((r->cursor+n)%r->count);
+    uint8_t i=(uint8_t)((r->cursor+n+0u)%r->count); // Unsigned: no __divsi3.
     if (!(r->blocked&(1u<<i)) || (int32_t)(now-r->blocked_until[i])>=0) { r->cursor=i; break; }
   }
   if (n==r->count) {
