@@ -120,11 +120,11 @@ PTT→确定选中或回话对象→停止守听并恢复对象方案→必要�
 
 RDS 链路为 SI 命令→HAL 的 RdsPacket→纯解析器／轮询器→Slot 标签→卡片。支持 PI、0A/0B PS、2A/2B RadioText；每个段须两次一致，PS 四段齐全才发布，RT 收齐结束符前连续段或全部段才发布。块错误、PI 改变、RT A/B／格式改变、溢出均有明确清理策略。
 
-进入 SI WFM 先等 300 ms、清 FIFO，每 100 ms 最多读四组；读失败停止本轮。连续 15 秒无有效同步数据则过期。实际重调谐重置解析器，单纯广播／BK 音频路由不重置。缓存按 Slot、频率隔离，不持久化；MR 正文优先频道名。ASCII 扩展映射为 ?，控制字符转空格，RT 回车结束；不实现完整字符集、RT+、时钟、AF。
+进入 SI WFM 先等 300 ms、清 FIFO，每 100 ms 最多读四组；读失败停止本轮。连续 15 秒无有效同步数据则过期。实际重调谐重置解析器，单纯广播／BK 音频路由不重置。缓存按 Slot、频率隔离，不持久化；MR 正文优先频道名。ASCII 扩展映射为 ?，控制字符转空格，RT 回车结束；不实现完整字符集、RT+、时钟、AF。命令与 BLE 错误等级依据 [Skyworks AN332](https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN332.pdf)，分组文本参考 [AN243](https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN243.pdf)。
 
 Seek 只在选中 VFO 的当前频段／模式内向前搜索、回绕一次。SI 使用原生 Seek，BK／BK1080 软件步进，独立检测信号，不能把 SQ0 音频常开视为电台。中间候选只改硬件；找到后用统一事务提交一次。取消、失败、无台恢复 origin，不保存。SSB 不 Seek。
 
-FC 仅 VFO、BK 频率检测。core/capture 接收 BUSY／INVALID／SAMPLE，同滤波范围两次差≤3000 Hz 采用最新值；Auto 每范围最多两次尝试再轮换，单次尝试 500 ms、轮询 20 ms，不设会话超时。MENU 可采用最新有效读数；EXIT 取消。候选必须精确为 NFM／BK 方案，采用后关闭 TX Enable、清 RX Tone／频道绑定，成功才保存。停止检测需失效 BK 缓存，同频恢复也全配置。它不解码模式或亚音，不保证免于谐波误捕。
+FC 仅 VFO、BK 频率检测。core/capture 接收 BUSY／INVALID／SAMPLE，同滤波范围两次差≤3000 Hz 采用最新值；Auto 每范围最多两次尝试再轮换，单次尝试 500 ms、轮询 20 ms，不设会话超时。MENU 可采用最新有效读数；EXIT 取消。候选必须精确为 NFM／BK 方案，采用后关闭 TX Enable、清 RX Tone／频道绑定，成功才保存。停止检测需失效 BK 缓存，同频恢复也全配置。它不解码模式或亚音，不保证免于谐波误捕。BK 驱动通过 REG32 的 0x0245／0x0244 开启／关闭检测，REG0D 完成位及 REG0E 合成读数；参考 [Egzumer BK4819 实现](https://github.com/egzumer/uv-k5-firmware-custom/blob/main/driver/bk4819.c)，未知寄存器字段不当作厂家规格。
 
 ## 7. 配置、频道与全局设置
 
@@ -152,3 +152,14 @@ FC 仅 VFO、BK 频率检测。core/capture 接收 BUSY／INVALID／SAMPLE，同
 中文计划应使用外部 EEPROM 字库与小缓存，先定义编码、资源清单／CRC、安装与升级工具、缺资源恢复，再设计中文输入。至少 12 px 字形所需高度要纳入 20 px 正文预算；不直接移植其他设备 SPI Flash 地址。512 KiB 外部容量可支持更大资源，但不增加 60 KiB MCU Flash 或 16 KiB RAM。
 
 增加 Slot 保存容量不增加同频芯片并行能力；更多 BK 事件仍需轮询，延迟与漏检增大。任何新 TX、资源写入或硬件参数必须保持明确边界，不能通过功能设置放开校准保护。
+
+## 9. 源码依据
+
+| 规则 | 当前实现 |
+| --- | --- |
+| 频段、模式、分辨率、跨频段步进 | [radio-model.c](../src/core/radio-model.c)、[tuning.c](../src/core/tuning.c)、[radio-state.h](../src/core/radio-state.h) |
+| 来源和调谐提交、RDS 标签 | [radio.c](../src/radio/radio.c)、[receiver.c](../src/core/receiver.c)、[rx-runtime.c](../src/core/rx-runtime.c) |
+| 页面按键、菜单与卡片 | [home.c](../src/screens/home.c)、[slot-menu.c](../src/screens/slot-menu.c)、[radio-card.c](../src/ui/radio-card.c) |
+| 守听、回话、TX 许可 | [watch.c](../src/core/watch.c)、[tx.c](../src/radio/tx.c)、[tx-model.c](../src/core/tx-model.c) |
+| Seek／FC／RDS | [seek.c](../src/radio/seek.c)、[capture.c](../src/radio/capture.c)、[rds.c](../src/core/rds.c)、[rds-receiver.c](../src/core/rds-receiver.c) |
+| 编码、写保护与偏好 | [config-store.c](../src/core/config-store.c)、[channel-store.c](../src/core/channel-store.c)、[eeprom-layout.h](../src/hal/eeprom-layout.h)、[settings.c](../src/core/settings.c) |
