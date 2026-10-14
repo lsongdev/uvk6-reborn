@@ -71,14 +71,15 @@ static void renderActivity(uint8_t y, const UI_RadioCardView *view) {
   UI_SmallTextWindow(2, y+24, 26, lower, 0);
 }
 
-// The header frequency is shown while the body carries a name.
-static void renderHeader(uint8_t y, const UI_RadioCardView *view, const char *frequency) {
-  const char *mode = (unsigned)view->mode < RX_MODE_COUNT ? rxModeNames[view->mode] : "--";
+// With a name in the body the header carries the frequency at its right
+// edge and the mode moves down to the empty unit corner.
+static void renderHeader(uint8_t y, const UI_RadioCardView *view,
+                         const char *mode, const char *frequency) {
   bool notice = view->header_message && *view->header_message;
   const char *text = notice ? view->header_message :
                      view->radio_text && *view->radio_text ? view->radio_text :
                      view->band_name ? view->band_name : "";
-  uint8_t right = LCD_WIDTH-UI_SmallTextWidth(mode)-3;
+  uint8_t right = LCD_WIDTH;
   if (view->selected) {
     DrawVLine(1, y+1, 5, C_FILL);
     DrawVLine(2, y+2, 3, C_FILL);
@@ -87,11 +88,11 @@ static void renderHeader(uint8_t y, const UI_RadioCardView *view, const char *fr
   char id[2] = {view->id ? view->id : 'A', 0};
   PrintSmall(5, y+5, id);
   if (view->changed) PrintSmall(10, y+5, "*");
-  PrintSmallEx(LCD_WIDTH, y+5, POS_R, C_FILL, mode);
   // A notice is brief and takes the frequency's place until it expires.
-  if (frequency && !notice) {
-    PrintSmallEx(right, y+5, POS_R, C_FILL, frequency);
-    right -= UI_SmallTextWidth(frequency)+3;
+  const char *corner = frequency ? (notice ? NULL : frequency) : mode;
+  if (corner) {
+    PrintSmallEx(right, y+5, POS_R, C_FILL, corner);
+    right -= UI_SmallTextWidth(corner)+3;
   }
   UI_SmallTextWindow(BAND_X, y+5, right > BAND_X ? right-BAND_X : 0, text, 0);
   FillRect(0, y, LCD_WIDTH, 8, C_INVERT);
@@ -113,7 +114,9 @@ void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view) {
     Text t = TEXT_Begin(frequency + strlen(frequency), sizeof(frequency) - strlen(frequency));
     TEXT_Add(&t, unit);
   }
-  renderHeader(y, view, named ? frequency : NULL);
+  const char *mode = view->mode_text ? view->mode_text :
+      (unsigned)view->mode < RX_MODE_COUNT ? rxModeNames[view->mode] : "--";
+  renderHeader(y, view, mode, named ? frequency : NULL);
   renderActivity(y, view);
   // Large body text: the name, or else the frequency. What does not fit
   // continues small in the column above the unit, then the edge clips.
@@ -123,6 +126,7 @@ void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view) {
   UI_LargeTextWindow(TEXT_RIGHT-width, y+22, width, head, 0);
   if (named) {
     UI_SmallTextWindow(TAIL_X, y+13, LCD_WIDTH-TAIL_X, rest, 0);
+    PrintSmallEx(LCD_WIDTH, y+22, POS_R, C_FILL, mode);
     return;
   }
   // Extra decimals right-align over the unit; a long draft keeps its end

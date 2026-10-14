@@ -57,7 +57,7 @@ int main(void) {
   render(8,&view);
   sameRows(0,64); // Stateless: the same view always draws the same pixels.
   view.frequency_hz=438506250;render(8,&view);
-  assert(ink(115,128,16,23) && !ink(113,115,16,36));
+  assert(ink(115,128,16,23) && !ink(113,115,16,24)); // The mode may be wider than the unit.
   view.frequency_hz=1339999980;render(8,&view);
   assert(leftmost(17,32) >= 30 && ink(115,128,16,23)); // 1339.99 + 998
   assert(!ink(0,128,36,64)); // A card never draws outside its 28 rows.
@@ -73,11 +73,12 @@ int main(void) {
   bool header=false;
   for (unsigned x=60;x<113;++x) for (unsigned y=8;y<16;++y)
     header |= GetPixel(x,y) != !!(saved[y/8][x]&(1<<(y%8)));
-  assert(header && ink(30,113,17,32) && !ink(113,128,16,32)); // No unit in the body.
+  // The unit corner now holds the mode; nothing sits above it for a short name.
+  assert(header && ink(30,113,17,32) && !ink(113,128,16,24) && ink(115,128,24,32));
   unsigned nameLeft=leftmost(17,32);
   view.name="My Channnnnnnnnnnnnel";render(8,&view);
   assert(leftmost(17,32) < nameLeft && leftmost(17,32) >= 30);
-  assert(ink(115,128,16,23) && !ink(113,115,16,36) && !ink(115,128,24,32));
+  assert(ink(115,128,16,23) && !ink(113,115,16,24)); // The mode may be wider than the unit.
   // Seeking and editing always show the large frequency with its unit.
   view.activity=UI_RADIO_CARD_SEEKING;render(8,&view);
   assert(ink(115,128,24,32));
@@ -97,8 +98,8 @@ int main(void) {
   render(8,&view);memcpy(saved,gFrameBuffer,sizeof(saved));
   view.radio_text=NULL;render(8,&view);
   sameRows(0,64);
-  view.name=NULL;render(8,&view);
-  sameRows(8,16); // With a notice the header is the same named or not.
+  view.frequency_hz=145500000;render(8,&view);
+  sameRows(8,16); // A notice hides the header frequency, so it cannot change it.
 
   // Second row and bounds.
   render(36,&view);
