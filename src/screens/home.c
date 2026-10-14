@@ -166,6 +166,7 @@ static void shortcutKey(KEY_Code_t key) {
   case KEY_5: SCREEN_Push(&spectrumScreen); break;
 #endif
   case KEY_6: cycleTxPower(); break;
+  case KEY_8: RADIO_Reverse(); break;
   case KEY_STAR: RADIO_StartSeek(); break;
   default:
     if (key != KEY_F && key != KEY_EXIT) RADIO_Notify("Not supported");

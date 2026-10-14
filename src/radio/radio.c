@@ -124,6 +124,30 @@ bool apply(const RxPlan *plan) {
   return true;
 }
 
+// Reverse: RX moves to the TX frequency and TX to the old RX, the shift
+// flipping with it, so a repeater's input can be heard; again swaps back.
+void RADIO_Reverse(void) {
+  if (!requireVfoSource()) return;
+  TxConfig tx = activeSlot.tx;
+  uint32_t rx = activeSlot.current.frequency_hz;
+  uint32_t target = TX_MODEL_Frequency(&tx, rx);
+  if (tx.shift == TX_SHIFT_OFF || target == rx) { notify("TX Shift is Off"); return; }
+  if (tx.shift == TX_SHIFT_PLUS) tx.shift = TX_SHIFT_MINUS;
+  else if (tx.shift == TX_SHIFT_MINUS) tx.shift = TX_SHIFT_PLUS;
+  else tx.split_hz = rx;
+  RxPlan plan;
+  RxResult result = TUNING_ExactPlan(target, activeSlot.current.parameters,
+                                     RECEIVER_Capabilities(), &plan);
+  if (result != RX_OK || !TX_MODEL_ConfigValid(&tx)) {
+    notify(result != RX_OK ? unavailable(result) : "Invalid value");
+    return;
+  }
+  TxConfig *stored = &gDeviceConfig.radio.slots[selectedSlot].tx;
+  TxConfig previous = *stored;
+  *stored = tx; // apply() takes the stored TX settings with the new RX.
+  if (!apply(&plan)) *stored = previous;
+}
+
 // Plans a target for the selected slot; an approximation waits for
 // RADIO_ConfirmTune instead of being applied.
 void request(uint32_t target, RadioParameters values) {
