@@ -224,8 +224,8 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 | --- | --- | --- |
 | `0x0800–0x0FFF` | UVR2 格式 9 双 1024 B 槽，已定义内容 825 B | 配置写入；CRC 与序号回读校验 |
 | `0xB000–0x113FF` | 用户频道：200 个 × 两份 64 B 副本（标记、序号、名称 16 B、RX、TX Shift／频差／Split、CRC32） | 频道写入；开机只读每份的 2 字节头部 |
-| `0x1E00–0x1FFF` | 原机校准备份范围。工具 [K5TOOL](https://github.com/qrp73/K5TOOL) 提供读取 `0x1E00` 长度 `0x0200`，并说明其用于校准；[k5prog](https://github.com/sq5bpf/k5prog) 也警告全片覆写的风险 | **默认绝不擦除或覆写**；先备份，不从其他设备复制射频校准 |
-| `[容量 - 8856, 容量)` | SI4732 SSB 资源：16 B `SSBP` 头位于 `0x7DD68–0x7DD77`，8840 B 数据位于 `0x7DD78–0x7FFFF`；见 [resource.h](../src/core/resource.h) | 补丁不随固件打包；由 `tools/resources.py` 通过正常固件 UART 安装、完整回读后重启，启动校验长度及全量 CRC；驱动只读加载，不等于 LOSEHU patch |
+| `0x1E00–0x1FFF` | 原机校准备份范围。工具 [K5TOOL](https://github.com/qrp73/K5TOOL) 提供读取 `0x1E00` 长度 `0x0200`，并说明其用于校准；[k5prog](https://github.com/sq5bpf/k5prog) 也警告全片覆写的风险 | 普通配置和频道写入绝不触及；`tools/resources.py` 只能经 UART 改 `0x1ED0 + band × 16` 起的 PA 九字节，且先备份整个区 |
+| `[容量 - 8856, 容量)` | SI4732 SSB 资源：16 B `SSBP` 头位于 `0x7DD68–0x7DD77`，8840 B 数据位于 `0x7DD78–0x7FFFF`；见 [resource.h](../src/core/resource.h) | 补丁不随固件打包；由 `tools/resources.py ssb-write` 通过正常固件 UART 安装（先清头、写数据、最后写头），完整回读后重启，启动校验长度及全量 CRC；驱动只读加载，不等于 LOSEHU patch。用法见[开发文档](development.md#eeprom-资源与校准工具) |
 | `0x3C228–0x3FFFF` | LOSEHU **2 Mbit** 固件的 15,832 B SI4732 patch 区 | 仅作为其他固件的布局参考，不自动识别为本项目的 patch |
 
 **原厂校准区不是可随意丢弃的旧软件兼容数据**。即使新固件不保留旧频道，也必须保留或通过可信设备备份维护射频校准。普通构建的 `UVR2` 不会主动覆写 `0x1E00–0x1FFF` 或补丁尾区；未来更换 EEPROM、改变用途或完整格式化时同样须保护。
@@ -242,7 +242,7 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 
 ### 普通构建写保护
 
-新版固件在 `hal/eeprom-layout.h` 只允许写配置区 `0x0800–0x0FFF`（两份格式 9 各 1024 字节）和频道区 `0xB000–0x113FF`。其他地址（包含 `0x1E00–0x1FFF` 校准区和任何 SSB patch）只能通过读取接口访问；UART 原始 EEPROM 写命令已经禁用。所有普通写入保守按最多 32 B 分块，候选页大小不等于已验证的物理页。未来若增加 EEPROM 资源管理，应显式设计带确认和备份的独立维护模式，而不是放开通用写入函数。
+新版固件在 `hal/eeprom-layout.h` 只允许写配置区 `0x0800–0x0FFF`（两份格式 9 各 1024 字节）和频道区 `0xB000–0x113FF`。其他地址只能通过读取接口访问，UART 原始 EEPROM 写命令已经禁用。唯一例外是独立的 UART 维护写（`EEPROM_WriteMaintenance`，命令 0x0570）：只接受 SSB 资源尾区和七个 PA 行的前 9 字节，写后回读；确认和备份由 `tools/resources.py` 负责，通用写入函数没有放开。所有写入保守按最多 32 B 分块，候选页大小不等于已验证的物理页。
 
 ## 6. PA 校准与维护例外
 
@@ -255,6 +255,6 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 
 每档三个值都不是 00／FF 才视为可用，按实际 TX 频率插值，下降曲线也支持。档位不是未经测量的固定瓦数。Mic 默认 16，Deviation 默认 130（驱动乘 10）；软件没有写入 REG_3B 晶振校准，已删除旧代码固定减 1270 Hz 的频偏。供电检查来自电池测量，物理 PTT 为 PC5 低电平，PA gate 由 BK GPIO 控制。
 
-**普通构建不写校准。** 特殊 `SEED_PA_CAL=1` 维护构建强制 RX-only，启动时只给全 00／FF 的上述九字节行写入源码参考值并读回。非空记录不覆盖；该路径刻意绕过普通写区域，不属于日常配置初始化。源码说明参考三份公开 UV-K5(8) dump，High 采用逐锚点最小值；这不是本机个体校准，不能把写入参考值视为 RF 验收。详细使用边界见[特殊维护镜像](development.md#特殊维护镜像)。
+**固件自身从不写校准。** 只有 `tools/resources.py` 经 UART 维护命令写入上述 PA 九字节行：先备份 `0x1E00–0x1FFF`，列出新旧值并确认，写后回读。`cal-seed` 只给全 00／FF 的行写参考值（三份公开 UV-K5(8) dump，High 取逐锚点最小值），已有数据不覆盖；这不是本机个体校准，不能把参考值视为 RF 验收。原先的 `SEED_PA_CAL` 维护镜像已删除。用法见[开发文档](development.md#eeprom-资源与校准工具)。
 
 当前文档未记录可证明本台功率、频偏、杂散、温度保护或最大关断时延通过验收的测量。后续将实测日期、条件和结果写入本节，并同步开发文档验收项，不用主机 Mock 代替实测。

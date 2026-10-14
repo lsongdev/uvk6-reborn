@@ -122,16 +122,37 @@ python3 tools/bdf-to-gfx.py input.bdf output.h --name myFont --line 8
 
 muMatrix 源文件注明由 muwerk 的 mufont 生成；转换格式不意味着来源或授权信息可以删除。未来外部中文字库的安装、缓存与编码方案见设计文档。
 
-### SSB 补丁安装与校验
+### EEPROM 资源与校准工具
 
-补丁不在固件中，通过正常运行固件的 UART 安装到 EEPROM 尾部，无需构建 CRC 宏。当前资源为 `resources/si4735/patch_init.h`，8840 B，CRC32 为 `0xf9c0f474`；数据位于 `0x7DD78–0x7FFFF`，前方 16 B 为 `SSBP` 资源头（长度、CRC）。工具先清除资源头、写入数据，最后写头并全量回读，成功后重启刷新能力检测。`SETTINGS_IsPatchPresent` 校验资源头和全部数据，驱动只读加载到 SI；不能只检查前缀，也不自动迁移其他固件的补丁布局。
+tools/resources.py 通过正常运行固件（非 Bootloader）的 UART 维护 EEPROM。固件命令 0x0570 只接受 SSB 资源尾区和每个频段 PA 行的 9 字节，写后回读再应答；配置、频道和其余校准仍不可由串口写入。
+
+补丁不在固件中，安装到 EEPROM 尾部，无需构建 CRC 宏。当前资源为 `resources/si4735/patch_init.h`，8840 B，CRC32 为 `0xf9c0f474`；数据位于 `0x7DD78–0x7FFFF`，前方 16 B 为 `SSBP` 资源头（长度、CRC）。工具先清除资源头、写入数据，最后写头并全量回读，成功后重启刷新能力检测。`SETTINGS_IsPatchPresent` 校验资源头和全部数据，驱动只读加载到 SI；不能只检查前缀，也不自动迁移其他固件的补丁布局。
 
 ```sh
 python3 tools/resources.py --port /dev/cu.usbserial-1410 ssb-write
 python3 tools/resources.py --port /dev/cu.usbserial-1410 ssb-verify
+python3 tools/resources.py --port /dev/cu.usbserial-1410 read 0x1E00 0x200 cal.bin
 ```
 
+ssb-write 在尾区非空时先把原内容存到 backups/（已被 .gitignore 忽略），内容相同则不写。read 可保存任意地址范围，每次最多按 128 B 读取。
+
 安装时使用普通开机状态，非 Bootloader；About → SSB patch 应显示 Present。SSB 可作为 SI 常驻源与 BK 守听并行，音频切换不重载 patch；SSB Seek 仍不支持。
+
+PA 校准命令都先把整个 0x1E00–0x1FFF 存到 backups/calibration-时间.bin，同一秒内的备份另起文件名不覆盖：
+
+```sh
+python3 tools/resources.py --port /dev/cu.usbserial-1410 cal-read
+python3 tools/resources.py --port /dev/cu.usbserial-1410 cal-write 5 '5a5a5a 646464 7b7b7a'
+python3 tools/resources.py --port /dev/cu.usbserial-1410 cal-seed
+python3 tools/resources.py --port /dev/cu.usbserial-1410 cal-restore backups/calibration-20261014-120000.bin
+```
+
+- cal-read：备份并列出 band 0–6 的 Low／Medium／High 各三个锚点。
+- cal-write BAND ROW：写一行 9 字节；值不得为 00／FF（固件视为无校准）。TX 只用 band 2（136–174 MHz）和 band 5（400–470 MHz）。
+- cal-seed：只给全 00／FF 的 band 2／5 写参考值，已有数据不动。参考值来自三份公开 UV-K5(8) dump，High 取逐锚点最小值，**不是本机测量值**。
+- cal-restore FILE：从 cal-read 等产生的 512 B 备份恢复 PA 行。
+
+写入前列出旧值和新值，须输入 yes 确认（--yes 跳过），写后逐行回读。TX 每次发射时读 PA 表，写入后无需重启。参考值或手工值都不能代替功率计验收。
 
 ### UI 预览
 
@@ -258,7 +279,3 @@ tests/run.sh 构建主机用例和刷机模拟，无需对讲机。主机 Mock �
 - Seek／FC／RDS：空场、强信号／谐波、短发射、取消和跨芯片恢复，RDS 归属与过期；SSB 要先核对 EEPROM 补丁位置和全量 CRC。
 - 故障：I²C NACK／时钟拉伸失败及恢复，UART 活动、锁键和物理释放；测主循环最长阻塞和动态栈峰值，不把链接预留当最大栈。
 - TX：假负载、功率／频偏／杂散、Low／Medium／High 校准、Mic gain／Deviation、Shift／Split、TX Tone；测松键、TOT、低电压及总线故障的最大 PA 关断时延。
-
-### 特殊维护镜像
-
-Makefile 另有 **SEED_PA_CAL=1**，强制 ENABLE_TX=0。启动时只对全 00／FF 的 VHF／UHF PA 九字节行写入参考值并读回；非空不覆写。它绕过正常配置／频道写区域，**不是日常初始化，也不是本机测得校准**。实现位于 hal/eeprom.c 和 main.c，地址和参考来源区别见硬件事实。普通构建 SEED_PA_CAL=0，不执行该操作。维护镜像不得作为默认发布镜像或偷偷用于设备容量探测。

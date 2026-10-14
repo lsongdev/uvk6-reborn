@@ -76,11 +76,6 @@ ENABLE_TX ?= 1
 ENABLE_FC ?= 1
 # Slot menu → Spectrum: BK4819 sweep around the slot. ENABLE_SPECTRUM=0 drops it.
 ENABLE_SPECTRUM ?= 1
-# One-off maintenance image: seeds an erased PA calibration table, RX-only.
-SEED_PA_CAL ?= 0
-ifeq ($(SEED_PA_CAL),1)
-    ENABLE_TX := 0
-endif
 
 # Debug/Release specific flags
 DEBUG_FLAGS   := -g3 -DDEBUG -Og
@@ -93,8 +88,7 @@ DEFINES  := -DGIT_HASH=\"$(GIT_HASH)\" \
             -DARMCM0 \
             -DUVK6_ENABLE_TX=$(ENABLE_TX) \
             -DUVK6_ENABLE_FC=$(ENABLE_FC) \
-            -DUVK6_ENABLE_SPECTRUM=$(ENABLE_SPECTRUM) \
-            -DUVK6_SEED_PA_CAL=$(SEED_PA_CAL)
+            -DUVK6_ENABLE_SPECTRUM=$(ENABLE_SPECTRUM)
 
 # Include paths
 INC_DIRS := -I./src \

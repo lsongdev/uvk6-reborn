@@ -157,8 +157,8 @@ typedef struct {
   } Data;
 } REPLY_051D_t;
 
-// Resource write (tools/resources.py): the firmware accepts only addresses
-// in the resource tail and replies after reading the bytes back.
+// Maintenance write (tools/resources.py): the firmware accepts only the
+// resource tail and the PA calibration rows, and replies after reading back.
 typedef struct {
   Header_t Header;
   uint32_t Offset;
@@ -314,7 +314,7 @@ static void CMD_0570(const uint8_t *pBuffer) {
   Reply.Header.ID = 0x0571;
   Reply.Header.Size = sizeof(Reply.Data);
   Reply.Data.Offset = pCmd->Offset;
-  Reply.Data.Ok = EEPROM_WriteResource(pCmd->Offset, pCmd->Data, pCmd->Size);
+  Reply.Data.Ok = EEPROM_WriteMaintenance(pCmd->Offset, pCmd->Data, pCmd->Size);
   SendReply(&Reply, sizeof(Reply));
 }
 
