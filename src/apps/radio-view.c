@@ -60,7 +60,7 @@ static void buildCardView(uint8_t id, const char *inputText,
     .activity = selected && transmitter.mode==RADIO_TX ? UI_RADIO_CARD_TRANSMITTING :
       selected && transmitter.mode==RADIO_FAULT ? UI_RADIO_CARD_FAULT :
       selected && seek.active ? UI_RADIO_CARD_SEEKING :
-      receivingSlot==id && WATCH_IsProbing(&watcher) ? UI_RADIO_CARD_WATCHING :
+      WATCH_Probe(&watcher)==id ? UI_RADIO_CARD_WATCHING :
       receiving && gReceiver.open ? UI_RADIO_CARD_RECEIVING :
       (channelMode && !effectiveOk) || (selected && !runtime.active) ? UI_RADIO_CARD_UNAVAILABLE : UI_RADIO_CARD_IDLE,
     .power_label = tx->power == TX_POWER_HIGH ? "HIGH" :
@@ -90,8 +90,9 @@ static void renderTitle(void) {
         activeSlot.source == RADIO_SOURCE_CHANNEL ? "MR" : "DW";
     TEXT_Add(&t, mode);
     TEXT_Char(&t, ' ');
-    TEXT_Char(&t, watchTitle ? (receivingSlot<RADIO_SLOT_CAPACITY ?
-              'A'+receivingSlot : '-') : 'A'+selectedSlot);
+    // While watching, the title names the slot actually heard.
+    uint8_t heard = watcher.phase!=WATCH_OFF ? WATCH_Owner(&watcher) : receivingSlot;
+    TEXT_Char(&t, watchTitle ? (heard<RADIO_SLOT_CAPACITY ? 'A'+heard : '-') : 'A'+selectedSlot);
     STATUSLINE_SetText(title);
   } else STATUSLINE_SetText("RADIO");
 }

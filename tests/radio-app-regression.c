@@ -786,71 +786,71 @@ int main(void) {
   assert(RADIO_STATE_SetCount(&gDeviceConfig.radio,3));
   assert(RADIO_STATE_SetCount(&gDeviceConfig.radio,2));
   assert(gDeviceConfig.radio.slots[2].current.frequency_hz==145512500); // Hidden state remains.
-  // Separate chips keep receiving; audio selection never retunes either chip.
+  // Broadcast background + BK event: the broadcast plays while B is quiet,
+  // even when it is the selected slot; a talk on B takes the speaker.
   setup(95900000,(RadioParameters){RX_WFM,100000,0,0,0});
-  watchSignalFrequency=95900000;
-  watchSecondSignalFrequency=438500000;
-  unsigned broadcastSaves=saveRequests;
+  unsigned broadcastSaves=saveRequests, broadcastApplies=applied;
   for(unsigned i=0;i<15;++i) { RADIO_APP_update();clockNow+=50; }
-  assert(watcher.parallel && watcher.phase==WATCH_HOLD && receivingSlot==0 && gReceiver.open);
-  assert(concurrentPrepares==1); // SI already tuned; only BK needs preparation.
-  unsigned broadcastApplies=applied, broadcastSelects=audioSelects;
-  for(unsigned i=0;i<5;++i) { clockNow+=3000;RADIO_APP_update(); }
+  assert(watcher.has_background && watcher.background.id==0 && watcher.count==1);
+  assert(WATCH_Owner(&watcher)==0 && receivingSlot==0 && gReceiver.open);
+  assert(concurrentPrepares>=1 && applied==broadcastApplies); // Polls never retune SI.
+  RADIO_APP_render();assert(!strcmp(statusText,"DW A"));
+  watchSecondSignalFrequency=438500000;
+  for(unsigned i=0;i<20;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(WATCH_Owner(&watcher)==1 && receivingSlot==1 && gReceiver.open && selectedSlot==0);
+  RADIO_APP_render();assert(!strcmp(statusText,"DW B"));
+  // No time limit on a talk.
+  for(unsigned i=0;i<200;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(receivingSlot==1 && gReceiver.open);
+  // End of B: two quiet seconds for a reply, then the broadcast returns.
+  watchSecondSignalFrequency=0;RADIO_APP_update();clockNow+=50;RADIO_APP_update();
+  assert(!gReceiver.open && watcher.phase==WATCH_HANG);
+  for(unsigned i=0;i<WATCH_HANG_MS/50+1;++i) { RADIO_APP_update();clockNow+=50; }
   assert(receivingSlot==0 && gReceiver.open && applied==broadcastApplies);
-  assert(audioSelects==broadcastSelects && concurrentPrepares==1);
   assert(selectedSlot==0 && saveRequests==broadcastSaves);
-  // Select B: idle B permits A playback; B's signal then takes audio only.
-  watchSecondSignalFrequency=0;
+  // Selecting B pauses (both chips stop), then the same watch resumes.
   press(KEY_F);press(KEY_2);assert(selectedSlot==1 && chipStops==2);
   clockNow+=2000;
   for(unsigned i=0;i<15;++i) { RADIO_APP_update();clockNow+=50; }
-  assert(watcher.phase==WATCH_HOLD && receivingSlot==0 && gReceiver.open);
-  unsigned parallelApplies=applied, parallelPrepares=concurrentPrepares;
-  watchSecondSignalFrequency=438500000;
-  for(unsigned i=0;i<4;++i) { RADIO_APP_update();clockNow+=50; }
-  assert(receivingSlot==1 && gReceiver.open && selectedSlot==1);
-  assert(applied==parallelApplies && concurrentPrepares==parallelPrepares);
-  clockNow+=10000;RADIO_APP_update();assert(receivingSlot==1 && gReceiver.open);
-  // End of B signal: a silent one-second gap, then resume A without retuning.
-  watchSecondSignalFrequency=0;clockNow+=50;RADIO_APP_update();assert(!gReceiver.open);
-  clockNow+=WATCH_HANG_MS;RADIO_APP_update();assert(receivingSlot==0 && gReceiver.open);
-  assert(applied==parallelApplies && concurrentPrepares==parallelPrepares);
+  assert(WATCH_Owner(&watcher)==0 && gReceiver.open);
 
-  // RDS remains live on SI while selected BK owns the speaker.
+  // RDS stays live on the SI background while a BK talk owns the speaker.
   setup(438500000,fm);
   assert(RADIO_STATE_Set(&gDeviceConfig.radio,1,100000000,
       (RadioParameters){RX_WFM,100000,0,0,0}));
-  watchSignalFrequency=438500000;
-  watchSecondSignalFrequency=100000000;rdsAvailable=true;
+  watchSignalFrequency=438500000;rdsAvailable=true;
   unsigned parallelSaves=saveRequests;
   for(unsigned i=0;i<40;++i) { RADIO_APP_update();clockNow+=50; }
   assert(receivingSlot==0 && gReceiver.open && labels[1].ps[0] && !labels[0].ps[0]);
-  assert(rdsReads && rdsClears);
-  assert(saveRequests==parallelSaves && concurrentPrepares==1);
-  // PTT stops both background receivers and restores the selected RX plan.
+  assert(rdsReads && rdsClears && saveRequests==parallelSaves);
+  RADIO_APP_render();assert(drawn[1].name && drawn[1].name[0]);
+  // PTT stops every watched chip and restores the selected RX plan.
   txFakeVerified=true;activeSlot.tx.enabled=gDeviceConfig.radio.slots[0].tx.enabled=true;
   assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED) && transmitter.mode==RADIO_TX);
   assert(chipStops==2 && watcher.phase==WATCH_OFF && transmitter.previous_rx.frequency_hz==438500000);
   RADIO_APP_PttRelease();assert(receivingSlot==0 && runtime.current.frequency_hz==438500000);
 
-  // Watch RF visits never commit RX frequencies, selected index or EEPROM saves.
+  // Two BK events: polling never commits RX frequencies, selection or saves.
   setup(145500000,fm);
   watchSignalFrequency=438500000;unsigned watchSaves=saveRequests;
   RADIO_APP_update();assert(watcher.phase==WATCH_SETTLE && !RADIO_APP_isReceiving());
-  clockNow+=180;RADIO_APP_update();assert(watcher.phase==WATCH_TUNE);
-  RADIO_APP_update();assert(receivingSlot==1 && selectedSlot==0);
+  RADIO_APP_render();assert(drawn[0].activity==UI_RADIO_CARD_WATCHING && !strcmp(statusText,"DW -"));
+  clockNow+=180;RADIO_APP_update();assert(watcher.phase==WATCH_POLL);
+  RADIO_APP_update();assert(WATCH_Probe(&watcher)==1 && selectedSlot==0);
   clockNow+=180;RADIO_APP_update();assert(watcher.phase==WATCH_VERIFY);
   clockNow+=80;RADIO_APP_update();assert(watcher.phase==WATCH_HOLD && RADIO_APP_isReceiving());
-  assert(gReceiver.open);RADIO_APP_render();assert(drawn[1].activity==UI_RADIO_CARD_RECEIVING && !drawn[1].selected);
+  assert(gReceiver.open && receivingSlot==1);
+  RADIO_APP_render();assert(drawn[1].activity==UI_RADIO_CARD_RECEIVING && !drawn[1].selected);
   assert(drawn[0].selected && !drawn[0].signal_valid);
   assert(saveRequests==watchSaves && activeSlot.current.frequency_hz==145500000);
   assert(gDeviceConfig.radio.slots[1].current.frequency_hz==438500000 && !gDeviceConfig.radio.selected_slot);
   press(KEY_UP);assert(watcher.phase==WATCH_OFF && receivingSlot==0);
   assert(runtime.current.frequency_hz==145512500 && selectedSlot==0);
-  unsigned afterManual=applied;clockNow+=1999;RADIO_APP_update();assert(applied==afterManual);
+  unsigned afterManual=concurrentPrepares;clockNow+=1999;RADIO_APP_update();
+  assert(concurrentPrepares==afterManual);
   clockNow++;RADIO_APP_update();assert(watcher.phase==WATCH_SETTLE);
   RADIO_APP_deinit();assert(watcher.phase==WATCH_OFF && receivingSlot==0);
-  // PTT preempts background listening and uses A's plan, never B's carrier.
+  // PTT preempts a background talk and uses A's plan, never B's carrier.
   setup(438500000,fm);
   assert(RADIO_STATE_Set(&gDeviceConfig.radio,1,438600000,fm));
   watchSignalFrequency=438600000;
@@ -891,36 +891,31 @@ int main(void) {
     }
     RADIO_APP_PttRelease();
   }
-  // An offscreen watch owner is reported without moving selection or paging.
+  // Every enabled slot is watched; selection and paging never move.
   setup(145500000,fm);RADIO_STATE_SetCount(&gDeviceConfig.radio,4);
+  assert(RADIO_STATE_Set(&gDeviceConfig.radio,2,145600000,fm));
+  assert(RADIO_STATE_Set(&gDeviceConfig.radio,3,438600000,fm));
   press(KEY_F);press(KEY_2);press(KEY_F);press(KEY_2);assert(selectedSlot==2);
-  watchDelay=false;RADIO_APP_update();RADIO_APP_render();
-  assert(drawn[2].selected && !drawn[2].signal_valid && !strcmp(statusText,"DW A"));
-  // Dedup/unsupported groups stay on the primary, without busy-loop retunes.
+  watchDelay=false;watchSignalFrequency=438600000;
+  for(unsigned i=0;i<30;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(watcher.count==4 && WATCH_Owner(&watcher)==3 && selectedSlot==2);
+  RADIO_APP_render();
+  assert(drawn[2].selected && !drawn[2].signal_valid && !strcmp(statusText,"DW D"));
+  // Duplicates collapse to one source: stay on the primary, no busy retunes.
   setup(145500000,fm);RADIO_STATE_Set(&gDeviceConfig.radio,1,145500000,fm);
-  unsigned noVisits=applied;
-  RADIO_APP_update();assert(watcher.phase==WATCH_OFF && applied==noVisits);
+  unsigned noVisits=concurrentPrepares;
+  RADIO_APP_update();assert(watcher.phase==WATCH_OFF && concurrentPrepares==noVisits);
   RADIO_APP_render();assert(!strcmp(statusText,"DW A"));
-  assert(!strcmp(drawn[0].header_message,"DW: same channel") && !drawn[1].header_message);
+  assert(!strcmp(drawn[0].header_message,"DW: one source") && !drawn[1].header_message);
   for (unsigned i=0;i<10;++i) { clockNow+=100;RADIO_APP_update(); }
-  assert(applied==noVisits);
-  // Apply/sample errors back off; even primary restore is attempted only once.
+  assert(concurrentPrepares==noVisits);
+  // Tune/sample errors back off; the primary restore is attempted only once.
   setup(145500000,fm);failApply=true;
   RADIO_APP_update();RADIO_APP_update();RADIO_APP_update();assert(watcher.phase==WATCH_RETRY);
   unsigned attempts=applyAttempts;
   for(unsigned i=0;i<10;++i) { clockNow+=100;RADIO_APP_update(); }
   assert(applyAttempts==attempts && receivingSlot==UINT8_MAX);
-  failApply=false;clockNow+=WATCH_RETRY_MS;RADIO_APP_update();assert(runtime.active);
-  // RDS belongs to the actual background WFM receiver, not the selected NFM VFO.
-  setup(145500000,fm);
-  assert(RADIO_STATE_Set(&gDeviceConfig.radio,1,100000000,(RadioParameters){RX_WFM,100000,0,0,0}));
-  watchSignalFrequency=100000000;rdsAvailable=true;
-  RADIO_APP_update();clockNow+=180;RADIO_APP_update();RADIO_APP_update();
-  clockNow+=350;RADIO_APP_update();clockNow+=80;RADIO_APP_update();
-  assert(receivingSlot==1 && selectedSlot==0 && watcher.phase==WATCH_HOLD);
-  clockNow+=300;RADIO_APP_update();clockNow+=100;RADIO_APP_update();clockNow+=100;RADIO_APP_update();
-  assert(!labels[0].ps[0] && labels[1].ps[0]);
-  RADIO_APP_render();assert(drawn[1].name && drawn[1].name[0] && !drawn[0].name[0]);
+  failApply=false;clockNow+=WATCH_RETRY_MS;RADIO_APP_update();assert(watcher.phase==WATCH_SETTLE);
   // Reducing count in Settings changes selection on return, preserving hidden VFO data.
   setup(145500000,fm);RADIO_STATE_SetCount(&gDeviceConfig.radio,4);
   press(KEY_F);press(KEY_2);press(KEY_F);press(KEY_2);assert(selectedSlot==2);

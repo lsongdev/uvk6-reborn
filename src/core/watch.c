@@ -4,6 +4,10 @@ bool WATCH_Eligible(const RxPlan *p) {
   // SSB mode/patch handoffs need measured latency before enabling polling.
   return p && p->parameters.mode != RX_LSB && p->parameters.mode != RX_USB;
 }
+// Continuous sound: a broadcast chip, or a BK channel whose squelch is off.
+bool WATCH_IsBackground(const RxPlan *p) {
+  return p && (p->device != RX_DEVICE_BK || !p->parameters.squelch);
+}
 bool WATCH_SameReceiver(const RxPlan *a, const RxPlan *b) {
   if (!a || !b) return false;
   const RadioParameters *x=&a->parameters, *y=&b->parameters;
@@ -11,182 +15,173 @@ bool WATCH_SameReceiver(const RxPlan *a, const RxPlan *b) {
          x->mode==y->mode && x->bandwidth_hz==y->bandwidth_hz &&
          x->squelch==y->squelch && x->rx_tone==y->rx_tone;
 }
-bool WATCH_Start(WatchRuntime *r, const WatchTarget *targets, uint8_t count, uint8_t selected_id) {
-  if (!r || !targets || count<2 || count>RADIO_WATCH_LIMIT) return false;
-  WatchRuntime next={.priority_id=selected_id};
+
+bool WATCH_Start(WatchRuntime *r, const WatchTarget *targets, uint8_t count,
+                 uint8_t selected_id, uint32_t now) {
+  if (!r || !targets || count>RADIO_WATCH_LIMIT) return false;
+  // Deadlines are relative to now so a start near the clock wrap still polls.
+  WatchRuntime next={.phase=WATCH_POLL,.deadline=now,.background_retry=now};
+  // Only one background can play: the selected slot's, else the first.
   for (uint8_t i=0; i<count; ++i) {
-    if (targets[i].id>=RADIO_SLOT_CAPACITY) return false;
-    if (!WATCH_Eligible(&targets[i].plan)) continue;
-    bool duplicate=false;
-    for (uint8_t j=0; j<next.count; ++j) {
-      if (targets[i].id==next.targets[j].id) return false;
-      if (WATCH_SameReceiver(&targets[i].plan,&next.targets[j].plan)) duplicate=true;
-    }
-    if (!duplicate) next.targets[next.count++]=targets[i];
+    const WatchTarget *t=&targets[i];
+    if (t->id>=RADIO_SLOT_CAPACITY) return false;
+    if (!WATCH_Eligible(&t->plan) || !WATCH_IsBackground(&t->plan)) continue;
+    if (!next.has_background || t->id==selected_id) next.background=*t;
+    next.has_background=true;
   }
-  if (next.count<2) return false;
-  for (uint8_t i=0; i<next.count; ++i)
-    if (next.targets[i].id == selected_id) next.cursor=i;
-  next.parallel = next.targets[0].plan.device != next.targets[1].plan.device;
-  next.phase=WATCH_TUNE;
+  for (uint8_t i=0; i<count; ++i) {
+    const WatchTarget *t=&targets[i];
+    if (!WATCH_Eligible(&t->plan) || WATCH_IsBackground(&t->plan)) continue;
+    bool duplicate=false;
+    for (uint8_t j=0; j<next.count; ++j)
+      duplicate |= WATCH_SameReceiver(&t->plan,&next.events[j].plan);
+    if (duplicate) continue;
+    if (t->id==selected_id) next.cursor=next.count; // Check it first.
+    next.events[next.count++]=*t;
+  }
+  if (next.count+next.has_background<2) return false;
+  if (next.count) next.devices |= 1u<<RX_DEVICE_BK;
+  if (next.has_background) next.devices |= 1u<<next.background.plan.device;
   *r=next;
   return true;
 }
 void WATCH_Stop(WatchRuntime *r) { if (r) *r=(WatchRuntime){0}; }
-bool WATCH_IsProbing(const WatchRuntime *r) {
-  return r && r->phase!=WATCH_OFF && r->phase!=WATCH_RETRY &&
-         !(r->phase==WATCH_HOLD && r->signal);
+
+uint8_t WATCH_Owner(const WatchRuntime *r) {
+  if (!r || r->phase==WATCH_OFF) return UINT8_MAX;
+  return r->audio==WATCH_EVENT ? r->events[r->cursor].id :
+         r->audio==WATCH_BACKGROUND ? r->background.id : UINT8_MAX;
 }
+uint8_t WATCH_Probe(const WatchRuntime *r) {
+  return r && (r->phase==WATCH_SETTLE || r->phase==WATCH_VERIFY) ?
+         r->events[r->cursor].id : UINT8_MAX;
+}
+bool WATCH_IsProbing(const WatchRuntime *r) {
+  return r && r->phase!=WATCH_OFF && r->audio==WATCH_QUIET;
+}
+
 static uint32_t clockNow(const WatchOperations *ops, uint32_t fallback) {
   return ops->now ? ops->now(ops->context) : fallback;
 }
-static void advance(WatchRuntime *r, const WatchOperations *ops) {
-  ops->audio(ops->context,false);
-  r->signal=false;
-  r->cursor=(r->cursor+1u)%r->count;
-  r->phase=WATCH_TUNE;
+static bool backgroundOnBk(const WatchRuntime *r) {
+  return r->has_background && r->background.plan.device==RX_DEVICE_BK;
 }
-static void failure(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
+static void speaker(WatchRuntime *r, const WatchOperations *ops,
+                    const WatchTarget *target, WatchAudio audio) {
+  if (!ops->select(ops->context,target,audio!=WATCH_QUIET)) {
+    if (audio==WATCH_BACKGROUND) r->background_ready=false;
+    audio=WATCH_QUIET;
+  }
+  r->audio=audio;
+}
+static void block(WatchRuntime *r, uint32_t now) {
   r->blocked |= 1u<<r->cursor;
   r->blocked_until[r->cursor]=now+WATCH_RETRY_MS;
-  advance(r,ops);
 }
-static void parallelUpdate(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
-  if (!ops->prepare || !ops->select) return;
-  if (r->phase==WATCH_TUNE) r->deadline=now;
-  // Configure each chip once; failed chips retry independently with a cooldown.
-  for (uint8_t n=0; n<r->count; ++n) {
-    uint8_t i=(unsigned)(r->cursor+n)%r->count, bit=1u<<i;
-    if ((r->prepared_mask&bit) || ((r->blocked&bit) &&
-        (int32_t)(now-r->blocked_until[i])<0)) continue;
-    if (ops->prepare(ops->context,&r->targets[i])) {
-      r->prepared_mask |= bit;
-      r->blocked &= ~bit;
-      r->stable_at[i]=clockNow(ops,now)+
-        (r->targets[i].plan.device==RX_DEVICE_BK ? 180u : 350u);
-    } else {
-      r->blocked |= bit;
-      r->blocked_until[i]=clockNow(ops,now)+WATCH_RETRY_MS;
-    }
-    now=clockNow(ops,now);
-    break; // At most one hardware preparation per update.
+static void next(WatchRuntime *r, uint32_t now) {
+  r->cursor=(r->cursor+1u)%r->count;
+  r->phase=WATCH_POLL;
+  r->deadline=now;
+}
+// A BK background is retuned and heard for a while after every round.
+static void home(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
+  r->visited=0;
+  if ((int32_t)(now-r->background_retry)>=0 && ops->prepare(ops->context,&r->background)) {
+    speaker(r,ops,&r->background,WATCH_BACKGROUND);
+    r->phase=WATCH_HOME;
+    r->deadline=clockNow(ops,now)+WATCH_HOME_MS;
+    return;
   }
-  if ((int32_t)(now-r->deadline)<0) return;
-  uint8_t priority=UINT8_MAX;
-  for (uint8_t i=0; i<r->count; ++i) {
-    uint8_t bit=1u<<i;
-    if (r->targets[i].id==r->priority_id) priority=i;
-    if (!(r->prepared_mask&bit) || (int32_t)(now-r->stable_at[i])<0) continue;
-    bool found=false;
-    if (!ops->signal(ops->context,&r->targets[i].plan,&found)) {
-      r->prepared_mask &= ~bit;
-      r->blocked |= bit;
-      r->blocked_until[i]=clockNow(ops,now)+WATCH_RETRY_MS;
-      found=false;
-    }
-    if (!found) {
-      r->candidate_mask &= ~bit;
-      r->signal_mask &= ~bit;
-    } else if (!(r->candidate_mask&bit)) {
-      r->candidate_mask |= bit;
-      r->confirm_at[i]=clockNow(ops,now)+WATCH_VERIFY_MS;
-    } else if ((int32_t)(clockNow(ops,now)-r->confirm_at[i])>=0) {
-      r->signal_mask |= bit;
-    }
+  r->background_retry=now+WATCH_RETRY_MS;
+  r->phase=WATCH_POLL;
+  r->deadline=now;
+}
+// After a talk (or its hang) the background plays again.
+static void release(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
+  r->audio=WATCH_QUIET;
+  if (backgroundOnBk(r)) { r->cursor=(r->cursor+1u)%r->count; home(r,now,ops); return; }
+  if (r->has_background && r->background_ready)
+    speaker(r,ops,&r->background,WATCH_BACKGROUND);
+  next(r,now);
+}
+static void poll(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
+  if (backgroundOnBk(r) && (!r->count || r->visited>=r->count)) { home(r,now,ops); return; }
+  uint8_t n=0;
+  for (; n<r->count; ++n) {
+    uint8_t i=(uint8_t)((r->cursor+n)%r->count);
+    if (!(r->blocked&(1u<<i)) || (int32_t)(now-r->blocked_until[i])>=0) { r->cursor=i; break; }
   }
-  now=clockNow(ops,now);
-  uint8_t chosen=UINT8_MAX;
-  if (priority<r->count && (r->signal_mask&(1u<<priority))) chosen=priority;
-  else if (r->cursor==priority && (r->signal || r->phase==WATCH_HANG)) {
-    if (r->signal) r->hang_until=now+WATCH_HANG_MS;
-    if ((int32_t)(now-r->hang_until)<0) {
-      if (r->signal) (void)ops->select(ops->context,&r->targets[r->cursor],false);
-      r->signal=false;r->phase=WATCH_HANG;r->deadline=now+WATCH_SAMPLE_MS;
-      return;
-    }
+  if (n==r->count) {
+    if (backgroundOnBk(r)) { home(r,now,ops); return; }
+    r->phase=WATCH_RETRY;
+    r->deadline=now+WATCH_RETRY_MS;
+    return;
   }
-  if (chosen==UINT8_MAX) {
-    // Keep the current background owner when both are valid and no priority
-    // participant exists; otherwise choose the first valid receiver.
-    if (r->signal_mask&(1u<<r->cursor)) chosen=r->cursor;
-    else for (uint8_t i=0; i<r->count; ++i)
-      if (r->signal_mask&(1u<<i)) { chosen=i;break; }
+  r->blocked &= ~(1u<<r->cursor);
+  ++r->visited;
+  // Leaving a BK background for another channel must silence it first.
+  if (r->audio==WATCH_BACKGROUND && backgroundOnBk(r))
+    speaker(r,ops,&r->background,WATCH_QUIET);
+  if (!ops->prepare(ops->context,&r->events[r->cursor])) {
+    now=clockNow(ops,now); block(r,now); next(r,now); return;
   }
-  if (chosen<r->count) {
-    if ((!r->signal || chosen!=r->cursor) &&
-        !ops->select(ops->context,&r->targets[chosen],true)) {
-      uint8_t bit=1u<<chosen;
-      r->signal_mask &= ~bit;r->candidate_mask &= ~bit;r->prepared_mask &= ~bit;
-      r->blocked |= bit;r->blocked_until[chosen]=now+WATCH_RETRY_MS;
-      r->signal=false;r->phase=WATCH_SETTLE;
-    } else {
-      r->cursor=chosen;r->signal=true;r->phase=WATCH_HOLD;
-    }
-  } else {
-    if (r->signal) (void)ops->select(ops->context,&r->targets[r->cursor],false);
-    r->signal=false;r->phase=r->prepared_mask ? WATCH_SETTLE : WATCH_RETRY;
-  }
-  r->deadline=now+(r->phase==WATCH_RETRY ? WATCH_RETRY_MS : WATCH_SAMPLE_MS);
+  r->phase=WATCH_SETTLE;
+  r->deadline=clockNow(ops,now)+WATCH_SETTLE_MS;
 }
 
 void WATCH_Update(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
-  if (!r || r->phase==WATCH_OFF || !ops || !ops->signal || r->count<2) return;
-  if (!r->parallel && (!ops->tune || !ops->audio)) return;
-  if (r->phase==WATCH_RETRY) {
-    if ((int32_t)(now-r->deadline)<0) return;
-    r->phase=WATCH_TUNE;
-  }
-  if (r->parallel) { parallelUpdate(r,now,ops); return; }
-  if (r->phase==WATCH_TUNE) {
-    // At most count candidates, and one RF apply per update: never spin.
-    uint8_t checked=0;
-    while (checked<r->count && (r->blocked&(1u<<r->cursor)) &&
-           (int32_t)(now-r->blocked_until[r->cursor])<0) {
-      r->cursor=(r->cursor+1u)%r->count; ++checked;
-    }
-    if (checked==r->count) {
-      r->phase=WATCH_RETRY; r->deadline=now+WATCH_RETRY_MS; return;
-    }
-    r->blocked &= ~(1u<<r->cursor);
-    ops->audio(ops->context,false);
-    if (!ops->tune(ops->context,&r->targets[r->cursor])) {
-      failure(r,clockNow(ops,now),ops); return;
-    }
-    uint32_t settle=r->targets[r->cursor].plan.device==RX_DEVICE_BK ? 180u : 350u;
-    r->deadline=clockNow(ops,now)+settle;
-    r->phase=WATCH_SETTLE;
+  if (!r || r->phase==WATCH_OFF || !ops || !ops->prepare || !ops->signal || !ops->select)
     return;
+  // Bring a broadcast background up once; it keeps receiving underneath.
+  if (r->has_background && !backgroundOnBk(r) && !r->background_ready &&
+      (int32_t)(now-r->background_retry)>=0) {
+    if (ops->prepare(ops->context,&r->background)) {
+      r->background_ready=true;
+      if (r->audio==WATCH_QUIET && r->phase!=WATCH_HANG)
+        speaker(r,ops,&r->background,WATCH_BACKGROUND);
+    } else r->background_retry=clockNow(ops,now)+WATCH_RETRY_MS;
+    return; // At most one hardware preparation per update.
   }
   if ((int32_t)(now-r->deadline)<0) return;
+  if (r->phase==WATCH_POLL || r->phase==WATCH_RETRY || r->phase==WATCH_HOME) {
+    if (r->phase==WATCH_HOME) r->visited=0;
+    poll(r,now,ops);
+    return;
+  }
+  const WatchTarget *event=&r->events[r->cursor];
   bool found=false;
-  if (!ops->signal(ops->context,&r->targets[r->cursor].plan,&found)) {
-    failure(r,clockNow(ops,now),ops); return;
+  if (!ops->signal(ops->context,&event->plan,&found)) {
+    now=clockNow(ops,now);
+    block(r,now);
+    if (r->audio==WATCH_EVENT || r->phase==WATCH_HANG) release(r,now,ops);
+    else next(r,now);
+    return;
   }
   now=clockNow(ops,now);
   switch (r->phase) {
   case WATCH_SETTLE:
-    if (!found) { advance(r,ops); return; }
+    if (!found) { next(r,now); return; }
     r->phase=WATCH_VERIFY; r->deadline=now+WATCH_VERIFY_MS; return;
   case WATCH_VERIFY:
-    if (!found) { advance(r,ops); return; }
-    r->hold_at=now; r->phase=WATCH_HOLD; break;
-  case WATCH_HOLD:
-  case WATCH_HANG:
-    if (r->targets[r->cursor].id != r->priority_id &&
-        now-r->hold_at>=WATCH_MAX_HOLD_MS) { advance(r,ops); return; }
-    if (!found && r->phase==WATCH_HOLD) {
-      r->phase=WATCH_HANG; r->hang_until=now+WATCH_HANG_MS;
-      r->deadline=now+WATCH_SAMPLE_MS;
-      r->signal=false; ops->audio(ops->context,false); return;
-    }
-    if (!found) {
-      if ((int32_t)(now-r->hang_until)>=0) advance(r,ops);
-      else r->deadline=now+WATCH_SAMPLE_MS;
-      return;
-    }
+    if (!found) { next(r,now); return; }
+    speaker(r,ops,event,WATCH_EVENT);
+    if (r->audio!=WATCH_EVENT) { block(r,now); next(r,now); return; }
     r->phase=WATCH_HOLD; break;
+  case WATCH_HOLD:
+    // No time limit: a talk is heard to its end, then the hang keeps the
+    // channel (muted) for a reply before anything else is heard.
+    if (!found) {
+      speaker(r,ops,event,WATCH_QUIET);
+      r->phase=WATCH_HANG; r->hang_until=now+WATCH_HANG_MS;
+    }
+    break;
+  case WATCH_HANG:
+    if (found) {
+      speaker(r,ops,event,WATCH_EVENT);
+      if (r->audio==WATCH_EVENT) r->phase=WATCH_HOLD;
+    } else if ((int32_t)(now-r->hang_until)>=0) { release(r,now,ops); return; }
+    break;
   default: return;
   }
-  r->signal=true; r->deadline=now+WATCH_SAMPLE_MS;
-  ops->audio(ops->context,true);
+  r->deadline=now+WATCH_SAMPLE_MS;
 }

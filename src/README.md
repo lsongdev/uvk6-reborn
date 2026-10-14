@@ -22,7 +22,7 @@ drivers/             BK4819、SI4732、BK1080、ST7565 与 DP32G030 外设
 | `apps/radio.c` | Radio 控制器：Slot 选择、VFO/MR 解析、调谐事务（`request`/`apply`/`tuneExact`）、按键分派 |
 | `apps/radio-seek.c` | Seek：临时调谐候选，只在确认找到时提交 |
 | `apps/radio-capture.c` | FC 频率捕获与临时 NFM 试听 |
-| `apps/radio-watch.c` | 双守听及暂停后恢复主接收 |
+| `apps/radio-watch.c` | 多路守听及暂停后恢复主接收 |
 | `apps/radio-tx.c` | PTT、忙碌禁发、TX 安全时限、各 Slot TX 设置 |
 | `apps/radio-menu.c` | Slot 菜单（RX 参数、Watch、TX、频道命名/保存） |
 | `apps/radio-view.c` | 卡片视图数据、标题与调谐确认页 |
@@ -30,7 +30,7 @@ drivers/             BK4819、SI4732、BK1080、ST7565 与 DP32G030 外设
 | `apps/settings.c`、`apps/bands.c` | 全局设置与频段预设编辑 |
 | `apps/channel-manager.*` | MR 频道命名、保存与覆盖确认 |
 | `core/radio-state.*` | `RadioSlot`：VFO 频段记忆、来源、选中项 |
-| `core/watch.*`、`core/seek.*`、`core/capture.*` | 双守听、Seek、FC 的纯状态机 |
+| `core/watch.*`、`core/seek.*`、`core/capture.*` | 多路守听、Seek、FC 的纯状态机 |
 | `core/rx-runtime.*`、`core/tx-runtime.*` | 已提交接收方案的回滚，半双工 TX 生命周期 |
 | `core/config-store.*`、`core/channel-store.*` | UVR2 配置双副本与用户频道存储 |
 | `ui/components/radio-card.*` | Slot 卡片绘制；无状态、不滚动 |

@@ -4,7 +4,7 @@
 
 ## 概念
 
-- **RadioSlot（A/B/C/D）**：独立工作位置，最多四项、每页显示两项。含各频段 VFO 记忆、当前来源、MR 频道编号与 TX 配置。双守听固定为 A、B。
+- **RadioSlot（A/B/C/D）**：独立工作位置，最多四项、每页显示两项。含各频段 VFO 记忆、当前来源、MR 频道编号与 TX 配置。两项及以上时守听全部已启用 Slot。
 - **RadioSource**：`RADIO_SOURCE_VFO`（直接调谐）或 `RADIO_SOURCE_CHANNEL`（MR 频道）。
 - **RxMode**：NFM、WFM、AM、LSB、USB，是解调模式，与来源无关。
 - **RadioBand**：频段表（LW、MW、SW、FM Radio、Airband、2m、70cm 及 VHF/UHF 兜底），覆盖 150 kHz–1.34 GHz 全部频率，窄频段优先。
@@ -41,7 +41,7 @@ RadioSlot.source
 | `radio.c` | Slot、VFO/MR 解析、调谐事务、RDS 标签、按键分派 | `apply`、`request`、`notify`、选中/接收 Slot、`runtime` |
 | `radio-seek.c` | Seek 状态机：BK/BK1080 逐步检测，SI 用芯片 Seek，单次回绕 | `startSeek`、`seekUpdate`、`finishSeek` |
 | `radio-capture.c` | FC：BK4819 频率捕获、自动/VHF/UHF、确认后直接调谐 | `startCapture`、`captureUpdate`、`captureKey` |
-| `radio-watch.c` | 双守听：同芯片轮询、异芯片并行；暂停时恢复主接收 | `watchUpdate`、`pauseWatch`、`delayWatch` |
+| `radio-watch.c` | 多路守听：广播常驻源 + BK 事件轮询、先到先得；暂停时恢复主接收 | `watchUpdate`、`pauseWatch`、`delayWatch` |
 | `radio-tx.c` | PTT、忙碌禁发、电压/松键/TOT 安全、TX 设置 | `pttKey`、`txBusy`、`changeTxPower` |
 | `radio-menu.c` | Slot 菜单（项目枚举与 `RadioParameterField` 对齐） | `menuKey`、`renderMenu` |
 | `radio-view.c` | 卡片视图、标题、确认页 | 无（实现 `RADIO_APP_render`） |
@@ -56,4 +56,4 @@ RadioSlot.source
 
 ## 兼容与验证
 
-EEPROM UVR2 配置的字节布局、地址、CRC 与旧格式解析不变，无迁移。主机回归覆盖 VFO/MR 切换、频道失效、双守听、卡片视图、接收回滚与提交、芯片采样与音频时序、保存及纯调谐逻辑。实机芯片／音频／功放时序需另行硬件验收。
+EEPROM UVR2 配置的字节布局、地址、CRC 与旧格式解析不变，无迁移。主机回归覆盖 VFO/MR 切换、频道失效、多路守听、卡片视图、接收回滚与提交、芯片采样与音频时序、保存及纯调谐逻辑。实机芯片／音频／功放时序需另行硬件验收。

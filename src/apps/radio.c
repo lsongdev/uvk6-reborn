@@ -272,13 +272,13 @@ void RADIO_APP_update(void) {
   const RxPlan *rdsPlan=&runtime.current;
   bool rdsEnabled=RADIO_APP_isReceiving() && runtime.active &&
     rdsPlan->device==RX_DEVICE_SI && rdsPlan->parameters.mode==RX_WFM;
-  if (watcher.parallel && watcher.phase!=WATCH_OFF) {
-    rdsEnabled=false;
-    for (uint8_t i=0; i<watcher.count; ++i)
-      if ((watcher.prepared_mask&(1u<<i)) && watcher.targets[i].plan.device==RX_DEVICE_SI &&
-          watcher.targets[i].plan.parameters.mode==RX_WFM) {
-        rdsSlot=watcher.targets[i].id;rdsPlan=&watcher.targets[i].plan;rdsEnabled=true;
-      }
+  // While watching, RDS follows the broadcast background, even when a BK
+  // talk currently owns the speaker.
+  if (watcher.phase!=WATCH_OFF) {
+    const WatchTarget *bg=&watcher.background;
+    rdsEnabled=watcher.background_ready && bg->plan.device==RX_DEVICE_SI &&
+               bg->plan.parameters.mode==RX_WFM;
+    rdsSlot=bg->id;rdsPlan=&bg->plan;
   }
   bool textExpired = rdsEnabled && now-rds.last_group >= 15000u;
   if (RDS_ReceiverUpdate(&rds, now, rdsEnabled, readRds, NULL) || textExpired) {
