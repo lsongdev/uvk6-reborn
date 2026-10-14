@@ -34,6 +34,7 @@ jobs:
         run: |
           make -B -j4 all ENABLE_FC=0
           make -B -j4 all ENABLE_TX=0
+          make -B -j4 all ENABLE_SPECTRUM=0
       - name: Build firmware
         run: |
           arm-none-eabi-gcc --version | head -1
