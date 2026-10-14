@@ -19,10 +19,10 @@ void STATUSLINE_SetText(const char *pattern, ...) {
 }
 static UI_RadioCardView drawn[RADIO_SLOT_CAPACITY];
 static unsigned drawCount;
-void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view, UI_RadioCardState *state, uint32_t now) {
+void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view) {
   unsigned id = view->id-'A';
-  assert(id<RADIO_SLOT_CAPACITY && y==8+(id-RADIO_STATE_VisibleFirst(&gDeviceConfig.radio))*UI_RADIO_CARD_HEIGHT && state==&cards[id]);
-  (void)now; drawn[id]=*view; ++drawCount;
+  assert(id<RADIO_SLOT_CAPACITY && y==8+(id-RADIO_STATE_VisibleFirst(&gDeviceConfig.radio))*UI_RADIO_CARD_HEIGHT);
+  drawn[id]=*view; ++drawCount;
 }
 uint8_t UI_SMeterLevel(void) { return 8; }
 void PrintSmall(uint8_t x, uint8_t y, const char *pattern, ...) {
@@ -99,8 +99,6 @@ void RX_DEVICE_SeekCancel(RxDevice dev) { (void)dev; ++nativeCancels; }
 bool RX_DEVICE_SeekSignal(RxDevice dev, bool *found) {
   (void)dev; *found = gReceiver.plan.frequency_hz == soughtFrequency; return true;
 }
-void UI_RadioCardShowFrequency(UI_RadioCardState *state, uint32_t now) { state->tuned_at = now; }
-bool UI_RadioCardUpdate(UI_RadioCardState *state, uint32_t now) { (void)state; (void)now; return false; }
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear) {
   ++rdsReads;
   *packet=(RdsPacket){0};
@@ -207,7 +205,6 @@ static void setup(uint32_t frequency, RadioParameters values) {
   functionPending = false;
   selectedSlot = inputSlot = 0;
   receivingSlot = UINT8_MAX;
-  memset(cards, 0, sizeof(cards));
   memset(labels, 0, sizeof(labels));
   transmitter = (TxRuntime){0};
   txFakePttPressed=txFakeVoltageValid=true;
@@ -1016,7 +1013,7 @@ int main(void) {
   assert(runtime.current.frequency_hz==438500000 && activeSlot.current.frequency_hz==438500000);
   assert(saveRequests==fcSaves && gReceiver.plan.frequency_hz==captureHz);
   RADIO_APP_render();assert(drawn[0].frequency_hz==captureHz && drawn[0].mode==RX_NFM);
-  assert(!drawn[0].name && !drawn[0].rds);
+  assert(!drawn[0].name && !drawn[0].radio_text);
   assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED));press(KEY_PTT);assert(!txFakePrepares);
   press(KEY_EXIT);assert(capturePhase==FC_OFF && gReceiver.plan.frequency_hz==438500000);
   assert(saveRequests==fcSaves && !memcmp(&fcOrigin,&gDeviceConfig.radio.slots[0],sizeof(fcOrigin)));

@@ -70,8 +70,10 @@ void PrintSymbolsEx(uint8_t x, uint8_t y, TextPos posLCR, Color color,
 uint16_t UI_SymbolsTextWidth(const char *text);
 uint16_t UI_SmallTextWidth(const char *text);
 void UI_SmallTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
-// Native 12 px capitals/digits; printable ASCII fits the 17 px VFO body.
-uint16_t UI_BodyTextWidth(const char *text);
-void UI_BodyTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
+uint16_t UI_MediumTextWidth(const char *text);
+void UI_MediumTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
+// Medium glyphs at 2x, emboldened: the card's frequency-only body.
+uint16_t UI_LargeTextWidth(const char *text);
+void UI_LargeTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset);
 
 #endif /* end of include guard: GRAPHICS_H */

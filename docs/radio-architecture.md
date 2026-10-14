@@ -44,7 +44,7 @@ RadioSlot.source
 | `radio-watch.c` | 双守听：同芯片轮询、异芯片并行；暂停时恢复主接收 | `watchUpdate`、`pauseWatch`、`delayWatch` |
 | `radio-tx.c` | PTT、忙碌禁发、电压/松键/TOT 安全、TX 设置 | `pttKey`、`txBusy`、`changeTxPower` |
 | `radio-menu.c` | Slot 菜单（项目枚举与 `RadioParameterField` 对齐） | `menuKey`、`renderMenu` |
-| `radio-view.c` | 卡片视图、标题、确认页 | `showFrequency`、`cards` |
+| `radio-view.c` | 卡片视图、标题、确认页 | 无（实现 `RADIO_APP_render`） |
 
 模块内其余状态均为 `static`。主机回归 `tests/radio-app-regression.c` 以单一编译单元包含全部模块，可直接检查私有状态。
 

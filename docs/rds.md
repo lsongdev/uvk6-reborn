@@ -2,18 +2,18 @@
 
 2026-10-13：实际接收归属的 VFO 在 **SI4732 接收路径 + WFM 模式** 下轮询 RDS。BK4819 的 NFM/AM、SI4732 的 AM/SSB 和 BK1080 接收路径不读取 RDS。
 
-当前支持 PI 电台识别码、0A/0B 的 8 字符 Programme Service（PS）电台名，以及 2A 的最多 64 字符、2B 的最多 32 字符 RadioText。PS 与 RadioText 放在同一个名称区域，以 ` / ` 拼接，只有一个时直接显示；超宽滚动。调谐后大字号频率保持 1 秒，有文本时正文切换为名称，完整频率移入黑底横条；再次调谐恢复大字号频率。无文本时保持频率。布局见 [VFO 首屏布局](ui-layout.md)。VFO 自定义名称编辑尚未实现。
+当前支持 PI 电台识别码、0A/0B 的 8 字符 Programme Service（PS）电台名，以及 2A 的最多 64 字符、2B 的最多 32 字符 RadioText。PS 作为名称显示在卡片正文，频率在其下方；RadioText 占用该卡片的黑底横条，替换频段名。两者都不滚动，放不下的部分裁掉。没有 PS 时正文只显示大号频率。布局见 [VFO 首屏布局](ui-layout.md)。VFO 自定义名称编辑尚未实现。
 
 ![当前频率与名称布局](images/vfo-states.png)
 
-上图为当前组件的频率／名称状态示例，不是实机收台截图。运行 `python3 tools/ui-preview.py` 可重建；如需查看模拟 RDS 数据组经过实际解析器的显示，运行 `python3 tools/ui-preview.py --frames plain rds --output /tmp/vfo-rds.png`。
+上图右侧 A 卡为 PS + RadioText 的示例，不是实机收台截图。运行 `python3 tools/ui-preview.py` 可重建；如需查看模拟 RDS 数据组经过实际解析器的显示，运行 `python3 tools/ui-preview.py --frames plain rds --output /tmp/vfo-rds.png`。
 
 ## 数据链路
 
 1. `drivers/si473x/si473x.c` 设置 RDS 接收、FIFO 门限 1 组和最多 1～2 位纠错门限；`SI47XX_ReadRDS` 检查电源、模式、I2C 应答、CTS 和 ERR，将 13 字节响应转换为块、错误等级、同步和 FIFO 状态。失败不修改调用者的输出。
 2. `hal/rx-device.c` 将芯片返回的数据适配为与芯片协议无关的 `RdsPacket`。
 3. `core/rds-receiver.c` 管理轮询及过期，`core/rds.c` 只处理 RDS 数据组和文本，均不依赖硬件或 UI。
-4. `apps/radio.c` 按实际成功应用的接收方案启停 RDS，把 PS/RadioText 送给卡片组件；文本变化时才请求重绘，滚动由组件独立处理。
+4. `apps/radio.c` 按实际成功应用的接收方案启停 RDS，把 PS/RadioText 送给卡片组件；文本变化时才请求重绘。
 
 ## 完整性与生命周期
 
@@ -21,7 +21,7 @@
 - A/B 块须无错或已纠正 1～2 位错误。PS 还要求 D 块有效；2A 要求 C/D 块有效，2B 只使用 D 块文本。错误数据不会替换已发布文本。
 - PI 改变时清空电台名与文本；RadioText 的 A/B 标志或 2A/2B 格式变化时清空旧文本，保留 PS。动态 PS 保留上次完整名称，等待新名称完整到达。
 - 每次实际调谐尝试及停止接收都会清空解析状态，包括失败后恢复旧频率。进入 SI/WFM 后先等待 300 ms，再清空硬件 FIFO，随后每 100 ms 最多读四组；首次读失败就停止本轮。
-- FIFO 溢出时重新收集文本。连续 15 秒没有同步且 A/B 块有效的数据组时，文本过期，界面恢复大字号频率。
+- FIFO 溢出时重新收集文本。连续 15 秒没有同步且 A/B 块有效的数据组时，文本过期，界面恢复只显示大号频率。
 - RDS 信息不写入 EEPROM。当前使用 ASCII 显示：扩展字符暂以 `?` 代替，普通控制字符转为空格，RadioText 回车作为结束符；不支持完整 RDS 字符集、中文、RT+、时钟或 AF 自动换台。
 
 ## 验证与资料

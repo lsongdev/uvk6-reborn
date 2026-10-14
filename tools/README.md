@@ -24,7 +24,7 @@ python3 tools/ui-preview.py --frames frequency name --output /tmp/vfo-name.png
 python3 tools/ui-preview.py --frames max maxtext --output /tmp/vfo-max.png
 ```
 
-默认输出 `docs/images/vfo-states.png`，左侧为频率状态，右侧为名称状态，均展示两个组件的布局。`--scale` 支持 1～12 倍，默认 4 倍；`--frames` 可选择左右预览场景：`single`（名称状态）、`plain`（无名称）、`dual`、`max`（最长频率）、`maxtext`（最长频率带名称）、`lw`、`frequency`（双 VFO 频率状态）、`name`（双 VFO 名称状态）、`tuned`（重新调谐）、`tx`（发射布局）、`seek`（搜索）、`rds`（模拟数据组经过实际解析器后的输出）。示例频率、名称、RDS 和信号值在 `tools/ui-preview.c` 中修改。
+默认输出 `docs/images/vfo-states.png`，左侧只有频率，右侧为名称 + 频率，均展示两张卡片的布局。`--scale` 支持 1～12 倍，默认 4 倍；`--frames` 可选择左右预览场景：`plain`（单张卡片，只有频率）、`frequency`（两张卡片，只有频率，B 带小字尾数）、`single`（广播 PS + RT）、`name`／`dual`（A 广播、B MR 频道名）、`tuned`（B 输入草稿）、`max`（最长频率）、`maxtext`（长名称溢出到小字栏）、`lw`、`tx`（发射布局）、`seek`（搜索）、`rds`（模拟数据组经过实际解析器后的输出）。示例频率、名称、RDS 和信号值在 `tools/ui-preview.c` 中修改。
 
 需要 Python 3 和主机 C 编译器（默认 `cc`，可通过 `CC` 指定），无额外 Python 依赖，也无需 ARM 工具链或连接对讲机。脚本在临时目录编译当前固件的绘图代码，运行后自动清理；预览使用示例数据。
 
@@ -49,9 +49,7 @@ A/B 首屏切换预览：`python3 tools/ui-preview.py --frames ab-a ab-b --outpu
 
 多 VFO 分页：`python3 tools/ui-preview.py --frames multi-ab multi-cd --output docs/images/multi-vfo.png`。双守听探测／接收归属：`python3 tools/ui-preview.py --frames watch-probe watch-rx --output docs/images/dual-watch.png`。
 
-VFO 提示位置预览：`python3 tools/ui-preview.py --frames error-short error-long --output /tmp/vfo-errors.png`，分别展示长提示的起始位置和滚动到末尾的位置。
-
-统一字库预览：`python3 tools/ui-preview.py --frames font-frequency font-name --output docs/images/vfo-font.png`，对照频率数字与名称中相同数字的字形。
+VFO 提示位置预览：`python3 tools/ui-preview.py --frames error-short error-long --output /tmp/vfo-errors.png`，分别展示短提示和被横条裁掉的长提示。
 
 ## 固件资源占用
 

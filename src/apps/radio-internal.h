@@ -116,7 +116,5 @@ bool menuKey(KEY_Code_t key, Key_State_t state);
 void renderMenu(void);
 
 // radio-view.c
-extern UI_RadioCardState cards[RADIO_SLOT_CAPACITY];
-void showFrequency(void);
 
 #endif
