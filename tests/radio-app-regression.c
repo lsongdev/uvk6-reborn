@@ -77,8 +77,9 @@ static unsigned captureStarts, captureStops;
 static CaptureSample captureReply;
 static uint32_t captureHz;
 static CaptureRange captureRange;
+static RxDevice captureLeaves;
 void RX_DEVICE_CaptureStart(CaptureRange range, RxDevice previous) {
-  (void)previous; captureRange=range; ++captureStarts;
+  captureLeaves=previous; captureRange=range; ++captureStarts;
 }
 CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
   assert(range==captureRange); *hz=captureHz; return captureReply;
@@ -832,6 +833,27 @@ int main(void) {
   press(KEY_EXIT);press(KEY_EXIT);assert(!inMenu);
   clockNow+=2000;for(unsigned i=0;i<10;++i) { RADIO_APP_update();clockNow+=50; }
   assert(WATCH_Owner(&watcher)==1 && gReceiver.open);
+
+  // FC on BK A leaves B's broadcast playing, and EXIT does not retune it.
+  setup(438500000,fm);
+  assert(RADIO_STATE_Set(&gDeviceConfig.radio,1,95900000,(RadioParameters){RX_WFM,100000,0,0,0}));
+  for(unsigned i=0;i<10;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(WATCH_Owner(&watcher)==1 && gReceiver.open);
+  unsigned fcStops=chipStops, fcApplies=applyAttempts;
+  press(KEY_F);press(KEY_4);
+  assert(capturing && captureLeaves==RX_DEVICE_BK && chipStops==fcStops+1); // Only BK.
+  assert(gReceiver.open && gReceiver.plan.device==RX_DEVICE_SI && receivingSlot==1);
+  for(unsigned i=0;i<10;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(gReceiver.open && gReceiver.plan.device==RX_DEVICE_SI);
+  press(KEY_EXIT);
+  assert(!capturing && gReceiver.open && receivingSlot==1 && applyAttempts==fcApplies);
+  // A BK talk owning the speaker hands it back to the broadcast for FC.
+  clockNow+=2000;watchSignalFrequency=438500000;
+  for(unsigned i=0;i<10;++i) { RADIO_APP_update();clockNow+=50; }
+  assert(WATCH_Owner(&watcher)==0);
+  press(KEY_F);press(KEY_4);
+  assert(capturing && gReceiver.open && gReceiver.plan.device==RX_DEVICE_SI);
+  press(KEY_EXIT);watchSignalFrequency=0;
 
   // RDS stays live on the SI background while a BK talk owns the speaker.
   setup(438500000,fm);

@@ -109,6 +109,7 @@ extern const char *watchStatus;
 void watchUpdate(void);
 bool pauseWatch(void);
 bool pauseWatchTo(const WatchTarget *target);
+void yieldWatch(const WatchTarget *keep);
 void delayWatch(void);
 
 // radio-tx.c

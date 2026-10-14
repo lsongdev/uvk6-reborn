@@ -27,8 +27,9 @@ RxSeekResult RX_DEVICE_SeekPoll(RxDevice device, uint32_t *frequency_hz);
 void RX_DEVICE_SeekCancel(RxDevice device);
 bool RX_DEVICE_SeekSignal(RxDevice device, bool *found);
 
-// Caller mutes audio first. Capture temporarily owns BK, even when the
-// committed receiver mirror still names SI/BK1080. Stop before any RX apply.
+// Capture temporarily owns BK with its audio muted; previous is the chip
+// to leave (pass RX_DEVICE_BK to keep a broadcast chip playing). Stop before
+// any RX apply.
 void RX_DEVICE_CaptureStart(CaptureRange range, RxDevice previous);
 CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *frequency_hz);
 void RX_DEVICE_CaptureStop(void);
