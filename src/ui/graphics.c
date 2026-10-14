@@ -1,6 +1,5 @@
 #include "ui/graphics.h"
 #include "core/misc.h"
-#include "ui/fonts/helvetica12.h"
 #include "ui/fonts/TomThumb.h"
 #include "ui/fonts/muMatrix8ptRegular.h"
 #include "ui/fonts/symbols.h"
@@ -86,7 +85,8 @@ static void m_putchar(int16_t x, int16_t y, uint8_t c, Color col, uint8_t sx,
         bits = *b++;
       if (bits & 0x80) {
         int16_t left = x + (xo + xx) * sx;
-        int16_t right = left + sx;
+        // Scaled glyphs gain one pixel per dot so 2x strokes read as bold.
+        int16_t right = left + sx + (sx > 1);
         if (left < textClipLeft) left = textClipLeft;
         if (right > textClipRight) right = textClipRight;
         if (right > left)
@@ -232,10 +232,14 @@ static void textWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *t
 
 uint16_t UI_SymbolsTextWidth(const char *text) { return textWidth(text, &Symbols); }
 uint16_t UI_SmallTextWidth(const char *text) { return textWidth(text, &TomThumb); }
-uint16_t UI_BodyTextWidth(const char *text) { return textWidth(text, &uiBodyFont); }
+uint16_t UI_MediumTextWidth(const char *text) { return textWidth(text, &MuMatrix8ptRegular); }
+uint16_t UI_LargeTextWidth(const char *text) { return 2 * UI_MediumTextWidth(text); }
 void UI_SmallTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset) {
   textWindow(x, baseline, width, text, offset, &TomThumb, 1);
 }
-void UI_BodyTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset) {
-  textWindow(x, baseline, width, text, offset, &uiBodyFont, 1);
+void UI_MediumTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset) {
+  textWindow(x, baseline, width, text, offset, &MuMatrix8ptRegular, 1);
+}
+void UI_LargeTextWindow(uint8_t x, uint8_t baseline, uint8_t width, const char *text, int16_t offset) {
+  textWindow(x, baseline, width, text, offset, &MuMatrix8ptRegular, 2);
 }

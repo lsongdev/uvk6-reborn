@@ -4,40 +4,25 @@
 #include "ui/graphics.h"
 #include <string.h>
 
-enum { BODY_X = 30, FREQUENCY_RIGHT = 110, BAND_X = 14 };
+// Body text ends at TEXT_RIGHT; the small column above the unit is always
+// reserved and takes whatever does not fit, then the screen edge clips.
+enum { BODY_X = 30, TEXT_RIGHT = 113, TAIL_X = 115, BAND_X = 14 };
 
-void UI_RadioCardShowFrequency(UI_RadioCardState *state, uint32_t now) {
-  state->tuned_at = now;
-  state->show_name = false;
-  state->offset = 0;
-}
+typedef uint16_t (*TextWidth)(const char *text);
 
-static uint32_t textHash(const char *text) {
-  uint32_t hash = 2166136261u; // FNV-1a
-  while (*text) hash = (hash ^ (uint8_t)*text++) * 16777619u;
-  return hash;
-}
-
-static uint16_t scrollOffset(uint32_t now, uint32_t started, uint16_t overflow) {
-  if (!overflow) return 0;
-  uint32_t phase = (now-started)%(2u*UI_RADIO_CARD_SCROLL_PAUSE_MS+overflow*UI_RADIO_CARD_SCROLL_PIXEL_MS);
-  return phase < UI_RADIO_CARD_SCROLL_PAUSE_MS ? 0 : phase < UI_RADIO_CARD_SCROLL_PAUSE_MS+overflow*UI_RADIO_CARD_SCROLL_PIXEL_MS
-                              ? (phase-UI_RADIO_CARD_SCROLL_PAUSE_MS)/UI_RADIO_CARD_SCROLL_PIXEL_MS : overflow;
-}
-
-bool UI_RadioCardUpdate(UI_RadioCardState *state, uint32_t now) {
-  if (!state->initialized) return false;
-  bool show = state->has_label && !state->tuning &&
-              now-state->tuned_at >= UI_RADIO_CARD_NAME_DELAY_MS;
-  bool changed = show != state->show_name;
-  if (show && !state->show_name) state->label_started = now;
-  state->show_name = show;
-  uint16_t offset = show ? scrollOffset(now, state->label_started, state->overflow) : 0;
-  uint16_t bandOffset = scrollOffset(now, state->band_started, state->band_overflow);
-  changed |= offset != state->offset || bandOffset != state->band_offset;
-  state->offset = offset;
-  state->band_offset = bandOffset;
-  return changed;
+// Copies the longest prefix of text that fits in width; returns the rest.
+static const char *fit(const char *text, TextWidth measure, uint16_t width,
+                       char head[24]) {
+  uint8_t n = 0;
+  for (char glyph[2] = {0}; text[n] && n < 23; ++n) {
+    glyph[0] = text[n];
+    uint16_t w = measure(glyph);
+    if (w > width) break;
+    width -= w;
+  }
+  memcpy(head, text, n);
+  head[n] = 0;
+  return text + n;
 }
 
 static void formatStep(uint32_t hz, char text[24]) {
@@ -82,58 +67,12 @@ static void renderActivity(uint8_t y, const UI_RadioCardView *view) {
   UI_SmallTextWindow(2, y+24, 26, lower, 0);
 }
 
-void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view, UI_RadioCardState *state, uint32_t now) {
-  if (!view || !state || y+UI_RADIO_CARD_HEIGHT > LCD_HEIGHT) return;
-  if (!state->initialized || state->frequency_hz != view->frequency_hz) {
-    UI_RadioCardShowFrequency(state, now);
-    state->initialized = true;
-    state->frequency_hz = view->frequency_hz;
-  }
-  bool wasTuning = state->tuning;
-  state->tuning = view->edit_text || view->activity == UI_RADIO_CARD_SEEKING;
-  if (wasTuning && !state->tuning) UI_RadioCardShowFrequency(state, now);
-  if (state->tuning) UI_RadioCardShowFrequency(state, now);
-  char label[128], frequency[16];
-  const char *name = view->name ? view->name : "";
-  const char *rds = view->rds ? view->rds : "";
-  snprintf(label, sizeof(label), "%s%s%s", name, *name && *rds ? " / " : "", rds);
-  uint32_t labelHash = textHash(label);
-  state->has_label = label[0];
-  if (labelHash != state->label_hash) {
-    state->label_hash = labelHash;
-    state->label_started = now;
-    state->offset = 0;
-  }
-  uint16_t textWidth = UI_BodyTextWidth(label);
-  state->overflow = textWidth > LCD_WIDTH-BODY_X ? textWidth-(LCD_WIDTH-BODY_X) : 0;
-  UI_RadioCardUpdate(state, now);
-  const char *unit = UI_FormatFrequency(view->frequency_hz, frequency);
-  if (view->edit_text) {
-    snprintf(frequency, sizeof(frequency), "%s", view->edit_text);
-    unit = "MHz";
-    state->show_name = false;
-  }
+static void renderHeader(uint8_t y, const UI_RadioCardView *view) {
   const char *mode = (unsigned)view->mode < RX_MODE_COUNT ? rxModeNames[view->mode] : "--";
+  const char *text = view->header_message && *view->header_message ? view->header_message :
+                     view->radio_text && *view->radio_text ? view->radio_text :
+                     view->band_name ? view->band_name : "";
   uint8_t modeLeft = LCD_WIDTH-UI_SmallTextWidth(mode);
-  char compact[24];
-  snprintf(compact, sizeof(compact), "%s%s", frequency, unit);
-  bool headerMessage = view->header_message && *view->header_message;
-  uint8_t bandRight = modeLeft-3;
-  if (state->show_name && !headerMessage) bandRight -= UI_SmallTextWidth(compact)+3;
-  uint16_t bandWidth = bandRight > BAND_X ? bandRight-BAND_X : 0;
-  const char *band = headerMessage ? view->header_message : view->band_name ? view->band_name : "";
-  uint32_t bandHash = textHash(band);
-  if (bandHash != state->band_hash || bandWidth != state->band_width) {
-    state->band_hash = bandHash;
-    state->band_started = now;
-    state->band_offset = 0;
-    state->band_width = bandWidth;
-  }
-  uint16_t bandTextWidth = UI_SmallTextWidth(band);
-  state->band_overflow = bandTextWidth > bandWidth ? bandTextWidth-bandWidth : 0;
-  state->band_offset = scrollOffset(now, state->band_started, state->band_overflow);
-
-  FillRect(0, y, LCD_WIDTH, UI_RADIO_CARD_HEIGHT, C_CLEAR);
   if (view->selected) {
     DrawVLine(1, y+1, 5, C_FILL);
     DrawVLine(2, y+2, 3, C_FILL);
@@ -141,26 +80,40 @@ void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view, UI_RadioCardSta
   }
   PrintSmall(5, y+5, "%c", view->id ? view->id : 'A');
   if (view->changed) PrintSmall(10, y+5, "*");
-  UI_SmallTextWindow(BAND_X, y+5, bandWidth, band, state->band_offset);
+  UI_SmallTextWindow(BAND_X, y+5, modeLeft-3-BAND_X, text, 0);
   PrintSmallEx(LCD_WIDTH, y+5, POS_R, C_FILL, "%s", mode);
-  if (state->show_name && !headerMessage)
-    PrintSmallEx(modeLeft-3, y+5, POS_R, C_FILL, "%s", compact);
   FillRect(0, y, LCD_WIDTH, 8, C_INVERT);
+}
+
+void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view) {
+  if (!view || y+UI_RADIO_CARD_HEIGHT > LCD_HEIGHT) return;
+  FillRect(0, y, LCD_WIDTH, UI_RADIO_CARD_HEIGHT, C_CLEAR);
+  renderHeader(y, view);
   renderActivity(y, view);
-  if (state->show_name) {
-    int16_t offset = state->overflow ? state->offset :
-                     (int16_t)textWidth-(LCD_WIDTH-BODY_X);
-    UI_BodyTextWindow(BODY_X, y+22, LCD_WIDTH-BODY_X, label, offset);
-  } else {
-    char *tail = NULL;
-    char *dot = strchr(frequency, '.');
-    if (unit[0] == 'M' && dot && strlen(dot+1) > 3) {
-      tail = dot+4;
-      PrintSmallEx(LCD_WIDTH, y+13, POS_R, C_FILL, "%s", tail);
-      *tail = 0;
-    }
-    UI_BodyTextWindow(BODY_X, y+22, FREQUENCY_RIGHT-BODY_X, frequency,
-        (int16_t)UI_BodyTextWidth(frequency)-(FREQUENCY_RIGHT-BODY_X));
-    PrintSmallEx(LCD_WIDTH, y+21, POS_R, C_FILL, "%s", unit);
+  char frequency[16], head[24];
+  const char *unit = UI_FormatFrequency(view->frequency_hz, frequency);
+  bool tuning = view->edit_text || view->activity == UI_RADIO_CARD_SEEKING;
+  if (view->edit_text) {
+    snprintf(frequency, sizeof(frequency), "%s", view->edit_text);
+    unit = "MHz";
   }
+  if (!tuning && view->name && *view->name) {
+    // Name over frequency, both medium and right-aligned to TEXT_RIGHT.
+    const char *rest = fit(view->name, UI_MediumTextWidth, TEXT_RIGHT-BODY_X, head);
+    uint16_t width = UI_MediumTextWidth(head);
+    UI_MediumTextWindow(TEXT_RIGHT-width, y+16, width, head, 0);
+    UI_SmallTextWindow(TAIL_X, y+16, LCD_WIDTH-TAIL_X, rest, 0);
+    width = UI_MediumTextWidth(frequency);
+    UI_MediumTextWindow(TEXT_RIGHT-width, y+26, width, frequency, 0);
+    PrintSmallEx(LCD_WIDTH, y+26, POS_R, C_FILL, "%s", unit);
+    return;
+  }
+  // Frequency alone: large digits; extra decimals or draft digits stack
+  // small above the unit, keeping their end (the cursor) in view.
+  const char *rest = fit(frequency, UI_LargeTextWidth, TEXT_RIGHT-BODY_X, head);
+  uint16_t width = UI_LargeTextWidth(head), tail = UI_SmallTextWidth(rest);
+  UI_LargeTextWindow(TEXT_RIGHT-width, y+22, width, head, 0);
+  if (tail <= LCD_WIDTH-TAIL_X) UI_SmallTextWindow(LCD_WIDTH-tail, y+13, tail, rest, 0);
+  else UI_SmallTextWindow(TAIL_X, y+13, LCD_WIDTH-TAIL_X, rest, tail-(LCD_WIDTH-TAIL_X));
+  PrintSmallEx(LCD_WIDTH, y+22, POS_R, C_FILL, "%s", unit);
 }

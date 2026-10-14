@@ -33,7 +33,7 @@ drivers/             BK4819、SI4732、BK1080、ST7565 与 DP32G030 外设
 | `core/watch.*`、`core/seek.*`、`core/capture.*` | 双守听、Seek、FC 的纯状态机 |
 | `core/rx-runtime.*`、`core/tx-runtime.*` | 已提交接收方案的回滚，半双工 TX 生命周期 |
 | `core/config-store.*`、`core/channel-store.*` | UVR2 配置双副本与用户频道存储 |
-| `ui/components/radio-card.*` | Slot 卡片绘制与滚动；只保存文本指纹，不复制文本 |
+| `ui/components/radio-card.*` | Slot 卡片绘制；无状态、不滚动 |
 | `tests/` | 主机回归；`sh tests/run.sh` |
 
 ## 约定

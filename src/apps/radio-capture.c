@@ -23,7 +23,6 @@ void cancelCapture(const char *status) {
     receivingSlot=selectedSlot;
   }
   delayWatch();
-  showFrequency();
   message=NULL;
   if (status) notify(status);
   gRedrawScreen=true;
@@ -62,7 +61,6 @@ void captureUpdate(void) {
     if (!applyReceiver(NULL, &plan)) { cancelCapture("Tune failed"); return; }
     capturePhase=FC_PREVIEW;
     receivingSlot=selectedSlot;
-    showFrequency();
     gRedrawScreen=true;
   }
 }

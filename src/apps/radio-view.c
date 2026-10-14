@@ -1,11 +1,6 @@
 // Main screen: slot cards, status title and tune confirmation.
 #include "apps/radio-internal.h"
 
-UI_RadioCardState cards[RADIO_SLOT_CAPACITY];
-void __attribute__((noinline)) showFrequency(void) {
-  UI_RadioCardShowFrequency(&cards[selectedSlot], Now());
-}
-
 // Owns transient strings until the card has been drawn.
 typedef struct {
   UserChannel channel;
@@ -56,7 +51,7 @@ static void buildCardView(uint8_t id, const char *inputText,
     .mode = p->mode, .band_name = header,
     .changed = modified, .step_hz = p->step_hz,
     .name = channelMode ? channelName : textValid ? labels[id].ps : NULL,
-    .rds = textValid ? labels[id].text : NULL,
+    .radio_text = textValid ? labels[id].text : NULL,
     .header_message = selected && !number.active ? (message ? message :
         gDeviceConfig.radio.watch_enabled ? watchStatus : NULL) : NULL,
     .signal_valid = receiving, .signal_level = receiving ? UI_SMeterLevel() : 0,
@@ -70,7 +65,7 @@ static void buildCardView(uint8_t id, const char *inputText,
                    tx->power == TX_POWER_MEDIUM ? "MID" : "LOW",
   };
   if (selected && capturePhase!=FC_OFF) {
-    view->name=view->rds=NULL;
+    view->name=view->radio_text=NULL;
     view->header_message=capturePhase==FC_PREVIEW ? "FC Preview" : "FC detecting";
     if (capturePhase==FC_PREVIEW) {
       view->frequency_hz=capture.last_hz;
@@ -120,13 +115,12 @@ void RADIO_APP_render(void) {
   // The number formatter is only needed by an active RX frequency editor.
   if (number.active && !inputTx) NUMBER_Text(&number, inputText);
   uint8_t first = RADIO_STATE_VisibleFirst(&gDeviceConfig.radio);
-  uint32_t now = Now();
   uint8_t visible = MIN(gDeviceConfig.radio.slot_count, RADIO_SLOT_VISIBLE);
   for (uint8_t row = 0; row < visible; ++row) {
     uint8_t id = first + row;
     RadioViewStorage storage;
     UI_RadioCardView view;
     buildCardView(id, inputText, &view, &storage);
-    UI_RadioCardRender(8 + row * UI_RADIO_CARD_HEIGHT, &view, &cards[id], now);
+    UI_RadioCardRender(8 + row * UI_RADIO_CARD_HEIGHT, &view);
   }
 }

@@ -1,14 +1,8 @@
-// Real framebuffer rendering: separate cards, title clipping and scrolling.
+// Real framebuffer rendering: stateless cards, reserved tail column, no scrolling.
 #include "ui/components/radio-card.h"
 #include "ui/components/frequency.h"
 #include "ui/graphics.h"
 #include <assert.h>
-// Same FNV-1a identity the card keeps instead of a text copy.
-static uint32_t hash(const char *text) {
-  uint32_t h = 2166136261u;
-  while (*text) h = (h ^ (uint8_t)*text++) * 16777619u;
-  return h;
-}
 #include <string.h>
 uint8_t gFrameBuffer[8][128];
 bool gRedrawScreen;
@@ -18,48 +12,24 @@ static void sameRows(unsigned first, unsigned last) {
     for (unsigned x=0; x<128; ++x)
       assert(GetPixel(x,y) == !!(saved[y/8][x] & (1<<(y%8))));
 }
+static bool ink(unsigned x0, unsigned x1, unsigned y0, unsigned y1) {
+  for (unsigned y=y0; y<y1; ++y) for (unsigned x=x0; x<x1; ++x) if (GetPixel(x,y)) return true;
+  return false;
+}
+static unsigned leftmost(unsigned y0, unsigned y1) {
+  for (unsigned x=28; x<128; ++x) if (ink(x,x+1,y0,y1)) return x; // Body only.
+  return 128;
+}
+static void render(uint8_t y, const UI_RadioCardView *view) {
+  memset(gFrameBuffer,0,sizeof(gFrameBuffer));
+  UI_RadioCardRender(y,view);
+}
 int main(void) {
-  // Names and frequencies use the same native 12 px ASCII glyphs.
-  memset(gFrameBuffer,0,sizeof(gFrameBuffer));
-  UI_BodyTextWindow(30,22,98,"A",0);
-  unsigned inkRows=0;
-  for(unsigned y=0;y<64;++y) {
-    bool ink=false;
-    for(unsigned x=30;x<128;++x) ink |= GetPixel(x,y);
-    inkRows += ink;
-  }
-  assert(inkRows == 12);
-  // Frequency and name use identical glyph pixels and the same baseline.
-  UI_RadioCardState matching={0};
-  UI_RadioCardView match={.frequency_hz=438500000,.mode=RX_NFM,.step_hz=12500,.band_name="70cm"};
-  UI_RadioCardRender(8,&match,&matching,0);
-  memcpy(saved,gFrameBuffer,sizeof(saved));
-  match.name="438.500";
-  UI_RadioCardRender(8,&match,&matching,1000);
-  for (unsigned y=17;y<34;++y) for(unsigned x=30;x<110;++x)
-    assert(GetPixel(x+18,y)==!!(saved[y/8][x]&(1<<(y%8))));
-  // Scrolling must clip pixels and retain native descenders.
-  memset(gFrameBuffer,0,sizeof(gFrameBuffer));
-  UI_BodyTextWindow(30,22,98,"Agjp WWWWWWWWW",1);
-  bool descender=false;
-  for(unsigned y=0;y<64;++y) for(unsigned x=0;x<128;++x) {
-    if(x<30 || y<9 || y>25) assert(!GetPixel(x,y));
-    if(y==25 && GetPixel(x,y)) descender=true;
-  }
-  assert(descender);
   const struct { uint32_t frequency; const char *text, *unit; } cases[] = {
-    {103900000,"103.900","MHz"},
-    {410000,"410","kHz"},
-    {95925000,"95.925","MHz"},
-    {438500000,"438.500","MHz"},
-    {438512500,"438.5125","MHz"},
-    {145506250,"145.50625","MHz"},
-    {7100000,"7.100","MHz"},
-    {410020,"410.02","kHz"},
-    {999000,"999","kHz"},
-    {1000000,"1.000","MHz"},
-    {1340000000,"1340.000","MHz"},
-    {1339999980,"1339.99998","MHz"},
+    {103900000,"103.900","MHz"}, {410000,"410","kHz"}, {95925000,"95.925","MHz"},
+    {438500000,"438.500","MHz"}, {438512500,"438.5125","MHz"}, {145506250,"145.50625","MHz"},
+    {7100000,"7.100","MHz"}, {410020,"410.02","kHz"}, {999000,"999","kHz"},
+    {1000000,"1.000","MHz"}, {1340000000,"1340.000","MHz"}, {1339999980,"1339.99998","MHz"},
     {1000001,"1.000001","MHz"},
   };
   for (unsigned i=0; i<sizeof(cases)/sizeof(cases[0]); ++i) {
@@ -67,94 +37,65 @@ int main(void) {
     assert(!strcmp(UI_FormatFrequency(cases[i].frequency,text),cases[i].unit));
     assert(!strcmp(text,cases[i].text));
   }
-  UI_RadioCardState a={0}, b={0};
-  UI_RadioCardView view={.id='A',.selected=true,.frequency_hz=103900000,.step_hz=100000,
-    .mode=RX_WFM,.band_name="FM Radio",.name="Main receiver",
-    .activity=UI_RADIO_CARD_RECEIVING,.signal_valid=true,.signal_level=14};
-  memset(gFrameBuffer,0xaa,sizeof(gFrameBuffer));
+  // Large digits: medium glyphs at 2x, one pixel bolder per dot.
+  assert(UI_LargeTextWidth("438.506") == 2*UI_MediumTextWidth("438.506"));
+  memset(gFrameBuffer,0,sizeof(gFrameBuffer));
+  UI_MediumTextWindow(0,10,20,"1",0);
+  unsigned thin=0; for (unsigned x=0;x<20;++x) thin+=ink(x,x+1,0,12);
+  memset(gFrameBuffer,0,sizeof(gFrameBuffer));
+  UI_LargeTextWindow(0,20,40,"1",0);
+  unsigned bold=0; for (unsigned x=0;x<40;++x) bold+=ink(x,x+1,0,24);
+  assert(bold == 2*thin+1);
+
+  // Frequency alone: three decimals fit, extra decimals stack above the unit.
+  UI_RadioCardView view={.id='A',.selected=true,.frequency_hz=438500000,.step_hz=12500,
+    .mode=RX_NFM,.band_name="70cm",.activity=UI_RADIO_CARD_RECEIVING,.signal_valid=true,.signal_level=9};
+  render(8,&view);
+  assert(ink(30,113,17,32) && !ink(113,115,16,36) && !ink(115,128,16,23));
   memcpy(saved,gFrameBuffer,sizeof(saved));
-  UI_RadioCardRender(8,&view,&a,100);
-  sameRows(0,8); sameRows(36,64);
-  assert(!a.show_name && !UI_RadioCardUpdate(&a,1099));
-  assert(UI_RadioCardUpdate(&a,1100) && a.show_name);
-  UI_RadioCardRender(8,&view,&a,1100);
-  assert(a.label_hash==hash("Main receiver") && a.has_label);
-  UI_RadioCardShowFrequency(&a,1200);
-  UI_RadioCardRender(8,&view,&a,1200);
-  assert(!a.show_name); // Same-frequency retune starts a fresh hold.
-  assert(!UI_RadioCardUpdate(&a,2199));
-  assert(UI_RadioCardUpdate(&a,2200));
-  view.frequency_hz=1339999980;view.mode=RX_NFM;view.band_name="UHF";
-  UI_RadioCardRender(8,&view,&a,2300);
-  assert(!a.show_name && a.tuned_at == 2300);
-  for(unsigned y=17;y<34;++y) {
-    assert(!GetPixel(28,y) && !GetPixel(29,y)); // Longest frequency cannot hit status.
-  }
+  render(8,&view);
+  sameRows(0,64); // Stateless: the same view always draws the same pixels.
+  view.frequency_hz=438506250;render(8,&view);
+  assert(ink(115,128,16,23) && !ink(113,115,16,36));
+  view.frequency_hz=1339999980;render(8,&view);
+  assert(leftmost(17,32) >= 30 && ink(115,128,16,23)); // 1339.99 + 998
+  assert(!ink(0,128,36,64)); // A card never draws outside its 28 rows.
+  // Drafts keep their end (the cursor) visible in the tail column.
+  view.edit_text="1340.000001_";render(8,&view);
+  assert(leftmost(17,32) >= 30 && ink(124,128,16,23));
+  view.edit_text=NULL;
+
+  // Name over frequency, both medium and right-aligned to the same edge.
+  view.frequency_hz=438500000;view.name="Repeater";render(8,&view);
+  assert(ink(30,113,17,25) && ink(30,113,28,36) && !ink(113,128,16,25));
+  unsigned nameLeft=leftmost(17,25);
+  view.name="My Channnnnnnnnnnnnel";render(8,&view);
+  assert(leftmost(17,25) < nameLeft && ink(115,128,17,25) && !ink(113,115,16,36));
+  // Seeking and editing always show the large frequency.
   memcpy(saved,gFrameBuffer,sizeof(saved));
-  view=(UI_RadioCardView){.id='B',.frequency_hz=401000,.step_hz=1000,.mode=RX_AM,
-    .band_name="Longwave",.rds="Radio text"};
-  UI_RadioCardRender(36,&view,&b,2300);
-  sameRows(0,36);
-  view.name="Very long station name";view.rds="Another long radio text message";
-  UI_RadioCardRender(36,&view,&b,2400);
-  assert(b.label_hash==hash("Very long station name / Another long radio text message"));
-  assert(!b.show_name && b.overflow);
-  assert(UI_RadioCardUpdate(&b,3300));
-  UI_RadioCardRender(36,&view,&b,3300);
-  assert(!b.offset && !UI_RadioCardUpdate(&b,4499));
-  memcpy(saved,gFrameBuffer,sizeof(saved));
-  assert(UI_RadioCardUpdate(&b,4650) && b.offset == 1);
-  UI_RadioCardRender(36,&view,&b,4650);
-  sameRows(0,44); sameRows(62,64);
-  for(unsigned y=44;y<62;++y) for(unsigned x=0;x<30;++x)
-    assert(GetPixel(x,y) == !!(saved[y/8][x] & (1<<(y%8))));
-  view.name=NULL;view.rds=NULL;UI_RadioCardRender(36,&view,&b,4700);
-  assert(!b.show_name && !b.has_label && !b.overflow && !b.offset);
-  view.name="Late RDS";UI_RadioCardRender(36,&view,&b,4800);
-  assert(b.show_name); // RDS arriving after the hold can be shown immediately.
-  view.activity=UI_RADIO_CARD_SEEKING;UI_RadioCardRender(36,&view,&b,4900);
-  assert(!b.show_name && !UI_RadioCardUpdate(&b,10000));
-  view.activity=UI_RADIO_CARD_IDLE;UI_RadioCardRender(36,&view,&b,10000);
-  assert(!b.show_name); // Search holds frequency until its last activity expires.
-  assert(!UI_RadioCardUpdate(&b,10999));
-  assert(UI_RadioCardUpdate(&b,11000));
-  view.band_name="Very long custom band name that must never overlap the frequency or mode";
-  UI_RadioCardRender(36,&view,&b,11001);
-  assert(b.band_overflow);
-  memcpy(saved,gFrameBuffer,sizeof(saved));
-  assert(UI_RadioCardUpdate(&b,12351));UI_RadioCardRender(36,&view,&b,12351);
-  for(unsigned y=36;y<44;++y) for(unsigned x=14+b.band_width;x<128;++x)
-    assert(GetPixel(x,y) == !!(saved[y/8][x] & (1<<(y%8))));
-  memcpy(saved,gFrameBuffer,sizeof(saved));UI_RadioCardRender(37,&view,&b,13000);
+  view.activity=UI_RADIO_CARD_SEEKING;render(8,&view);
+  assert(!ink(115,128,17,25) && ink(30,113,17,32));
+  view.activity=UI_RADIO_CARD_IDLE;
+
+  // Header: status message over RT over band; mode stays at the right edge.
+  view.name="RADIO FM";view.radio_text="Music and news at the top of the hour";
+  render(8,&view);memcpy(saved,gFrameBuffer,sizeof(saved));
+  view.radio_text=NULL;render(8,&view);
+  bool differs=false;
+  for (unsigned x=14;x<100;++x) for (unsigned y=8;y<16;++y)
+    differs |= GetPixel(x,y) != !!(saved[y/8][x]&(1<<(y%8)));
+  assert(differs);
+  sameRows(16,36); // RT never touches the body.
+  view.radio_text="RT";view.header_message="Channel store unavailable: please retry";
+  render(8,&view);memcpy(saved,gFrameBuffer,sizeof(saved));
+  view.radio_text=NULL;render(8,&view);
+  sameRows(0,64);
+
+  // Second row and bounds.
+  render(36,&view);
+  assert(!ink(0,128,0,36) && ink(0,128,36,64));
+  memset(gFrameBuffer,0xaa,sizeof(gFrameBuffer));memcpy(saved,gFrameBuffer,sizeof(saved));
+  UI_RadioCardRender(37,&view);
   sameRows(0,64); // Out-of-bounds cards never touch the framebuffer.
-  a=(UI_RadioCardState){0};view.band_name="LW";
-  UI_RadioCardRender(8,&view,&a,UINT32_MAX-500);
-  assert(!UI_RadioCardUpdate(&a,498));
-  assert(UI_RadioCardUpdate(&a,499) && a.show_name);
-  UI_RadioCardRender(8,&view,&a,500);
-  memcpy(saved,gFrameBuffer,sizeof(saved));
-  uint32_t label=a.label_hash;
-  // Every status uses the header; scrolling never changes the body or B card.
-  view.header_message="Channel store unavailable: please retry";
-  UI_RadioCardRender(8,&view,&a,500);
-  sameRows(0,8); sameRows(16,64);
-  assert(a.band_hash==hash(view.header_message) && a.label_hash==label && a.show_name);
-  assert(a.band_overflow);
-  assert(UI_RadioCardUpdate(&a,1850) && a.band_offset==1);
-  UI_RadioCardRender(8,&view,&a,1850);
-  sameRows(16,64); sameRows(0,8);
-  view.header_message=NULL; UI_RadioCardRender(8,&view,&a,1850);
-  assert(a.label_hash==label);
-  sameRows(0,64); // Removing status restores the header without resetting the name.
-  view.edit_text="1340.000001_";
-  memcpy(saved,gFrameBuffer,sizeof(saved));
-  UI_RadioCardRender(8,&view,&a,2000);
-  sameRows(0,8);sameRows(36,64);
-  assert(a.tuning && !a.show_name);
-  assert(!UI_RadioCardUpdate(&a,10000) && !a.show_name);
-  for(unsigned y=17;y<34;++y) assert(!GetPixel(28,y) && !GetPixel(29,y));
-  view.edit_text=NULL;UI_RadioCardRender(8,&view,&a,10000);
-  assert(!a.tuning && !a.show_name);
-  assert(UI_RadioCardUpdate(&a,11000) && a.show_name);
   return 0;
 }

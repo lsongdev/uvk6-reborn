@@ -110,7 +110,6 @@ static const char *unavailable(RxResult result) {
 static void tuned(void) {
   receivingSlot = selectedSlot;
   message = NULL;
-  showFrequency();
   gRedrawScreen = true;
 }
 
@@ -261,15 +260,7 @@ void RADIO_APP_update(void) {
   uint32_t now = Now();
   expireShortcut(now);
   RADIO_APP_TxSafetyUpdate(); // Also permit deterministic host/UI unit tests.
-  if (message || (!inMenu && !confirming))
-    for (uint8_t id=0; id<RADIO_SLOT_CAPACITY; ++id)
-      if (UI_RadioCardUpdate(&cards[id], now)) gRedrawScreen = true;
-  const UI_RadioCardState *card=&cards[selectedSlot];
-  uint32_t duration=2500u;
-  uint16_t overflow = card->band_overflow;
-  if (overflow)
-    duration=2u*UI_RADIO_CARD_SCROLL_PAUSE_MS+overflow*UI_RADIO_CARD_SCROLL_PIXEL_MS;
-  if (message && now-messageAt >= duration) {
+  if (message && now-messageAt >= 2500u) {
     message = NULL;
     gRedrawScreen = true;
   }
@@ -445,10 +436,7 @@ static void frequencyInputKey(KEY_Code_t key, Key_State_t state) {
       if (!setTxFrequency(value)) { number.active = true; number.invalid = true; }
     } else tuneTo(value);
   }
-  if (result != NUMBER_EDITING && !number.active) {
-    delayWatch();
-    showFrequency();
-  }
+  if (result != NUMBER_EDITING && !number.active) delayWatch();
   gRedrawScreen = true;
 }
 

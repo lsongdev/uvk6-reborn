@@ -1,24 +1,19 @@
 # UI 字库
 
-VFO 正文（主频率、名称、RDS、提示）和频率输入共用 `helvetica12.h`，来源为 Adobe X11 Helvetica Bold `helvB12.bdf` 的可打印 ASCII 子集，95 个字符（32–126）。原生大写字母与数字为 12 px 高，完整 ASCII 笔画含下伸部分占 17 px；不放大、不另选数字字形。字体为比例宽度，数字步进统一 9 px。
+固件只有两套文本字体和一套图标：
 
-`UI_BodyTextWidth` 和 `UI_BodyTextWindow` 使用同一套 glyph 元数据。VFO 的频率和名称共用基线；频率数字右边界 110，名称右边界 128。主频率 `1339.999` 宽 68 px，`438.506` 宽 59 px（含字符步进）。
+| 字库 | 尺寸 | 用途 |
+| --- | --- | --- |
+| `TomThumb.h` | 3×5 | 黑底横条、状态栏、菜单、单位、卡片小字栏 |
+| `muMatrix8ptRegular.h` | 5×7 | 卡片名称／频率、文本输入、提示页、菜单标题 |
+| `symbols.h` | 8×8 内 | 状态栏图标 |
 
-源 BDF 与许可保存在 `sources/helvB12-ascii.bdf`，生成头部保留完整版权与许可。来源：[U8g2 中的 Adobe X11 原始 BDF](https://github.com/olikraus/u8g2/blob/master/tools/font/bdf/helvB12.bdf)。转换仅选择 ASCII 并重新打包相同点阵，没有修改字形。
+卡片的大号频率不另设字库：`UI_LargeTextWindow` 把中字放大两倍，每个点向右多画 1 px，笔画因此接近粗体。数字步进 12 px、小数点 4 px，`UI_LargeTextWidth` 恒为 `UI_MediumTextWidth` 的两倍。
 
-重新生成：
+2026-10-14 前卡片使用 Adobe X11 Helvetica Bold 12 px（95 个 ASCII 字形，1,434 B），已删除。
+
+`tools/bdf-to-gfx.py` 仍可把 BDF 点阵转换为本固件的 GFX 格式：
 
 ```sh
-python3 tools/bdf-to-gfx.py src/ui/fonts/sources/helvB12-ascii.bdf src/ui/fonts/helvetica12.h
+python3 tools/bdf-to-gfx.py input.bdf output.h
 ```
-
-位图 959 B，95 个 GFXglyph 元数据（每个 7 B，合计 665 B，packed 去除尾部填充，不改变字形）；不引入 U8g2 解码器。状态栏／频段／单位的小字继续使用 TomThumb，菜单使用已有中字号字库。
-
-## Adobe X11 字库许可
-
-Copyright 1984-1989, 1994 Adobe Systems Incorporated.
-Copyright 1988, 1994 Digital Equipment Corporation.
-
-Adobe is a trademark of Adobe Systems Incorporated which may be registered in certain jurisdictions. Permission to use these trademarks is hereby granted only in association with the images described in this file.
-
-Permission to use, copy, modify, distribute and sell this software and its documentation for any purpose and without fee is hereby granted, provided that the above copyright notices appear in all copies and that both those copyright notices and this permission notice appear in supporting documentation, and that the names of Adobe Systems and Digital Equipment Corporation not be used in advertising or publicity pertaining to distribution of the software without specific, written prior permission. Adobe Systems and Digital Equipment Corporation make no representations about the suitability of this software for any purpose. It is provided "as is" without express or implied warranty.
