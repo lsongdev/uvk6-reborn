@@ -1054,7 +1054,9 @@ int main(void) {
   assert(capturing && !number.active && !functionPending);
   assert(!RADIO_APP_isReceiving() && receivingSlot==UINT8_MAX && captureStarts==1);
   assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED));press(KEY_PTT);
-  press(KEY_F);press(KEY_2);press(KEY_MENU); // Cancel while detecting.
+  press(KEY_F);press(KEY_2);
+  press(KEY_MENU);assert(capturing); // Nothing on screen yet: MENU has nothing to adopt.
+  press(KEY_EXIT);
   assert(!capturing && selectedSlot==0 && !txFakePrepares);
   assert(!memcmp(&fcOrigin,&gDeviceConfig.radio.slots[0],sizeof(fcOrigin)) && saveRequests==fcSaves);
   press(KEY_F);press(KEY_4);
@@ -1069,6 +1071,17 @@ int main(void) {
   captureReply=CAPTURE_SAMPLE;captureHz=438512340;
   clockNow+=20;RADIO_APP_update();assert(capturing);
   RADIO_APP_render();assert(drawn[0].frequency_hz==438512340 && !drawn[0].edit_text);
+  // MENU adopts the reading on screen before any confirmation.
+  {
+    RadioSlot before=gDeviceConfig.radio.slots[0];unsigned saves=saveRequests;
+    press(KEY_MENU);
+    assert(!capturing && runtime.current.frequency_hz==438512340 && saveRequests==saves+1);
+    gDeviceConfig.radio.slots[0]=activeSlot=before;
+    request(438500000,fm);fcSaves=saveRequests;
+    gDeviceConfig.radio.slots[0].tx.enabled=activeSlot.tx.enabled=true;
+    press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=438512340;
+    clockNow+=20;RADIO_APP_update();assert(capturing);
+  }
   captureHz+=3000;clockNow+=20;RADIO_APP_update();
   assert(!capturing && RADIO_APP_isReceiving() && runtime.current.frequency_hz==captureHz);
   assert(activeSlot.current.frequency_hz==captureHz && gReceiver.plan.frequency_hz==captureHz);

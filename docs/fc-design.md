@@ -9,7 +9,7 @@
 - 默认 Auto。任一侧键循环 Auto → VHF → UHF → Auto，清候选并重新开始检测。
 - 检测中当前 VFO 的横条显示检测器当前范围（`FC VHF`／`FC UHF`），模式位置显示所选范围（`Auto`／`VHF`／`UHF`），正文实时显示最近一次有效读数（无读数时 `---`）；顶部公共状态栏不再显示 FC 信息；暂停普通静噪轮询与 RDS，BK Slot 移出守听，广播 Slot 继续。
 - 两次稳定结果后关闭检测器，**直接调谐入口选中的 VFO**（与手动输入频率相同）：NFM、TX Enabled 强制 Off、RX Tone Off，清原频道编号／名称草稿，请求一次正常保存。2026-10-14 起取消临时试听和 MENU 采用这一步；原频率不再保留，与手动输入新频率一致。
-- EXIT 或 MENU 取消并恢复原方案；调谐失败或离开应用同样停止检测并恢复。没有会话超时。恢复失败则静音、清接收归属，提示 `RX error`。
+- **MENU 采用当前显示的读数**（尚无读数时忽略），效果与自动确认相同；**EXIT 退出**并恢复原方案；调谐失败或离开应用同样停止检测并恢复。没有会话超时。恢复失败则静音、清接收归属，提示 `RX error`。
 - 检测期间屏蔽 PTT，不切 VFO，不修改其他项；取消不写 VFO／频道／EEPROM。
 
 **只能捕获近处的强载波**：检测器测的是天线上最强信号的频率，需要发射机就在附近（约数米内，例如另一台对讲机按下 PTT）。远处的广播电台或中继信号太弱，读数会一直是 `---`，这不是故障。
@@ -38,7 +38,7 @@ BK4819 REG32 写 `0x0245` 开启 0.2 秒频率检测，`0x0244` 关闭。REG0D b
 
 核心 API 是 `CAPTURE_Start` / `CAPTURE_Update`，接收 BUSY／INVALID／SAMPLE，输出 WAIT／RESTART／FOUND／TIMEOUT。应用管理 OFF／DETECT／PREVIEW 生命周期，核心不持有芯片或用户状态。HAL 使用 `RX_DEVICE_CaptureStart` / `CapturePoll` / `CaptureStop`；BK 串行写没有 ACK，Start 没有虚构硬件成功返回值。
 
-FC 只借用 BK4819：守听中时，开始 FC 会把设备为 BK 的 Slot 暂时移出守听（`WATCH_SuspendBk`：正在出声或停留中的对讲、BK 上的常驻源都静音，广播常驻源接过喇叭），广播芯片上的 Slot 照常守听；FC 结束（EXIT／MENU）后这些 BK Slot 立即恢复，轮询从头开始。不在守听时，若当前接收在广播芯片上就继续播放，在 BK 上则静音，结束后恢复。BK 测频期间音频 DAC 关闭，避免混进扬声器。`RxRuntime.current` 在确认载波前一直保留最后提交的原方案；不持有完整 VFO 副本，不更新频段记忆。按键被冻结，因此归属项不会在捕获期间改变。
+FC 只借用 BK4819：守听中时，开始 FC 会把设备为 BK 的 Slot 暂时移出守听（`WATCH_SuspendBk`：正在出声或停留中的对讲、BK 上的常驻源都静音，广播常驻源接过喇叭），广播芯片上的 Slot 照常守听；FC 结束（EXIT 或采用读数）后这些 BK Slot 立即恢复，轮询从头开始。不在守听时，若当前接收在广播芯片上就继续播放，在 BK 上则静音，结束后恢复。BK 测频期间音频 DAC 关闭，避免混进扬声器。`RxRuntime.current` 在确认载波前一直保留最后提交的原方案；不持有完整 VFO 副本，不更新频段记忆。按键被冻结，因此归属项不会在捕获期间改变。
 
 进入检测先关闭音频、清接收归属／RDS、让旧芯片离开，建立 BK RX-only 基线，再选择滤波范围并开启检测。BK RX 基线关闭 PA、MIC ADC 与 TX DSP，使用 NFM、关闭亚音、自动增益；从 SI／BK1080 进入也不依赖 BK 原先是否处于休眠。
 
@@ -53,7 +53,8 @@ stateDiagram-v2
     [*] --> Detect: F4，VFO 接收可用
     Detect --> Detect: 重试／Auto 轮换
     Detect --> Idle: 两次稳定，调谐 VFO 成功
-    Detect --> Restore: EXIT／MENU／调谐失败／离开应用
+    Detect --> Idle: MENU 采用当前读数
+    Detect --> Restore: EXIT／调谐失败／离开应用
     Restore --> Idle: 原方案恢复
     Restore --> Fault: 静音，清接收归属
 ```
