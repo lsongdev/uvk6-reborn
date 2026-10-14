@@ -53,7 +53,7 @@ static void buildCardView(uint8_t id, const char *inputText,
     .mode = p->mode, .band_name = header,
     .changed = modified, .step_hz = p->step_hz,
     .name = channelMode ? channelName : textValid ? labels[id].ps : NULL,
-    .radio_text = textValid ? labels[id].text : NULL,
+    .radio_text = textValid && labels[id].rt_until ? labels[id].text : NULL,
     .header_message = !selected ? NULL : number.active ? (number.invalid ? "Invalid value" : NULL) :
         message ? message : watchStatus,
     .signal_valid = receiving, .signal_level = receiving ? UI_SMeterLevel() : 0,

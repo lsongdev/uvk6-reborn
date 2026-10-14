@@ -265,6 +265,11 @@ void RADIO_APP_update(void) {
     message = NULL;
     gRedrawScreen = true;
   }
+  for (uint8_t id = 0; id < RADIO_SLOT_CAPACITY; ++id)
+    if (labels[id].rt_until && (int32_t)(now - labels[id].rt_until) >= 0) {
+      labels[id].rt_until = 0;
+      gRedrawScreen = true;
+    }
   if (transmitter.mode != RADIO_RX)
     return;
   if (capturing) { captureUpdate(); return; }
@@ -285,9 +290,14 @@ void RADIO_APP_update(void) {
   bool textExpired = rdsEnabled && now-rds.last_group >= 15000u;
   if (RDS_ReceiverUpdate(&rds, now, rdsEnabled, readRds, NULL) || textExpired) {
     if (rdsSlot < RADIO_SLOT_CAPACITY && rdsEnabled) {
-      labels[rdsSlot].frequency_hz = rdsPlan->frequency_hz;
-      memcpy(labels[rdsSlot].ps, rds.decoder.ps, sizeof(rds.decoder.ps));
-      memcpy(labels[rdsSlot].text, rds.decoder.text, sizeof(rds.decoder.text));
+      SlotLabel *label = &labels[rdsSlot];
+      // A changed RadioText is shown in full for a while, then the header
+      // returns to band and frequency until the text changes again.
+      if (rds.decoder.text[0] && memcmp(label->text, rds.decoder.text, sizeof(label->text)))
+        label->rt_until = (now + RADIO_RT_SHOW_MS) | 1u;
+      label->frequency_hz = rdsPlan->frequency_hz;
+      memcpy(label->ps, rds.decoder.ps, sizeof(rds.decoder.ps));
+      memcpy(label->text, rds.decoder.text, sizeof(rds.decoder.text));
     }
     gRedrawScreen = true;
   }

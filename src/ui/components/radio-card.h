@@ -14,7 +14,7 @@ typedef struct {
   UI_RadioCardActivity activity;
   const char *band_name, *power_label;
   const char *name;       // Channel name or RDS PS: shown large in the body.
-  const char *radio_text; // RDS RT: replaces the band in the header.
+  const char *radio_text; // Fresh RDS RT: owns the header, frequency included.
   const char *edit_text;  // Native MHz draft; owns the body while editing.
   const char *header_message; // Temporarily replaces band text in the black header.
   const char *mode_text;  // Replaces the mode name, e.g. the FC scope.
