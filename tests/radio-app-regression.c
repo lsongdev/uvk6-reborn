@@ -363,6 +363,12 @@ int main(void) {
   press(KEY_F);press(KEY_6);
   assert(activeSlot.tx.power == TX_POWER_LOW && saveRequests == powerSaves + 3);
   assert(!strcmp(message, "VFO only") && !keypad.active && !functionPending);
+  // The menu shares the power cycle, not the notice: the value is on screen.
+  activeSlot.source = gDeviceConfig.radio.slots[0].source = RADIO_SOURCE_VFO;
+  openMenu(MENU_TX_POWER); message = NULL;
+  press(KEY_STAR); assert(activeSlot.tx.power == TX_POWER_MEDIUM && !message);
+  press(KEY_F); assert(activeSlot.tx.power == TX_POWER_LOW && !message);
+  press(KEY_EXIT);
 
   setup(438500000, fm);
   press(KEY_F);press(KEY_EXIT);

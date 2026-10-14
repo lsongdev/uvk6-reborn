@@ -3,6 +3,7 @@
 #include "core/radio-model.h"
 
 typedef enum { TX_POWER_LOW, TX_POWER_MEDIUM, TX_POWER_HIGH } TxPower;
+extern const char *const txPowerNames[TX_POWER_HIGH + 1];
 // Where TX sits relative to RX: same, repeater offset up/down, or split.
 typedef enum { TX_SHIFT_OFF, TX_SHIFT_PLUS, TX_SHIFT_MINUS, TX_SHIFT_SPLIT,
                TX_SHIFT_COUNT } TxShift;

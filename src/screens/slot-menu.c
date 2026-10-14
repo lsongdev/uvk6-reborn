@@ -41,7 +41,7 @@ static void menuChangeValue(bool up) {
   TxConfig tx = RADIO_Selected()->tx;
   switch (menuIndex) {
   case MENU_TX_ENABLE: tx.enabled = !tx.enabled; setTx(tx); return;
-  case MENU_TX_POWER: RADIO_CycleTxPower(up); return;
+  case MENU_TX_POWER: (void)RADIO_CycleTxPower(up); return;
   case MENU_TX_SHIFT:
     tx.shift = (TxShift)((tx.shift + (up ? 1u : TX_SHIFT_COUNT-1u)) % TX_SHIFT_COUNT);
     setTx(tx); return;
@@ -73,10 +73,7 @@ static const char *menuValue(uint8_t item, char out[24]) {
     if (rx->mode != RX_NFM) return "NFM only";
     TONE_Format(rx->rx_tone, out); return out;
   case MENU_TX_ENABLE: return tx->enabled ? "On" : "Off";
-  case MENU_TX_POWER: {
-    static const char *const powers[] = {"Low", "Medium", "High"};
-    return powers[tx->power <= TX_POWER_HIGH ? tx->power : 0];
-  }
+  case MENU_TX_POWER: return txPowerNames[tx->power <= TX_POWER_HIGH ? tx->power : 0];
   case MENU_TX_SHIFT: {
     static const char *const shifts[TX_SHIFT_COUNT] = {"Off", "+", "-", "Split"};
     return shifts[tx->shift < TX_SHIFT_COUNT ? tx->shift : 0];
