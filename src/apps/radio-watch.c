@@ -22,7 +22,7 @@ static bool restorePrimary(void) {
     return true;
   if (RX_RuntimeTune(&runtime,&plan,applyReceiver,stopReceiver,NULL)!=RX_APPLIED) {
     // A restored background watch plan is never a PTT/primary substitute.
-    RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX restore error"); return false;
+    RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX error"); return false;
   }
   receivingSlot=selectedSlot; gRedrawScreen=true;
   return true;

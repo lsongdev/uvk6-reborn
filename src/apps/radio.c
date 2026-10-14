@@ -150,7 +150,7 @@ bool apply(const RxPlan *plan) {
   if (activeSlot.source == RADIO_SOURCE_VFO &&
       !RADIO_SLOT_SetVfo(&activeSlot, plan->frequency_hz, plan->parameters)) {
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
-    notify("State error");
+    notify("RX error");
     return false;
   }
   if (activeSlot.source == RADIO_SOURCE_VFO) {
@@ -169,7 +169,7 @@ void request(uint32_t target, RadioParameters values) {
   RxPlan plan;
   RxResult result = RADIO_MODEL_Plan(target, values, RECEIVER_Capabilities(), &plan);
   if (result == RX_OUT_OF_RANGE || result == RX_INVALID_PARAMETERS) {
-    notify("Invalid params");
+    notify("Invalid value");
     return;
   }
   if (result != RX_OK) {
@@ -381,7 +381,7 @@ static void switchSource(void) {
       if (CHANNEL_STORE_IsOccupied(candidate)) { number = candidate; break; }
   }
   if (!number) {
-    notify(CHANNEL_STORE_Available() ? "No saved channels" : "Channel store unavailable");
+    notify(CHANNEL_STORE_Available() ? "No saved channels" : "No channel memory");
     return;
   }
   tuneChannel(number, true);
@@ -406,7 +406,7 @@ static void switchSlot(void) {
 // F-prefix and side-key shortcuts must enforce the same VFO-only rule.
 static bool requireVfoSource(void) {
   if (activeSlot.source == RADIO_SOURCE_VFO) return true;
-  notify("Channel mode");
+  notify("VFO only");
   return false;
 }
 
@@ -424,7 +424,7 @@ void nextMode(void) {
                          RECEIVER_Capabilities(), RADIO_FIELD_MODE, true))
     request(activeSlot.current.frequency_hz, candidate);
   else
-    notify("No other mode");
+    notify("No option");
 }
 
 static void frequencyInputKey(KEY_Code_t key, Key_State_t state) {
@@ -449,10 +449,13 @@ static void shortcutKey(KEY_Code_t key) {
   case KEY_3: switchSource(); break;
   case KEY_4: startCapture(); break;
   case KEY_6: {
-    static const char *const messages[] = {
-      "TX Power: Low", "TX Power: Medium", "TX Power: High"
-    };
-    if (changeTxPower(true)) notify(messages[activeSlot.tx.power]);
+    static char powerText[20]; // Outlives the call: notify keeps the pointer.
+    if (changeTxPower(true)) {
+      Text t = TEXT_Begin(powerText, sizeof(powerText));
+      TEXT_Add(&t, "TX Power: ");
+      TEXT_Add(&t, txPowerNames[activeSlot.tx.power]);
+      notify(powerText);
+    }
     break;
   }
   case KEY_STAR: startSeek(); break;
@@ -542,7 +545,7 @@ bool RADIO_APP_key(KEY_Code_t key, Key_State_t state) {
     ; // Consumed: the main screen has nothing to close.
   else if (key <= KEY_9) {
     if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
-      notify("Switch to VFO first");
+      notify("VFO only");
       return true;
     }
     beginFrequencyInput(false);

@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
   press(KEY_5);capture(); // SI hardware option also stays in Receive.
   unsigned before=requests;
   capabilities.si=false;
-  press(KEY_STAR); assert(requests==before && !strcmp(notice,"SI4732 missing"));
+  press(KEY_STAR); assert(requests==before && !strcmp(notice,"No SI4732"));
   capabilities.si=true;
   press(KEY_EXIT);
   enter(KEY_3); capture(); // Transmit
@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
   calibrationResult=2200;
   press(KEY_MENU);press(KEY_MENU);
   assert(saves==1 && gDeviceConfig.preferences.battery_calibration==2100);
-  assert(!strcmp(notice,"Invalid calibration"));
+  assert(!strcmp(notice,"Invalid value"));
   calibrationResult=2000; saveWorks=false;
   press(KEY_MENU);press(KEY_MENU);
   assert(saves==1 && gDeviceConfig.preferences.battery_calibration==2100);

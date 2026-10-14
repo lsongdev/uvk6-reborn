@@ -104,7 +104,7 @@ VFO 标识后的 `*` 表示当前模式、步进、带宽或静噪与该频段�
 
 `EXIT` 丢弃全部草稿并返回列表。`Use current` 和 `Defaults` 都需要再执行 `Save` 才会保存。恢复默认值不改变上次频率、其他频段或全局设置。
 
-保存时以所选频段上次成功使用的频率校验模式和参数。缺少接收芯片 / SSB 补丁时显示原因；`Save failed` 表示写入或回读校验失败，原预设保留，草稿仍可重试。成功显示 `Saved: next band entry`，表示预设在下次进入该频段时应用，当前接收保持原配置。即使编辑的是当前频段，同频段继续调频仍保留当前 VFO 参数；先切到其他频段再切回来即可应用。
+保存时以所选频段上次成功使用的频率校验模式和参数。缺少接收芯片 / SSB 补丁时显示原因；`Save failed` 表示写入或回读校验失败，原预设保留，草稿仍可重试。成功显示 `Saved`：预设在下次进入该频段时应用，当前接收保持原配置。即使编辑的是当前频段，同频段继续调频仍保留当前 VFO 参数；先切到其他频段再切回来即可应用。
 
 当前保存为 UVR2 **格式 8**，两份 1024 字节槽位位于 `0x0800–0x0FFF`。格式 7 配置保留四项 VFO 和全局设置，新增的频道来源默认 VFO。用户频道单独保存在 `0xB000–0xDFFF`，旧频道表不迁移。不会主动擦写原机 `0x1E00–0x1FFF` 校准区或 EEPROM 尾部 SI4732 补丁。
 
@@ -127,7 +127,7 @@ VFO 标识后的 `*` 表示当前模式、步进、带宽或静噪与该频段�
 
 ## 模式与接收芯片
 
-侧键 2 或 `F → 0` 按 **NFM → WFM → AM → LSB → USB** 循环，跳过不支持的模式。仅剩当前模式时显示 `No other mode`。`0(FM)` 在本项目中是解调模式入口；FM 广播通过频段选择或频率输入进入。
+侧键 2 或 `F → 0` 按 **NFM → WFM → AM → LSB → USB** 循环，跳过不支持的模式。仅剩当前模式时显示 `No option`。`0(FM)` 在本项目中是解调模式入口；FM 广播通过频段选择或频率输入进入。
 
 | 模式 / 组合 | 当前接收路径 |
 | --- | --- |
@@ -194,7 +194,7 @@ TX Frequency 在菜单当前行原地编辑，进入时显示当前值，首个�
 | Display → Light on RX | Off 不由信号触发；Timed 收到有效信号后按 Light time 熄灯；Receiving 接收音频期间保持亮灯、音频关闭后熄灯。Light time 的 Off／Always 优先 |
 | Receive → VFO count／Dual watch | VFO 数量与双守听总开关，具体参与项仍在各 VFO 的 RX Watch 中选择 |
 | Receive → SQL open delay／SQL close delay | BK4819 静噪打开／关闭时序档位，分别 Level 0～7／0～3；暂不标注未核实的毫秒数 |
-| Receive → SI4732 idle | Mute 静音待机／Power off 断电；下次离开 SI 接收路径生效。无 SI 时显示 No SI，不能编辑 |
+| Receive → SI4732 idle | Mute 静音待机／Power off 断电；下次离开 SI 接收路径生效。无 SI 时显示 No SI4732，不能编辑 |
 | Receive → Filter split | 240／280 MHz，BK 接收滤波切换频率；属于硬件工程设置 |
 | Transmit → Time limit | 单次发射时限，30／60／120／180／300／600 秒，默认 120 秒 |
 | Transmit → Block if busy | 忙信道发射保护，默认 On |
@@ -223,15 +223,22 @@ Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mi
 | `SSB patch missing` | 当前请求缺少有效 SSB 补丁，检查补丁与 EEPROM 布局 |
 | `Tune failed` | 新调谐失败，已尝试并成功恢复上一份接收方案 |
 | `RX error` | 调谐失败且无法恢复，接收停止 |
-| `Invalid params` / `Out of range` | 参数或输入范围不合法 |
+| `Invalid value` / `Out of range` | 参数或输入范围不合法 |
 | `Band boundary` | 频率量化后落入另一个频段，本次请求未应用 |
-| `Fixed bandwidth` | WFM 带宽固定 |
+| `Fixed` | WFM 带宽固定 |
+| `No option` | 当前频率下没有其他可选的模式或参数值 |
+| `VFO only` | 该操作只能在 VFO 来源使用（输频率、Seek、FC、改 Slot 参数或功率等）；先按 `F → 3` 切回 VFO |
+| `Seek failed` / `No station` | 搜索无法进行或出错／整段没有找到电台，已恢复原频率 |
 | `TX disabled` | VFO TX Enable 为 Off |
 | `TX HW locked` | 当前板级发射实现不可用 |
-| `TX calibration missing` | 目标频率／功率档校准缺失或读取失败 |
+| `TX uncalibrated` | 目标频率／功率档校准缺失或读取失败 |
 | `TX out of band` | TX 频率不在 136–174／400–470 MHz |
-| `TX battery voltage` | 电池电压未知或超出 6.00–9.00 V，拒绝或中止发射 |
-| `TX mode not supported` | 当前模式不是候选 BK4819/NFM |
+| `TX: bad battery` | 电池电压未知或超出 6.00–9.00 V，拒绝或中止发射 |
+| `TX: NFM only` | 当前模式不是 BK4819 的 NFM |
+| `TX busy/locked` | 菜单／频道保存页打开、按键锁含 PTT，或忙碌禁发的信道检测失败 |
+| `Channel busy` | 开启 Block if busy 且当前信道有信号 |
+| `TX error` | 发射硬件准备失败 |
+| `No channel memory` / `Channels full` | EEPROM 频道区不可用／已无空位 |
 
 显示可导航的目标频率不保证接收已成功；确认没有 `RX --`，并检查模式、天线、音量和静噪。FM 广播使用 WFM，UHF 对讲使用 NFM。进入设置后，主界面 `EXIT` 的关闭监听含义不适用于菜单返回键。
 
@@ -279,7 +286,7 @@ Reset prefs 保留电池校准／曲线、接收硬件与静噪工程参数、Mi
 
 FC 不识别解调模式或亚音，也可能捕获谐波／强信号误报；NFM 试听与频率准确度仍需实机验证。详见 [FC 实现与验收](fc-design.md)。
 
-发射被拒绝时（例如 TX disabled、TX mode not supported、TX HW locked），提示临时显示在选中 VFO 的黑底横条中，替换频段文案，保留 A–D 标识和模式；长文案裁掉，提示结束恢复原横条。频率／名称正文保持显示，FC timeout、调谐错误、Seek 状态、频道保存反馈和守听提示也使用同一状态条。
+发射被拒绝时（例如 TX disabled、TX: NFM only、TX HW locked），提示临时显示在选中 VFO 的黑底横条中，替换频段文案，保留 A–D 标识和模式；长文案裁掉，提示结束恢复原横条。频率／名称正文保持显示，FC timeout、调谐错误、Seek 状态、频道保存反馈和守听提示也使用同一状态条。
 
 PTT 发射已接入 BK4819 NFM 实际 HAL；初始化默认 TX Enable 仍为 Off，需在当前 VFO 菜单启用。Same／独立 TX 频率及 TX Tone 均进入发射方案，F→6 选择功率档。松开 PTT、超时或供电异常先关闭功放，再恢复原 RX；默认构建已开放，尚未用仪表测量射频输出。实现与校准布局见[PTT 发射链路](tx-design.md)。
 

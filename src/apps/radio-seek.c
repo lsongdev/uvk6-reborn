@@ -31,7 +31,7 @@ void finishSeek(bool found, uint32_t frequency_hz, const char *status) {
       apply(&selected); // The only place a found station is saved.
       return;
     }
-    status = "Seek error";
+    status = "Seek failed";
   }
   // Restoring directly does not update RadioUserState or request a save.
   if (!RECEIVER_Apply(&seekOrigin)) {
@@ -44,7 +44,7 @@ void finishSeek(bool found, uint32_t frequency_hz, const char *status) {
 
 void startSeek(void) {
   if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
-    notify("Seek is VFO only");
+    notify("VFO only");
     return;
   }
   if (!runtime.active || activeSlot.active_band >= radioBandCount) {
@@ -59,7 +59,7 @@ void startSeek(void) {
   seekOrigin = runtime.current;
   if (!SEEK_Start(&seek, &radioBands[activeSlot.active_band],
                   seekOrigin.frequency_hz, seekOrigin.parameters.step_hz)) {
-    notify("Seek unavailable");
+    notify("Seek failed");
     return;
   }
   seekNative = RX_DEVICE_SeekNative(&seekOrigin);
@@ -92,7 +92,7 @@ void seekUpdate(void) {
         candidate.frequency_hz >= seek.end_hz)
       return;
     if (!RECEIVER_Apply(&candidate)) {
-      finishSeek(false, 0, "Seek error");
+      finishSeek(false, 0, "Seek failed");
       return;
     }
     seekAt = now;
@@ -104,7 +104,7 @@ void seekUpdate(void) {
     if (elapsed < wait) return;
     bool detected;
     if (!RX_DEVICE_SeekSignal(seekOrigin.device, &detected)) {
-      finishSeek(false, 0, "Seek error");
+      finishSeek(false, 0, "Seek failed");
       return;
     }
     if (detected && seekPhase == SEEK_SETTLE) {
@@ -121,7 +121,7 @@ void seekUpdate(void) {
     // The SI hardware cannot search over arbitrary VFO modes or spacings.
     uint32_t end = seek.wrapped ? seek.origin_hz : seek.end_hz-1u;
     if (!RX_DEVICE_SeekStart(&seekOrigin, seek.lower_hz, end)) {
-      finishSeek(false, 0, "Seek error");
+      finishSeek(false, 0, "Seek failed");
       return;
     }
     seekDeadline = now + 15000u;
@@ -129,7 +129,7 @@ void seekUpdate(void) {
     seekPhase = SEEK_NATIVE_POLL;
   } else if (seekPhase == SEEK_NATIVE_POLL) {
     if ((int32_t)(now-seekDeadline) >= 0) {
-      finishSeek(false, 0, "Seek timeout");
+      finishSeek(false, 0, "No station");
       return;
     }
     if (now-seekAt < 90u) return;
@@ -138,7 +138,7 @@ void seekUpdate(void) {
     RxSeekResult result = RX_DEVICE_SeekPoll(seekOrigin.device, &frequency);
     if (result == RX_SEEK_BUSY) return;
     if (result == RX_SEEK_ERROR) {
-      finishSeek(false, 0, "Seek error");
+      finishSeek(false, 0, "Seek failed");
       return;
     }
     if (result == RX_SEEK_FOUND && SEEK_Accept(&seek, frequency)) {
@@ -156,7 +156,7 @@ void seekUpdate(void) {
                          RECEIVER_Capabilities(), &first) != RX_OK ||
         first.device != seekOrigin.device ||
         !RECEIVER_Apply(&first)) {
-      finishSeek(false, 0, "Seek error");
+      finishSeek(false, 0, "Seek failed");
       return;
     }
     seek.cursor_hz = first.frequency_hz;

@@ -109,6 +109,7 @@ extern TxRuntime transmitter;
 bool txBusy(void);
 void pttKey(Key_State_t state);
 bool setTxFrequency(uint32_t value);
+extern const char *const txPowerNames[3]; // Indexed by TxPower.
 bool changeTxPower(bool up);
 
 // radio-menu.c

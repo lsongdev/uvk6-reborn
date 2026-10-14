@@ -26,7 +26,7 @@ void BANDS_init(void) {
 
 static void save(void) {
   if (!gDeviceConfigReady) {
-    message = "Config not ready";
+    message = "Read only";
     return;
   }
   RxPlan plan;
@@ -34,7 +34,7 @@ static void save(void) {
                                     draft, RECEIVER_Capabilities(), &plan);
   if (result != RX_OK) {
     message = result == RX_PATCH_MISSING ? "SSB patch missing"
-            : result == RX_INVALID_PARAMETERS ? "Invalid params" : "RX unavailable";
+            : result == RX_INVALID_PARAMETERS ? "Invalid value" : "RX unavailable";
     return;
   }
   RadioParameters previous = gDeviceConfig.radio.presets[selected];
@@ -45,7 +45,7 @@ static void save(void) {
     return;
   }
   editing = false;
-  message = "Saved: next band entry";
+  message = "Saved";
 }
 
 bool BANDS_key(KEY_Code_t key, Key_State_t state) {
@@ -86,13 +86,13 @@ bool BANDS_key(KEY_Code_t key, Key_State_t state) {
     if (!RADIO_MODEL_Adjust(selectedSlot()->bands[selected].frequency_hz,
                             &draft, RECEIVER_Capabilities(),
                             (RadioParameterField)field, key != KEY_F))
-      message = field == RADIO_FIELD_BANDWIDTH && draft.mode == RX_WFM ? "Fixed bandwidth" : "No valid option";
+      message = field == RADIO_FIELD_BANDWIDTH && draft.mode == RX_WFM ? "Fixed" : "No option";
   } else if (key == KEY_MENU) {
     if (field == FIELD_CURRENT) {
       if (selected == selectedSlot()->active_band)
         draft = selectedSlot()->current.parameters;
       else
-        message = "Select current band";
+        message = "Not current band";
     } else if (field == FIELD_DEFAULTS) {
       draft = radioBands[selected].preset;
     } else {

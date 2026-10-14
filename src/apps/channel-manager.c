@@ -22,7 +22,7 @@ static ChannelManagerSaved saved;
 static void nameAccepted(void) {
   names[nameSlot][USER_CHANNEL_NAME_MAX] = '\0';
   gTextInputSize = 15;
-  if (notify) notify("Channel name ready");
+  if (notify) notify("Name set");
 }
 
 void CHANNEL_MANAGER_Init(ChannelManagerNotify onNotify,
@@ -58,7 +58,7 @@ void CHANNEL_MANAGER_StartSave(uint8_t slot, uint16_t current_number,
                                const UserChannel *channel) {
   if (slot >= RADIO_SLOT_CAPACITY || !channel) return;
   if (!CHANNEL_STORE_Available()) {
-    if (notify) notify("Channel store unavailable");
+    if (notify) notify("No channel memory");
     return;
   }
   saveSlot = slot;
@@ -74,7 +74,7 @@ void CHANNEL_MANAGER_StartSave(uint8_t slot, uint16_t current_number,
       if (CHANNEL_STORE_IsOccupied(n)) { target = n; break; }
   }
   if (!target) {
-    if (notify) notify("Channel memory full");
+    if (notify) notify("Channels full");
     return;
   }
   active = true;
@@ -91,14 +91,14 @@ static void save(void) {
     TEXT_Number(&t, target, 3, 10);
   }
   if (!CHANNEL_STORE_Save(target, &draft)) {
-    if (notify) notify("Channel save failed");
+    if (notify) notify("Save failed");
     return;
   }
   memcpy(names[saveSlot], draft.name, sizeof(names[saveSlot]));
   active = false;
   overwriteConfirm = false;
   if (saved) saved(saveSlot, target, &draft);
-  if (notify) notify("Channel saved");
+  if (notify) notify("Saved");
 }
 
 bool CHANNEL_MANAGER_HandleKey(KEY_Code_t key, Key_State_t state) {
@@ -141,7 +141,7 @@ bool CHANNEL_MANAGER_Render(void) {
   UI_FrequencyText(draft.frequency_hz, t.at);
   PrintSmallEx(126, 42, POS_R, C_FILL, line);
   PrintSmallEx(2, 57, POS_L, C_FILL,
-               overwriteConfirm ? "MENU: overwrite  EXIT: back"
-                                : "UP/DOWN: slot  MENU: select");
+               overwriteConfirm ? "MENU:OK  EXIT:Back"
+                                : "UP/DN:CH  MENU:OK");
   return true;
 }

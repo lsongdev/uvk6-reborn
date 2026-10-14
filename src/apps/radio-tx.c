@@ -55,7 +55,7 @@ void RADIO_APP_TxSafetyUpdate(void) {
   if (transmitter.mode == RADIO_TX && !TX_DEVICE_VoltageValid()) {
     RADIO_APP_PttRelease();
     transmitter.wait_release = true;
-    notify("TX battery voltage");
+    notify("TX: bad battery");
     return;
   }
 
@@ -65,7 +65,7 @@ void RADIO_APP_TxSafetyUpdate(void) {
     if (!runtime.active || receivingSlot != selectedSlot ||
         !RX_DEVICE_WatchSignal(&runtime.current, &busy)) {
       transmitter.wait_release = true;
-      notify("Busy check failed");
+      notify("TX busy/locked");
     } else if (busy) {
       transmitter.wait_release = true;
       notify("Channel busy");
@@ -75,7 +75,7 @@ void RADIO_APP_TxSafetyUpdate(void) {
   }
   // TOT is a system-level safety deadline, not a screen refresh feature.
   if (TX_RuntimeUpdate(&transmitter, Now(), &txOperations))
-    notify(transmitter.mode == RADIO_FAULT ? "RX restore error" : "TX timeout");
+    notify(transmitter.mode == RADIO_FAULT ? "RX error" : "TX timeout");
 }
 
 bool setTxFrequency(uint32_t value) {
@@ -87,9 +87,11 @@ bool setTxFrequency(uint32_t value) {
   return true;
 }
 
+const char *const txPowerNames[3] = {"Low", "Medium", "High"};
+
 bool changeTxPower(bool up) {
   if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
-    notify("Channel is read only");
+    notify("VFO only");
     return false;
   }
   TxConfig *tx = &gDeviceConfig.radio.slots[selectedSlot].tx;
@@ -116,22 +118,22 @@ static void startTransmit(void) {
                                  &capability, &policy, &planned);
   // The board policy and target-frequency calibration authorize TX independently of RX.
   if (result == TX_OK && !TX_DEVICE_VoltageValid()) {
-    notify("TX battery voltage");
+    notify("TX: bad battery");
     return;
   }
   if (result == TX_OK &&
       !TX_RuntimePress(&transmitter, &runtime.current, &planned,
                        gDeviceConfig.preferences.tx_timeout_seconds,
                        Now(), &txOperations))
-    notify("TX hardware error");
+    notify("TX error");
   else if (result == TX_DISABLED)
     notify("TX disabled");
   else if (result == TX_UNSUPPORTED_MODE)
-    notify("TX mode not supported");
+    notify("TX: NFM only");
   else if (result == TX_UNVERIFIED_HARDWARE)
     notify("TX HW locked");
   else if (result == TX_UNCALIBRATED)
-    notify("TX calibration missing");
+    notify("TX uncalibrated");
   else if (result == TX_OUT_OF_BAND)
     notify("TX out of band");
   else if (result != TX_OK)
