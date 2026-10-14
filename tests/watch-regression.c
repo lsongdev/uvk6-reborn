@@ -113,6 +113,16 @@ int main(void) {
   talking[0]=false; run(&r,WATCH_SAMPLE_MS);
   assert(r.phase==WATCH_HANG && heard==UINT8_MAX); // Quiet reply window.
   run(&r,WATCH_HANG_MS); assert(heard==3);
+  // FC borrows BK: a talk hands the speaker to the broadcast, BK slots
+  // stop being polled, and resuming starts the rounds over.
+  talking[0]=true; run(&r,WATCH_SETTLE_MS+WATCH_VERIFY_MS+WATCH_SAMPLE_MS);
+  assert(heard==0);
+  WATCH_SuspendBk(&r,true,now,&ops);
+  assert(r.bk_suspended && heard==3 && WATCH_Owner(&r)==3);
+  unsigned frozen=prepares+samples; run(&r,5000); assert(prepares+samples==frozen && heard==3);
+  WATCH_SuspendBk(&r,false,now,&ops);
+  run(&r,WATCH_SETTLE_MS+WATCH_VERIFY_MS+20); assert(heard==0); // A is still talking.
+  talking[0]=false;
   // A failed broadcast retries later; events keep working meanwhile.
   reset(); prepareOK=false;
   assert(WATCH_Start(&r,withFm,2,UINT8_MAX,now));
@@ -133,6 +143,11 @@ int main(void) {
   assert(heard==2);
   talking[2]=false; run(&r,WATCH_SAMPLE_MS+WATCH_HANG_MS+10);
   assert(r.phase==WATCH_HOME && heard==0); // Back home after the talk.
+
+  // Suspending BK silences a BK background too; resuming goes home again.
+  WATCH_SuspendBk(&r,true,now,&ops); assert(heard==UINT8_MAX);
+  WATCH_SuspendBk(&r,false,now,&ops);
+  run(&r,2*WATCH_SETTLE_MS+60); assert(r.phase==WATCH_HOME && heard==0);
 
   // Failures block a target for a while; all blocked retries later.
   reset();

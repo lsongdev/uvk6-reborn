@@ -841,14 +841,17 @@ int main(void) {
   assert(WATCH_Owner(&watcher)==1 && gReceiver.open);
   unsigned fcStops=chipStops, fcApplies=applyAttempts;
   press(KEY_F);press(KEY_4);
-  assert(capturing && captureLeaves==RX_DEVICE_BK && chipStops==fcStops+1); // Only BK.
+  // Only BK slots leave the watch; nothing is stopped or retuned.
+  assert(capturing && captureLeaves==RX_DEVICE_BK && chipStops==fcStops);
+  assert(watcher.phase!=WATCH_OFF && watcher.bk_suspended);
   assert(gReceiver.open && gReceiver.plan.device==RX_DEVICE_SI && receivingSlot==1);
   for(unsigned i=0;i<10;++i) { RADIO_APP_update();clockNow+=50; }
   assert(gReceiver.open && gReceiver.plan.device==RX_DEVICE_SI);
   press(KEY_EXIT);
   assert(!capturing && gReceiver.open && receivingSlot==1 && applyAttempts==fcApplies);
+  assert(!watcher.bk_suspended && watcher.phase==WATCH_POLL); // BK slots rejoin at once.
   // A BK talk owning the speaker hands it back to the broadcast for FC.
-  clockNow+=2000;watchSignalFrequency=438500000;
+  watchSignalFrequency=438500000;
   for(unsigned i=0;i<10;++i) { RADIO_APP_update();clockNow+=50; }
   assert(WATCH_Owner(&watcher)==0);
   press(KEY_F);press(KEY_4);

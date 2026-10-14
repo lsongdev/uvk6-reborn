@@ -22,6 +22,7 @@ typedef struct {
   WatchPhase phase;
   WatchAudio audio;
   bool has_background, background_ready;
+  bool bk_suspended; // FC borrows BK: BK slots sit out, broadcasts go on.
 } WatchRuntime;
 typedef struct {
   void *context;
@@ -53,6 +54,10 @@ uint8_t WATCH_Owner(const WatchRuntime *runtime);
 // Event slot being checked but not yet heard, or UINT8_MAX.
 uint8_t WATCH_Probe(const WatchRuntime *runtime);
 bool WATCH_IsProbing(const WatchRuntime *runtime);
+// Take every BK slot out of the watch (an event talk or a BK background
+// goes quiet) while a broadcast background keeps playing; resuming puts
+// them back and polling starts over.
+void WATCH_SuspendBk(WatchRuntime *runtime, bool suspend, uint32_t now, const WatchOperations *ops);
 // The event being heard or in its reply window: PTT answers it (talkback).
 bool WATCH_Talk(const WatchRuntime *runtime, WatchTarget *target);
 #endif

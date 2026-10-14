@@ -7,7 +7,7 @@
 - 编译开关 `ENABLE_FC`（默认 1）；`make ENABLE_FC=0` 去掉 FC 全部代码，Flash 约省 1.3 KiB，`F → 4` 提示 `Not supported`。主机回归另以 `-DUVK6_ENABLE_FC=0` 做语法检查，CI 构建该变体。
 - 仅在连续 VFO 来源启动，绑定入口时选中的 A–D；MR 中提示 `VFO only`。输入、菜单、确认、Seek、TX／PTT 等待释放期间保留原有独占操作。
 - 默认 Auto。任一侧键循环 Auto → VHF → UHF → Auto，清候选并重新开始检测。
-- 检测中当前 VFO 的横条显示检测器当前范围（`FC VHF`／`FC UHF`），模式位置显示所选范围（`Auto`／`VHF`／`UHF`），正文实时显示最近一次有效读数（无读数时 `---`）；顶部公共状态栏不再显示 FC 信息；暂停守听、普通静噪轮询与 RDS，BK 音频关闭，已在播放的广播继续播放。
+- 检测中当前 VFO 的横条显示检测器当前范围（`FC VHF`／`FC UHF`），模式位置显示所选范围（`Auto`／`VHF`／`UHF`），正文实时显示最近一次有效读数（无读数时 `---`）；顶部公共状态栏不再显示 FC 信息；暂停普通静噪轮询与 RDS，BK Slot 移出守听，广播 Slot 继续。
 - 两次稳定结果后关闭检测器，**直接调谐入口选中的 VFO**（与手动输入频率相同）：NFM、TX Enabled 强制 Off、RX Tone Off，清原频道编号／名称草稿，请求一次正常保存。2026-10-14 起取消临时试听和 MENU 采用这一步；原频率不再保留，与手动输入新频率一致。
 - EXIT 或 MENU 取消并恢复原方案；调谐失败或离开应用同样停止检测并恢复。没有会话超时。恢复失败则静音、清接收归属，提示 `RX error`。
 - 检测期间屏蔽 PTT，不切 VFO，不修改其他项；取消不写 VFO／频道／EEPROM。
@@ -38,7 +38,7 @@ BK4819 REG32 写 `0x0245` 开启 0.2 秒频率检测，`0x0244` 关闭。REG0D b
 
 核心 API 是 `CAPTURE_Start` / `CAPTURE_Update`，接收 BUSY／INVALID／SAMPLE，输出 WAIT／RESTART／FOUND／TIMEOUT。应用管理 OFF／DETECT／PREVIEW 生命周期，核心不持有芯片或用户状态。HAL 使用 `RX_DEVICE_CaptureStart` / `CapturePoll` / `CaptureStop`；BK 串行写没有 ACK，Start 没有虚构硬件成功返回值。
 
-FC 只占用 BK4819。开始时若有广播芯片正在放音（守听的广播常驻源，或选中的 Slot 本身是广播），就让它继续播放：只停 BK，扬声器留给广播，BK 测频期间音频 DAC 关闭；EXIT 时广播无需恢复。否则暂停守听并恢复选中接收项。`RxRuntime.current` 在确认载波前一直保留最后提交的原方案；不持有完整 VFO 副本，不更新频段记忆。按键被冻结，因此归属项不会在捕获期间改变。
+FC 只借用 BK4819：守听中时，开始 FC 会把设备为 BK 的 Slot 暂时移出守听（`WATCH_SuspendBk`：正在出声或停留中的对讲、BK 上的常驻源都静音，广播常驻源接过喇叭），广播芯片上的 Slot 照常守听；FC 结束（EXIT／MENU）后这些 BK Slot 立即恢复，轮询从头开始。不在守听时，若当前接收在广播芯片上就继续播放，在 BK 上则静音，结束后恢复。BK 测频期间音频 DAC 关闭，避免混进扬声器。`RxRuntime.current` 在确认载波前一直保留最后提交的原方案；不持有完整 VFO 副本，不更新频段记忆。按键被冻结，因此归属项不会在捕获期间改变。
 
 进入检测先关闭音频、清接收归属／RDS、让旧芯片离开，建立 BK RX-only 基线，再选择滤波范围并开启检测。BK RX 基线关闭 PA、MIC ADC 与 TX DSP，使用 NFM、关闭亚音、自动增益；从 SI／BK1080 进入也不依赖 BK 原先是否处于休眠。
 
