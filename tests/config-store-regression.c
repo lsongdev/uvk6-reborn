@@ -55,6 +55,15 @@ int main(void) {
   assert(!EEPROM_ResourceWriteAllowed(0x1e00, 16, cap)); // Calibration stays out.
   assert(!EEPROM_ResourceWriteAllowed(CONFIG_STORE_BASE, 16, cap));
   assert(!EEPROM_ResourceWriteAllowed(8192 - 16, 16, 8192)); // Small parts: none.
+  // Maintenance writes reach the 9 PA bytes of each band record only.
+  assert(EEPROM_CalibrationWriteAllowed(0x1ed0, 9));
+  assert(EEPROM_CalibrationWriteAllowed(0x1f20, 9) && EEPROM_CalibrationWriteAllowed(0x1f28, 1));
+  assert(EEPROM_CalibrationWriteAllowed(0x1f30, 9)); // Band 6, the last.
+  assert(!EEPROM_CalibrationWriteAllowed(0x1f40, 1));
+  assert(!EEPROM_CalibrationWriteAllowed(0x1ecf, 2) && !EEPROM_CalibrationWriteAllowed(0x1ed0, 10));
+  assert(!EEPROM_CalibrationWriteAllowed(0x1ed9, 1) && !EEPROM_CalibrationWriteAllowed(0x1e00, 16));
+  assert(!EEPROM_CalibrationWriteAllowed(0x1ed0, 0) && !EEPROM_CalibrationWriteAllowed(0, 9));
+  assert(!EEPROM_WriteAllowed(0x1ed0, 9)); // Never through the normal store.
   assert(RESOURCE_SsbPatchAddress(cap) == 0x7DD78u);
 
   // Round trip of every field family, including the TX shift.

@@ -155,10 +155,11 @@ bool EEPROM_TryWriteBuffer(uint32_t address, const uint8_t *pBuffer, uint16_t si
          writeUnchecked(address, pBuffer, size);
 }
 
-bool EEPROM_WriteResource(uint32_t address, const uint8_t *pBuffer, uint16_t size) {
+bool EEPROM_WriteMaintenance(uint32_t address, const uint8_t *pBuffer, uint16_t size) {
   uint8_t back[32];
-  if (!writes_enabled || !EEPROM_ResourceWriteAllowed(address, size, EEPROM_DetectSize()) ||
-      !writeUnchecked(address, pBuffer, size))
+  bool allowed = EEPROM_ResourceWriteAllowed(address, size, EEPROM_DetectSize()) ||
+      EEPROM_CalibrationWriteAllowed(address, size);
+  if (!writes_enabled || !allowed || !writeUnchecked(address, pBuffer, size))
     return false;
   for (uint16_t at = 0; at < size; at += sizeof(back)) { // Read back.
     uint16_t n = (uint16_t)(size - at);
@@ -169,32 +170,6 @@ bool EEPROM_WriteResource(uint32_t address, const uint8_t *pBuffer, uint16_t siz
   return true;
 }
 
-#if UVK6_SEED_PA_CAL
-// One-off maintenance build for a radio whose factory calibration was erased.
-// Seeds only empty VHF/UHF PA rows (0x1ED0 + band*16, Low/Mid/High x 3
-// anchors) and verifies by read-back; existing calibration is never touched.
-// Low/Mid are the identical factory values in three public UV-K5(8) dumps;
-// High is the per-anchor minimum of those dumps (conservative, unmeasured).
-static bool seedRow(uint32_t address, const uint8_t row[9]) {
-  uint8_t current[9];
-  if (EEPROM_ReadBuffer(address, current, sizeof(current)) != 0) return false;
-  bool empty00 = true, emptyFF = true;
-  for (uint8_t i = 0; i < sizeof(current); ++i) {
-    empty00 &= current[i] == 0x00;
-    emptyFF &= current[i] == 0xFF;
-  }
-  if (!empty00 && !emptyFF) return memcmp(current, row, sizeof(current)) == 0;
-  return writeUnchecked(address, row, 9) &&
-         EEPROM_ReadBuffer(address, current, sizeof(current)) == 0 &&
-         memcmp(current, row, sizeof(current)) == 0;
-}
-bool EEPROM_SeedPaCalibration(void) {
-  static const uint8_t vhf[9] = {0x5F,0x5F,0x5F, 0x69,0x69,0x69, 0x7A,0x8B,0x7F};
-  static const uint8_t uhf[9] = {0x5A,0x5A,0x5A, 0x64,0x64,0x64, 0x7B,0x7B,0x7A};
-  bool ok = seedRow(0x1ED0u + 2u*16u, vhf);
-  return seedRow(0x1ED0u + 5u*16u, uhf) && ok;
-}
-#endif
 
 
 

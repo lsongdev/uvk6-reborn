@@ -1,9 +1,13 @@
 """Host-only tests for tools/resources.py against a simulated firmware."""
+from argparse import Namespace
+from contextlib import redirect_stdout
 import importlib.util
+import io
 from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
 import zlib
 
 spec = importlib.util.spec_from_file_location('resources', Path(__file__).parents[1] / 'tools/resources.py')
@@ -15,7 +19,8 @@ TAIL = CAPACITY - resources.HEADER_BYTES - resources.SSB_BYTES
 
 
 class FakeFirmware:
-    """Answers 0x0514/0x051B/0x0570 like src/hal/uart.c; writes only the tail."""
+    """Answers 0x0514/0x051B/0x0570 like src/hal/uart.c; writes only the tail
+    and the 9 PA bytes of each calibration band record."""
 
     def __init__(self):
         self.eeprom = bytearray(b'\xff' * CAPACITY)
@@ -37,7 +42,9 @@ class FakeFirmware:
         elif kind == 0x0570:
             at, n, stamp = struct.unpack_from('<IB3xI', payload, 4)
             assert stamp == self.stamp and len(payload) == 16 + n
-            ok = TAIL <= at and at + n <= CAPACITY
+            row = at - resources.PA_BASE
+            pa = 0 <= row < 7 * 16 and row % 16 + n <= 9
+            ok = TAIL <= at and at + n <= CAPACITY or pa
             if ok:
                 self.eeprom[at:at + n] = payload[16:]
                 self.writes.append((at, n))
@@ -100,12 +107,68 @@ class ResourceTests(unittest.TestCase):
 
     def test_refused_write_raises(self):
         with self.assertRaises(IOError):
-            self.radio.write(0x1E00, b'\0' * 16)  # Calibration is outside the tail.
+            self.radio.write(0x1E00, b'\0' * 16)  # Only the PA rows of calibration.
 
     def test_verify_reports_damage(self):
         self.install()
         self.firmware.eeprom[self.address + 5] ^= 1
         self.assertFalse(resources.verify(self.radio, self.address, b'SSBP', self.patch, log=lambda *a: None))
+
+
+
+class CalibrationTests(unittest.TestCase):
+    def setUp(self):
+        self.firmware = FakeFirmware()
+        self.firmware.eeprom[0x1E00:0x2000] = bytes(range(256)) * 2  # Other calibration.
+        self.radio = resources.Radio(self.firmware)
+        self.backups = Path(tempfile.mkdtemp())
+        self.log = []
+
+    def run_command(self, command, **options):
+        args = Namespace(command=command, backup_dir=self.backups, yes=True, **options)
+        with redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(resources.calibration(self.radio, args), 0)
+        return out.getvalue()
+
+    def pa(self, band):
+        at = 0x1ED0 + band * 16
+        return bytes(self.firmware.eeprom[at:at + 9])
+
+    def test_write_backs_up_and_touches_only_the_row(self):
+        before = bytes(self.firmware.eeprom)
+        self.run_command('cal-write', band=5, row='50:50:50 60 60 60 70 70 70')
+        self.assertEqual(self.pa(5), bytes.fromhex('505050606060707070'))
+        changed = [i for i, (a, b) in enumerate(zip(before, self.firmware.eeprom)) if a != b]
+        self.assertTrue(changed and all(0x1F20 <= i < 0x1F29 for i in changed))
+        saved = list(self.backups.iterdir())
+        self.assertEqual(len(saved), 1)
+        self.assertEqual(saved[0].read_bytes(), before[0x1E00:0x2000])
+
+    def test_bad_rows_are_refused_before_any_access(self):
+        for band, row in ((7, '50' * 9), (2, '50' * 8), (2, '00' + '50' * 8), (2, 'ff' * 9)):
+            with self.assertRaises(ValueError):
+                self.run_command('cal-write', band=band, row=row)
+        self.assertEqual(list(self.backups.iterdir()), [])
+
+    def test_seed_fills_only_erased_rows(self):
+        self.firmware.eeprom[0x1EF0:0x1EF9] = b'\xff' * 9
+        measured = self.pa(5)
+        self.run_command('cal-seed')
+        self.assertEqual(self.pa(2), resources.PA_REFERENCE[2])
+        self.assertEqual(self.pa(5), measured)
+
+    def test_restore_and_confirmation(self):
+        self.run_command('cal-read')
+        backup = next(self.backups.iterdir())
+        self.run_command('cal-write', band=2, row='40' * 9)
+        self.assertEqual(len(list(self.backups.iterdir())), 2)  # Same second: kept apart.
+        args = Namespace(command='cal-restore', file=backup, backup_dir=self.backups, yes=False)
+        with patch('builtins.input', return_value='no'), redirect_stdout(io.StringIO()):
+            resources.calibration(self.radio, args)
+        self.assertEqual(self.pa(2), bytes.fromhex('40' * 9))
+        with patch('builtins.input', return_value='yes'), redirect_stdout(io.StringIO()):
+            resources.calibration(self.radio, args)
+        self.assertEqual(self.pa(2), resources.pa_rows(backup.read_bytes())[2])
 
 
 if __name__ == '__main__':

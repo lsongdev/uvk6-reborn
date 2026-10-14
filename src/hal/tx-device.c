@@ -1,5 +1,6 @@
 #include "hal/tx-device.h"
 #include "hal/eeprom.h"
+#include "hal/eeprom-layout.h"
 #include "hal/audio.h"
 #include "hal/led.h"
 #include "hal/gpio.h"
@@ -18,8 +19,9 @@
 
 #if UVK6_ENABLE_TX
 // Factory calibration layout from DualTachyon's UV-K5 radio.c/frequencies.c.
-// Read only: seven 16-byte band records starting at 0x1ED0, three anchors
-// per Low/Medium/High level. Our board policy uses records 2 and 5 only.
+// Seven 16-byte band records from PA_CAL_BASE, three anchors per
+// Low/Medium/High level; tools/resources.py writes them. Our board policy
+// uses records 2 and 5 only.
 static bool prepared;
 static uint8_t paBias;
 static uint32_t txFrequency;
@@ -32,7 +34,7 @@ static __attribute__((noinline)) bool readCalibration(uint32_t hz, uint8_t value
   } else if (hz >= 400000000u && hz < 470000000u) {
     band = 5; *low = 400000000u; *middle = 435000000u; *high = 469999990u;
   } else return false;
-  return !(hz % 10u) && EEPROM_ReadBuffer(0x1ED0u + band * 16u, values, 9) == 0;
+  return !(hz % 10u) && EEPROM_ReadBuffer(PA_CAL_BASE + band * PA_CAL_STRIDE, values, PA_CAL_BYTES) == 0;
 }
 static uint8_t calibrationMask(const uint8_t values[9]) {
   uint8_t mask = 0;
