@@ -106,7 +106,7 @@ void UI_RadioCardRender(uint8_t y, const UI_RadioCardView *view) {
   if (view->edit_text) {
     Text t = TEXT_Begin(frequency, sizeof(frequency));
     TEXT_Add(&t, view->edit_text);
-    unit = "MHz";
+    unit = view->edit_unit ? view->edit_unit : "MHz";
   }
   bool tuning = view->edit_text || view->activity == UI_RADIO_CARD_SEEKING;
   bool named = !tuning && view->name && *view->name;

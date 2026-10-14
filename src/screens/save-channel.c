@@ -24,28 +24,35 @@ void SAVE_CHANNEL_Open(void) {
   SCREEN_Push(&saveChannelScreen);
 }
 
+// The frequency, e.g. "438.500MHz": the channel number is already shown
+// wherever the name is, so the frequency is the more useful default.
+static void defaultName(char name[USER_CHANNEL_NAME_BYTES]) {
+  char text[20];
+  const char *unit = UI_FormatFrequency(draft.frequency_hz, text);
+  Text t = TEXT_Begin(name, USER_CHANNEL_NAME_BYTES);
+  TEXT_Add(&t, text);
+  TEXT_Add(&t, unit);
+}
+
 // Text input accepted the name: write the channel. An empty name becomes
-// "CH nnn"; leaving text input without accepting saves nothing.
+// the default; leaving text input without accepting saves nothing.
 static void channelSave(void) {
   memcpy(draft.name, nameDraft, sizeof(draft.name));
   draft.name[USER_CHANNEL_NAME_MAX] = '\0';
-  if (!draft.name[0]) {
-    Text t = TEXT_Begin(draft.name, sizeof(draft.name));
-    TEXT_Add(&t, "CH ");
-    TEXT_Number(&t, target, 3, 10);
-  }
+  if (!draft.name[0]) defaultName(draft.name);
   if (!CHANNEL_STORE_Save(target, &draft)) { RADIO_Notify("Save failed"); return; }
   RADIO_ChannelSaved(target, &draft);
   RADIO_Notify("Saved");
 }
 
 // Overwriting offers the old name; a new channel offers the draft's name
-// (e.g. the RDS station name), else starts empty. Text input replaces this
+// (e.g. the RDS station name), else the frequency. Text input replaces this
 // screen, so finishing it returns to where Save as channel was chosen.
 static void askName(void) {
   UserChannel old;
   memcpy(nameDraft, draft.name, sizeof(nameDraft));
   if (CHANNEL_STORE_Load(target, &old)) memcpy(nameDraft, old.name, sizeof(nameDraft));
+  if (!nameDraft[0]) defaultName(nameDraft);
   TEXT_INPUT_Open(nameDraft, USER_CHANNEL_NAME_MAX, channelSave, true);
 }
 

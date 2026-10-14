@@ -318,6 +318,8 @@ static void tuneChannel(uint16_t number, bool enterMode) {
   if (enterMode || selectionChanged) DEVICE_RequestSave();
 }
 
+void RADIO_TuneChannel(uint16_t number) { tuneChannel(number, true); }
+
 void RADIO_Step(bool up) {
   if (activeSlot.source == RADIO_SOURCE_CHANNEL) {
     uint16_t number = gDeviceConfig.radio.slots[selectedSlot].channel_number;

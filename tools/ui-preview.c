@@ -43,6 +43,9 @@ int main(int argc, char **argv) {
   // A frequency draft owns the body; its end stays visible above the unit.
   second.edit_text="1340.000001_";
   UI_RadioCardRender(8+UI_RADIO_CARD_HEIGHT,&second);snapshot("tuned.pbm");
+  // An MR channel number draft uses the same body with a CH unit.
+  second.band_name="CH 012";second.edit_text="15_";second.edit_unit="CH";
+  UI_RadioCardRender(8+UI_RADIO_CARD_HEIGHT,&second);snapshot("channel.pbm");
   // First-release A/B: only the selected row owns RX and valid signal.
   base();FillRect(100,0,10,5,C_CLEAR);
   v=(UI_RadioCardView){.id='A',.selected=true,.frequency_hz=145500000,.step_hz=12500,
