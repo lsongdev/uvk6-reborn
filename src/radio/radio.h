@@ -6,6 +6,7 @@
 // intents through these calls and read state back for display.
 #include "core/channel-model.h"
 #include "core/capture.h"
+#include "core/spectrum.h"
 #include "core/radio-state.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -50,6 +51,14 @@ void RADIO_PttPress(void);
 void RADIO_PttRelease(void);              // Always honoured, even under keylock.
 bool RADIO_TxBusy(void);
 void RADIO_CancelInteractive(void);       // The main screen was left: stop FC, Seek, PTT.
+// Spectrum sweeps around the selected slot with BK muted; the selected
+// slot's status shows the cursor. Stop restores reception, or tunes the
+// slot to the cursor (VFO only).
+void RADIO_StartSpectrum(void);
+void RADIO_StopSpectrum(bool tune);
+const Spectrum *RADIO_Spectrum(void);     // NULL unless sweeping.
+void RADIO_SpectrumMove(bool up);
+void RADIO_SpectrumZoom(bool wider);
 
 // Notices and global state for display.
 void RADIO_Notify(const char *text);

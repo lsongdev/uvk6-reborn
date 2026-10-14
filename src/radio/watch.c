@@ -83,7 +83,7 @@ void suspendWatchBk(bool suspend) {
 void watchUpdate(void) {
   // Menus, input and prompts leave watch running; only features that own
   // the RF chips (each pauses watch on entry) hold it here.
-  if (capturing || seek.active || RADIO_TxBusy()) return;
+  if (capturing || seek.active || spectrumOn || RADIO_TxBusy()) return;
   if (gDeviceConfig.radio.slot_count < 2) {
     watchStatus=NULL;
     if (watcher.phase!=WATCH_OFF) (void)pauseWatch();

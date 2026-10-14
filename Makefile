@@ -73,6 +73,8 @@ CFLAGS   := $(COMMON_FLAGS) $(OPTIMIZATION) \
 ENABLE_TX ?= 1
 # F→4 frequency capture (FC). ENABLE_FC=0 drops it and frees about 1.3 KiB.
 ENABLE_FC ?= 1
+# Slot menu → Spectrum: BK4819 sweep around the slot. ENABLE_SPECTRUM=0 drops it.
+ENABLE_SPECTRUM ?= 1
 # One-off maintenance image: seeds an erased PA calibration table, RX-only.
 SEED_PA_CAL ?= 0
 ifeq ($(SEED_PA_CAL),1)
@@ -90,6 +92,7 @@ DEFINES  := -DGIT_HASH=\"$(GIT_HASH)\" \
             -DARMCM0 \
             -DUVK6_ENABLE_TX=$(ENABLE_TX) \
             -DUVK6_ENABLE_FC=$(ENABLE_FC) \
+            -DUVK6_ENABLE_SPECTRUM=$(ENABLE_SPECTRUM) \
             -DUVK6_SEED_PA_CAL=$(SEED_PA_CAL)
 
 # Include paths

@@ -38,6 +38,7 @@ extern const RadioBand radioBands[];
 extern const uint8_t radioBandCount;
 extern const char *const rxModeNames[RX_MODE_COUNT];
 uint8_t RADIO_MODEL_BandAt(uint32_t frequency_hz);
+bool RADIO_MODEL_BkCovers(uint32_t frequency_hz); // BK4819 receive range.
 uint8_t RADIO_MODEL_NextBand(uint8_t current);
 RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
                           ReceiverCapabilities capabilities, RxPlan *plan);

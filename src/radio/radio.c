@@ -217,7 +217,8 @@ void RADIO_Init(void) {
 
 bool RADIO_IsReceiving(void) {
   return initialized && receivingSlot != UINT8_MAX && !WATCH_IsProbing(&watcher) &&
-         runtime.active && !seek.active && !capturing && transmitter.mode == RADIO_RX;
+         runtime.active && !seek.active && !capturing && !spectrumOn &&
+         transmitter.mode == RADIO_RX;
 }
 
 uint8_t RADIO_Heard(void) {
@@ -245,6 +246,7 @@ void RADIO_Update(void) {
   if (transmitter.mode != RADIO_RX)
     return;
   if (capturing) { captureUpdate(); return; }
+  if (spectrumOn) { spectrumUpdate(); return; }
   seekUpdate();
   watchUpdate();
   uint8_t rdsSlot=receivingSlot;
@@ -455,6 +457,17 @@ void RADIO_SlotStatus(uint8_t id, RadioSlotStatus *status) {
     status->capture_hz = capture.last_hz;
     status->capture_scope = capture.scope;
     status->capture_range = capture.range;
+  }
+  const Spectrum *sweep = selected ? RADIO_Spectrum() : NULL;
+  if (sweep) { // The card follows the spectrum cursor.
+    status->frequency_hz = SPECTRUM_Frequency(sweep, sweep->cursor);
+    status->name[0] = '\0';
+    status->radio_text = NULL;
+    uint8_t level = sweep->level[sweep->cursor];
+    RxPlan bk = {.device = RX_DEVICE_BK, .frequency_hz = status->frequency_hz};
+    status->receiving = level != 0;
+    status->signal_level = level ? RX_DEVICE_SignalLevel(&bk, level * 2u) : 0;
+    status->activity = RADIO_ACTIVITY_IDLE;
   }
 }
 

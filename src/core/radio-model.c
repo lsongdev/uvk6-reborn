@@ -64,6 +64,11 @@ static bool bandwidthSupported(RxDevice device, RxMode mode, uint32_t width) {
   return false;
 }
 
+bool RADIO_MODEL_BkCovers(uint32_t frequency_hz) {
+  return (frequency_hz >= 18000000u && frequency_hz <= 660000000u) ||
+         (frequency_hz >= 840000000u && frequency_hz <= 1300000000u);
+}
+
 RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
                           ReceiverCapabilities capabilities, RxPlan *plan) {
   if (!plan || (unsigned)parameters.mode >= RX_MODE_COUNT || !parameters.step_hz ||
@@ -100,16 +105,14 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
     }
     // Fall through to BK where its existing AM implementation is available.
     // No BK pseudo-SSB fallback is exposed as a supported SSB receiver.
-    if (!((frequency_hz >= 18000000u && frequency_hz <= 660000000u) ||
-          (frequency_hz >= 840000000u && frequency_hz <= 1300000000u)))
+    if (!RADIO_MODEL_BkCovers(frequency_hz))
       return RX_UNSUPPORTED_MODE;
     device = RX_DEVICE_BK;
     break;
   case RX_NFM:
     // NFM always uses BK, including frequencies overlapping SI's AM or WFM.
     // RX capability alone never grants transmit permission.
-    if (!((frequency_hz >= 18000000u && frequency_hz <= 660000000u) ||
-          (frequency_hz >= 840000000u && frequency_hz <= 1300000000u)))
+    if (!RADIO_MODEL_BkCovers(frequency_hz))
       return RX_UNSUPPORTED_MODE;
     device = RX_DEVICE_BK;
     break;

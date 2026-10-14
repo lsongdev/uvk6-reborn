@@ -4,6 +4,7 @@
 #include "core/radio-model.h"
 #include "core/rds-receiver.h"
 #include "core/capture.h"
+#include "core/spectrum.h"
 
 // Apply an already validated receive plan once. This is the sole hardware
 // tuning path; callers own the user state and failed-plan recovery.
@@ -37,5 +38,12 @@ void RX_DEVICE_CaptureStart(CaptureRange range, RxDevice previous);
 CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *frequency_hz);
 void RX_DEVICE_CaptureStop(void);
 void RX_DEVICE_InvalidateBk(void);
+
+// Spectrum borrows BK muted, like capture: previous is the chip to leave.
+// Tune one point, wait at least 1 ms, then read its RSSI (raw 0.5 dB units).
+void RX_DEVICE_SpectrumStart(RxDevice previous);
+void RX_DEVICE_SpectrumTune(uint32_t frequency_hz);
+uint16_t RX_DEVICE_SpectrumRssi(void);
+void RX_DEVICE_SpectrumStop(void);
 
 #endif
