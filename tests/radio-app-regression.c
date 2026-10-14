@@ -1252,6 +1252,32 @@ int main(void) {
   setup(145500000,fm);activeSlot.source=RADIO_SOURCE_CHANNEL;
   press(KEY_F);press(KEY_4);assert(!capturing && !captureStarts);
 
+  // F→8 reverse swaps RX and TX: the shift flips, a second press swaps back.
+  setup(145600000,fm);
+  gDeviceConfig.radio.slots[0].tx=activeSlot.tx=(TxConfig){.shift=TX_SHIFT_MINUS,.offset_hz=600000};
+  press(KEY_F);press(KEY_8);
+  assert(activeSlot.current.frequency_hz==145000000 && activeSlot.tx.shift==TX_SHIFT_PLUS);
+  assert(gDeviceConfig.radio.slots[0].current.frequency_hz==145000000 &&
+         gDeviceConfig.radio.slots[0].tx.shift==TX_SHIFT_PLUS && !functionPending);
+  assert(TX_MODEL_Frequency(&activeSlot.tx,145000000)==145600000);
+  press(KEY_F);press(KEY_8);
+  assert(activeSlot.current.frequency_hz==145600000 && activeSlot.tx.shift==TX_SHIFT_MINUS);
+  gDeviceConfig.radio.slots[0].tx=activeSlot.tx=(TxConfig){.shift=TX_SHIFT_SPLIT,.split_hz=435000000};
+  press(KEY_F);press(KEY_8);
+  assert(activeSlot.current.frequency_hz==435000000 && activeSlot.tx.split_hz==145600000);
+  gDeviceConfig.radio.slots[0].tx=activeSlot.tx=(TxConfig){.shift=TX_SHIFT_SPLIT};
+  press(KEY_F);press(KEY_8);assert(!strcmp(message,"TX Shift is Off")); // Split, TX same.
+  gDeviceConfig.radio.slots[0].tx=activeSlot.tx=(TxConfig){0};
+  press(KEY_F);press(KEY_8);
+  assert(!strcmp(message,"TX Shift is Off") && activeSlot.current.frequency_hz==435000000);
+  // A failed retune keeps both RX and TX as they were.
+  gDeviceConfig.radio.slots[0].tx=activeSlot.tx=(TxConfig){.shift=TX_SHIFT_PLUS,.offset_hz=5000000};
+  failFrequency=440000000;press(KEY_F);press(KEY_8);failFrequency=0;
+  assert(activeSlot.current.frequency_hz==435000000 && activeSlot.tx.shift==TX_SHIFT_PLUS &&
+         gDeviceConfig.radio.slots[0].tx.shift==TX_SHIFT_PLUS);
+  activeSlot.source=gDeviceConfig.radio.slots[0].source=RADIO_SOURCE_CHANNEL;
+  press(KEY_F);press(KEY_8);assert(!strcmp(message,"VFO only"));
+
   // Spectrum: opened from the slot menu, the card follows the cursor.
   setup(145500000,fm);
   openMenu(MENU_SPECTRUM);press(KEY_MENU);

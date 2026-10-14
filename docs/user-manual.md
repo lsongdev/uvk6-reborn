@@ -6,7 +6,7 @@
 
 主屏幕支持 A/B/C/D 四个独立 Slot，可启用 1–4 个，每页显示两个。每个 Slot 可以直接调频（VFO）或读取已保存频道（MR）；切换来源不会丢掉原来的 VFO 频率和频段记忆。两个及以上 Slot 自动守听，没有额外的 Dual watch 或 RX Watch 开关。只听一路时将 Slot count 设为 1。
 
-接收模式为 NFM、WFM、AM、LSB、USB。芯片由频率、模式和硬件能力共同决定，不需手动选择，没有 Auto 解调模式。默认固件包含 BK4819 NFM 发射和 FC 频率捕获，各 Slot 的 TX Enable 初始均为 Off。中文显示、NOAA、VOX、倒频和呼叫频道快捷键尚未实现。
+接收模式为 NFM、WFM、AM、LSB、USB。芯片由频率、模式和硬件能力共同决定，不需手动选择，没有 Auto 解调模式。默认固件包含 BK4819 NFM 发射和 FC 频率捕获，各 Slot 的 TX Enable 初始均为 Off。中文显示、NOAA、VOX 和呼叫频道快捷键尚未实现。
 
 ### 刷入与初始化
 
@@ -72,6 +72,7 @@
 | F→4（FC） | 捕获附近强载波频率 |
 | F→5（Spectrum） | 打开频谱，与 Slot 菜单 → Spectrum 相同 |
 | F→6（H/M/L） | VFO 功率 Low→Medium→High→Low，保存并提示 |
+| F→8（R） | 倒频：接收换到发射频率，频差方向随之反转（+↔-，Split 互换两个频率）；再按一次换回。仅 VFO，TX Shift 为 Off 时提示 |
 | F→0（FM） | 循环当前频率可用的明确解调模式 |
 | F→*（Scan） | 当前频段向前搜台 Seek |
 | 其余目标键 | Not supported |

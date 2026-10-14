@@ -37,6 +37,7 @@ void RADIO_AdjustRx(RadioParameterField field, bool up);
 void RADIO_ResetToPreset(void);
 bool RADIO_SetTx(const TxConfig *tx);     // False (and a notice) when refused.
 bool RADIO_CycleTxPower(bool up);      // Low ↔ Medium ↔ High; false when refused.
+void RADIO_Reverse(void);                 // Swap RX and TX frequencies (VFO).
 
 // Features that own RF while they run.
 void RADIO_StartSeek(void);
