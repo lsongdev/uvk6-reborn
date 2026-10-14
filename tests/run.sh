@@ -103,6 +103,8 @@ esac
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
   tests/text-regression.c src/core/dcs.c src/core/text.c -o "$test_binary"
 "$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/font-regression.c -o "$test_binary"
+"$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections tests/menu-regression.c src/ui/number-input.c src/core/text.c \
   src/ui/numnav.c src/core/measurements.c "$dead_strip" -o "$test_binary"
 "$test_binary"

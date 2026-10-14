@@ -70,10 +70,18 @@ void FillRect(int16_t x, int16_t y, int16_t w, int16_t h, Color c) {
     DrawVLine(i, y, h, c);
 }
 
+// Bitmaps are packed back to back: skip every earlier glyph's bytes.
+static const uint8_t *glyphBitmap(const GFXfont *f, uint8_t index) {
+  const uint8_t *b = f->bitmap;
+  for (const GFXglyph *g = f->glyph; index--; ++g)
+    b += (g->width * g->height + 7) >> 3;
+  return b;
+}
+
 static void m_putchar(int16_t x, int16_t y, uint8_t c, Color col, uint8_t sx,
                       uint8_t sy, const GFXfont *f) {
   const GFXglyph *g = &f->glyph[c - f->first];
-  const uint8_t *b = f->bitmap + g->bitmapOffset;
+  const uint8_t *b = glyphBitmap(f, c - f->first);
   uint8_t w = g->width, h = g->height, bits = 0, bit = 0;
   int8_t xo = g->xOffset, yo = g->yOffset;
 
