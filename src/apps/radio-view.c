@@ -117,7 +117,7 @@ static void renderConfirmation(void) {
   TEXT_Number(&t, pending.parameters.step_hz, 1, 10);
   TEXT_Add(&t, " Hz");
   PrintSmall(2, 40, line);
-  PrintSmall(2, 57, "MENU: apply  EXIT: cancel");
+  PrintSmall(2, 57, "MENU:OK  EXIT:Back");
 }
 
 void RADIO_APP_render(void) {

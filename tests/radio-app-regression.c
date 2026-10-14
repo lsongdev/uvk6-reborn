@@ -255,11 +255,11 @@ int main(void) {
   unsigned mrApplies = applied, mrSaves = saveRequests;
   uint32_t mrFrequency = activeSlot.current.frequency_hz;
   press(KEY_F); press(KEY_1);
-  assert(!strcmp(message,"Channel mode") && !functionPending);
+  assert(!strcmp(message,"VFO only") && !functionPending);
   press(KEY_F); press(KEY_0);
-  assert(!strcmp(message,"Channel mode") && !functionPending);
-  press(KEY_SIDE1); assert(!strcmp(message,"Channel mode"));
-  press(KEY_SIDE2); assert(!strcmp(message,"Channel mode"));
+  assert(!strcmp(message,"VFO only") && !functionPending);
+  press(KEY_SIDE1); assert(!strcmp(message,"VFO only"));
+  press(KEY_SIDE2); assert(!strcmp(message,"VFO only"));
   assert(applied==mrApplies && saveRequests==mrSaves &&
          activeSlot.current.frequency_hz==mrFrequency);
   press(KEY_F);press(KEY_3);assert(activeSlot.source==RADIO_SOURCE_VFO);
@@ -282,7 +282,7 @@ int main(void) {
   capabilities.ssb_patch = false;
   press(KEY_F);press(KEY_0);
   assert(!functionPending && activeSlot.current.parameters.mode == RX_AM);
-  assert(!strcmp(message,"No other mode") && appRuns == 0);
+  assert(!strcmp(message,"No option") && appRuns == 0);
 
   setup(438500000, fm);
   assert(RADIO_APP_key(KEY_F, KEY_PRESSED) == false);
@@ -316,7 +316,7 @@ int main(void) {
   activeSlot.source = gDeviceConfig.radio.slots[0].source = RADIO_SOURCE_CHANNEL;
   press(KEY_F);press(KEY_6);
   assert(activeSlot.tx.power == TX_POWER_LOW && saveRequests == powerSaves + 3);
-  assert(!strcmp(message, "Channel is read only") && !number.active && !functionPending);
+  assert(!strcmp(message, "VFO only") && !number.active && !functionPending);
 
   setup(438500000, fm);
   press(KEY_F);press(KEY_EXIT);
@@ -572,7 +572,7 @@ int main(void) {
   setup(100000000, (RadioParameters){RX_WFM,100000,0,0});
   gDeviceConfig.radio.slots[0].tx.enabled = activeSlot.tx.enabled = true;
   assert(RADIO_APP_key(KEY_PTT, KEY_PRESSED));
-  assert(!strcmp(message, "TX mode not supported"));
+  assert(!strcmp(message, "TX: NFM only"));
   assert(transmitter.mode == RADIO_RX);
   RADIO_APP_PttRelease();
 
@@ -622,7 +622,7 @@ int main(void) {
   txFakeVerified = true;
   txFakePrepareOK = false;
   assert(RADIO_APP_key(KEY_PTT, KEY_PRESSED));
-  assert(!strcmp(message, "TX hardware error"));
+  assert(!strcmp(message, "TX error"));
   assert(transmitter.mode == RADIO_RX && transmitter.wait_release);
   assert(txFakePrepares == 1 && txFakeEnables == 0 && txFakeDisables == 2);
   RADIO_APP_PttRelease();
@@ -895,7 +895,7 @@ int main(void) {
       assert(!txFakePrepares && transmitter.mode==RADIO_RX);
       if (scenario!=3) {
         assert(transmitter.wait_release);
-        assert(!strcmp(message,scenario==0 ? "Channel busy" : "Busy check failed"));
+        assert(!strcmp(message,scenario==0 ? "Channel busy" : "TX busy/locked"));
       }
     }
     RADIO_APP_PttRelease();
@@ -980,8 +980,8 @@ int main(void) {
   assert(RADIO_APP_key(KEY_PTT,KEY_PRESSED) && transmitter.mode==RADIO_TX);
   txFakeVoltageValid=false;RADIO_APP_TxSafetyUpdate();
   assert(transmitter.mode==RADIO_RX && transmitter.wait_release);
-  assert(!strcmp(message,"TX battery voltage"));
-  RADIO_APP_render();assert(!strcmp(drawn[0].header_message,"TX battery voltage"));
+  assert(!strcmp(message,"TX: bad battery"));
+  RADIO_APP_render();assert(!strcmp(drawn[0].header_message,"TX: bad battery"));
   press(KEY_PTT);
 
   // An inexact target still requires the existing hardware quantization confirmation.

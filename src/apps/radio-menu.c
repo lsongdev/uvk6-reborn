@@ -23,13 +23,13 @@ static void changeValue(bool up) {
   }
   if (gDeviceConfig.radio.slots[selectedSlot].source == RADIO_SOURCE_CHANNEL &&
       menuIndex != MENU_RX_WATCH) {
-    notify("Channel is read only");
+    notify("VFO only");
     return;
   }
   if (menuIndex==MENU_RX_WATCH) {
     bool enabled=!gDeviceConfig.radio.slots[selectedSlot].watch;
     if (!RADIO_STATE_SetWatch(&gDeviceConfig.radio,selectedSlot,enabled))
-      notify("Watch limit: 2");
+      notify("DW: max 2");
     else DEVICE_RequestSave();
     return;
   }
@@ -54,7 +54,7 @@ static void changeValue(bool up) {
     return;
   }
   if (menuIndex == MENU_RX_TONE && activeSlot.current.parameters.mode != RX_NFM) {
-    notify("Tone: NFM only");
+    notify("NFM only");
     return;
   }
   if (menuIndex == MENU_TX_ENABLE) {
@@ -72,7 +72,7 @@ static void changeValue(bool up) {
                          RECEIVER_Capabilities(), (RadioParameterField)menuIndex, up))
     request(activeSlot.current.frequency_hz, candidate);
   else if (menuIndex == MENU_RX_BANDWIDTH && candidate.mode == RX_WFM)
-    notify("Fixed bandwidth");
+    notify("Fixed");
 }
 
 static const char *menuValue(uint8_t item, char out[24]) {
@@ -95,8 +95,7 @@ static const char *menuValue(uint8_t item, char out[24]) {
   case MENU_RX_WATCH: return gDeviceConfig.radio.slots[selectedSlot].watch ? "On" : "Off";
   case MENU_TX_ENABLE: return activeSlot.tx.enabled ? "On" : "Off";
   case MENU_TX_POWER: {
-    static const char *const powers[] = {"Low", "Medium", "High"};
-    return powers[activeSlot.tx.power <= TX_POWER_HIGH ? activeSlot.tx.power : 0];
+    return txPowerNames[activeSlot.tx.power <= TX_POWER_HIGH ? activeSlot.tx.power : 0];
   }
   case MENU_TX_FREQUENCY:
     if (number.active && inputTx) { NUMBER_Text(&number,out); return out; }

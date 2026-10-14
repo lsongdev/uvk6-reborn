@@ -19,24 +19,24 @@ static uint8_t oldOpen, oldClose, oldBoundary;
 
 static void getValue(const MenuItem *item, char *out, uint8_t size) {
   if (item->setting == SETTING_SI4732POWEROFF && !RECEIVER_Capabilities().si) {
-    TEXT_Copy(out,size,"No SI"); return;
+    TEXT_Copy(out,size,"No SI4732"); return;
   }
   SETTINGS_GetValueText(item->setting,out,size);
 }
 static void changeValue(const MenuItem *item, bool up) {
   notice = NULL;
   if (item->setting == SETTING_SI4732POWEROFF && !RECEIVER_Capabilities().si) {
-    notice = "SI4732 missing"; return;
+    notice = "No SI4732"; return;
   }
   SETTINGS_IncDecValue(item->setting,up);
 }
 static void doCalibrate(uint32_t value, uint32_t unused) {
   (void)unused;
   uint16_t calibration = BATTERY_GetCal(value*100u);
-  if (calibration < 1900 || calibration > 2154) { notice="Invalid calibration"; return; }
+  if (calibration < 1900 || calibration > 2154) { notice="Invalid value"; return; }
   ConfigPreferences next = gDeviceConfig.preferences;
   next.battery_calibration = calibration;
-  notice = DEVICE_SavePreferences(&next) ? "Voltage calibrated" : "Save failed";
+  notice = DEVICE_SavePreferences(&next) ? "Calibrated" : "Save failed";
 }
 static bool calibrate(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
@@ -105,7 +105,7 @@ static void getSaveStatus(const MenuItem *item, char *out, uint8_t size) {
 static bool saveNow(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
   (void)item;
   if (key != KEY_MENU || state != KEY_RELEASED) return false;
-  notice = DEVICE_SaveNow() ? "Settings saved" : "Save failed"; return true;
+  notice = DEVICE_SaveNow() ? "Saved" : "Save failed"; return true;
 }
 static void getTxStatus(const MenuItem *item, char *out, uint8_t size) {
   (void)item;
@@ -192,8 +192,7 @@ void SETTINGS_render(void) {
     STATUSLINE_SetText("Reset prefs?");
     PrintSmall(3,18,"Display, keys, TX limits");
     PrintSmall(3,29,"Keep radio & calibration");
-    PrintSmall(3,45,"MENU: reset");
-    PrintSmall(3,56,"EXIT: cancel");
+    PrintSmall(3,56,"MENU:OK  EXIT:Back");
     return;
   }
   MENU_Render();

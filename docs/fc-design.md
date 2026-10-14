@@ -4,7 +4,7 @@
 
 ## 操作
 
-- 仅在连续 VFO 来源启动，绑定入口时选中的 A–D；MR 中提示 `FC: VFO only`。输入、菜单、确认、Seek、TX／PTT 等待释放期间保留原有独占操作。
+- 仅在连续 VFO 来源启动，绑定入口时选中的 A–D；MR 中提示 `VFO only`。输入、菜单、确认、Seek、TX／PTT 等待释放期间保留原有独占操作。
 - 默认 Auto，顶部显示当前检测范围。任一侧键循环 Auto → VHF → UHF → Auto，清候选并重新开始 15 秒会话；试听中也可重新捕获。
 - 检测中在当前 VFO 黑底状态条显示 `FC detecting`，正文保留频率；关闭音频，暂停双守听、普通静噪轮询与 RDS；两次稳定结果后关闭检测器，临时 NFM 试听。当前行显示 `FC Preview` 和实际频率，顶部显示 `MENU:Use`。
 - 试听时 MENU 采用候选，TX Enabled 强制 Off、RX Tone Off，并清原频道编号／名称草稿；通过已有 Name／Save 显式保存频道。

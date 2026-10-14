@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
   second.activity=UI_RADIO_CARD_RECEIVING;second.signal_valid=true;second.signal_level=11;
   UI_RadioCardRender(36,&second);snapshot("watch-rx.pbm");
   second.activity=UI_RADIO_CARD_IDLE;second.signal_valid=false;
-  v.header_message="TX mode not supported";
+  v.header_message="TX: NFM only";
   base();FillRect(100,0,10,5,C_CLEAR);
   UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("error-short.pbm");
   v.header_message="Channel store unavailable: please retry";

@@ -40,7 +40,7 @@ static void captureAttempt(void) {
 }
 
 void startCapture(void) {
-  if (activeSlot.source!=RADIO_SOURCE_VFO) { notify("FC: VFO only"); return; }
+  if (activeSlot.source!=RADIO_SOURCE_VFO) { notify("VFO only"); return; }
   if (!runtime.active || !pauseWatch()) return;
   CAPTURE_Start(&capture, CAPTURE_AUTO, Now());
   captureAttempt();
