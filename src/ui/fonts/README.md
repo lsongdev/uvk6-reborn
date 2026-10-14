@@ -12,8 +12,12 @@
 
 2026-10-14 前卡片使用 Adobe X11 Helvetica Bold 12 px（95 个 ASCII 字形，1,434 B），已删除。
 
-`tools/bdf-to-gfx.py` 仍可把 BDF 点阵转换为本固件的 GFX 格式：
+## 存储格式
+
+沿用 Adafruit GFX 的位图编码，但每个字形只存 3 字节度量（宽、高、步进、x/y 偏移，位域压缩），不存位图偏移：所有字形的位图首尾相接，每个占 `ceil(宽×高/8)` 字节，绘制时把前面字形的大小累加得到起点。`tests/font-regression.c` 检查每套字库的位图总长恰好等于各字形大小之和，手工改字形时漏改会直接失败。
+
+`tools/bdf-to-gfx.py` 把 BDF 点阵转换为这一格式：
 
 ```sh
-python3 tools/bdf-to-gfx.py input.bdf output.h
+python3 tools/bdf-to-gfx.py input.bdf output.h --name myFont --line 8
 ```
