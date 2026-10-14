@@ -27,7 +27,9 @@ static bool restorePrimary(void) {
   receivingSlot=selectedSlot; gRedrawScreen=true;
   return true;
 }
-bool pauseWatch(void) {
+bool pauseWatch(void) { return pauseWatchTo(NULL); }
+// Stops watching and leaves target (or, by default, the selected slot) tuned.
+bool pauseWatchTo(const WatchTarget *target) {
   bool wasWatching=watcher.phase!=WATCH_OFF;
   if (wasWatching) {
     // Watch may have left any chip tuned elsewhere: stop them all and let
@@ -38,8 +40,16 @@ bool pauseWatch(void) {
     runtime.active=false;receivingSlot=UINT8_MAX;
   }
   WATCH_Stop(&watcher);
-  delayWatch();
-  return !wasWatching || restorePrimary();
+  // Manual RF changes push the restart back; with no watch pending (start-up,
+  // single slot) there is nothing to delay.
+  if (wasWatching || watchDelay) delayWatch();
+  if (!wasWatching) return true;
+  if (!target) return restorePrimary();
+  if (RX_RuntimeTune(&runtime,&target->plan,applyReceiver,stopReceiver,NULL)!=RX_APPLIED) {
+    RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX error"); return false;
+  }
+  receivingSlot=target->id; gRedrawScreen=true;
+  return true;
 }
 static bool watchSignal(void *unused, const RxPlan *plan, bool *found) {
   (void)unused; return RX_DEVICE_WatchSignal(plan,found);
@@ -68,8 +78,9 @@ static const WatchOperations watchOperations={
   .prepare=watchPrepare,.signal=watchSignal,.select=watchSelect,.now=watchNow
 };
 void watchUpdate(void) {
-  if (capturing || number.active || CHANNEL_MANAGER_Active() || inMenu || confirming || seek.active || functionPending ||
-      txBusy()) return;
+  // Menus, input and prompts leave watch running; only features that own
+  // the RF chips (each pauses watch on entry) hold it here.
+  if (capturing || seek.active || txBusy()) return;
   if (gDeviceConfig.radio.slot_count < 2) {
     watchStatus=NULL;
     if (watcher.phase!=WATCH_OFF) (void)pauseWatch();

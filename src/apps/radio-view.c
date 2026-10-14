@@ -57,8 +57,8 @@ static void buildCardView(uint8_t id, const char *inputText,
     .header_message = selected && !number.active ? (message ? message :
         watchStatus) : NULL,
     .signal_valid = receiving, .signal_level = receiving ? UI_SMeterLevel() : 0,
-    .activity = selected && transmitter.mode==RADIO_TX ? UI_RADIO_CARD_TRANSMITTING :
-      selected && transmitter.mode==RADIO_FAULT ? UI_RADIO_CARD_FAULT :
+    .activity = id==txSlot && transmitter.mode==RADIO_TX ? UI_RADIO_CARD_TRANSMITTING :
+      id==txSlot && transmitter.mode==RADIO_FAULT ? UI_RADIO_CARD_FAULT :
       selected && seek.active ? UI_RADIO_CARD_SEEKING :
       WATCH_Probe(&watcher)==id ? UI_RADIO_CARD_WATCHING :
       receiving && gReceiver.open ? UI_RADIO_CARD_RECEIVING :

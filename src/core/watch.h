@@ -53,4 +53,6 @@ uint8_t WATCH_Owner(const WatchRuntime *runtime);
 // Event slot being checked but not yet heard, or UINT8_MAX.
 uint8_t WATCH_Probe(const WatchRuntime *runtime);
 bool WATCH_IsProbing(const WatchRuntime *runtime);
+// The event being heard or in its reply window: PTT answers it (talkback).
+bool WATCH_Talk(const WatchRuntime *runtime, WatchTarget *target);
 #endif
