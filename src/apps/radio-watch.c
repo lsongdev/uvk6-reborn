@@ -28,6 +28,19 @@ static bool restorePrimary(void) {
   return true;
 }
 bool pauseWatch(void) { return pauseWatchTo(NULL); }
+// FC needs only BK: stop watching but leave keep's broadcast chip playing.
+void yieldWatch(const WatchTarget *keep) {
+  bool audible=WATCH_Owner(&watcher)==keep->id;
+  for (uint8_t device=0; device<8; ++device)
+    if ((watcher.devices&(1u<<device)) && device!=keep->plan.device)
+      RX_DEVICE_StopChip((RxDevice)device);
+  WATCH_Stop(&watcher);
+  delayWatch();
+  if (!audible)
+    (void)RECEIVER_Select(&keep->plan,(1u<<RX_DEVICE_BK)|(1u<<keep->plan.device),true);
+  runtime.current=keep->plan;runtime.active=true;receivingSlot=keep->id;
+  gRedrawScreen=true;
+}
 // Stops watching and leaves target (or, by default, the selected slot) tuned.
 bool pauseWatchTo(const WatchTarget *target) {
   bool wasWatching=watcher.phase!=WATCH_OFF;

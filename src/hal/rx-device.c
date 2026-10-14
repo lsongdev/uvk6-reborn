@@ -66,6 +66,10 @@ void RX_DEVICE_CaptureStart(CaptureRange range, RxDevice previous) {
   BK4819_SetAGC(AUTO_GAIN_INDEX);
   BK4819_SelectFilterEx(range==CAPTURE_RANGE_VHF ? FILTER_VHF : FILTER_UHF);
   BK4819_EnableFrequencyScanEx(F_SC_T_0_2s);
+  // RX turn-on enables the AF DAC; FC never plays BK audio, and a broadcast
+  // chip may be using the speaker meanwhile.
+  BK4819_SetAF(BK4819_AF_MUTE);
+  BK4819_ToggleAFDAC(false);
 }
 
 CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
