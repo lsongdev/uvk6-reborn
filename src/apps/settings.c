@@ -58,22 +58,21 @@ static const MenuItem displayItems[] = {
 };
 MENU_DEF(displayMenu,"Display",displayItems);
 
-static void getRadioValue(const MenuItem *item, char *out, uint8_t size) {
+static void getSlotCount(const MenuItem *item, char *out, uint8_t size) {
+  (void)item;
   Text t = TEXT_Begin(out,size);
-  if (!item->setting) TEXT_Number(&t,gDeviceConfig.radio.slot_count,1,10);
-  else TEXT_Add(&t,gDeviceConfig.radio.watch_enabled ? "On" : "Off");
+  TEXT_Number(&t,gDeviceConfig.radio.slot_count,1,10);
 }
-static void changeRadioValue(const MenuItem *item, bool up) {
+// Two or more slots also turn on dual watch over A and B.
+static void changeSlotCount(const MenuItem *item, bool up) {
+  (void)item;
   notice = NULL;
-  if (!item->setting) {
-    uint8_t count=IncDecU(gDeviceConfig.radio.slot_count,1,RADIO_SLOT_CAPACITY+1u,up);
-    if (!RADIO_STATE_SetCount(&gDeviceConfig.radio,count)) return;
-  } else gDeviceConfig.radio.watch_enabled ^= 1u;
+  uint8_t count=IncDecU(gDeviceConfig.radio.slot_count,1,RADIO_SLOT_CAPACITY+1u,up);
+  if (!RADIO_STATE_SetCount(&gDeviceConfig.radio,count)) return;
   DEVICE_RequestSave();
 }
 static const MenuItem receiveItems[] = {
-    {"Slot count",0,getRadioValue,changeRadioValue},
-    {"Dual watch",1,getRadioValue,changeRadioValue},
+    {"Slot count",0,getSlotCount,changeSlotCount},
     VALUE("SQL open delay",SETTING_SQLOPENTIME),
     VALUE("SQL close delay",SETTING_SQLCLOSETIME),
     VALUE("SI4732 idle",SETTING_SI4732POWEROFF),

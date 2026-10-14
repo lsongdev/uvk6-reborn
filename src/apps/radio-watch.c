@@ -80,7 +80,7 @@ static const WatchOperations watchOperations={
 void watchUpdate(void) {
   if (capturing || number.active || CHANNEL_MANAGER_Active() || inMenu || confirming || seek.active || functionPending ||
       txBusy()) return;
-  if (!gDeviceConfig.radio.watch_enabled || gDeviceConfig.radio.slot_count < 2) {
+  if (gDeviceConfig.radio.slot_count < 2) {
     watchStatus=NULL;
     if (watcher.phase!=WATCH_OFF) (void)pauseWatch();
     return;
@@ -93,11 +93,9 @@ void watchUpdate(void) {
     if (!runtime.active) return;
     WatchTarget targets[RADIO_WATCH_LIMIT];
     uint8_t count=0;
-    watchStatus="DW: select 2";
-    for (uint8_t id=0; id<gDeviceConfig.radio.slot_count && count<RADIO_WATCH_LIMIT; ++id) {
-      const RadioSlot *stored=&gDeviceConfig.radio.slots[id];
+    watchStatus=NULL;
+    for (uint8_t id=0; id<RADIO_WATCH_LIMIT; ++id) {
       RadioSlot effective;
-      if (!stored->watch) continue;
       if (!effectiveSlot(id, &effective, NULL)) {
         watchStatus="DW: unavailable"; continue;
       }

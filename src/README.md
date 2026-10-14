@@ -29,7 +29,7 @@ drivers/             BK4819、SI4732、BK1080、ST7565 与 DP32G030 外设
 | `apps/radio-internal.h` | 上述模块间的私有共享状态，不是公共接口 |
 | `apps/settings.c`、`apps/bands.c` | 全局设置与频段预设编辑 |
 | `apps/channel-manager.*` | MR 频道命名、保存与覆盖确认 |
-| `core/radio-state.*` | `RadioSlot`：VFO 频段记忆、来源、选中项、Watch 资格 |
+| `core/radio-state.*` | `RadioSlot`：VFO 频段记忆、来源、选中项 |
 | `core/watch.*`、`core/seek.*`、`core/capture.*` | 双守听、Seek、FC 的纯状态机 |
 | `core/rx-runtime.*`、`core/tx-runtime.*` | 已提交接收方案的回滚，半双工 TX 生命周期 |
 | `core/config-store.*`、`core/channel-store.*` | UVR2 配置双副本与用户频道存储 |
