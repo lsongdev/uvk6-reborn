@@ -1,14 +1,14 @@
 // Per-slot menu: RX parameters, TX settings, reset and Save as channel.
-#include "screens/slot-menu.h"
-#include "screens/save-channel.h"
-#include "screens/spectrum.h"
+#include "ui/screens/slot-menu.h"
+#include "ui/screens/save-channel.h"
+#include "ui/screens/spectrum.h"
 #include "radio/radio.h"
 #include "core/text.h"
 #include "core/tone.h"
 #include "ui/frequency.h"
 #include "ui/graphics.h"
 #include "ui/number-input.h"
-#include "screens/statusline.h"
+#include "ui/screens/statusline.h"
 
 _Static_assert(MENU_RX_MODE == (int)RADIO_FIELD_MODE && MENU_RX_TONE == (int)RADIO_FIELD_RX_TONE,
                "RX items pass straight through as RadioParameterField");

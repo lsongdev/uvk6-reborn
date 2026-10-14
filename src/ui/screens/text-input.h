@@ -1,6 +1,6 @@
-#ifndef SCREENS_TEXT_INPUT_H
-#define SCREENS_TEXT_INPUT_H
-#include "screens/screen.h"
+#ifndef UI_SCREENS_TEXT_INPUT_H
+#define UI_SCREENS_TEXT_INPUT_H
+#include "ui/screens/screen.h"
 #include <stdbool.h>
 #include <stdint.h>
 

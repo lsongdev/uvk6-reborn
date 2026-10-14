@@ -1,5 +1,5 @@
 // Settings → Channels: browse, rename and delete against the real store.
-#include "../src/screens/channels.c"
+#include "../src/ui/screens/channels.c"
 #include <assert.h>
 
 static uint8_t eeprom[524288];

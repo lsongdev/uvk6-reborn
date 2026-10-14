@@ -1,11 +1,11 @@
-#include "screens/channels.h"
-#include "screens/text-input.h"
+#include "ui/screens/channels.h"
+#include "ui/screens/text-input.h"
 #include "radio/radio.h"
 #include "core/channel-store.h"
 #include "core/text.h"
 #include "ui/frequency.h"
 #include "ui/graphics.h"
-#include "screens/statusline.h"
+#include "ui/screens/statusline.h"
 #include <string.h>
 
 #define ROWS 4

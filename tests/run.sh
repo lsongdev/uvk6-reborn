@@ -40,12 +40,12 @@ esac
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include -DUVK6_ENABLE_FC=0 -fsyntax-only \
   src/radio/radio.c src/radio/capture.c src/radio/watch.c src/radio/seek.c src/radio/tx.c \
-  src/radio/spectrum.c src/screens/home.c src/screens/slot-menu.c src/screens/save-channel.c \
-  src/screens/spectrum.c src/ui/spectrum.c
+  src/radio/spectrum.c src/ui/screens/home.c src/ui/screens/slot-menu.c src/ui/screens/save-channel.c \
+  src/ui/screens/spectrum.c src/ui/spectrum.c
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include -DUVK6_ENABLE_SPECTRUM=0 -fsyntax-only \
-  src/radio/radio.c src/radio/spectrum.c src/radio/watch.c src/screens/slot-menu.c
+  src/radio/radio.c src/radio/spectrum.c src/radio/watch.c src/ui/screens/slot-menu.c
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \

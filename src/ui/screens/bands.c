@@ -1,9 +1,9 @@
-#include "screens/bands.h"
+#include "ui/screens/bands.h"
 #include "core/device-config.h"
 #include "core/receiver.h"
 #include "ui/graphics.h"
 #include "core/text.h"
-#include "screens/statusline.h"
+#include "ui/screens/statusline.h"
 
 static uint8_t selected, field;
 static bool editing;

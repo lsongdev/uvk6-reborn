@@ -1,5 +1,5 @@
-#include "screens/screen.h"
-#include "screens/statusline.h"
+#include "ui/screens/screen.h"
+#include "ui/screens/statusline.h"
 #include "hal/display.h"
 #include <stddef.h>
 

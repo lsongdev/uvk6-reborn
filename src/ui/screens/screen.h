@@ -1,5 +1,5 @@
-#ifndef SCREENS_SCREEN_H
-#define SCREENS_SCREEN_H
+#ifndef UI_SCREENS_SCREEN_H
+#define UI_SCREENS_SCREEN_H
 #include "hal/keyboard.h"
 #include <stdbool.h>
 

@@ -1,12 +1,12 @@
-#include "screens/save-channel.h"
-#include "screens/text-input.h"
+#include "ui/screens/save-channel.h"
+#include "ui/screens/text-input.h"
 #include "radio/radio.h"
 #include "hal/display.h"
 #include "core/channel-store.h"
 #include "core/text.h"
 #include "ui/frequency.h"
 #include "ui/graphics.h"
-#include "screens/statusline.h"
+#include "ui/screens/statusline.h"
 #include <string.h>
 
 static bool overwriteConfirm;

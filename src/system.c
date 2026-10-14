@@ -2,10 +2,10 @@
 #include "core/device-config.h"
 #include "system.h"
 #include "radio/radio.h"
-#include "screens/screen.h"
-#include "screens/home.h"
-#include "screens/reset.h"
-#include "screens/settings.h"
+#include "ui/screens/screen.h"
+#include "ui/screens/home.h"
+#include "ui/screens/reset.h"
+#include "ui/screens/settings.h"
 #include "hal/backlight.h"
 #include "hal/eeprom.h"
 #include "hal/keyboard.h"
@@ -18,7 +18,7 @@
 #include "hal/scheduler.h"
 #include "core/settings.h"
 #include "ui/graphics.h"
-#include "screens/statusline.h"
+#include "ui/screens/statusline.h"
 
 #define queueLen 20
 #define itemSize sizeof(SystemMessages)

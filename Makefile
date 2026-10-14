@@ -23,7 +23,7 @@ SRC := $(SRC_DIR)/main.c \
        $(wildcard $(SRC_DIR)/drivers/*/*.c) \
        $(wildcard $(SRC_DIR)/ui/*.c) \
        $(wildcard $(SRC_DIR)/radio/*.c) \
-       $(wildcard $(SRC_DIR)/screens/*.c) \
+       $(wildcard $(SRC_DIR)/ui/screens/*.c) \
        $(SRC_DIR)/system.c
 
 OBJS := $(OBJ_DIR)/hal/start.o \

@@ -169,7 +169,7 @@ FC 仅 VFO、BK 频率检测。core/capture 接收 BUSY／INVALID／SAMPLE，同
 | --- | --- |
 | 频段、模式、分辨率、跨频段步进 | [radio-model.c](../src/core/radio-model.c)、[tuning.c](../src/core/tuning.c)、[radio-state.h](../src/core/radio-state.h) |
 | 来源和调谐提交、RDS 标签 | [radio.c](../src/radio/radio.c)、[receiver.c](../src/core/receiver.c)、[rx-runtime.c](../src/core/rx-runtime.c) |
-| 页面按键、菜单与卡片 | [home.c](../src/screens/home.c)、[slot-menu.c](../src/screens/slot-menu.c)、[radio-card.c](../src/ui/radio-card.c) |
+| 页面按键、菜单与卡片 | [home.c](../src/ui/screens/home.c)、[slot-menu.c](../src/ui/screens/slot-menu.c)、[radio-card.c](../src/ui/radio-card.c) |
 | 守听、回话、TX 许可 | [watch.c](../src/core/watch.c)、[tx.c](../src/radio/tx.c)、[tx-model.c](../src/core/tx-model.c) |
 | Seek／FC／RDS | [seek.c](../src/radio/seek.c)、[capture.c](../src/radio/capture.c)、[rds.c](../src/core/rds.c)、[rds-receiver.c](../src/core/rds-receiver.c) |
 | 编码、写保护与偏好 | [config-store.c](../src/core/config-store.c)、[channel-store.c](../src/core/channel-store.c)、[eeprom-layout.h](../src/hal/eeprom-layout.h)、[settings.c](../src/core/settings.c) |

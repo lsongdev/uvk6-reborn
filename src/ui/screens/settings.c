@@ -1,6 +1,6 @@
-#include "screens/settings.h"
-#include "screens/bands.h"
-#include "screens/channels.h"
+#include "ui/screens/settings.h"
+#include "ui/screens/bands.h"
+#include "ui/screens/channels.h"
 #include "radio/radio.h"
 #include "core/settings.h"
 #include "core/device-config.h"
@@ -11,7 +11,7 @@
 #include "hal/tx-device.h"
 #include "ui/menu.h"
 #include "ui/graphics.h"
-#include "screens/statusline.h"
+#include "ui/screens/statusline.h"
 #include "core/text.h"
 
 static const char *notice;

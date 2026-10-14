@@ -12,7 +12,7 @@ python3 -m pip install crcmod
 make
 ```
 
-默认 release 使用 -Os、LTO、函数／数据独立段和链接垃圾回收。Makefile 收集 core、hal、drivers、ui、radio、screens 和 system 的源文件，不再靠旧应用排除清单。GIT_HASH 和 UTC 构建时间编入镜像。
+默认 release 使用 -Os、LTO、函数／数据独立段和链接垃圾回收。Makefile 收集 core、hal、drivers、ui（含 ui/screens）、radio 和 system 的源文件，不再靠旧应用排除清单。GIT_HASH 和 UTC 构建时间编入镜像。
 
 | 选项／目标 | 行为 |
 | --- | --- |
@@ -63,15 +63,15 @@ python3 tests/flash-regression.py
 ```text
 main.c / hal/start.S  硬件与默认配置初始化
 system.c             主循环、全局按键、显示节奏、UART、优先 TX 安全检查
-screens/             页面栈、主屏、Slot 菜单、频道、设置、草稿输入
 radio/               常驻控制器：Slot、来源、调谐事务、RDS、Seek/FC/Watch/PTT
-ui/                  纯绘图、字体、菜单和输入工具
+ui/                  界面：顶层为纯绘图、字体、菜单和输入工具
+ui/screens/          页面栈、主屏、Slot 菜单、频道、设置、草稿输入
 core/                模型、状态机、接收镜像、文本和持久化
 hal/                 整机资源、总线及芯片适配
 drivers/             按芯片组织的寄存器与命令实现
 ```
 
-screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包含 screens／ui，不知道菜单、输入框或 F 前缀。ui 不访问射频全局状态，只绘制传入视图。纯模型 core/tuning、radio-model、watch、seek、capture 不调用 EEPROM、HAL、显示或系统时钟，由调用者传输入／回调。
+ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包含 ui，不知道菜单、输入框或 F 前缀。ui 顶层的绘图代码不包含 ui/screens 和 radio，不访问射频全局状态，只绘制传入视图，因此 UI 预览和卡片回归可只编译它们。纯模型 core/tuning、radio-model、watch、seek、capture 不调用 EEPROM、HAL、显示或系统时钟，由调用者传输入／回调。
 
 | 模块 | 责任与入口 |
 | --- | --- |
@@ -80,11 +80,11 @@ screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包含 s
 | radio/watch.c | core/watch 回调、暂停恢复、广播后台与事件归属 |
 | radio/tx.c | PTT 对象与回话、忙碌检查、TX 安全、Slot TX 设置 |
 | radio/radio-internal.h | 控制器模块间私有状态，页面不得依赖 |
-| screens/screen.c | 最多 6 层静态页面栈，栈底不可弹出 |
-| screens/home.c、slot-menu.c | 卡片、快捷键、VFO 频率／MR 频道号草稿；Slot 参数、独立 TX 数值草稿 |
-| screens/save-channel.c、channels.c、text-input.c | 编号／覆盖／名称保存、列表改名删除、字符输入 |
-| screens/settings.c、bands.c、reset.c | 全局偏好、预设草稿、初始化确认 |
-| screens/statusline.c | 所有页面共用的标题、F、写入、SI、锁、电池图标 |
+| ui/screens/screen.c | 最多 6 层静态页面栈，栈底不可弹出 |
+| ui/screens/home.c、slot-menu.c | 卡片、快捷键、VFO 频率／MR 频道号草稿；Slot 参数、独立 TX 数值草稿 |
+| ui/screens/save-channel.c、channels.c、text-input.c | 编号／覆盖／名称保存、列表改名删除、字符输入 |
+| ui/screens/settings.c、bands.c、reset.c | 全局偏好、预设草稿、初始化确认 |
+| ui/screens/statusline.c | 所有页面共用的标题、F、写入、SI、锁、电池图标 |
 | core/receiver.c | gReceiver 统一硬件方案、测量和音频镜像 |
 | core/rx-runtime.c、tx-runtime.c | 接收失败回滚／TX 半双工生命周期 |
 | core/radio-state.c、tuning.c | 保存状态、来源解析、跨频段步进、精确方案 |
@@ -240,7 +240,7 @@ tests/run.sh 构建主机用例和刷机模拟，无需对讲机。主机 Mock �
 
 | 代码改变 | 必须同步核对 |
 | --- | --- |
-| screens/home、slot-menu、settings、bands、channels、text-input | 手册的按键、菜单、输入和保存流程 |
+| ui/screens/home、slot-menu、settings、bands、channels、text-input | 手册的按键、菜单、输入和保存流程 |
 | radio 与 core/tuning、watch、tx-model | 设计中的来源、调谐、音频归属和回话规则 |
 | config-store、channel-store、eeprom-layout | 设计中的字节格式、硬件事实中的地址与写保护 |
 | Makefile、工具、目录或资源格式 | 开发文档；README 入口保持简单 |
