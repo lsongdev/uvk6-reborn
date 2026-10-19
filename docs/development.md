@@ -63,19 +63,20 @@ python3 tests/flash-regression.py
 ## 3. 源码分层与公共 API
 
 ```text
-main.c               默认配置后调用 BOARD_Init、STORAGE_Init，进入主循环
-system.c             主循环、全局按键、显示节奏、UART、优先 TX 安全检查
-radio/               常驻控制器：Slot、来源、调谐事务、RDS、Seek/FC/Watch/PTT
-ui/                  界面：顶层为纯绘图、字体、菜单和输入工具
-ui/screens/          页面栈、主屏、Slot 菜单、频道、设置、草稿输入
-core/                模型、状态机、接收镜像、文本和持久化
-hal/                 与板无关的接口及其公共实现（背光、音频、收发适配、PC 链路协议）
-drivers/             外部芯片驱动（bk4819、st7565、si473x、bk1080、eeprom-24cxx）
-drivers/mcu/<mcu>/   MCU 寄存器、启动、时钟、定时器、外设驱动、mcu.mk
-boards/<board>/      引脚表、板级初始化、键盘接线、背光输出、存储布局、链接脚本、board.mk
+app/             入口与编排：main.c、主循环 loop.c、偏好应用 settings.c、PC 链路 link/
+ui/              界面：顶层为纯绘图、字体、菜单和输入工具；screens/ 为页面
+radio/           收发信机行为：Slot 控制器、接收镜像、RX/TX 运行时、RDS、测量
+store/           持久化：配置、频道、保存调度、资源、校准布局
+core/            纯模型：不依赖 hal、驱动和其他目录，主机可直接测试
+devices/         与板无关的整机设备：收发适配、显示、背光、音频、LED、电池、按键定义
+hal/             只放硬件接口头文件，由板级与 MCU 驱动实现
+drivers/<chip>/  芯片驱动平铺；含 mcu.mk 的目录是 MCU（寄存器、启动、时钟、外设）
+boards/<board>/  引脚表、初始化顺序、机制不同的小函数、存储布局、链接脚本、board.mk
 ```
 
-ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包含 ui，不知道菜单、输入框或 F 前缀。ui 顶层的绘图代码不包含 ui/screens 和 radio，不访问射频全局状态，只绘制传入视图，因此 UI 预览和卡片回归可只编译它们。纯模型 core/tuning、radio-model、watch、seek、capture 不调用 EEPROM、HAL、显示或系统时钟，由调用者传输入／回调。
+依赖方向：app → ui → radio → devices → drivers → hal；radio、devices 可读 store；core 不依赖任何目录；boards 实现 hal，可使用 drivers。共享代码不写 `#if BOARD`：差异是数据（引脚、接线）就放进板级表格，差异是机制（外设、介质）就由板级实现最小的函数。
+
+ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包含 ui，不知道菜单、输入框或 F 前缀。ui 顶层的绘图代码不包含 ui/screens 和 radio，不访问射频全局状态，只绘制传入视图，因此 UI 预览和卡片回归可只编译它们。core/ 内的模型不调用存储、HAL、显示或系统时钟，由调用者传输入／回调。
 
 | 模块 | 责任与入口 |
 | --- | --- |
@@ -89,25 +90,25 @@ ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包�
 | ui/screens/save-channel.c、channels.c、text-input.c | 编号／覆盖／名称保存、列表改名删除、字符输入 |
 | ui/screens/settings.c、bands.c、reset.c | 全局偏好、预设草稿、初始化确认 |
 | ui/screens/statusline.c | 所有页面共用的标题、F、写入、SI、锁、电池图标 |
-| core/receiver.c | gReceiver 统一硬件方案、测量和音频镜像 |
-| core/rx-runtime.c、tx-runtime.c | 接收失败回滚／TX 半双工生命周期 |
+| radio/receiver.c | gReceiver 统一硬件方案、测量和音频镜像 |
+| radio/rx-runtime.c、tx-runtime.c | 接收失败回滚／TX 半双工生命周期 |
 | core/radio-state.c、tuning.c | 保存状态、来源解析、跨频段步进、精确方案 |
-| core/device-config.c、config-store.c | dirty／重试、UVR2 固定字节格式、双副本 |
-| core/channel-store.c | 频道双副本（写旧份后镜像）、占用位图、CRC、删除 |
+| store/device-config.c、config-store.c | dirty／重试、UVR2 固定字节格式、双副本 |
+| store/channel-store.c | 频道双副本（写旧份后镜像）、占用位图、CRC、删除 |
 | boards/uvk6/storage.c、storage-layout.h | 存储区到 UV-K6 EEPROM 地址的映射、写保护、维护通道 |
-| hal/rx-device.c | 芯片单位／带宽／信号口径／亚音、音频门、Seek／FC 适配 |
-| hal/tx-device.c | 板级范围、校准读取与插值、物理 PTT／供电、PA 顺序 |
+| devices/rx-device.c | 芯片单位／带宽／信号口径／亚音、音频门、Seek／FC 适配 |
+| devices/tx-device.c | 板级范围、校准读取与插值、物理 PTT／供电、PA 顺序 |
 | drivers/{bk4819,si473x,bk1080,st7565,eeprom-24cxx}/ | 外部芯片命令 |
-| drivers/mcu/dp32g030/ | DP32G030 寄存器、启动、时钟、定时器、SPI、UART 收发、ADC、CRC |
-| hal/uart.c | PC 链路帧格式、混淆与命令；原始读／维护写交给板级 |
+| drivers/dp32g030/ | DP32G030 寄存器、启动、时钟、定时器、SPI、UART 收发、ADC、CRC |
+| app/link/uart-link.c | PC 链路帧格式、混淆与命令；原始读／维护写交给板级 |
 
-依赖只向下。HAL 抽象按键、屏幕、LED、音频、背光、EEPROM／总线等资源，也集中跨芯片适配；driver 不读取产品配置或实现菜单。上层不依赖芯片单位、增益索引或寄存器号。
+driver 不读取产品配置或实现菜单；devices 集中跨芯片适配，上层不依赖芯片单位、增益索引或寄存器号。
 
-构建按板选择：`make BOARD=uvk6`（默认）读取 boards/uvk6/board.mk 得到 `MCU=dp32g030`，再引入 drivers/mcu/dp32g030/mcu.mk（CPU 与 CMSIS 选项），编译该板和该 MCU 目录下的源文件，产物在 bin/uvk6/、obj/uvk6/。MCU 驱动不认识具体引脚，板级不重复实现外设驱动；同一 MCU 的新机型只需新增 boards/ 目录。
+构建按板选择：`make BOARD=uvk6`（默认）读取 boards/uvk6/board.mk 得到 `MCU=dp32g030`，再引入 drivers/dp32g030/mcu.mk（CPU 与 CMSIS 选项），编译该板和该 MCU 目录下的源文件，产物在 bin/uvk6/、obj/uvk6/。MCU 驱动不认识具体引脚，板级不重复实现外设驱动；同一 MCU 的新机型只需新增 boards/ 目录。
 
-只有 boards/ 与 drivers/mcu/ 可以包含 MCU 寄存器头。其余代码经 hal 接口访问硬件：单根信号经 hal/gpio.h 的 `GpioLine`（`GPIO_Write`／`GPIO_Read`／`GPIO_SetInput`，线路表由板级定义），显示总线经 hal/spi.h，背光输出经 `BOARD_BacklightSetLevel`，复位经 `SYS_Reset`，整机初始化经 `BOARD_Init`。
+只有 boards/ 与 MCU 驱动目录可以包含 MCU 寄存器头。其余代码经 hal 接口访问硬件：单根信号经 hal/gpio.h 的 `GpioLine`（`GPIO_Write`／`GPIO_Read`／`GPIO_SetInput`，线路表由板级定义），显示总线经 hal/spi.h，背光输出经 `BOARD_BacklightSetLevel`，复位经 `SYS_Reset`，整机初始化经 `BOARD_Init`。
 
-持久数据同理：core 与驱动只经 hal/storage.h 按“区域 + 区内偏移”读写（配置 A／B、频道 A／B、只读校准、只读资源区），不出现绝对地址。区域契约：断电时一次写入最多波及同一区域内的其他字节（闪存擦除单元），绝不影响其他区域；因此一条记录的两份必须放在不同区域，写完一份再写另一份。UV-K6 的 boards/uvk6/storage.c 把各区映射回原有 EEPROM 地址（频道两份仍交错存放），布局只写在 boards/uvk6/storage-layout.h，并由 storage-regression 校验。UART 原始读和维护写经 `BOARD_RawRead`／`BOARD_MaintenanceWrite`，按该板介质的绝对地址；24Cxx 驱动本身不含布局策略。
+持久数据同理：store 与驱动只经 hal/storage.h 按“区域 + 区内偏移”读写（配置 A／B、频道 A／B、只读校准、只读资源区），不出现绝对地址。区域契约：断电时一次写入最多波及同一区域内的其他字节（闪存擦除单元），绝不影响其他区域；因此一条记录的两份必须放在不同区域，写完一份再写另一份。UV-K6 的 boards/uvk6/storage.c 把各区映射回原有 EEPROM 地址（频道两份仍交错存放），布局只写在 boards/uvk6/storage-layout.h，并由 storage-regression 校验。UART 原始读和维护写经 `BOARD_RawRead`／`BOARD_MaintenanceWrite`，按该板介质的绝对地址；24Cxx 驱动本身不含布局策略。
 
 selectedSlot 是操作对象，receivingSlot 是接收归属，txSlot 可是回话对象，gReceiver.plan 是实际硬件镜像，runtime.current 是接收事务的运行方案。临时调谐不得把硬件镜像回写用户记忆。MR 的有效参数只读，保存频道是独立显式动作。
 

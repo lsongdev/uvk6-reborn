@@ -1,5 +1,5 @@
 // Receiver commit/restore rules with the hardware boundary mocked.
-#include "../src/core/receiver.c"
+#include "../src/radio/receiver.c"
 #include <assert.h>
 #include <string.h>
 bool gRedrawScreen;

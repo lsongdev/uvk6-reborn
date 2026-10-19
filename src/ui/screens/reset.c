@@ -1,8 +1,8 @@
 #include "ui/screens/reset.h"
-#include "core/device-config.h"
+#include "store/device-config.h"
 #include "hal/storage.h"
 #include "hal/system.h"
-#include "core/settings.h"
+#include "app/settings.h"
 #include "ui/graphics.h"
 #include "ui/screens/statusline.h"
 

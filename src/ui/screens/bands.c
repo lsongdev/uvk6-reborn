@@ -1,6 +1,6 @@
 #include "ui/screens/bands.h"
-#include "core/device-config.h"
-#include "core/receiver.h"
+#include "store/device-config.h"
+#include "radio/receiver.h"
 #include "ui/graphics.h"
 #include "core/text.h"
 #include "ui/screens/statusline.h"

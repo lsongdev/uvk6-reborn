@@ -19,7 +19,7 @@
 
 ## 2. MCU 与链接约束
 
-项目面向 DP32G030 平台，构建参数为 ARM Cortex-M0、Thumb、AAPCS。寄存器定义位于 `src/drivers/mcu/dp32g030/`。尚未通过本台设备芯片丝印独立确认 MCU 型号。
+项目面向 DP32G030 平台，构建参数为 ARM Cortex-M0、Thumb、AAPCS。寄存器定义位于 `src/drivers/dp32g030/`。尚未通过本台设备芯片丝印独立确认 MCU 型号。
 
 [链接脚本](../src/boards/uvk6/firmware.ld) 定义：
 
@@ -58,7 +58,7 @@
 
 ### 键盘与键帽依据
 
-按键编号与扫描位置依据 [按键枚举](../src/hal/keyboard.h)、[键盘矩阵](../src/boards/uvk6/keyboard.c) 和 [引脚号](../src/boards/uvk6/pins.h)。键帽主标、副标是物理标记，不等同于当前固件已经绑定的功能；当前短按、长按行为以 [用户手册](user-manual.md#2-主屏幕与按键) 为准。
+按键编号与扫描位置依据 [按键枚举](../src/devices/keyboard.h)、[键盘矩阵](../src/boards/uvk6/keyboard.c) 和 [引脚号](../src/boards/uvk6/pins.h)。键帽主标、副标是物理标记，不等同于当前固件已经绑定的功能；当前短按、长按行为以 [用户手册](user-manual.md#2-主屏幕与按键) 为准。
 
 **键帽依据**：2026-10-12 逐项核对[泉盛官方 UV-K5(8) 产品页](https://en.qsfj.com/products/3268)的清晰正面图（图片文件 `fm-1683793427.png`）。厂家该页面正文称设备为 UV-K6，[对应下载页](https://en.qsfj.com/support/downloads/3268)也包含 UV-K6 资料。`M(A)`、`▲(B)`、`▼(C)`、`1(Band)`、`2(A/B)` 同时与用户提供的本台标记一致。下表完整记录厂家图中的主标与副标；大小写保留键帽写法，换行副标以 `/` 连写。它是原厂面板依据，换装键帽时应同步更新。
 
@@ -225,7 +225,7 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 | `0x0800–0x0FFF` | UVR2 格式 9 双 1024 B 槽，已定义内容 825 B | 配置写入；CRC 与序号回读校验 |
 | `0xB000–0x113FF` | 用户频道：200 个 × 两份 64 B 副本（标记、序号、名称 16 B、RX、TX Shift／频差／Split、CRC32） | 频道写入；开机只读每份的 2 字节头部 |
 | `0x1E00–0x1FFF` | 原机校准备份范围。工具 [K5TOOL](https://github.com/qrp73/K5TOOL) 提供读取 `0x1E00` 长度 `0x0200`，并说明其用于校准；[k5prog](https://github.com/sq5bpf/k5prog) 也警告全片覆写的风险 | 普通配置和频道写入绝不触及；只有 `tools/resources.py` 经 UART 维护写修改：单行 PA 或从备份整块恢复，且先备份整个区 |
-| `[容量 - 8856, 容量)` | SI4732 SSB 资源：16 B `SSBP` 头位于 `0x7DD68–0x7DD77`，8840 B 数据位于 `0x7DD78–0x7FFFF`；见 [resource.h](../src/core/resource.h) | 补丁不随固件打包；由 `tools/resources.py ssb-write` 通过正常固件 UART 安装（先清头、写数据、最后写头），完整回读后重启，启动校验长度及全量 CRC；驱动只读加载，不等于 LOSEHU patch。用法见[开发文档](development.md#eeprom-资源与校准工具) |
+| `[容量 - 8856, 容量)` | SI4732 SSB 资源：16 B `SSBP` 头位于 `0x7DD68–0x7DD77`，8840 B 数据位于 `0x7DD78–0x7FFFF`；见 [resource.h](../src/store/resource.h) | 补丁不随固件打包；由 `tools/resources.py ssb-write` 通过正常固件 UART 安装（先清头、写数据、最后写头），完整回读后重启，启动校验长度及全量 CRC；驱动只读加载，不等于 LOSEHU patch。用法见[开发文档](development.md#eeprom-资源与校准工具) |
 | `0x3C228–0x3FFFF` | LOSEHU **2 Mbit** 固件的 15,832 B SI4732 patch 区 | 仅作为其他固件的布局参考，不自动识别为本项目的 patch |
 
 **原厂校准区不是可随意丢弃的旧软件兼容数据**。即使新固件不保留旧频道，也必须保留或通过可信设备备份维护射频校准。普通构建的 `UVR2` 不会主动覆写 `0x1E00–0x1FFF` 或补丁尾区；未来更换 EEPROM、改变用途或完整格式化时同样须保护。
@@ -246,7 +246,7 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 
 ## 6. PA 校准与维护例外
 
-板级 TX 只读原厂 PA 表：起点 `0x1ED0 + band × 16`，每档 Low／Medium／High 各三个偏置锚点，共 9 B。实现为 [tx-device.c](../src/hal/tx-device.c)，参考 [DualTachyon radio.c](https://github.com/DualTachyon/uv-k5-firmware/blob/main/radio.c) 和 [frequencies.c](https://github.com/DualTachyon/uv-k5-firmware/blob/main/frequencies.c) 的布局与锚点；布局依据不证明本台值经过仪表测量。
+板级 TX 只读原厂 PA 表：起点 `0x1ED0 + band × 16`，每档 Low／Medium／High 各三个偏置锚点，共 9 B。实现为 [tx-device.c](../src/devices/tx-device.c)，参考 [DualTachyon radio.c](https://github.com/DualTachyon/uv-k5-firmware/blob/main/radio.c) 和 [frequencies.c](https://github.com/DualTachyon/uv-k5-firmware/blob/main/frequencies.c) 的布局与锚点；布局依据不证明本台值经过仪表测量。
 
 | 软件允许范围 | band | 读取地址 | 锚点 MHz |
 | --- | ---: | --- | --- |

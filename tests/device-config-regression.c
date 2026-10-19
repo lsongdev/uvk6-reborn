@@ -1,5 +1,5 @@
 // Exercise the real versioned store through the device save scheduler.
-#include "../src/core/device-config.c"
+#include "../src/store/device-config.c"
 #include "fake-storage.h"
 #include <assert.h>
 #include <string.h>

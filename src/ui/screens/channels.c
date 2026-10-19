@@ -1,7 +1,7 @@
 #include "ui/screens/channels.h"
 #include "ui/screens/text-input.h"
 #include "radio/radio.h"
-#include "core/channel-store.h"
+#include "store/channel-store.h"
 #include "core/text.h"
 #include "ui/frequency.h"
 #include "ui/graphics.h"

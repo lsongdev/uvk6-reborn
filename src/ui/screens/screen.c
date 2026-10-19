@@ -1,6 +1,6 @@
 #include "ui/screens/screen.h"
 #include "ui/screens/statusline.h"
-#include "hal/display.h"
+#include "devices/display.h"
 #include <stddef.h>
 
 #define DEPTH 6

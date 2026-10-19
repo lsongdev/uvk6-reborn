@@ -2,14 +2,15 @@
 # Board
 # =============================================================================
 # uvk6: UV-K6 (DP32G030). Board code lives in src/boards/$(BOARD)/; its
-# board.mk names the MCU, whose drivers live in src/drivers/mcu/$(MCU)/.
+# board.mk names the MCU. Chip drivers sit side by side in src/drivers/;
+# a directory with an mcu.mk is an MCU, and only the board's one is built.
 BOARD ?= uvk6
 BOARD_DIR := src/boards/$(BOARD)
 ifeq ($(wildcard $(BOARD_DIR)/board.mk),)
   $(error Unknown BOARD=$(BOARD): no $(BOARD_DIR)/board.mk)
 endif
 include $(BOARD_DIR)/board.mk
-MCU_DIR := src/drivers/mcu/$(MCU)
+MCU_DIR := src/drivers/$(MCU)
 include $(MCU_DIR)/mcu.mk
 
 # =============================================================================
@@ -31,18 +32,21 @@ BUILD_TAG     := $(shell date -u +'%Y%m%d_%H%M')
 # =============================================================================
 # Source Files
 # =============================================================================
-SRC := $(SRC_DIR)/main.c \
-       $(wildcard $(SRC_DIR)/core/*.c) \
-       $(wildcard $(SRC_DIR)/hal/*.c) \
-       $(wildcard $(BOARD_DIR)/*.c) \
-       $(wildcard $(MCU_DIR)/*.c) \
-       $(wildcard $(SRC_DIR)/drivers/*/*.c) \
-       $(wildcard $(SRC_DIR)/ui/*.c) \
-       $(wildcard $(SRC_DIR)/radio/*.c) \
-       $(wildcard $(SRC_DIR)/ui/screens/*.c) \
-       $(SRC_DIR)/system.c
+OTHER_MCUS := $(filter-out $(MCU_DIR)/,$(dir $(wildcard $(SRC_DIR)/drivers/*/mcu.mk)))
+DRIVER_SRC := $(filter-out $(addsuffix %,$(OTHER_MCUS)),$(wildcard $(SRC_DIR)/drivers/*/*.c))
 
-OBJS := $(OBJ_DIR)/drivers/mcu/$(MCU)/start.o \
+SRC := $(wildcard $(SRC_DIR)/app/*.c) \
+       $(wildcard $(SRC_DIR)/app/link/*.c) \
+       $(wildcard $(SRC_DIR)/ui/*.c) \
+       $(wildcard $(SRC_DIR)/ui/screens/*.c) \
+       $(wildcard $(SRC_DIR)/radio/*.c) \
+       $(wildcard $(SRC_DIR)/store/*.c) \
+       $(wildcard $(SRC_DIR)/core/*.c) \
+       $(wildcard $(SRC_DIR)/devices/*.c) \
+       $(DRIVER_SRC) \
+       $(wildcard $(BOARD_DIR)/*.c)
+
+OBJS := $(OBJ_DIR)/drivers/$(MCU)/start.o \
         $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 # =============================================================================

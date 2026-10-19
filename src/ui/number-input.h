@@ -1,6 +1,6 @@
 #ifndef UI_NUMBER_INPUT_H
 #define UI_NUMBER_INPUT_H
-#include "hal/keyboard.h"
+#include "devices/keyboard.h"
 
 // Decimal draft in caller-owned storage; scale and bounds use native units.
 typedef struct {

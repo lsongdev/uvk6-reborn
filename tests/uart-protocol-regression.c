@@ -1,4 +1,4 @@
-#include "../src/hal/uart-protocol.h"
+#include "../src/app/link/uart-protocol.h"
 #include <assert.h>
 #include <string.h>
 

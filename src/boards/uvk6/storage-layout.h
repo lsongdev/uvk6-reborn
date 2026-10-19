@@ -2,10 +2,10 @@
 #define EEPROM_LAYOUT_H
 // Where the UV-K6 I2C EEPROM keeps each storage area. Writes need no erase,
 // so a channel's two copies may sit side by side.
-#include "core/calibration.h"
-#include "core/config-store.h"
-#include "core/channel-store.h"
-#include "core/resource.h"
+#include "store/calibration.h"
+#include "store/config-store.h"
+#include "store/channel-store.h"
+#include "store/resource.h"
 #include "drivers/eeprom-24cxx/eeprom.h"
 
 #define CONFIG_STORE_BASE 0x0800u

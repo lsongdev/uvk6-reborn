@@ -10,22 +10,22 @@
 // Nothing here knows about screens.
 #include "radio/radio.h"
 #include "core/text.h"
-#include "core/receiver.h"
+#include "radio/receiver.h"
 #include "core/misc.h"
-#include "core/device-config.h"
-#include "core/channel-store.h"
+#include "store/device-config.h"
+#include "store/channel-store.h"
 #include "core/tuning.h"
-#include "core/rx-runtime.h"
+#include "radio/rx-runtime.h"
 #include "core/watch.h"
 #include "core/tx-model.h"
-#include "core/tx-runtime.h"
-#include "core/settings.h"
+#include "radio/tx-runtime.h"
+#include "app/settings.h"
 #include "core/seek.h"
-#include "core/rds-receiver.h"
-#include "hal/tx-device.h"
-#include "hal/rx-device.h"
+#include "radio/rds-receiver.h"
+#include "devices/tx-device.h"
+#include "devices/rx-device.h"
 #include "hal/scheduler.h"
-#include "hal/display.h" // gRedrawScreen: ask the system loop to redraw.
+#include "devices/display.h" // gRedrawScreen: ask the system loop to redraw.
 #include <string.h>
 
 // RDS text belongs to the frequency it was received on.

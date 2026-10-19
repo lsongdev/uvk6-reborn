@@ -2,7 +2,7 @@
 #include "hal/uart.h"
 #include "ui/graphics.h"
 #include "core/text.h"
-#include "core/measurements.h"
+#include "radio/measurements.h"
 #include "ui/numnav.h"
 #include <stdbool.h>
 #include <string.h>

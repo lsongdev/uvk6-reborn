@@ -1,6 +1,6 @@
 #ifndef UI_SCREENS_SCREEN_H
 #define UI_SCREENS_SCREEN_H
-#include "hal/keyboard.h"
+#include "devices/keyboard.h"
 #include <stdbool.h>
 
 // A page on the screen stack. Only the top screen draws and takes keys; the

@@ -1,5 +1,5 @@
 #include "core/tx-model.h"
-#include "core/tx-runtime.h"
+#include "radio/tx-runtime.h"
 #include <assert.h>
 #include <stddef.h>
 
