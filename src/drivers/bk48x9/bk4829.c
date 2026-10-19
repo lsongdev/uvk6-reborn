@@ -4,8 +4,8 @@
 
 // Statically selected chip backend; register values preserved by trace regressions.
 const BK48X9Chip BK48X9_CHIP={
-  // Reference K1 squelch timing (open 5, close 3): shorter delays flipped
-  // the squelch on every flutter of a strong carrier on this radio.
+  // Recommended squelch timing: open 5, close 3, as the stock firmware and
+  // the reference set it. 1/1 also receives cleanly on this radio.
   .capabilities={4829,true,(1u<<0)|(1u<<4)|(1u<<9),5,3},
   .squelch_interrupts=0x000C,.vco_restart=0,.bus_delay_us=1,
   .lna_attenuation={28,24,19,0},
