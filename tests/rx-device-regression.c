@@ -158,9 +158,10 @@ static void testCalibratedSquelch(void) {
     calibration[0x60 + 16 * i + 4] = (uint8_t)(0x50 + i);
   }
   SQL sq = squelchFor(4, 438500000u);
-  assert(sq.ro == 0x40 && sq.rc == 0x41 && sq.no == 0x42 && sq.nc == 0x43 && sq.gc == 0x44 && sq.go == 0x45);
+  // Reference tuning: RSSI open halved, noise and glitch open doubled.
+  assert(sq.ro == 0x20 && sq.rc == 0x41 && sq.no == 0x7F && sq.nc == 0x43 && sq.gc == 0x44 && sq.go == 0x8A);
   sq = squelchFor(4, 145500000u);
-  assert(sq.ro == 0x50 && sq.go == 0x55); // VHF rows below 174 MHz.
+  assert(sq.ro == 0x28 && sq.go == 0xAA); // VHF rows below 174 MHz.
   calibration[0x50 + 4] = 0xFF; // Erased byte: the formula takes over.
   assert(squelchFor(4, 438500000u).ro == 108);
   calibration[0x50 + 4] = 0x45;
