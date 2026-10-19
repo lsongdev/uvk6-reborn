@@ -244,3 +244,6 @@ bool BOARD_BroadcastUsesBkVhfPath(void) { return false; }
 
 
 bool BOARD_HasHorizontalArrows(void) { return false; }
+
+const SerialPort *const BOARD_SERIAL_PORTS[] = {&UART_PORT};
+const uint8_t BOARD_SERIAL_PORT_COUNT = 1;

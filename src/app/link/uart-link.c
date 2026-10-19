@@ -1,4 +1,4 @@
-#include "hal/uart.h"
+#include "hal/serial.h"
 #include "app/loop.h"
 #include "drivers/bk48x9/bk48x9.h"
 #include "radio/receiver.h"
@@ -12,12 +12,14 @@
 #include <string.h>
 
 // The PC link protocol (tools/resources.py): framing, obfuscation and the
-// command set, over whatever transport the board's UART_* provides.
+// command set, over every transport the board lists in BOARD_SERIAL_PORTS.
+// Each port keeps its own read position and obfuscation state; a reply goes
+// back on the port its request arrived on.
 static const char Version[] = "s0v4";
 
 static bool bIsInLockScreen = false;
 
-#define RING_INDEX(x, y) (((x) + (y)) % sizeof(gUartRxRing))
+#define RING_INDEX(x, y) ((uint16_t)(((unsigned)(x) + (unsigned)(y)) % port->ring_bytes))
 
 typedef struct {
   uint16_t ID;
@@ -156,14 +158,22 @@ static union {
 } UART_Command;
 
 static uint32_t Timestamp;
-static uint16_t gUART_WriteIndex;
-static bool bIsEncrypted = true;
+
+typedef struct {
+  uint16_t read; // Next unparsed ring index.
+  bool encrypted;
+} PortState;
+static PortState ports[BOARD_SERIAL_PORTS_MAX];
+static bool portsReady;
+static uint8_t replyPort; // The port the current command came from.
 
 static Header_t Header;
 static Footer_t Footer;
 static uint8_t *pBytes;
 static void SendReply(void *pReply, uint16_t Size) {
   uint16_t i;
+  const SerialPort *port = BOARD_SERIAL_PORTS[replyPort];
+  bool bIsEncrypted = ports[replyPort].encrypted;
 
   if (bIsEncrypted) {
     pBytes = (uint8_t *)pReply;
@@ -174,8 +184,8 @@ static void SendReply(void *pReply, uint16_t Size) {
 
   Header.ID = 0xCDAB;
   Header.Size = Size;
-  UART_Send(&Header, sizeof(Header));
-  UART_Send(pReply, Size);
+  port->send(&Header, sizeof(Header));
+  port->send(pReply, Size);
   if (bIsEncrypted) {
     Footer.Padding[0] = Obfuscation[(Size + 0) % 16] ^ 0xFF;
     Footer.Padding[1] = Obfuscation[(Size + 1) % 16] ^ 0xFF;
@@ -185,7 +195,7 @@ static void SendReply(void *pReply, uint16_t Size) {
   }
   Footer.ID = 0xBADC;
 
-  UART_Send(&Footer, sizeof(Footer));
+  port->send(&Footer, sizeof(Footer));
 }
 
 static void SendVersion(void) {
@@ -307,7 +317,10 @@ static void CMD_052F(const uint8_t *pBuffer) {
   SendVersion();
 }
 
-bool UART_IsCommandAvailable(void) {
+static bool commandOn(uint8_t index) {
+  const SerialPort *port = BOARD_SERIAL_PORTS[index];
+  uint8_t *ring = port->ring;
+  uint16_t *read = &ports[index].read;
   uint16_t DmaLength;
   uint16_t CommandLength;
   uint16_t Index;
@@ -316,39 +329,39 @@ bool UART_IsCommandAvailable(void) {
   uint16_t CRC;
   uint16_t i;
 
-  DmaLength = UART_RxHead();
+  DmaLength = port->head();
   while (1) {
-    if (gUART_WriteIndex == DmaLength) {
+    if (*read == DmaLength) {
       return false;
     }
 
-    while (gUART_WriteIndex != DmaLength &&
-           gUartRxRing[gUART_WriteIndex] != 0xABU) {
-      gUART_WriteIndex = RING_INDEX(gUART_WriteIndex, 1);
+    while (*read != DmaLength &&
+           ring[*read] != 0xABU) {
+      *read = RING_INDEX(*read, 1);
     }
 
-    if (gUART_WriteIndex == DmaLength) {
+    if (*read == DmaLength) {
       return false;
     }
 
-    if (gUART_WriteIndex < DmaLength) {
-      CommandLength = DmaLength - gUART_WriteIndex;
+    if (*read < DmaLength) {
+      CommandLength = DmaLength - *read;
     } else {
-      CommandLength = (DmaLength + sizeof(gUartRxRing)) - gUART_WriteIndex;
+      CommandLength = (DmaLength + port->ring_bytes) - *read;
     }
     if (CommandLength < 8u) {
       return 0;
     }
-    if (gUartRxRing[RING_INDEX(gUART_WriteIndex, 1)] == 0xCD) {
+    if (ring[RING_INDEX(*read, 1)] == 0xCD) {
       break;
     }
-    gUART_WriteIndex = RING_INDEX(gUART_WriteIndex, 1);
+    *read = RING_INDEX(*read, 1);
   }
 
-  Index = RING_INDEX(gUART_WriteIndex, 2);
-  Size = (gUartRxRing[RING_INDEX(Index, 1)] << 8) | gUartRxRing[Index];
-  if ((uint32_t)Size + 8u > sizeof(gUartRxRing)) {
-    gUART_WriteIndex = DmaLength;
+  Index = RING_INDEX(*read, 2);
+  Size = (ring[RING_INDEX(Index, 1)] << 8) | ring[Index];
+  if ((uint32_t)Size + 8u > port->ring_bytes || Size + 2u > sizeof(UART_Command.Buffer)) {
+    *read = DmaLength;
     return false;
   }
   if (CommandLength < Size + 8) {
@@ -356,33 +369,33 @@ bool UART_IsCommandAvailable(void) {
   }
   Index = RING_INDEX(Index, 2);
   TailIndex = RING_INDEX(Index, Size + 2);
-  if (gUartRxRing[TailIndex] != 0xDC ||
-      gUartRxRing[RING_INDEX(TailIndex, 1)] != 0xBA) {
-    gUART_WriteIndex = DmaLength;
+  if (ring[TailIndex] != 0xDC ||
+      ring[RING_INDEX(TailIndex, 1)] != 0xBA) {
+    *read = DmaLength;
     return false;
   }
   if (TailIndex < Index) {
-    uint16_t ChunkSize = sizeof(gUartRxRing) - Index;
+    uint16_t ChunkSize = port->ring_bytes - Index;
 
-    memcpy(UART_Command.Buffer, gUartRxRing + Index, ChunkSize);
-    memcpy(UART_Command.Buffer + ChunkSize, gUartRxRing, TailIndex);
+    memcpy(UART_Command.Buffer, ring + Index, ChunkSize);
+    memcpy(UART_Command.Buffer + ChunkSize, ring, TailIndex);
   } else {
-    memcpy(UART_Command.Buffer, gUartRxRing + Index, TailIndex - Index);
+    memcpy(UART_Command.Buffer, ring + Index, TailIndex - Index);
   }
 
   TailIndex = RING_INDEX(TailIndex, 2);
-  if (TailIndex < gUART_WriteIndex) {
-    memset(gUartRxRing + gUART_WriteIndex, 0,
-           sizeof(gUartRxRing) - gUART_WriteIndex);
-    memset(gUartRxRing, 0, TailIndex);
+  if (TailIndex < *read) {
+    memset(ring + *read, 0,
+           port->ring_bytes - *read);
+    memset(ring, 0, TailIndex);
   } else {
-    memset(gUartRxRing + gUART_WriteIndex, 0, TailIndex - gUART_WriteIndex);
+    memset(ring + *read, 0, TailIndex - *read);
   }
 
-  gUART_WriteIndex = TailIndex;
+  *read = TailIndex;
 
   // Candidate framing must not alter connection state until CRC validation.
-  bool encrypted = bIsEncrypted;
+  bool encrypted = ports[index].encrypted;
   if (UART_Command.Header.ID == 0x0514) encrypted = false;
   if (UART_Command.Header.ID == 0x6902) encrypted = true;
   if (encrypted) {
@@ -396,11 +409,29 @@ bool UART_IsCommandAvailable(void) {
       !UART_CommandValid(UART_Command.Buffer, Size))
     return false;
 
-  bIsEncrypted = encrypted;
+  ports[index].encrypted = encrypted;
+  replyPort = index;
   return true;
 }
 
-void UART_HandleCommand(void) {
+// Ports take turns, so a busy one cannot starve the other.
+bool LINK_IsCommandAvailable(void) {
+  static uint8_t next;
+  if (!portsReady) {
+    for (uint8_t i = 0; i < BOARD_SERIAL_PORT_COUNT; ++i) ports[i].encrypted = true;
+    portsReady = true;
+  }
+  for (uint8_t n = 0; n < BOARD_SERIAL_PORT_COUNT; ++n) {
+    uint8_t index = (uint8_t)((next + n) % BOARD_SERIAL_PORT_COUNT);
+    if (commandOn(index)) {
+      next = (uint8_t)((index + 1u) % BOARD_SERIAL_PORT_COUNT);
+      return true;
+    }
+  }
+  return false;
+}
+
+void LINK_HandleCommand(void) {
   switch (UART_Command.Header.ID) {
     // VERSION
   case 0x0514:

@@ -152,6 +152,8 @@ python3 tools/resources.py --port /dev/cu.usbserial-1410 ssb-verify
 python3 tools/resources.py --port /dev/cu.usbserial-1410 read 0x1E00 0x200 cal.bin
 ```
 
+K1 也可以不用 K 头线，直接用 USB-C 数据线连接正常开机的对讲机，端口为 `/dev/cu.usbmodem<序列号>1`（序列号取芯片 UID），命令完全相同；刷机仍须用 K 头线。
+
 ssb-write 在尾区非空时先把原内容存到 backups/（已被 .gitignore 忽略），内容相同则不写。read 可保存任意地址范围，每次最多按 128 B 读取。
 
 安装时使用普通开机状态，非 Bootloader；About → SSB patch 应显示 Present。SSB 可作为 SI 常驻源与 BK 守听并行，音频切换不重载 patch；SSB Seek 仍不支持。

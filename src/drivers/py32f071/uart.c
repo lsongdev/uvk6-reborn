@@ -3,7 +3,7 @@
 #include "py32f0xx.h"
 
 // USART1 at 38400 baud; DMA1 channel 2 loops over gUartRxRing.
-uint8_t gUartRxRing[UART_RX_RING_BYTES];
+static uint8_t gUartRxRing[UART_RX_RING_BYTES];
 
 #define RX_DMA DMA1_Channel2
 #define DMA_MAP_USART1_RD 7u // SYSCFG_CFGR3 request number for USART1 RX.
@@ -34,7 +34,7 @@ void UART_Init(void) {
   RX_DMA->CCR |= DMA_CCR_EN;
 }
 
-void UART_Send(const void *pBuffer, uint32_t Size) {
+static void UART_Send(const void *pBuffer, uint32_t Size) {
   const uint8_t *pData = pBuffer;
   for (uint32_t i = 0; i < Size; i++) {
     // A stuck transmitter must not freeze the main loop (or the PTT timeout).
@@ -49,6 +49,8 @@ void UART_Send(const void *pBuffer, uint32_t Size) {
 void _putchar(char c) { UART_Send((uint8_t *)&c, 1); }
 
 // CNDTR counts down from the ring size and reloads in circular mode.
-uint16_t UART_RxHead(void) {
+static uint16_t UART_RxHead(void) {
   return (uint16_t)((UART_RX_RING_BYTES - RX_DMA->CNDTR) % UART_RX_RING_BYTES);
 }
+
+const SerialPort UART_PORT = {gUartRxRing, UART_RX_RING_BYTES, UART_RxHead, UART_Send};

@@ -3,9 +3,9 @@
 
 #include <stdbool.h>
 
-// PC link protocol over hal/uart.h (tools/resources.py): framing,
-// obfuscation and the command set.
-bool UART_IsCommandAvailable(void);
-void UART_HandleCommand(void);
+// PC link protocol over the board's serial ports (hal/serial.h,
+// tools/resources.py): framing, obfuscation and the command set.
+bool LINK_IsCommandAvailable(void);
+void LINK_HandleCommand(void);
 
 #endif
