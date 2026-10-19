@@ -1,9 +1,29 @@
 #include "hal/spi.h"
+#include "drivers/dp32g030/spi.h"
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
 #include "drivers/dp32g030/irq.h"
 #include "drivers/dp32g030/syscon.h"
 
-void SPI0_Init(void) {
+typedef struct {
+  uint8_t MSTR;
+  uint8_t SPR;
+  uint8_t CPHA;
+  uint8_t CPOL;
+  uint8_t LSB;
+  uint8_t TF_CLR;
+  uint8_t RF_CLR;
+  uint8_t TXFIFO_HFULL;
+  uint8_t TXFIFO_EMPTY;
+  uint8_t RXFIFO_HFULL;
+  uint8_t RXFIFO_FULL;
+  uint8_t RXFIFO_OVF;
+} SPI_Config_t;
+
+static void SPI_Disable(volatile uint32_t *pCR);
+static void SPI_Configure(volatile SPI_Port_t *pPort, SPI_Config_t *pConfig);
+static void SPI_Enable(volatile uint32_t *pCR);
+
+void SPI_Init(void) {
   SPI_Config_t Config;
 
   SPI_Disable(&SPI0->CR);
@@ -25,7 +45,7 @@ void SPI0_Init(void) {
   SPI_Enable(&SPI0->CR);
 }
 
-void SPI_WaitForUndocumentedTxFifoStatusBit(void) {
+void SPI_Flush(void) {
   uint32_t Timeout;
 
   Timeout = 0;
@@ -38,11 +58,11 @@ void SPI_WaitForUndocumentedTxFifoStatusBit(void) {
   } while (Timeout <= 100000);
 }
 
-void SPI_Disable(volatile uint32_t *pCR) {
+static void SPI_Disable(volatile uint32_t *pCR) {
   *pCR = (*pCR & ~SPI_CR_SPE_MASK) | SPI_CR_SPE_BITS_DISABLE;
 }
 
-void SPI_Configure(volatile SPI_Port_t *pPort, SPI_Config_t *pConfig) {
+static void SPI_Configure(volatile SPI_Port_t *pPort, SPI_Config_t *pConfig) {
   if (pPort == SPI0) {
     SYSCON_DEV_CLK_GATE =
         (SYSCON_DEV_CLK_GATE & ~SYSCON_DEV_CLK_GATE_SPI0_MASK) |
@@ -88,14 +108,22 @@ void SPI_Configure(volatile SPI_Port_t *pPort, SPI_Config_t *pConfig) {
   }
 }
 
-void SPI_ToggleMasterMode(volatile uint32_t *pCR, bool bIsMaster) {
-  if (bIsMaster) {
-    *pCR = (*pCR & ~SPI_CR_MSR_SSN_MASK) | SPI_CR_MSR_SSN_BITS_ENABLE;
+// MSR_SSN disabled drives SSN low, selecting the display.
+void SPI_Select(bool selected) {
+  if (selected) {
+    SPI0->CR = (SPI0->CR & ~SPI_CR_MSR_SSN_MASK) | SPI_CR_MSR_SSN_BITS_DISABLE;
   } else {
-    *pCR = (*pCR & ~SPI_CR_MSR_SSN_MASK) | SPI_CR_MSR_SSN_BITS_DISABLE;
+    SPI0->CR = (SPI0->CR & ~SPI_CR_MSR_SSN_MASK) | SPI_CR_MSR_SSN_BITS_ENABLE;
   }
 }
 
-void SPI_Enable(volatile uint32_t *pCR) {
+void SPI_Write(uint8_t value) {
+  while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
+    continue;
+  }
+  SPI0->WDR = value;
+}
+
+static void SPI_Enable(volatile uint32_t *pCR) {
   *pCR = (*pCR & ~SPI_CR_SPE_MASK) | SPI_CR_SPE_BITS_ENABLE;
 }

@@ -8,5 +8,6 @@
 void SYS_DelayMs(uint32_t Delay);
 void SYS_ConfigureClocks(void);
 void SYS_ConfigureSysCon(void);
+void SYS_Reset(void);
 
 #endif

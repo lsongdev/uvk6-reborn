@@ -2,8 +2,11 @@
 #include "drivers/dp32g030/pmu.h"
 #include "drivers/dp32g030/syscon.h"
 #include "hal/systick.h"
+#include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
 
 void SYS_DelayMs(uint32_t Delay) { TIMER_DelayUs(Delay * 1000); }
+
+void SYS_Reset(void) { NVIC_SystemReset(); }
 
 void SYS_ConfigureClocks(void) {
   // Set source clock from external crystal

@@ -1,6 +1,5 @@
 #include "core/resource.h"
 #include "drivers/si473x/si473x.h"
-#include "drivers/dp32g030/gpio.h"
 #include "core/misc.h"
 #include "core/settings.h"
 #include "hal/eeprom.h"
@@ -13,8 +12,8 @@
 
 static const uint8_t SI47XX_I2C_ADDR = 0x22;
 
-#define RST_HIGH GPIO_ClearBit(&GPIOB->DATA, GPIOB_PIN_BK1080)
-#define RST_LOW GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_BK1080)
+#define RST_HIGH GPIO_Write(GPIO_BK1080, false)
+#define RST_LOW GPIO_Write(GPIO_BK1080, true)
 
 RSQStatus rsqStatus;
 static SsbMode currentSsbMode;

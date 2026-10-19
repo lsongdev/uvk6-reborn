@@ -19,8 +19,8 @@ int EEPROM_ReadBuffer(uint32_t address, void *data, uint16_t size) {
   if (!readOK) return -1;
   memcpy(data,calibration,size);return 0;
 }
-uint8_t GPIO_CheckBit(volatile const uint32_t *reg, uint8_t bit) {
-  (void)reg;assert(bit==GPIOC_PIN_PTT);return !pressed;
+bool GPIO_Read(GpioLine line) {
+  assert(line==GPIO_PTT);return !pressed;
 }
 void BK4819_ToggleGpioOut(BK4819_GPIO_PIN_t pin, bool on) {
   if(pin==BK4819_GPIO1_PIN29_PA_ENABLE) {
