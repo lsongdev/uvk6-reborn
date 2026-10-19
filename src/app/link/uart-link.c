@@ -414,6 +414,8 @@ static bool commandOn(uint8_t index) {
   return true;
 }
 
+const SerialPort *LINK_CommandPort(void) { return BOARD_SERIAL_PORTS[replyPort]; }
+
 // Ports take turns, so a busy one cannot starve the other.
 bool LINK_IsCommandAvailable(void) {
   static uint8_t next;

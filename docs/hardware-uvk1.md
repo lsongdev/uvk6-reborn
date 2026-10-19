@@ -134,7 +134,7 @@ K1 的 band 2／5 High 档（`91 96 91`）与本项目 `tools/resources.py` 中�
 
 首次实机流程和备份命令见 [UV-K1 首启与只读备份](uvk1-bringup.md)。原先规定「两次完整读取并核对一致前不实现外部 Flash 写入」；2026-10-19 用户决定不等整片双读、直接开放写入。整片仍只读到 `0x0ACFFF`，更高地址的原厂内容未备份，写入范围因此限定在已确认为空白的扇区内。
 
-- USB CDC：`drivers/py32f071/usb.c` 是本项目自写的精简 CDC-ACM 设备驱动（寄存器按 Puya 的 CherryUSB 移植层），时钟沿用 Bootloader 留下的 48 MHz HSI。VID:PID 为 pid.codes 测试号 `1209:0001`，厂商／产品字串 `uvk6-reborn`／`UV-K1 Reborn`，序列号取芯片 UID，不冒用原厂 `36B7:0001`「K1 CPS」。PC 链路协议与 K 头 UART 相同，回复走请求所在的线路；主机未打开端口（DTR）时输出直接丢弃，不阻塞主循环。刷机仍须走 K 头线（Bootloader 只认 UART）。
+- USB CDC：`drivers/py32f071/usb.c` 是本项目自写的精简 CDC-ACM 设备驱动（寄存器按 Puya 的 CherryUSB 移植层），时钟沿用 Bootloader 留下的 48 MHz HSI。VID:PID 为 pid.codes 测试号 `1209:0001`，厂商／产品字串 `uvk6-reborn`／`UV-K1 Reborn`，序列号取芯片 UID，不冒用原厂 `36B7:0001`「K1 CPS」。PC 链路协议与 K 头 UART 相同，回复走请求所在的线路；主机未打开端口（DTR）时输出直接丢弃，不阻塞主循环。K 头线通信后 5 秒内按键暂停（K 头线同时是麦克风、耳机与 PTT 线路，防止误触发和通信中发射）；USB 通信不暂停按键。刷机仍须走 K 头线（Bootloader 只认 UART）。
 - 2026-10-20 实机：macOS 枚举为 `/dev/cu.usbmodem7262025C1`；经 USB 的 `info`、`stats`、`rf` 正常，64 KiB 读取 13.8 s（约 4.7 KB/s，受每次 128 B 的请求往返限制），其中校准扇区与备份逐字节一致。
 
 后续工作：K1 能力/菜单适配。

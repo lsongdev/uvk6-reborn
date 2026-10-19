@@ -81,4 +81,4 @@ void _putchar(char c) { UART_Send((uint8_t *)&c, 1); }
 
 static uint16_t UART_RxHead(void) { return DMA_CH0->ST & 0xFFFU; }
 
-const SerialPort UART_PORT = {gUartRxRing, UART_RX_RING_BYTES, UART_RxHead, UART_Send};
+const SerialPort UART_PORT = {gUartRxRing, UART_RX_RING_BYTES, UART_RxHead, UART_Send, true};

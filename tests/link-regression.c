@@ -32,8 +32,8 @@ static uint16_t head0(void) { return fake[0].head; }
 static uint16_t head1(void) { return fake[1].head; }
 static void send0(const void *d, uint32_t n) { memcpy(fake[0].sent + fake[0].sentBytes, d, n); fake[0].sentBytes += n; }
 static void send1(const void *d, uint32_t n) { memcpy(fake[1].sent + fake[1].sentBytes, d, n); fake[1].sentBytes += n; }
-static const SerialPort port0 = {fake[0].ring, sizeof(fake[0].ring), head0, send0};
-static const SerialPort port1 = {fake[1].ring, sizeof(fake[1].ring), head1, send1};
+static const SerialPort port0 = {fake[0].ring, sizeof(fake[0].ring), head0, send0, true};
+static const SerialPort port1 = {fake[1].ring, sizeof(fake[1].ring), head1, send1, false};
 const SerialPort *const BOARD_SERIAL_PORTS[] = {&port0, &port1};
 const uint8_t BOARD_SERIAL_PORT_COUNT = 2;
 
@@ -73,12 +73,16 @@ static uint16_t replyId(unsigned p, bool obfuscated) {
 int main(void) {
   // A plain hello on the UART answers on the UART only.
   hello(0, 0x11111111u, false);
-  assert(handleAll() == 1);
+  assert(LINK_IsCommandAvailable() && LINK_CommandPort() == &port0 && LINK_CommandPort()->on_audio_jack);
+  LINK_HandleCommand();
+  assert(!LINK_IsCommandAvailable());
   assert(fake[1].sentBytes == 0 && replyId(0, false) == 0x0515);
   // An obfuscated hello on USB switches only USB to obfuscation.
   fake[0].sentBytes = 0;
   hello(1, 0x22222222u, true);
-  assert(handleAll() == 1);
+  assert(LINK_IsCommandAvailable() && LINK_CommandPort() == &port1 && !LINK_CommandPort()->on_audio_jack);
+  LINK_HandleCommand();
+  assert(!LINK_IsCommandAvailable());
   assert(fake[0].sentBytes == 0 && replyId(1, true) == 0x0515);
   // Both ports at once, the second wrapping its ring: one reply each.
   fake[0].sentBytes = fake[1].sentBytes = 0;

@@ -53,4 +53,4 @@ static uint16_t UART_RxHead(void) {
   return (uint16_t)((UART_RX_RING_BYTES - RX_DMA->CNDTR) % UART_RX_RING_BYTES);
 }
 
-const SerialPort UART_PORT = {gUartRxRing, UART_RX_RING_BYTES, UART_RxHead, UART_Send};
+const SerialPort UART_PORT = {gUartRxRing, UART_RX_RING_BYTES, UART_RxHead, UART_Send, true};

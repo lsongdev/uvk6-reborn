@@ -339,7 +339,7 @@ static void usbSend(const void *data, uint32_t size) {
   __disable_irq(); kick(); __enable_irq();
 }
 
-const SerialPort USB_PORT = {rxRing, RX_RING_BYTES, usbHead, usbSend};
+const SerialPort USB_PORT = {rxRing, RX_RING_BYTES, usbHead, usbSend, false};
 
 void USB_Init(void) {
   RCC->APBENR1 |= RCC_APBENR1_USBEN;
