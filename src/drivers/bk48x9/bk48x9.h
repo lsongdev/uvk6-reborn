@@ -93,6 +93,8 @@ typedef struct {
   uint16_t chip_id;
   bool am;
   uint16_t bandwidth_mask; // Bits correspond to BK48X9_FilterBandwidth_t.
+  // Recommended squelch open (0..7) and close (0..3) delays for this chip.
+  uint8_t squelch_open_delay, squelch_close_delay;
 } BK48X9Capabilities;
 BK48X9Capabilities BK48X9_GetCapabilities(void);
 // Mute this receiver, retaining the chip-specific RX DSP/DAC requirements.

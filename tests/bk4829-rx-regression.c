@@ -48,7 +48,13 @@ int main(void) {
   BK48X9_SetFilterBandwidth(BK48X9_FILTER_BW_6k); assert(regs[0x43] == 0x2058);
   BK48X9_SetFilterBandwidth(BK48X9_FILTER_BW_12k); assert(regs[0x43] == 0x4048);
   BK48X9_SetFilterBandwidth(BK48X9_FILTER_BW_26k); assert(regs[0x43] == 0x3028);
+  // User delays reach REG_4E; Auto resolves to the reference 5/3.
   BK48X9_SetupSquelch((SQL){.ro=50,.rc=40,.no=70,.nc=38,.go=16,.gc=8}, 1, 1);
+  assert(regs[0x4E] == 0x4B10);
+  BK48X9Capabilities caps = BK48X9_GetCapabilities();
+  assert(caps.am && caps.squelch_open_delay == 5 && caps.squelch_close_delay == 3);
+  BK48X9_SetupSquelch((SQL){.ro=50,.rc=40,.no=70,.nc=38,.go=16,.gc=8},
+                      caps.squelch_open_delay, caps.squelch_close_delay);
   assert(regs[0x4D] == 0xA008 && regs[0x4E] == 0x6F10 && regs[0x4F] == 0x2646 && regs[0x78] == 0x3228);
   BK48X9_CssOff();
   event = BK48X9_REG_02_SQUELCH_LOST;
@@ -65,8 +71,19 @@ int main(void) {
   assert(regs[0x3F] == (BK48X9_REG_3F_SQUELCH_FOUND | BK48X9_REG_3F_SQUELCH_LOST));
   BK48X9_SetCTCSSFrequency(670); assert(regs[0x51] == 0x9040 && regs[0x07] == 1383);
   BK48X9_SetCDCSSCodeWord(0x123456); assert(regs[0x51] == 0xA033 && regs[0x07] == 2775);
+  // AM: stock demodulator values, AFC off, AM filter preset below 26k.
+  BK48X9_SetRxMode(true);
+  assert((regs[0x31] & 1) && regs[0x42] == 0x6F5C && regs[0x2A] == 0x7434 && (regs[0x73] & 0x10));
+  BK48X9_SetFilterBandwidth(BK48X9_FILTER_BW_6k); assert(regs[0x43] == 0x345C);
+  BK48X9_SetFilterBandwidth(BK48X9_FILTER_BW_12k); assert(regs[0x43] == 0x345C);
+  BK48X9_SetFilterBandwidth(BK48X9_FILTER_BW_26k); assert(regs[0x43] == 0x3028);
+  BK48X9_SetRxMode(false);
+  assert(!(regs[0x31] & 1) && regs[0x42] == 0x6B5A && !(regs[0x73] & 0x10));
+  BK48X9_SetFilterBandwidth(BK48X9_FILTER_BW_6k); assert(regs[0x43] == 0x2058);
 #else
   // The BK4819 backend keeps its original VCO restart and AF routing.
+  BK48X9Capabilities caps = BK48X9_GetCapabilities();
+  assert(caps.am && caps.squelch_open_delay == 1 && caps.squelch_close_delay == 1); // Auto = K6's 1/1.
   BK48X9_RX_TurnOn(); BK48X9_TuneTo(14550000u, true);
   assert(rxTransitions[0] == 0x0200 && rxTransitions[2] == 0x0200);
   BK48X9_SetAF(BK48X9_AF_FM); assert(regs[0x47] == 0x6140);

@@ -63,11 +63,10 @@ int main(int argc, char **argv) {
   choose(KEY_2); capture(); // Receive
   press(KEY_2);press(KEY_STAR);capture(); // SQL delay is editable directly within Receive.
   assert(active_menu==&receiveMenu && menu_stack_top==1);
-  press(KEY_4);capture(); // SI hardware option also stays in Receive.
-  unsigned before=requests;
-  capabilities.si=false;
-  press(KEY_STAR); assert(requests==before && !strcmp(notice,"No SI4732"));
-  capabilities.si=true;
+  // The SI4732 option exists only in builds with that chip.
+  assert(receiveMenu.num_items==4u+UVK6_ENABLE_SI4732);
+  assert(!strcmp(receiveItems[3].name,UVK6_ENABLE_SI4732 ? "SI4732 idle" : "Filter split"));
+  if (UVK6_ENABLE_SI4732) { press(KEY_4);capture(); }
   press(KEY_EXIT);
   choose(KEY_3); capture(); // Transmit
   press(KEY_EXIT); choose(KEY_5); capture(); // Battery
@@ -92,11 +91,16 @@ int main(int argc, char **argv) {
   press(KEY_EXIT); choose(KEY_7); // Channels opens the channel list.
   assert(lastScreen==&channelsScreen && active_menu==&settingsMenu);
   choose(KEY_8); capture(); // About is last and also holds the former System items.
-  assert(active_menu==&aboutMenu && menu_stack_top==1 && active_menu->num_items==9);
+  // SSB patch status only in SI4732 builds; the FM chip names the fitted part.
+  const KEY_Code_t resetKey=(KEY_Code_t)(7u+UVK6_ENABLE_SI4732);
+  assert(active_menu==&aboutMenu && menu_stack_top==1 && active_menu->num_items==resetKey);
+  assert(!strcmp(aboutItems[1].name,"Storage") && !strcmp(aboutItems[3].name,"FM chip"));
+  char info[16]; aboutItems[3].get_value_text(&aboutItems[3],info,sizeof(info));
+  assert(!strcmp(info,UVK6_ENABLE_SI4732 ? "SI4732" : "BK1080"));
   assert(menuItems[ARRAY_SIZE(menuItems)-1].submenu==&aboutMenu);
-  choose(KEY_9); capture(); // Reset confirmation
+  choose(resetKey); capture(); // Reset confirmation
   press(KEY_EXIT); assert(!resetConfirm && saves==1);
-  choose(KEY_9);press(KEY_MENU);assert(saves==2 && !resetConfirm);
+  choose(resetKey);press(KEY_MENU);assert(saves==2 && !resetConfirm);
   assert(gDeviceConfig.preferences.battery_calibration==2100);
   // A failed reapplication restores the prior engineering preferences.
   gDeviceConfig.preferences.sql_open_time=3;

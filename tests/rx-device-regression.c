@@ -64,7 +64,8 @@ void BK48X9_SetAGC(uint8_t i) { (void)i; }
 void BK48X9_SetAFC(uint8_t n) { (void)n; }
 void BK48X9_SetAFCSpeed(uint8_t n) { (void)n; }
 static SQL lastSquelch;
-void BK48X9_SetupSquelch(SQL sq, uint8_t a, uint8_t b) { lastSquelch = sq; (void)a; (void)b; }
+static uint8_t lastOpenDelay, lastCloseDelay;
+void BK48X9_SetupSquelch(SQL sq, uint8_t a, uint8_t b) { lastSquelch = sq; lastOpenDelay = a; lastCloseDelay = b; }
 // UV-K1 calibration rows: 0x00 UHF and 0x60 VHF, six rows of 16 bytes.
 static uint8_t calibration[0x200];
 static bool calibrationReadable = true;
@@ -155,8 +156,8 @@ bool BOARD_BroadcastUsesBkVhfPath(void) { return sharedBkPath; }
 bool isSi4732On;
 // The board build fixes the chips: K6 SI4732 + BK4819, K1 BK1080 + BK4829.
 BK48X9Capabilities BK48X9_GetCapabilities(void) {
-  return UVK6_ENABLE_SI4732 ? (BK48X9Capabilities){4819, true, 0x3FF}
-                            : (BK48X9Capabilities){4829, false, (1u << 0) | (1u << 4) | (1u << 9)};
+  return UVK6_ENABLE_SI4732 ? (BK48X9Capabilities){4819, true, 0x3FF, 1, 1}
+                            : (BK48X9Capabilities){4829, true, (1u << 0) | (1u << 4) | (1u << 9), 5, 3};
 }
 bool RESOURCE_SsbPatchPresent(void) { return true; }
 bool RESOURCE_SsbPatchRead(uint16_t offset, uint8_t *out, uint16_t size) {
@@ -211,14 +212,21 @@ static void testDetectionAndInit(void) {
 
 static void testUvk1(void) {
   ReceiverCapabilities c = RX_DEVICE_Capabilities();
-  assert(!c.si && !c.ssb_patch && c.broadcast && !c.bk_am);
+  assert(!c.si && !c.ssb_patch && c.broadcast && c.bk_am);
   assert(c.bk_bandwidth_mask == (RX_BK_BANDWIDTH_6K | RX_BK_BANDWIDTH_12K | RX_BK_BANDWIDTH_26K));
-  RxPlan am = plan(125000000, RX_AM, RX_DEVICE_BK);
-  assert(!RX_DEVICE_Activate(&am));
   assert(patchSources == 0); // No SI4732 driver path in this build.
   RxPlan unsupported = plan(100000000, RX_WFM, RX_DEVICE_SI);
   assert(!RX_DEVICE_Activate(&unsupported));
   assert(!siTunes && !bkTunes && !bkIdle && !siPowerDowns);
+  // BK4829 AM (airband), and Auto squelch delays resolve to its 5/3.
+  gDeviceConfig.preferences.sql_open_time = PREFERENCES_SQL_OPEN_AUTO;
+  gDeviceConfig.preferences.sql_close_time = PREFERENCES_SQL_CLOSE_AUTO;
+  RxPlan am = plan(125000000, RX_AM, RX_DEVICE_BK);
+  assert(RX_DEVICE_Activate(&am) && bkTunes == 1 && lastOpenDelay == 5 && lastCloseDelay == 3);
+  gDeviceConfig.preferences.sql_open_time = 2; gDeviceConfig.preferences.sql_close_time = 0;
+  assert(RX_DEVICE_Activate(&am) && lastOpenDelay == 2 && lastCloseDelay == 0); // User levels apply.
+  gDeviceConfig.preferences.sql_open_time = gDeviceConfig.preferences.sql_close_time = 0;
+  bkTunes = bkModes = 0;
   RdsPacket packet;
   assert(!RX_DEVICE_ReadRDS(&packet, false));
   uint16_t rssi; bool found;

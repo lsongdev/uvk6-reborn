@@ -9,6 +9,7 @@
 #include "core/measurements.h"
 #include "radio/receiver.h"
 #include "hal/storage.h"
+#include "hal/features.h"
 #include "devices/tx-device.h"
 #include "ui/menu.h"
 #include "ui/graphics.h"
@@ -20,16 +21,10 @@ static bool resetConfirm;
 static uint8_t oldOpen, oldClose, oldBoundary;
 
 static void getValue(const MenuItem *item, char *out, uint8_t size) {
-  if (item->setting == SETTING_SI4732POWEROFF && !RECEIVER_Capabilities().si) {
-    TEXT_Copy(out,size,"No SI4732"); return;
-  }
   SETTINGS_GetValueText(item->setting,out,size);
 }
 static void changeValue(const MenuItem *item, bool up) {
   notice = NULL;
-  if (item->setting == SETTING_SI4732POWEROFF && !RECEIVER_Capabilities().si) {
-    notice = "No SI4732"; return;
-  }
   SETTINGS_IncDecValue(item->setting,up);
 }
 static void doCalibrate(uint32_t value) {
@@ -77,7 +72,9 @@ static const MenuItem receiveItems[] = {
     {"Slot count",0,getSlotCount,changeSlotCount},
     VALUE("SQL open delay",SETTING_SQLOPENTIME),
     VALUE("SQL close delay",SETTING_SQLCLOSETIME),
+#if UVK6_ENABLE_SI4732
     VALUE("SI4732 idle",SETTING_SI4732POWEROFF),
+#endif
     VALUE("Filter split",SETTING_BOUND240_280),
 };
 MENU_DEF(receiveMenu,"Receive",receiveItems);
@@ -135,8 +132,7 @@ static void getInfo(const MenuItem *item, char *out, uint8_t size) {
     break;
   case 1: TEXT_Number(&t,STORAGE_Capacity()/1024u,1,10); TEXT_Add(&t," KiB"); break;
   case 2: TEXT_Add(&t,"UVR2 "); TEXT_Number(&t,CONFIG_STORE_FORMAT,1,10); break;
-  case 3: TEXT_Add(&t,capabilities.si ? "Present" : "Missing"); break;
-  case 4: TEXT_Add(&t,capabilities.broadcast ? "Present" : "Missing"); break;
+  case 3: TEXT_Add(&t,UVK6_ENABLE_SI4732 ? "SI4732" : "BK1080"); break;
   default: TEXT_Add(&t,capabilities.ssb_patch ? "Present" : "Missing"); break;
   }
 }
@@ -146,8 +142,11 @@ static bool openChannels(const MenuItem *item, KEY_Code_t key, Key_State_t state
   SCREEN_Push(&channelsScreen); return true;
 }
 static const MenuItem aboutItems[] = {
-    {"Firmware",0,getInfo}, {"EEPROM",1,getInfo}, {"Config",2,getInfo},
-    {"SI4732",3,getInfo}, {"BK1080",4,getInfo}, {"SSB patch",5,getInfo},
+    {"Firmware",0,getInfo}, {"Storage",1,getInfo}, {"Config",2,getInfo},
+    {"FM chip",3,getInfo},
+#if UVK6_ENABLE_SI4732
+    {"SSB patch",4,getInfo},
+#endif
     {"TX status",.get_value_text=getTxStatus},
     {"Save status",.get_value_text=getSaveStatus,.action=saveNow},
     {"Reset prefs",.action=resetPreferences},

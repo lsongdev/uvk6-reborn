@@ -204,6 +204,11 @@ uint16_t RX_DEVICE_SpectrumRssi(void) { return BK48X9_GetRSSI(); }
 void RX_DEVICE_SpectrumStop(void) { RX_DEVICE_InvalidateBk(); }
 #endif
 
+// "Auto" squelch delays use the chip's own recommendation.
+static uint8_t sqlDelay(uint8_t preference, uint8_t automatic, uint8_t recommended) {
+  return preference >= automatic ? recommended : preference;
+}
+
 static bool preparePlan(const RxPlan *plan, bool foreground) {
   if (!plan || plan->frequency_hz < RADIO_MIN_HZ ||
       plan->frequency_hz > RADIO_MAX_HZ ||
@@ -288,8 +293,10 @@ static bool preparePlan(const RxPlan *plan, bool foreground) {
       BK48X9_SetAFC(8);
       BK48X9_SetAFCSpeed(63);
       BK48X9_SetupSquelch(squelchFor(plan->parameters.squelch, plan->frequency_hz),
-                          gDeviceConfig.preferences.sql_open_time,
-                          gDeviceConfig.preferences.sql_close_time);
+                          sqlDelay(gDeviceConfig.preferences.sql_open_time,
+                                   PREFERENCES_SQL_OPEN_AUTO, BK48X9_GetCapabilities().squelch_open_delay),
+                          sqlDelay(gDeviceConfig.preferences.sql_close_time,
+                                   PREFERENCES_SQL_CLOSE_AUTO, BK48X9_GetCapabilities().squelch_close_delay));
     }
     if (!fastBk || ((oldBkFrequency / 10u < PREFERENCES_FilterBound()) !=
                     (frequency < PREFERENCES_FilterBound())))

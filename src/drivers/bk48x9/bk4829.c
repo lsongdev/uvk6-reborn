@@ -4,7 +4,9 @@
 
 // Statically selected chip backend; register values preserved by trace regressions.
 const BK48X9Chip BK48X9_CHIP={
-  .capabilities={4829,false,(1u<<0)|(1u<<4)|(1u<<9)},
+  // Reference K1 squelch timing (open 5, close 3): shorter delays flipped
+  // the squelch on every flutter of a strong carrier on this radio.
+  .capabilities={4829,true,(1u<<0)|(1u<<4)|(1u<<9),5,3},
   .squelch_interrupts=0x000C,.vco_restart=0,.bus_delay_us=1,
   .lna_attenuation={28,24,19,0},
 };
@@ -26,20 +28,21 @@ void BK48X9_SetAGC(uint8_t gainIndex) {
 
 }
 
+// Demodulator last configured; AM narrows with its own filter preset.
+static bool amDemodulator;
+
 void BK48X9_SetFilterBandwidth(BK48X9_FilterBandwidth_t bw) {
-
-    // Project nominal width labels select the three reference presets.
-    // These labels are not measurements of the analog filter's -3 dB width.
-    uint16_t value;
-    switch (bw) {
-    case BK48X9_FILTER_BW_6k: value = 0x2058; break;
-    case BK48X9_FILTER_BW_12k: value = 0x4048; break;
-    case BK48X9_FILTER_BW_26k: value = 0x3028; break;
-    default: return;
-    }
-    BK48X9_WriteRegister(BK48X9_REG_43, value);
-    return;
-
+  // Project nominal width labels select the reference presets. These labels
+  // are not measurements of the analog filter's -3 dB width. AM uses the
+  // stock AM preset below 26k and the wide preset at 26k (reference 5fedc09).
+  uint16_t value;
+  switch (bw) {
+  case BK48X9_FILTER_BW_6k: value = amDemodulator ? 0x345C : 0x2058; break;
+  case BK48X9_FILTER_BW_12k: value = amDemodulator ? 0x345C : 0x4048; break;
+  case BK48X9_FILTER_BW_26k: value = 0x3028; break;
+  default: return;
+  }
+  BK48X9_WriteRegister(BK48X9_REG_43, value);
 }
 
 void BK48X9_SetAF(BK48X9_AF_Type_t af) { BK48X9_WriteRegister(BK48X9_REG_47,0x6042u | (af << 8)); }
@@ -50,16 +53,9 @@ void BK48X9_SetupSquelch(SQL sq, uint8_t delayOpen, uint8_t delayClose) {
   sq.nc = Clamp(sq.nc, 0, 127);
 
   BK48X9_WriteRegister(BK48X9_REG_4D, 0xA000 | sq.gc);
-  // BK4829: the reference K1 squelch timing (open 5, close 3) and bit 8,
-  // which the stock BK4829 firmware sets; shorter delays flip the squelch
-  // on every flutter of a strong carrier. The SQL time preferences apply to
-  // the BK4819 only.
-
-    delayOpen = 5;
-    delayClose = 3;
-
-  BK48X9_WriteRegister(BK48X9_REG_4E, (1u << 14) | (delayOpen << 11) |
-                                          (delayClose << 9) | (1u << 8) | sq.go);
+  // Bit 8 as the stock BK4829 firmware sets it.
+  BK48X9_WriteRegister(BK48X9_REG_4E, (1u << 14) | ((delayOpen & 7u) << 11) |
+                                          ((delayClose & 3u) << 9) | (1u << 8) | sq.go);
   BK48X9_WriteRegister(BK48X9_REG_4F, (sq.nc << 8) | sq.no);
   BK48X9_WriteRegister(BK48X9_REG_78, (sq.ro << 8) | sq.rc);
 }
@@ -137,22 +133,25 @@ void BK48X9_ConfigureTxAudio(uint8_t mic,uint16_t deviation) {
 }
 
 bool BK48X9_ConfigureDemodulator(bool am) {
-  if (am) return false;
-
-    // Reference RADIO_SetModulation(FM) on the K1 (5fedc09), whose AM/FM
-    // register values it copies from the stock UV-K1 firmware: demodulator,
-    // FM audio profile (0x54/0x55), 0x3D, AF DAC gain 15 and AFC on.
-    BK48X9_WriteRegister(BK48X9_REG_31, BK48X9_ReadRegister(BK48X9_REG_31) & ~1u);
-    BK48X9_WriteRegister(0x42, 0x6B5A);
-    BK48X9_WriteRegister(0x2A, 0x7400);
+  // Reference RADIO_SetModulation on the K1 (5fedc09), whose AM/FM register
+  // values it copies from the stock UV-K1 firmware: demodulator, audio
+  // profile (0x54/0x55), 0x3D, AF DAC gain 15, AFC on for FM only. AM keeps
+  // 0x2B/0x2F as FM left them, as the stock firmware does.
+  uint16_t reg31 = BK48X9_ReadRegister(BK48X9_REG_31);
+  BK48X9_WriteRegister(BK48X9_REG_31, am ? reg31 | 1u : reg31 & ~1u);
+  BK48X9_WriteRegister(0x42, am ? 0x6F5C : 0x6B5A);
+  BK48X9_WriteRegister(0x2A, am ? 0x7434 : 0x7400);
+  if (!am) {
     BK48X9_WriteRegister(BK48X9_REG_2B, 0x0000);
     BK48X9_WriteRegister(0x2F, 0x9890);
-    BK48X9_WriteRegister(0x54, 0x9009);
-    BK48X9_WriteRegister(0x55, 0x31A9);
-    BK48X9_WriteRegister(BK48X9_REG_48, (BK48X9_ReadRegister(BK48X9_REG_48) & ~0xFu) | 0xFu);
-    BK48X9_WriteRegister(0x3D, 0x2AAB);
-    BK48X9_WriteRegister(0x73, BK48X9_ReadRegister(0x73) & ~(1u << 4));
-
+  }
+  BK48X9_WriteRegister(0x54, 0x9009);
+  BK48X9_WriteRegister(0x55, 0x31A9);
+  BK48X9_WriteRegister(BK48X9_REG_48, (BK48X9_ReadRegister(BK48X9_REG_48) & ~0xFu) | 0xFu);
+  BK48X9_WriteRegister(0x3D, 0x2AAB);
+  uint16_t reg73 = BK48X9_ReadRegister(0x73);
+  BK48X9_WriteRegister(0x73, am ? reg73 | (1u << 4) : reg73 & ~(1u << 4));
+  amDemodulator = am;
   return true;
 }
 
