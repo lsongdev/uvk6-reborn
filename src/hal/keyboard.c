@@ -2,6 +2,7 @@
 #include "drivers/dp32g030/gpio.h"
 #include "hal/scheduler.h"
 #include "hal/gpio.h"
+#include "hal/gpio-dp32g030.h"
 #include "hal/systick.h"
 
 static void postKey(KEY_Code_t key, Key_State_t state);
@@ -82,7 +83,7 @@ static Keyboard keyboard[5] = {
 
 static void HandlePttKey(void) {
   uint32_t currentTick = Now();
-  mKeyPtt = !GPIO_CheckBit(&GPIOC->DATA, GPIOC_PIN_PTT);
+  mKeyPtt = !GPIO_Read(GPIO_PTT);
 
   if (mKeyPtt) {
     if (mPrevStatePtt == KEY_RELEASED) {

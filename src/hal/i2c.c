@@ -2,7 +2,7 @@
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
 #include "drivers/dp32g030/gpio.h"
 #include "drivers/dp32g030/portcon.h"
-#include "hal/gpio.h"
+#include "hal/gpio-dp32g030.h"
 #include "hal/systick.h"
 
 // Clock-stretch timeout is sticky until the next START.

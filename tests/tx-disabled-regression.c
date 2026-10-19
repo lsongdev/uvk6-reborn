@@ -4,9 +4,7 @@
 DeviceConfig gDeviceConfig = {.preferences=CONFIG_DEFAULT_PREFERENCES};
 uint16_t gBatteryVoltage=760;
 static unsigned paStarts,paStops;
-uint8_t GPIO_CheckBit(volatile const uint32_t *reg, uint8_t pin) {
-  (void)reg; (void)pin; return 0;
-}
+bool GPIO_Read(GpioLine line) { (void)line; return false; }
 void BK4819_ToggleGpioOut(BK4819_GPIO_PIN_t pin, bool enable) {
   assert(pin==BK4819_GPIO1_PIN29_PA_ENABLE);
   if(enable) ++paStarts; else ++paStops;

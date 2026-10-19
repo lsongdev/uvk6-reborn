@@ -1,6 +1,4 @@
 #include "hal/led.h"
-#include "hal/gpio.h"
-#include "drivers/dp32g030/gpio.h"
 #include "drivers/bk4819/bk4819.h"
 void LED_SetGreen(bool on) {
   BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_GREEN, on);

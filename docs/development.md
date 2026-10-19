@@ -96,6 +96,8 @@ ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包�
 
 依赖只向下。HAL 抽象按键、屏幕、LED、音频、背光、EEPROM／总线等资源，也集中跨芯片适配；driver 不读取产品配置或实现菜单。上层不依赖芯片单位、增益索引或寄存器号。
 
+芯片驱动（drivers/ 下除 dp32g030 外）和 hal/ 以外的代码不得包含 MCU 寄存器头：单根信号经 hal/gpio.h 的 `GpioLine`（`GPIO_Write`／`GPIO_Read`／`GPIO_SetInput`），显示总线经 hal/spi.h，复位经 `SYS_Reset`，整机初始化经 `BOARD_Init`。端口、引脚号与寄存器只出现在 hal/ 的板级实现中（hal/gpio.c 的线路表、hal/gpio-dp32g030.h、board.c、keyboard.c、i2c.c 等），换板时只替换这些文件。
+
 selectedSlot 是操作对象，receivingSlot 是接收归属，txSlot 可是回话对象，gReceiver.plan 是实际硬件镜像，runtime.current 是接收事务的运行方案。临时调谐不得把硬件镜像回写用户记忆。MR 的有效参数只读，保存频道是独立显式动作。
 
 主循环每轮先 RADIO_TxSafetyUpdate，再保存调度与 RADIO_Update，最后页面更新／绘制。PTT release 总是优先处理，单项接收的普通静噪轮询在守听拥有音频时禁用。离开主屏会取消草稿、Seek、FC 与 PTT，接收和守听继续。

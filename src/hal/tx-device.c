@@ -6,7 +6,6 @@
 #include "hal/gpio.h"
 #include "hal/rx-device.h"
 #include "hal/system.h"
-#include "drivers/dp32g030/gpio.h"
 #include "drivers/bk4819/bk4819.h"
 #include "core/device-config.h"
 #include "core/battery.h"
@@ -64,7 +63,7 @@ TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
 #endif
 
 bool TX_DEVICE_PttPressed(void) {
-  return !GPIO_CheckBit(&GPIOC->DATA, GPIOC_PIN_PTT);
+  return !GPIO_Read(GPIO_PTT);
 }
 bool TX_DEVICE_VoltageValid(void) {
   // Battery voltage is in 10 mV units; unknown readings also fail closed.

@@ -2,8 +2,11 @@
 #include "hal/adc.h"
 #include "hal/backlight.h"
 #include "hal/crc.h"
-#include "hal/gpio.h"
+#include "hal/gpio-dp32g030.h"
 #include "hal/display.h"
+#include "hal/i2c.h"
+#include "hal/system.h"
+#include "hal/systick.h"
 #include "hal/uart.h"
 #include "drivers/dp32g030/gpio.h"
 #include "drivers/dp32g030/portcon.h"
@@ -36,7 +39,7 @@
 
 #define GPIOC_DIR_INPUT_MASK (GPIO_DIR_5_MASK)
 
-void BOARD_GPIO_Init(void) {
+static void BOARD_GPIO_Init(void) {
   // GPIO A configuration - одна операция на регистр
   SET_BITS(GPIOA->DIR, GPIOA_DIR_OUTPUT_MASK);
   CLEAR_BITS(GPIOA->DIR, GPIOA_DIR_INPUT_MASK);
@@ -49,7 +52,7 @@ void BOARD_GPIO_Init(void) {
   CLEAR_BITS(GPIOC->DIR, GPIOC_DIR_INPUT_MASK);
 }
 
-void BOARD_PORTCON_Init(void) {
+static void BOARD_PORTCON_Init(void) {
   // PORT A pin selection - сгруппированные операции
   MODIFY_REG(PORTCON_PORTA_SEL0,
              PORTCON_PORTA_SEL0_A3_MASK | PORTCON_PORTA_SEL0_A4_MASK |
@@ -183,7 +186,7 @@ void BOARD_PORTCON_Init(void) {
           PORTCON_PORTC_OD_C4_BITS_DISABLE | PORTCON_PORTC_OD_C5_BITS_ENABLE);
 }
 
-void BOARD_ADC_Init(void) {
+static void BOARD_ADC_Init(void) {
   // Использование designated initializers для ясности
   ADC_Config_t Config = {
       .CLK_SEL = SYSCON_CLK_SEL_W_SARADC_SMPL_VALUE_DIV2,
@@ -206,6 +209,22 @@ void BOARD_ADC_Init(void) {
   ADC_Configure(&Config);
   ADC_Enable();
   ADC_SoftReset();
+}
+
+void BOARD_Init(void) {
+  SYS_ConfigureClocks();
+  SYS_ConfigureSysCon();
+
+  BOARD_GPIO_Init();
+  BOARD_PORTCON_Init();
+  BOARD_ADC_Init();
+
+  CRC_Init();
+  UART_Init();
+  I2C_Init();
+
+  TIMER0_InitAsUptimeCounter();
+  TIMER1_InitForDelay();
 }
 
 void BOARD_ADC_GetBatteryInfo(uint16_t *pVoltage, uint16_t *pCurrent) {

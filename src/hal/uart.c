@@ -8,7 +8,7 @@
 #include "drivers/bk4819/bk4819.h"
 #include "hal/crc.h"
 #include "hal/eeprom.h"
-#include "hal/gpio.h"
+#include "hal/gpio-dp32g030.h"
 #include "hal/uart.h"
 #include "hal/uart-protocol.h"
 #include <stdbool.h>

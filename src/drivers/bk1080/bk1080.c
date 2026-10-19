@@ -1,5 +1,4 @@
 #include "drivers/bk1080/bk1080.h"
-#include "drivers/dp32g030/gpio.h"
 #include "core/misc.h"
 #include "drivers/bk1080/bk1080-regs.h"
 #include "hal/gpio.h"
@@ -47,7 +46,7 @@ bool BK1080_Init(uint32_t f, bool bEnable) {
   uint8_t i;
 
   if (bEnable) {
-    GPIO_ClearBit(&GPIOB->DATA, GPIOB_PIN_BK1080);
+    GPIO_Write(GPIO_BK1080, false);
 
     if (!gIsInitBK1080) {
       for (i = 0; i < ARRAY_SIZE(BK1080_RegisterTable); i++) {
@@ -67,7 +66,7 @@ bool BK1080_Init(uint32_t f, bool bEnable) {
     return BK1080_SetFrequency(f);
   }
   bool ok = BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x0241);
-  GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_BK1080);
+  GPIO_Write(GPIO_BK1080, true);
   currentF = 0;
   return ok;
 }
@@ -106,9 +105,9 @@ uint16_t BK1080_GetRSSI() {
 }
 
 bool BK1080_Detect(void) {
-  GPIO_ClearBit(&GPIOB->DATA, GPIOB_PIN_BK1080);
+  GPIO_Write(GPIO_BK1080, false);
   SYS_DelayMs(10);
   bool present = BK1080_ReadRegister(1) == 0x1080;
-  GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_BK1080);
+  GPIO_Write(GPIO_BK1080, true);
   return present;
 }

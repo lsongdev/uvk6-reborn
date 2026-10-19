@@ -18,12 +18,7 @@ uint16_t I2C_ReadBuffer(void *data, uint16_t size) {
   return size;
 }
 void SYS_DelayMs(uint32_t ms) { (void)ms; }
-void GPIO_ClearBit(volatile uint32_t *reg, uint8_t bit) {
-  (void)reg; (void)bit;
-}
-void GPIO_SetBit(volatile uint32_t *reg, uint8_t bit) {
-  (void)reg; (void)bit;
-}
+void GPIO_Write(GpioLine line, bool high) { assert(line == GPIO_BK1080); (void)high; }
 
 int main(void) {
   ack = false;

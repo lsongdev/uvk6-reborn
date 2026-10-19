@@ -1,7 +1,7 @@
 #include "ui/screens/reset.h"
 #include "core/device-config.h"
 #include "hal/eeprom.h"
-#include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
+#include "hal/system.h"
 #include "core/settings.h"
 #include "ui/graphics.h"
 #include "ui/screens/statusline.h"
@@ -47,7 +47,7 @@ static bool key(KEY_Code_t key, Key_State_t state) {
   } else if (confirm && key == KEY_1) {
     EEPROM_SetWritesEnabled(true); // Only after explicit user confirmation.
     if (DEVICE_Initialize())
-      NVIC_SystemReset();
+      SYS_Reset();
     else {
       EEPROM_SetWritesEnabled(false);
       failed = true;

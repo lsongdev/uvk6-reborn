@@ -11,7 +11,6 @@
 #include "hal/keyboard.h"
 #include "hal/display.h"
 #include "hal/uart.h"
-#include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
 #include "core/battery.h"
 #include "ui/menu.h"
 #include "core/receiver.h"
