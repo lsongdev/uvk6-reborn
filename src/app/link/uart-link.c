@@ -1,6 +1,6 @@
 #include "hal/uart.h"
 #include "app/loop.h"
-#include "drivers/bk4819/bk4819.h"
+#include "drivers/bk48x9/bk48x9.h"
 #include "radio/receiver.h"
 #include "app/link/uart-link.h"
 #include "hal/board.h"
@@ -254,11 +254,36 @@ static void CMD_0574(const uint8_t *buffer) {
     uint16_t Rssi, Noise, Glitch, Status;
   } reply = {{0x0575, 0}, {0}, gReceiver.plan.frequency_hz,
       (uint8_t)gReceiver.plan.device, gReceiver.open, RECEIVER_Capabilities().broadcast,
-      RECEIVER_Capabilities().si, BK4819_ReadRegister(BK4819_REG_67) & 0x1FFu,
-      BK4819_ReadRegister(BK4819_REG_65) & 0x7Fu, BK4819_ReadRegister(BK4819_REG_63) & 0xFFu,
-      BK4819_ReadRegister(BK4819_REG_0C)};
+      RECEIVER_Capabilities().si, BK48X9_ReadRegister(BK48X9_REG_67) & 0x1FFu,
+      BK48X9_ReadRegister(BK48X9_REG_65) & 0x7Fu, BK48X9_ReadRegister(BK48X9_REG_63) & 0xFFu,
+      BK48X9_ReadRegister(BK48X9_REG_0C)};
   _Static_assert(sizeof(reply) == 4 + 12 + 4 + 4 + 8, "0x0575 layout is naturally aligned");
   LOOP_TakeStats(&reply.Loop);
+  reply.Header.Size = sizeof(reply) - sizeof(reply.Header);
+  SendReply(&reply, sizeof(reply));
+}
+
+static void CMD_0576(const uint8_t *buffer) {
+  const CMD_0514_t *cmd = (const CMD_0514_t *)buffer;
+  if (cmd->Timestamp != Timestamp) return;
+  // Exclude REG_02 and scan-result/FIFO ports: a diagnostic must not consume
+  // receive events or data. REG_30 is the bus driver's requested-state cache.
+  static const uint8_t regs[] = {
+    0x0C, 0x10, 0x11, 0x12, 0x13, 0x14, 0x19, 0x1F, 0x2A, 0x2B,
+    0x2F, 0x30, 0x31, 0x33, 0x36, 0x37, 0x38, 0x39, 0x3B, 0x3C,
+    0x3D, 0x3F, 0x40, 0x42, 0x43, 0x47, 0x48, 0x4D, 0x4E, 0x4F,
+    0x50, 0x51, 0x52, 0x54, 0x55, 0x67, 0x70, 0x73, 0x77, 0x78,
+    0x7B, 0x7D, 0x7E,
+  };
+  struct {
+    Header_t Header;
+    uint16_t Chip, Count;
+    struct { uint16_t Reg, Value; } Values[sizeof(regs)];
+  } reply = {{0x0577, 0}, BK48X9_GetCapabilities().chip_id, sizeof(regs), {{0}}};
+  for (unsigned i = 0; i < sizeof(regs); ++i) {
+    reply.Values[i].Reg = regs[i];
+    reply.Values[i].Value = BK48X9_ReadRegister(regs[i]);
+  }
   reply.Header.Size = sizeof(reply) - sizeof(reply.Header);
   SendReply(&reply, sizeof(reply));
 }
@@ -399,6 +424,10 @@ void UART_HandleCommand(void) {
 
   case 0x0574:
     CMD_0574(UART_Command.Buffer);
+    break;
+
+  case 0x0576:
+    CMD_0576(UART_Command.Buffer);
     break;
 
   case 0x0570:

@@ -1,5 +1,6 @@
-# UV-K1 bring-up: receive-only, no external flash programming/erasing.
+# UV-K1: factory-calibrated NFM RX/TX; external flash remains read-only.
 MCU := py32f071
-override ENABLE_TX := 0
+RADIO_CHIP := bk4829
+override ENABLE_SI4732 := 0
 PACK_FIRMWARE := 0
 RELEASE_PREFIX := UVK1-Reborn

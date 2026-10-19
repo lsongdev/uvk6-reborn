@@ -53,9 +53,9 @@ void BOARD_ADC_GetBatteryInfo(uint16_t *voltage, uint16_t *current) {
   *current = 0; // Reference K1 firmware exposes no charging-current measurement.
 }
 
-bool BOARD_HasSi4732(void) { return false; }
 
 // Reference FM_Start selects the VHF LNA and stops dual watch (5fedc09).
 bool BOARD_BroadcastUsesBkVhfPath(void) { return true; }
 
-BoardRadioChip BOARD_RadioChip(void) { return BOARD_RADIO_BK4829; }
+
+bool BOARD_HasHorizontalArrows(void) { return true; }

@@ -236,6 +236,9 @@ static void loadSelected(void) {
 }
 
 void RADIO_Init(void) {
+  // The receiver owns chip reset, RF defaults and factory calibration.
+  // It must run before loadSelected() probes capabilities or applies a plan.
+  RECEIVER_Init();
   initialized = true;
   transmitter = (TxRuntime){0};
   seek.active = false;

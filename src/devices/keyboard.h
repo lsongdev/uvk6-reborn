@@ -61,4 +61,9 @@ void KEYBOARD_Poll(void);
 void KEYBOARD_CheckKeys();
 SystemMessages KEYBOARD_GetKey();
 
+// For UP/DOWN keys in frequency/channel stepping and spectrum movement.
+// Horizontal arrows increase to the right; vertical arrows increase upward.
+// Menu navigation continues to consume the original logical key codes.
+bool KEYBOARD_FrequencyIncreases(KEY_Code_t key);
+
 #endif

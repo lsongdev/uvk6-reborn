@@ -167,6 +167,19 @@ class Radio:
                  'rssi', 'noise', 'glitch', 'status')
         return dict(zip(names, fields))
 
+    def rf_registers(self):
+        """Fixed, non-consuming RF registers; REG_30 is the requested-state cache."""
+        reply = self.request(struct.pack('<HHI', 0x0576, 4, self.stamp), 0x0577)
+        if len(reply) < 8:
+            raise IOError('Bad RF register reply')
+        chip, count = struct.unpack_from('<HH', reply, 4)
+        if chip not in (4819, 4829) or not count or len(reply) != 8 + 4 * count:
+            raise IOError('Bad RF register reply')
+        pairs = list(struct.iter_unpack('<HH', reply[8:]))
+        if len({reg for reg, _ in pairs}) != count or any(reg >= 128 for reg, _ in pairs):
+            raise IOError('Bad RF register reply')
+        return chip, dict(pairs)
+
     def read(self, address, size, progress=None):
         out = bytearray()
         for at, n in chunks(address, size):
@@ -402,6 +415,7 @@ def main():
     for command in (cal_write, cal_seed, cal_restore):
         command.add_argument('--yes', action='store_true', help='skip the confirmation')
     commands.add_parser('info', help='physical storage capacity and identity (JEDEC ID on SPI)')
+    commands.add_parser('rf', help='read-only RF register snapshot (REG_30 is cached)')
     stats = commands.add_parser('stats', help='main-loop and receiver diagnostics')
     stats.add_argument('--every', type=float, default=0, help='repeat every N seconds')
     read = commands.add_parser('read', help='save a physical storage range to a file')
@@ -430,6 +444,12 @@ def main():
                 if not args.every:
                     return 0
                 time.sleep(args.every)
+        if args.command == 'rf':
+            chip, registers = radio.rf_registers()
+            print(f'BK{chip} (REG_30 is requested state, not physical readback)')
+            for reg, value in registers.items():
+                print(f'{reg:02X}={value:04X}')
+            return 0
         if args.command == 'read':
             def progress(done, total):
                 if done % 65536 == 0 or done == total:

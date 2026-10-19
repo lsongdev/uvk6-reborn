@@ -6,6 +6,10 @@
 
 static void postKey(KEY_Code_t key, Key_State_t state);
 
+bool KEYBOARD_FrequencyIncreases(KEY_Code_t key) {
+  return BOARD_HasHorizontalArrows() ? key == KEY_DOWN : key == KEY_UP;
+}
+
 static SystemMessages n;
 
 #define LONG_PRESS_TIME 500

@@ -497,14 +497,4 @@ bool SI47XX_BandwidthFromHz(uint32_t hz, bool ssb, uint16_t *index) {
   return false;
 }
 
-bool SI47XX_Detect(void) {
-  // Release the shared receiver reset line before probing the SI address.
-  RST_HIGH;
-  SYS_DelayMs(10);
-  I2C_Start();
-  bool present = I2C_Write(SI47XX_I2C_ADDR) == 0;
-  I2C_Stop();
-  if (!present)
-    RST_LOW;
-  return present;
-}
+

@@ -7,7 +7,8 @@
 #include "hal/gpio.h"
 #include "devices/rx-device.h"
 #include "hal/system.h"
-#include "drivers/bk4819/bk4819.h"
+#include "hal/board.h"
+#include "drivers/bk48x9/bk48x9.h"
 #include "store/device-config.h"
 #include "devices/battery.h"
 #include "core/dcs.h"
@@ -18,24 +19,16 @@
 #endif
 
 #if UVK6_ENABLE_TX
-// Factory calibration layout from DualTachyon's UV-K5 radio.c/frequencies.c.
-// Seven 16-byte band records from CALIBRATION_PA_OFFSET, three anchors per
-// Low/Medium/High level; tools/resources.py writes them. Our board policy
-// uses records 2 and 5 only.
+// Read only the board's factory PA records. Never synthesize a calibration
+// from another board's defaults or apply reference firmware power boosts.
 static bool prepared;
 static uint8_t paBias;
 static uint32_t txFrequency;
 
-static __attribute__((noinline)) bool readCalibration(uint32_t hz, uint8_t values[9], uint32_t *low,
-                            uint32_t *middle, uint32_t *high) {
-  uint8_t band;
-  if (hz >= 136000000u && hz < 174000000u) {
-    band = 2; *low = 136000000u; *middle = 150000000u; *high = 173999990u;
-  } else if (hz >= 400000000u && hz < 470000000u) {
-    band = 5; *low = 400000000u; *middle = 435000000u; *high = 469999990u;
-  } else return false;
-  return !(hz % 10u) && STORAGE_Read(STORAGE_CALIBRATION, CALIBRATION_PA_OFFSET + band * CALIBRATION_PA_STRIDE,
-                                        values, CALIBRATION_PA_BYTES);
+static __attribute__((noinline)) bool readCalibration(uint32_t hz, uint8_t values[9],
+                                                      BoardTxCalibration *record) {
+  return BOARD_TxCalibration(hz, record) &&
+    STORAGE_Read(STORAGE_CALIBRATION, record->offset, values, CALIBRATION_PA_BYTES);
 }
 static uint8_t calibrationMask(const uint8_t values[9]) {
   uint8_t mask = 0;
@@ -48,9 +41,9 @@ static uint8_t calibrationMask(const uint8_t values[9]) {
 }
 // Measured: sharing this across Settings and PTT saves 128 B with release LTO.
 __attribute__((noinline)) TxCapabilities TX_DEVICE_Capabilities(uint32_t hz) {
-  uint8_t values[9]; uint32_t low, middle, high;
+  uint8_t values[9]; BoardTxCalibration record;
   return (TxCapabilities){.available=true,
-    .power_mask=readCalibration(hz,values,&low,&middle,&high) ? calibrationMask(values) : 0};
+    .power_mask=readCalibration(hz,values,&record) ? calibrationMask(values) : 0};
 }
 TxPolicy TX_DEVICE_Policy(void) {
   return (TxPolicy){.authorized=true, .count=2,
@@ -73,14 +66,14 @@ bool TX_DEVICE_VoltageValid(void) {
 }
 void TX_DEVICE_Disable(void) {
   // PA gate is always the first hardware action, including repeated releases.
-  BK4819_ToggleGpioOut(BK4819_GPIO1_PIN29_PA_ENABLE, false);
-  BK4819_WriteRegister(BK4819_REG_36, 0);
+  BK48X9_ToggleGpioOut(BK48X9_GPIO1_PIN29_PA_ENABLE, false);
+  BK48X9_WriteRegister(BK48X9_REG_36, 0);
   LED_SetRed(false);
 #if UVK6_ENABLE_TX
   if (prepared) {
-    BK4819_EnterTxMute();
-    BK4819_Idle();
-    BK4819_ExitSubAu();
+    BK48X9_EnterTxMute();
+    BK48X9_Idle();
+    BK48X9_ExitSubAu();
     RX_DEVICE_InvalidateBk();
   }
   prepared = false;
@@ -98,36 +91,41 @@ bool TX_DEVICE_Prepare(const TxPlan *plan) {
   TX_DEVICE_Disable();
   if (!plan || !TONE_Valid(plan->tone) || (unsigned)plan->power > TX_POWER_HIGH ||
       !TX_DEVICE_PttPressed() || !TX_DEVICE_VoltageValid()) return false;
-  uint8_t values[9]; uint32_t low, middle, high;
-  if (!readCalibration(plan->frequency_hz,values,&low,&middle,&high) ||
+  uint8_t values[9]; BoardTxCalibration record;
+  if (!readCalibration(plan->frequency_hz,values,&record) ||
       !(calibrationMask(values) & (1u << plan->power))) return false;
   const uint8_t *anchors = values + plan->power * 3;
-  paBias = plan->frequency_hz <= middle ?
-    interpolate(anchors[0],anchors[1],plan->frequency_hz,low,middle) :
-    interpolate(anchors[1],anchors[2],plan->frequency_hz,middle,high);
+  paBias = plan->frequency_hz <= record.middle_hz ?
+    interpolate(anchors[0],anchors[1],plan->frequency_hz,record.lower_hz,record.middle_hz) :
+    interpolate(anchors[1],anchors[2],plan->frequency_hz,record.middle_hz,record.upper_hz);
+  // TX owns the antenna. A muted BK1080 may still be receiving; park all
+  // receivers successfully before touching the shared RF path or voice DSP.
+  if (!RX_DEVICE_StopAll()) return false;
   txFrequency = plan->frequency_hz / 10u;
   prepared = true; // All subsequent exit paths must stop DSP and invalidate RX.
   AUDIO_ToggleSpeaker(false);
   LED_SetGreen(false);
-  BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_RX_ENABLE, false);
+  BK48X9_ToggleGpioOut(BK48X9_GPIO0_PIN28_RX_ENABLE, false);
   RX_DEVICE_InvalidateBk();
-  BK4819_ConfigureVoiceTx(txFrequency, gDeviceConfig.preferences.mic,
+  BK48X9_ConfigureVoiceTx(txFrequency, gDeviceConfig.preferences.mic,
                          gDeviceConfig.preferences.deviation * 10u, PREFERENCES_FilterBound());
-  if (!plan->tone) BK4819_ExitSubAu();
+  if (!plan->tone) BK48X9_ExitSubAu();
   else if (TONE_Type(plan->tone) == CODE_TYPE_CONTINUOUS_TONE)
-    BK4819_SetCTCSSFrequency(CTCSS_Options[TONE_Code(plan->tone)]);
-  else BK4819_SetCDCSSCodeWord(DCS_GetGolayCodeWord(TONE_Type(plan->tone),TONE_Code(plan->tone)));
+    BK48X9_SetCTCSSFrequency(CTCSS_Options[TONE_Code(plan->tone)]);
+  else BK48X9_SetCDCSSCodeWord(DCS_GetGolayCodeWord(TONE_Type(plan->tone),TONE_Code(plan->tone)));
   return true;
 }
 bool TX_DEVICE_Enable(void) {
-  if (!prepared || !TX_DEVICE_PttPressed() || !TX_DEVICE_VoltageValid()) return false;
-  BK4819_PrepareTransmit(); // Voice DSP includes the microphone ADC (0xC1FE).
+  if (!prepared || !TX_DEVICE_PttPressed() || !TX_DEVICE_VoltageValid()) {
+    TX_DEVICE_Disable(); return false;
+  }
+  BK48X9_PrepareTransmit(); // Voice DSP includes the microphone ADC (0xC1FE).
   SYS_DelayMs(10);
-  BK4819_SetupPowerAmplifier(paBias,txFrequency);
+  BK48X9_SetupPowerAmplifier(paBias,txFrequency);
   if (!TX_DEVICE_PttPressed() || !TX_DEVICE_VoltageValid()) {
     TX_DEVICE_Disable(); return false;
   }
-  BK4819_ToggleGpioOut(BK4819_GPIO1_PIN29_PA_ENABLE, true); // Last RF enable.
+  BK48X9_ToggleGpioOut(BK48X9_GPIO1_PIN29_PA_ENABLE, true); // Last RF enable.
   LED_SetRed(true);
   return true; // Register commands sent; this is not an RF measurement.
 }

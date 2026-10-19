@@ -1,8 +1,7 @@
 #include "core/watch.h"
 
-// Continuous sound: SI (including SSB), BK1080, or a BK channel with SQ0.
-bool WATCH_IsBackground(const RxPlan *p) {
-  return p && (p->device != RX_DEVICE_BK || !p->parameters.squelch);
+bool WATCH_IsEvent(const RxPlan *p) {
+  return p && p->device == RX_DEVICE_BK && p->parameters.squelch;
 }
 bool WATCH_SameReceiver(const RxPlan *a, const RxPlan *b) {
   if (!a || !b) return false;
@@ -17,17 +16,21 @@ bool WATCH_Start(WatchRuntime *r, const WatchTarget *targets, uint8_t count,
   if (!r || !targets || count>RADIO_WATCH_LIMIT) return false;
   // Deadlines are relative to now so a start near the clock wrap still polls.
   WatchRuntime next={.phase=WATCH_POLL,.deadline=now,.background_retry=now};
-  // Only one background can play: the selected slot's, else the first.
+  // BK SQ0 owns its chip continuously. Unselected SQ0 slots sit out.
+  // Only one auxiliary background plays: the selected one, else the first.
   for (uint8_t i=0; i<count; ++i) {
     const WatchTarget *t=&targets[i];
     if (t->id>=RADIO_SLOT_CAPACITY) return false;
-    if (!WATCH_IsBackground(&t->plan)) continue;
+    if (t->plan.device==RX_DEVICE_BK) {
+      if (t->id==selected_id && !WATCH_IsEvent(&t->plan)) return false;
+      continue;
+    }
     if (!next.has_background || t->id==selected_id) next.background=*t;
     next.has_background=true;
   }
   for (uint8_t i=0; i<count; ++i) {
     const WatchTarget *t=&targets[i];
-    if (WATCH_IsBackground(&t->plan)) continue;
+    if (!WATCH_IsEvent(&t->plan)) continue;
     bool duplicate=false;
     for (uint8_t j=0; j<next.count; ++j)
       duplicate |= WATCH_SameReceiver(&t->plan,&next.events[j].plan);
@@ -60,13 +63,13 @@ bool WATCH_IsProbing(const WatchRuntime *r) {
 static uint32_t clockNow(const WatchOperations *ops, uint32_t fallback) {
   return ops->now ? ops->now(ops->context) : fallback;
 }
-static bool backgroundOnBk(const WatchRuntime *r) {
-  return r->has_background && r->background.plan.device==RX_DEVICE_BK;
-}
 static void speaker(WatchRuntime *r, const WatchOperations *ops,
                     const WatchTarget *target, WatchAudio audio) {
   if (!ops->select(ops->context,target,audio!=WATCH_QUIET)) {
-    if (audio==WATCH_BACKGROUND) r->background_ready=false;
+    if (audio==WATCH_BACKGROUND) {
+      r->background_ready=false;
+      r->background_retry=clockNow(ops,r->deadline)+WATCH_RETRY_MS;
+    }
     audio=WATCH_QUIET;
   }
   r->audio=audio;
@@ -80,45 +83,25 @@ static void next(WatchRuntime *r, uint32_t now) {
   r->phase=WATCH_POLL;
   r->deadline=now;
 }
-// A BK background is retuned and heard for a while after every round.
-static void home(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
-  r->visited=0;
-  if ((int32_t)(now-r->background_retry)>=0 && ops->prepare(ops->context,&r->background)) {
-    speaker(r,ops,&r->background,WATCH_BACKGROUND);
-    r->phase=WATCH_HOME;
-    r->deadline=clockNow(ops,now)+WATCH_HOME_MS;
-    return;
-  }
-  r->background_retry=now+WATCH_RETRY_MS;
-  r->phase=WATCH_POLL;
-  r->deadline=now;
-}
 // After a talk (or its hang) the background plays again.
 static void release(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
   r->audio=WATCH_QUIET;
-  if (backgroundOnBk(r)) { r->cursor=(r->cursor+1u)%r->count; home(r,now,ops); return; }
   if (r->has_background && r->background_ready)
     speaker(r,ops,&r->background,WATCH_BACKGROUND);
   next(r,now);
 }
 static void poll(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
-  if (backgroundOnBk(r) && (!r->count || r->visited>=r->count)) { home(r,now,ops); return; }
   uint8_t n=0;
   for (; n<r->count; ++n) {
     uint8_t i=(uint8_t)((r->cursor+n+0u)%r->count); // Unsigned: no __divsi3.
     if (!(r->blocked&(1u<<i)) || (int32_t)(now-r->blocked_until[i])>=0) { r->cursor=i; break; }
   }
   if (n==r->count) {
-    if (backgroundOnBk(r)) { home(r,now,ops); return; }
     r->phase=WATCH_RETRY;
     r->deadline=now+WATCH_RETRY_MS;
     return;
   }
   r->blocked &= ~(1u<<r->cursor);
-  ++r->visited;
-  // Leaving a BK background for another channel must silence it first.
-  if (r->audio==WATCH_BACKGROUND && backgroundOnBk(r))
-    speaker(r,ops,&r->background,WATCH_QUIET);
   if (!ops->prepare(ops->context,&r->events[r->cursor])) {
     now=clockNow(ops,now); block(r,now); next(r,now); return;
   }
@@ -130,14 +113,13 @@ void WATCH_SuspendBk(WatchRuntime *r, bool suspend, uint32_t now, const WatchOpe
   if (!r || r->phase==WATCH_OFF || !ops || !ops->select || r->bk_suspended==suspend) return;
   r->bk_suspended=suspend;
   if (suspend) {
-    bool broadcast=r->has_background && !backgroundOnBk(r) && r->background_ready;
-    if (r->audio==WATCH_EVENT || r->phase==WATCH_HANG || (r->audio==WATCH_BACKGROUND && !broadcast)) {
-      const WatchTarget *quiet=r->audio==WATCH_BACKGROUND ? &r->background : &r->events[r->cursor];
+    bool broadcast=r->has_background && r->background_ready;
+    if (r->audio==WATCH_EVENT || r->phase==WATCH_HANG) {
+      const WatchTarget *quiet=&r->events[r->cursor];
       if (broadcast) speaker(r,ops,&r->background,WATCH_BACKGROUND);
       else speaker(r,ops,quiet,WATCH_QUIET);
     }
   }
-  r->visited=0;
   r->phase=WATCH_POLL;
   r->deadline=now;
 }
@@ -146,7 +128,7 @@ void WATCH_Update(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
   if (!r || r->phase==WATCH_OFF || !ops || !ops->prepare || !ops->signal || !ops->select)
     return;
   // Bring a broadcast background up once; it keeps receiving underneath.
-  if (r->has_background && !backgroundOnBk(r) && !r->background_ready &&
+  if (r->has_background && !r->background_ready &&
       (int32_t)(now-r->background_retry)>=0) {
     if (ops->prepare(ops->context,&r->background)) {
       r->background_ready=true;
@@ -156,8 +138,7 @@ void WATCH_Update(WatchRuntime *r, uint32_t now, const WatchOperations *ops) {
     return; // At most one hardware preparation per update.
   }
   if (r->bk_suspended || (int32_t)(now-r->deadline)<0) return;
-  if (r->phase==WATCH_POLL || r->phase==WATCH_RETRY || r->phase==WATCH_HOME) {
-    if (r->phase==WATCH_HOME) r->visited=0;
+  if (r->phase==WATCH_POLL || r->phase==WATCH_RETRY) {
     poll(r,now,ops);
     return;
   }

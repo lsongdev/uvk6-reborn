@@ -567,7 +567,6 @@ typedef union {
   uint8_t raw[2];
 } SI47XX_BW_Config; // AM_CHANNEL_FILTER
 
-bool SI47XX_Detect(void);
 bool SI47XX_PowerUp();
 // SSB patch bytes (PATCH_ARGS/PATCH_DATA lines); length 0 means none.
 typedef bool (*SI47XX_PatchRead)(uint16_t offset, uint8_t *out, uint16_t size);

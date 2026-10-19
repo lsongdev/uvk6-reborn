@@ -16,6 +16,8 @@
 
 Receiver gReceiver;
 bool gRedrawScreen;
+static bool horizontalArrows;
+bool BOARD_HasHorizontalArrows(void) { return horizontalArrows; }
 static char statusText[32];
 void STATUSLINE_SetText(const char *text) { TEXT_Copy(statusText, sizeof(statusText), text); }
 static bool shortcutShown;
@@ -84,8 +86,8 @@ static CaptureSample captureReply;
 static uint32_t captureHz;
 static CaptureRange captureRange;
 static RxDevice captureLeaves;
-void RX_DEVICE_CaptureStart(CaptureRange range, RxDevice previous) {
-  captureLeaves=previous; captureRange=range; ++captureStarts;
+bool RX_DEVICE_CaptureStart(CaptureRange range) {
+  captureLeaves=RX_DEVICE_BK; captureRange=range; ++captureStarts; return true;
 }
 CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
   assert(range==captureRange); *hz=captureHz; return captureReply;
@@ -94,7 +96,7 @@ void RX_DEVICE_CaptureStop(void) { ++captureStops; }
 static unsigned spectrumStarts, spectrumStops, spectrumTunes;
 static uint32_t spectrumTuned;
 static uint16_t spectrumRssi = 100;
-void RX_DEVICE_SpectrumStart(RxDevice previous) { (void)previous; ++spectrumStarts; }
+bool RX_DEVICE_SpectrumStart(void) { ++spectrumStarts; return true; }
 void RX_DEVICE_SpectrumTune(uint32_t hz) { spectrumTuned = hz; ++spectrumTunes; }
 uint16_t RX_DEVICE_SpectrumRssi(void) { return spectrumRssi; }
 void RX_DEVICE_SpectrumStop(void) { ++spectrumStops; }
@@ -144,8 +146,12 @@ void DEVICE_RequestSave(void) { ++saveRequests; }
 static uint32_t failFrequency;
 
 uint32_t Now(void) { return clockNow; }
-ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
+static bool receiverReady;
+static unsigned receiverInitializations;
+void RECEIVER_Init(void) { receiverReady = true; ++receiverInitializations; }
+ReceiverCapabilities RECEIVER_Capabilities(void) { assert(receiverReady); return capabilities; }
 bool RECEIVER_Apply(const RxPlan *plan) {
+  assert(receiverReady);
   ++applyAttempts;
   if (failApply || (failFrequency && plan->frequency_hz == failFrequency))
     return false;
@@ -155,14 +161,18 @@ bool RECEIVER_Apply(const RxPlan *plan) {
 }
 static unsigned concurrentPrepares, audioSelects, chipStops;
 static bool broadcastExcludesBk;
-bool RX_DEVICE_BroadcastExcludesBk(void) { return broadcastExcludesBk; }
-bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan) {
+bool RX_DEVICE_CanRunTogether(RxDevice a, RxDevice b) {
+  if (a == b) return false;
+  return !broadcastExcludesBk || !((a==RX_DEVICE_BK && b==RX_DEVICE_BROADCAST) ||
+    (b==RX_DEVICE_BK && a==RX_DEVICE_BROADCAST));
+}
+bool RX_DEVICE_Prepare(const RxPlan *plan) {
   ++concurrentPrepares;
   return !failApply && (!failFrequency || plan->frequency_hz!=failFrequency);
 }
-void RX_DEVICE_StopChip(RxDevice device) { (void)device;++chipStops; }
-bool RECEIVER_Select(const RxPlan *plan, uint8_t devices, bool open) {
-  assert(devices & (1u<<plan->device));++audioSelects;
+bool RX_DEVICE_StopChip(RxDevice device) { (void)device;++chipStops;return true; }
+bool RECEIVER_Select(const RxPlan *plan, bool open) {
+  ++audioSelects;
   gReceiver.plan=*plan;
   gReceiver.open=open;
   return true;
@@ -265,7 +275,9 @@ static void setup(uint32_t frequency, RadioParameters values) {
   nativeReply = RX_SEEK_FOUND;
   nativeStarts = nativeCancels = 0;
   capabilities = (ReceiverCapabilities){true, false, true, true, RX_BK_BANDWIDTH_ALL};
+  receiverReady = false; receiverInitializations = 0;
   RADIO_Init();
+  assert(receiverReady && receiverInitializations == 1);
 }
 static void press(KEY_Code_t key) { assert(SCREEN_Key(key, KEY_RELEASED)); }
 static void update(void) { RADIO_Update(); SCREEN_Update(); }
@@ -913,10 +925,28 @@ int main(void) {
     capabilities.si=false;capabilities.broadcast=true;broadcastExcludesBk=true;
     request(95900000,activeSlot.current.parameters);
     for (unsigned j=0;j<30;++j) { update();clockNow+=50; }
-    assert(watcher.phase==WATCH_OFF && !strcmp(RADIO_WatchStatus(),"DW: off in FM"));
+    assert(watcher.phase==WATCH_OFF && !strcmp(RADIO_WatchStatus(),"DW: shared RF"));
     assert(runtime.current.device==RX_DEVICE_BROADCAST && receivingSlot==0);
+    assert(RADIO_STATE_SetCount(&gDeviceConfig.radio,3));
+    assert(RADIO_STATE_Set(&gDeviceConfig.radio,2,145600000,fm));
+    press(KEY_F);press(KEY_2); // B must receive even while A remains FM.
+    assert(selectedSlot==1 && runtime.current.device==RX_DEVICE_BK);
+    clockNow+=2000;watchSignalFrequency=145600000;
+    for (unsigned j=0;j<30;++j) { update();clockNow+=50; }
+    assert(watcher.count==2 && !watcher.has_background && WATCH_Owner(&watcher)==2);
+    assert(watcher.devices==(1u<<RX_DEVICE_BK)); // FM did not disable B/C watch.
+    press(KEY_F);press(KEY_2);press(KEY_F);press(KEY_2); // C then A.
+    assert(selectedSlot==0 && runtime.current.device==RX_DEVICE_BROADCAST);
+    for (unsigned j=0;j<60;++j) { update();clockNow+=50; }
+    assert(watcher.phase==WATCH_OFF && receivingSlot==0);
     broadcastExcludesBk=false;capabilities=saved;
   }
+
+  // Selected BK SQ0 is continuous, with no periodic home/retune branch.
+  setup(145500000,(RadioParameters){RX_NFM,12500,12000,0,0});
+  unsigned monitorTunes=concurrentPrepares;
+  for (unsigned j=0;j<100;++j) { update();clockNow+=50; }
+  assert(watcher.phase==WATCH_OFF && concurrentPrepares==monitorTunes && receivingSlot==0);
 
   // Broadcast background + BK event: the broadcast plays while B is quiet,
   // even when it is the selected slot; a talk on B takes the speaker.
@@ -1348,5 +1378,29 @@ int main(void) {
   setup(145500000,fm);activeSlot.source=gDeviceConfig.radio.slots[0].source=RADIO_SOURCE_CHANNEL;
   openMenu(MENU_SPECTRUM);press(KEY_MENU);press(KEY_UP);press(KEY_MENU);
   assert(!spectrumOn && activeSlot.current.frequency_hz==145500000 && !strcmp(message,"VFO only"));
+  // K1's physical left/right arrows preserve menu order but tune spatially.
+  setup(145500000,fm);horizontalArrows=true;
+  press(KEY_UP);assert(activeSlot.current.frequency_hz==145487500); // Left decreases.
+  press(KEY_DOWN);assert(activeSlot.current.frequency_hz==145500000); // Right increases.
+  SCREEN_Key(KEY_DOWN,KEY_LONG_PRESSED_CONT);
+  assert(activeSlot.current.frequency_hz==145512500);
+  SCREEN_Key(KEY_UP,KEY_LONG_PRESSED_CONT);
+  assert(activeSlot.current.frequency_hz==145500000);
+  openMenu(MENU_RX_STEP);
+  press(KEY_DOWN);assert(menuIndex==MENU_RX_BANDWIDTH); // Right still moves down.
+  press(KEY_UP);assert(menuIndex==MENU_RX_STEP); // Left still moves up.
+  press(KEY_EXIT);
+  openMenu(MENU_SPECTRUM);press(KEY_MENU);
+  press(KEY_UP);assert(spectrum.cursor==63); // Left moves left on graph.
+  press(KEY_DOWN);assert(spectrum.cursor==64);
+  SCREEN_Key(KEY_DOWN,KEY_LONG_PRESSED_CONT);assert(spectrum.cursor==65);
+  press(KEY_MENU);assert(activeSlot.current.frequency_hz==145512500);
+  memset(fakeChannelUsed,0,sizeof(fakeChannelUsed));
+  fakeChannels[3]=(UserChannel){.frequency_hz=145500000u,.rx=fm};fakeChannelUsed[3]=true;
+  fakeChannels[7]=(UserChannel){.frequency_hz=145525000u,.rx=fm};fakeChannelUsed[7]=true;
+  press(KEY_F);press(KEY_3);assert(gDeviceConfig.radio.slots[0].channel_number==3);
+  press(KEY_DOWN);assert(gDeviceConfig.radio.slots[0].channel_number==7); // Right = next channel.
+  press(KEY_UP);assert(gDeviceConfig.radio.slots[0].channel_number==3);
+  horizontalArrows=false;
   return 0;
 }

@@ -7,9 +7,9 @@
 // own port and pin; drivers never name ports or registers. A line a board
 // lacks ignores writes and reads false.
 typedef enum {
-  GPIO_BK4819_SCN,
-  GPIO_BK4819_SCL,
-  GPIO_BK4819_SDA, // Bidirectional: see GPIO_SetInput.
+  GPIO_BK48X9_SCN,
+  GPIO_BK48X9_SCL,
+  GPIO_BK48X9_SDA, // Bidirectional: see GPIO_SetInput.
   GPIO_ST7565_CS, // Optional: hardware chip select on UV-K6.
   GPIO_ST7565_A0,
   GPIO_ST7565_RES,

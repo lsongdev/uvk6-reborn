@@ -71,6 +71,24 @@ class ResourceTests(unittest.TestCase):
         return resources.install(self.radio, self.address, resources.SSB_MAGIC, self.patch,
                                  self.backups, log=lambda *a, **k: None)
 
+    def test_rf_snapshot(self):
+        class Snapshot(FakeFirmware):
+            def send(self, payload, obfuscate=True):
+                if int.from_bytes(payload[:2], 'little') == 0x0576:
+                    assert len(payload) == 8 and struct.unpack_from('<I', payload, 4)[0] == self.stamp
+                    self.reply = struct.pack('<HHHHHHHH', 0x0577, 12, 4829, 2, 0x3B, 22654, 0x48, 0xB2CF)
+                else:
+                    super().send(payload, obfuscate)
+        firmware = Snapshot()
+        radio = resources.Radio(firmware)
+        self.assertEqual(radio.rf_registers(), (4829, {0x3B: 22654, 0x48: 0xB2CF}))
+        self.assertEqual(firmware.writes, [])
+        for bad in (b'', struct.pack('<HHHH', 0x0577, 4, 4829, 1),
+                    struct.pack('<HHHHHHHH', 0x0577, 12, 4829, 2, 0x47, 0, 0x47, 0)):
+            with patch.object(radio, 'request', return_value=bad):
+                with self.assertRaises(IOError):
+                    radio.rf_registers()
+
     def test_k1_info_and_full_physical_flash_read(self):
         class PhysicalFlash(FakeFirmware):
             def __init__(self):

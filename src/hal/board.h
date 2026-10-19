@@ -24,12 +24,30 @@
 void BOARD_Init(void);
 void BOARD_ADC_GetBatteryInfo(uint16_t *pVoltage, uint16_t *pCurrent);
 
-typedef enum { BOARD_RADIO_BK4819, BOARD_RADIO_BK4829 } BoardRadioChip;
-BoardRadioChip BOARD_RadioChip(void);
+// Factory PA record and its three frequency anchors, in Hz. The record
+// offset is relative to STORAGE_CALIBRATION, never a physical flash address.
+typedef struct {
+  uint16_t offset;
+  uint32_t lower_hz, middle_hz, upper_hz;
+} BoardTxCalibration;
+bool BOARD_TxCalibration(uint32_t frequency_hz, BoardTxCalibration *record);
 
-// Whether an SI4732 may be fitted; false on boards with only BK1080.
-// This is a wiring capability, not a detection result.
-bool BOARD_HasSi4732(void);
+typedef struct { int16_t trim; uint8_t volume,dac; } BoardRxCalibration;
+// Whether this board supplies a factory RX profile; unreadable fields use
+// that board's defaults. No calibration storage is ever written here.
+bool BOARD_RxCalibration(BoardRxCalibration *out);
+typedef struct {
+  uint8_t rssi_open,rssi_close,noise_open,noise_close,glitch_open,glitch_close;
+} BoardSquelchCalibration;
+bool BOARD_SquelchCalibration(uint32_t hz,uint8_t level,BoardSquelchCalibration *out);
+uint8_t BOARD_RxCalibrationBand(uint32_t hz);
+
+// The RF chip GPIOs driving the two status colors differ between boards.
+void BOARD_SetGreenLed(bool on);
+void BOARD_SetRedLed(bool on);
+
+// Physical arrow arrangement; menu navigation keeps its logical UP/DOWN.
+bool BOARD_HasHorizontalArrows(void);
 
 // The BK1080's antenna path runs through the BK4819/BK4829 VHF LNA switch
 // (UV-K1): broadcast reception needs that switch on VHF, so the BK chip
