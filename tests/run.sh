@@ -36,6 +36,12 @@ esac
   tests/radio-app-regression.c src/devices/keyboard.c src/core/tuning.c src/ui/number-input.c src/core/dcs.c src/core/text.c src/core/radio-model.c src/core/radio-state.c src/radio/rx-runtime.c src/core/watch.c src/core/tx-model.c src/radio/tx-runtime.c src/core/seek.c src/core/capture.c src/core/spectrum.c \
   src/core/rds.c src/core/rds-receiver.c src/ui/frequency.c "$dead_strip" -o "$test_binary"
 "$test_binary"
+# Noise diagnostics: disabled RDS and disabled FM RSQ must still build.
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
+  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+  -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
+  -DUVK6_ENABLE_RDS_POLL=0 -DUVK6_FM_RSQ_POLL_MS=0 -fsyntax-only \
+  src/radio/radio.c src/radio/watch.c src/app/loop.c
 # ENABLE_FC=0 must keep compiling: FC branches fold to a constant phase.
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \

@@ -263,10 +263,12 @@ uint8_t RADIO_Heard(void) {
   return watcher.phase != WATCH_OFF ? WATCH_Owner(&watcher) : receivingSlot;
 }
 
+#if UVK6_ENABLE_RDS_POLL
 static bool readRds(void *unused, RdsPacket *packet, bool clear_fifo) {
   (void)unused;
   return RX_DEVICE_ReadRDS(packet, clear_fifo);
 }
+#endif
 
 void RADIO_Update(void) {
   if (!initialized) return; // Not yet started (e.g. the EEPROM reset page).
@@ -287,6 +289,7 @@ void RADIO_Update(void) {
   if (spectrumOn) { spectrumUpdate(); return; }
   seekUpdate();
   watchUpdate();
+#if UVK6_ENABLE_RDS_POLL
   uint8_t rdsSlot=receivingSlot;
   const RxPlan *rdsPlan=&runtime.current;
   bool rdsEnabled=RADIO_IsReceiving() && runtime.active &&
@@ -319,6 +322,7 @@ void RADIO_Update(void) {
     clockAt = now | 1u;
     gRedrawScreen = true;
   }
+#endif
 }
 
 // --- Intents on the selected slot -----------------------------------------

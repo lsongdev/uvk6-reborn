@@ -28,6 +28,9 @@ static uint32_t gLastRender;
 static uint32_t secondTimer;
 static uint32_t appsKeyboardTimer;
 static uint32_t radioTimer;
+#if UVK6_FM_RSQ_POLL_MS
+static uint32_t fmSignalTimer;
+#endif
 
 static uint32_t lastPlugLinkTime;
 static LoopStats stats;
@@ -180,7 +183,24 @@ void SYS_Main() {
 
     if (RADIO_IsReceiving() && !RADIO_IsWatching() &&
         Now()-radioTimer >= RECEIVER_SamplePeriodMs(gReceiver.plan.device)) {
-      RECEIVER_UpdateSquelch();
+      const RxPlan *plan = &gReceiver.plan;
+      bool fmMonitor = plan->device == RX_DEVICE_SI &&
+                       plan->parameters.mode == RX_WFM &&
+                       plan->parameters.squelch == 0;
+      if (fmMonitor) {
+        // SQ0 must not depend on I2C measurements to open the audio path.
+        // Retry a failed initial route at the normal, bounded cadence.
+        if (!gReceiver.open) RECEIVER_SetOpen(true);
+        // Meter refresh is independent of speaker gate. 0 disables it.
+#if UVK6_FM_RSQ_POLL_MS
+        if (Now()-fmSignalTimer >= UVK6_FM_RSQ_POLL_MS) {
+          (void)RECEIVER_Measure();
+          fmSignalTimer = Now();
+        }
+#endif
+      } else {
+        RECEIVER_UpdateSquelch();
+      }
       radioTimer = Now();
     }
 

@@ -3,6 +3,7 @@
 
 WatchRuntime watcher;
 static uint32_t watchResumeAt;
+static uint32_t watchMeterAt;
 static bool watchDelay;
 const char *watchStatus;
 void __attribute__((noinline)) delayWatch(void) {
@@ -131,8 +132,20 @@ void watchUpdate(void) {
   watchStatus=NULL;
   bool wasRetrying=watcher.phase==WATCH_RETRY;
   WATCH_Update(&watcher,Now(),&watchOperations);
-  // Refresh RSSI for display; Watch, not squelch, owns the audio gate here.
-  if (WATCH_Owner(&watcher)!=UINT8_MAX) (void)RECEIVER_Measure();
+  // Previously measured on every main-loop iteration: an SI broadcast
+  // background could continuously hammer the shared I2C bus.
+  // Watch owns the audio gate; these samples update the display only.
+  if (WATCH_Owner(&watcher)!=UINT8_MAX) {
+    uint32_t interval = gReceiver.plan.device == RX_DEVICE_SI &&
+                        gReceiver.plan.parameters.mode == RX_WFM
+                          ? UVK6_FM_RSQ_POLL_MS :
+                        gReceiver.plan.device == RX_DEVICE_BROADCAST
+                          ? 1000u : WATCH_METER_POLL_MS;
+    if (interval && (int32_t)(Now()-watchMeterAt)>=0) {
+      watchMeterAt = Now()+interval;
+      (void)RECEIVER_Measure();
+    }
+  }
   // If all candidates fail, listen to the primary during bounded retry delay.
   if (watcher.phase==WATCH_RETRY && !wasRetrying) (void)restorePrimary();
 }

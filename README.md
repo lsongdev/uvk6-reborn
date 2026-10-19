@@ -9,6 +9,7 @@ Tune by band, frequency, and explicit demodulation mode. Features include multi-
 - [User Manual](docs/user-manual.md): installation, controls, menus, and everyday use.
 - [Design](docs/design.md): feature behavior, data model, and roadmap.
 - [Development](docs/development.md): build, flashing, source code, tools, and checks.
+- [FM Audio Noise Investigation](docs/fm-audio-noise.md): SI4732 sampling audit, fixes, diagnostic builds, and listening tests.
 - [Hardware Facts](docs/hardware-uvk6.md): device, chips, controls, and storage references.
 
 ## Quick Start

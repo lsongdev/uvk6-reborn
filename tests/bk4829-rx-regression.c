@@ -9,7 +9,6 @@ static uint16_t regs[128], event;
 static uint16_t rxTransitions[16];
 static unsigned transitions;
 void BK48X9_BusInit(void) {}
-void BK48X9_ConfigureMicrophone(uint8_t mic) { (void)mic; }
 void SYS_DelayMs(uint32_t ms) { (void)ms; }
 static unsigned rssiReads, glitchHigh, delays;
 void TIMER_DelayUs(uint32_t us) { delays += us; }

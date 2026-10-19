@@ -15,9 +15,9 @@ bool RX_DEVICE_RouteAudio(RxDevice device, bool open) {
   (void)device; if (!open) ++mutes; return routeOK;
 }
 static uint16_t sampleRssi = 42;
-static bool sampleOpen;
+static bool sampleOpen, sampleOK = true;
 bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open) {
-  (void)plan; *rssi = sampleRssi; *open = sampleOpen; return true;
+  (void)plan; *rssi = sampleRssi; *open = sampleOpen; return sampleOK;
 }
 void LED_SetGreen(bool on) { (void)on; }
 void BACKLIGHT_SetReception(bool open) { (void)open; }
@@ -56,6 +56,11 @@ int main(int argc, char **argv) {
   sampleOpen = true; RECEIVER_UpdateSquelch();
   assert(gReceiver.open && gReceiver.rssi == 42);
   unsigned before = mutes;
+  // A transient RSQ NACK must not cut off an FM station or zero RSSI.
+  sampleOK = false; sampleOpen = false; sampleRssi = 0;
+  RECEIVER_UpdateSquelch();
+  assert(gReceiver.open && gReceiver.rssi == 42 && mutes == before);
+  sampleOK = true; sampleRssi = 42;
   sampleOpen = false; RECEIVER_UpdateSquelch();
   assert(!gReceiver.open && mutes == before + 1);
   RECEIVER_UpdateSquelch(); assert(mutes == before + 1);
