@@ -5,19 +5,20 @@
 bool gRedrawScreen;
 
 static bool hasSi = true, hardwareApplyOk = true, routeOK = true;
-static unsigned probes, hardwareApplies, mutes;
+static unsigned probes, hardwareApplies, mutes, opens;
 static RxDevice lastPrevious;
 bool RX_DEVICE_Activate(const RxPlan *plan) {
   (void)plan; lastPrevious = gReceiver.plan.device; ++hardwareApplies;
   return hardwareApplyOk;
 }
 bool RX_DEVICE_RouteAudio(RxDevice device, bool open) {
-  (void)device; if (!open) ++mutes; return routeOK;
+  (void)device; if (open) ++opens; else ++mutes; return routeOK;
 }
 static uint16_t sampleRssi = 42;
 static bool sampleOpen, sampleOK = true;
+static unsigned samples;
 bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open) {
-  (void)plan; *rssi = sampleRssi; *open = sampleOpen; return sampleOK;
+  (void)plan; ++samples; *rssi = sampleRssi; *open = sampleOpen; return sampleOK;
 }
 void LED_SetGreen(bool on) { (void)on; }
 void BACKLIGHT_SetReception(bool open) { (void)open; }
@@ -28,6 +29,42 @@ static unsigned chipInitializations;
 void RX_DEVICE_Init(void) { ++chipInitializations; }
 
 void testFrequencyInput(void);
+
+// Samples since the previous call.
+static unsigned sampled(void) { unsigned n = samples; samples = 0; return n; }
+// Polls every millisecond across [from, to).
+static uint32_t pollFor(uint32_t from, uint32_t to) {
+  for (uint32_t t = from; t < to; ++t) RECEIVER_Poll(t);
+  return to;
+}
+static void testPoll(void) {
+  // SQ0 without a tone opens without waiting on a sample; the meter of a
+  // BK plan is read every 200 ms, not at the 50 ms squelch rate.
+  gReceiver.plan = (RxPlan){RX_DEVICE_BK, 145500000u, {RX_NFM, 12500, 12000, 0, 0}};
+  gReceiver.open = false; sampleOpen = false; sampled();
+  uint32_t t = pollFor(10000, 11000);
+  assert(gReceiver.open && sampled() == 5);
+  // SQ0 with a receive tone still decides: 50 ms squelch samples.
+  gReceiver.plan.parameters.rx_tone = 1;
+  t = pollFor(t, t + 1000);
+  assert(!gReceiver.open && sampled() == 20);
+  // A squelched plan: 50 ms.
+  gReceiver.plan.parameters.rx_tone = 0; gReceiver.plan.parameters.squelch = 4;
+  t = pollFor(t, t + 1000); assert(sampled() == 20);
+  // BK1080: once a second, squelched or not, and the meter still updates.
+  gReceiver.plan = (RxPlan){RX_DEVICE_BROADCAST, 95900000u, {RX_WFM, 100000, 0, 4, 0}};
+  t = pollFor(t, t + 3000); assert(sampled() == 3);
+  gReceiver.plan.parameters.squelch = 0; sampleRssi = 77;
+  t = pollFor(t, t + 3000); assert(sampled() == 3 && gReceiver.rssi == 77 && gReceiver.open);
+  // SI4732 meter: UVK6_FM_RSQ_POLL_MS.
+  gReceiver.plan = (RxPlan){RX_DEVICE_SI, 95900000u, {RX_WFM, 100000, 0, 0, 0}};
+  t = pollFor(t, t + 2000); assert(sampled() == 2000u / UVK6_FM_RSQ_POLL_MS);
+  // A failed route at SQ0 is retried at the squelch cadence, not every loop.
+  gReceiver.open = false; routeOK = false; opens = 0;
+  (void)pollFor(t, t + 1000);
+  assert(!gReceiver.open && opens == 20);
+  routeOK = true; sampleRssi = 42;
+}
 
 int main(int argc, char **argv) {
   (void)argv;
@@ -71,6 +108,7 @@ int main(int argc, char **argv) {
   routeOK = true;
   assert(RECEIVER_Select(&bk,true));
   assert(gReceiver.plan.frequency_hz == 438500000u && gReceiver.open && hardwareApplies == 2);
+  testPoll();
   testFrequencyInput();
   return 0;
 }

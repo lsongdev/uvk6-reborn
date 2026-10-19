@@ -48,13 +48,13 @@ alter transmit/RF calibrations, AGC or undocumented FM tuning properties.
 
 ## Changes in this PR
 
-1. Watch's *display-only meter* now refreshes every 500 ms for SI4732 WFM,
-   every 1000 ms for BK1080 broadcast, and every 200 ms for other receivers.
-   Signal detection and 50 ms BK event checks remain controlled by the watch
-   state machine. This keeps main's recent BK1080 normal-squelch slow polling.
-2. Outside watch, SI4732 WFM SQ0 routes audio continuously without waiting
-   on RSQ. It polls signal quality every 500 ms **only for meter display**.
-   SQ>0 retains 50 ms squelch response; non-SI receive paths are unchanged.
+1. One sampling policy (`src/radio/receiver.h`, `RECEIVER_Poll`): a plan
+   with SQ0 and no receive tone stays open and is sampled only for the
+   meter, every `RECEIVER_MeterPeriodMs()` (SI4732 500 ms, BK1080 1000 ms,
+   BK 200 ms); other plans sample squelch every 50 ms (BK1080 1000 ms).
+   Watch uses the same meter period instead of measuring every loop.
+2. The BK1080 is read once a second whatever its squelch, so the signal
+   meter keeps updating.
 3. Failed `RX_DEVICE_Sample()` leaves the current audio gate and last valid
    signal meter value intact. This prevents one failed read being interpreted
    as "squelch closed"; a separate policy for sustained hardware faults may
@@ -90,6 +90,14 @@ sound. Useful additional experiments after the above: freeze LCD refresh,
 use a fixed (non-PWM) backlight level via temporary board-only diagnostic
 code, suspend matrix scanning while maintaining physical PTT safety, or
 measure VDD/audio with an oscilloscope. These are **not** changes made here.
+
+## UV-K1 hardware evidence (2026-10-20)
+
+On the UV-K1 (BK1080 broadcast over a bit-banged I2C on PF5/PF6) the user
+heard a faint regular ticking with BK1080 read every 50 ms. Reading it once
+a second instead left a barely audible tick about once a second. Bus traffic
+to the receiver chip is therefore an audible source on that radio; the K6
+SI4732 path has not been A/B tested yet.
 
 ## Verification limits
 
