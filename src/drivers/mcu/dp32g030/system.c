@@ -1,6 +1,6 @@
 #include "hal/system.h"
-#include "drivers/dp32g030/pmu.h"
-#include "drivers/dp32g030/syscon.h"
+#include "drivers/mcu/dp32g030/pmu.h"
+#include "drivers/mcu/dp32g030/syscon.h"
 #include "hal/systick.h"
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
 

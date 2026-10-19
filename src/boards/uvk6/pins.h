@@ -14,12 +14,12 @@
  *     limitations under the License.
  */
 
-// DP32G030 pin numbers and register bit helpers for the UV-K6 board files
-// in hal/. Drivers and higher layers use hal/gpio.h lines instead.
-#ifndef HAL_GPIO_DP32G030_H
-#define HAL_GPIO_DP32G030_H
+// UV-K6 pin numbers on the DP32G030 ports, for board files only. Drivers
+// and higher layers use hal/gpio.h lines instead.
+#ifndef BOARDS_UVK6_PINS_H
+#define BOARDS_UVK6_PINS_H
 
-#include <stdint.h>
+#include "drivers/mcu/dp32g030/gpio-bits.h"
 
 enum GPIOA_PINS {
 	GPIOA_PIN_KEYBOARD_0 = 3,
@@ -61,10 +61,6 @@ enum GPIOC_PINS {
 
 	GPIOC_PIN_PTT = 5,
 };
-
-void GPIO_ClearBit(volatile uint32_t *pReg, uint8_t Bit);
-uint8_t GPIO_CheckBit(volatile const uint32_t *pReg, uint8_t Bit);
-void GPIO_SetBit(volatile uint32_t *pReg, uint8_t Bit);
 
 #endif
 

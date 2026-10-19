@@ -1,17 +1,17 @@
 #include "hal/board.h"
-#include "hal/adc.h"
+#include "drivers/mcu/dp32g030/adc.h"
 #include "hal/backlight.h"
 #include "hal/crc.h"
-#include "hal/gpio-dp32g030.h"
+#include "boards/uvk6/pins.h"
 #include "hal/display.h"
 #include "hal/i2c.h"
 #include "hal/system.h"
 #include "hal/systick.h"
 #include "hal/uart.h"
-#include "drivers/dp32g030/gpio.h"
-#include "drivers/dp32g030/portcon.h"
-#include "drivers/dp32g030/saradc.h"
-#include "drivers/dp32g030/syscon.h"
+#include "drivers/mcu/dp32g030/gpio.h"
+#include "drivers/mcu/dp32g030/portcon.h"
+#include "drivers/mcu/dp32g030/saradc.h"
+#include "drivers/mcu/dp32g030/syscon.h"
 
 // Макросы для сокращения кода
 #define SET_BITS(reg, mask) ((reg) |= (mask))

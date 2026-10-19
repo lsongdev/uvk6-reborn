@@ -1,6 +1,4 @@
-#include "hal/eeprom.h"
-#include "hal/eeprom-layout.h"
-#include "hal/storage.h"
+#include "drivers/eeprom-24cxx/eeprom.h"
 #include "hal/scheduler.h"
 #include "hal/i2c.h"
 #include "hal/system.h"
@@ -11,9 +9,6 @@ const char *EEPROM_TYPE_NAMES[7] = {"64 ?", "128", "256", "512", "1024", "M02?",
 static const uint32_t EEPROM_SIZES[7] = {8192,16384,32768,65536,131072,262144,524288};
 static const uint16_t PAGE_SIZES[7] = {32,64,64,128,128,256,128};
 
-static bool writes_enabled = false;
-
-void EEPROM_SetWritesEnabled(bool enabled) { writes_enabled = enabled; }
 
 static uint32_t g_eeprom_size = 0;
 
@@ -99,7 +94,7 @@ int EEPROM_ReadBuffer(uint32_t address, void *pBuffer, uint16_t size) {
 
 
 // Page-split write with no layout policy; every caller must apply one.
-static bool writeUnchecked(uint32_t address, const uint8_t *pBuffer, uint16_t size) {
+bool EEPROM_WriteBuffer(uint32_t address, const uint8_t *pBuffer, uint16_t size) {
   if (pBuffer == NULL || address >= g_eeprom_size || size > g_eeprom_size - address)
     return false;
 
@@ -149,34 +144,9 @@ static bool writeUnchecked(uint32_t address, const uint8_t *pBuffer, uint16_t si
     pBuffer += chunk_size;
     address += chunk_size;
     size -= chunk_size;
-    gStorageWrite = true;
   }
   return true;
 }
-
-bool EEPROM_TryWriteBuffer(uint32_t address, const uint8_t *pBuffer, uint16_t size) {
-  return writes_enabled && EEPROM_WriteAllowed(address, size) &&
-         writeUnchecked(address, pBuffer, size);
-}
-
-bool EEPROM_WriteMaintenance(uint32_t address, const uint8_t *pBuffer, uint16_t size) {
-  uint8_t back[32];
-  bool allowed = EEPROM_ResourceWriteAllowed(address, size, EEPROM_DetectSize()) ||
-      EEPROM_CalibrationWriteAllowed(address, size);
-  if (!writes_enabled || !allowed || !writeUnchecked(address, pBuffer, size))
-    return false;
-  for (uint16_t at = 0; at < size; at += sizeof(back)) { // Read back.
-    uint16_t n = (uint16_t)(size - at);
-    if (n > sizeof(back)) n = sizeof(back);
-    if (EEPROM_ReadBuffer(address + at, back, n) != 0 || memcmp(back, pBuffer + at, n) != 0)
-      return false;
-  }
-  return true;
-}
-
-
-
-
 
 EEPROMType EEPROM_DetectType(void) {
   static bool probed;
@@ -212,5 +182,4 @@ bool EEPROM_Detect(uint8_t device_addr) {
   return (result == 0);
 }
 
-#include "hal/uart.h"
 

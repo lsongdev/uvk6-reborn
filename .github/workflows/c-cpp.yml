@@ -39,19 +39,19 @@ jobs:
         run: |
           arm-none-eabi-gcc --version | head -1
           make -B -j4 all
-          python3 tools/map_analyze.py obj/output.map 15
+          python3 tools/map_analyze.py obj/uvk6/output.map 15
       - name: Verify artifacts
         run: |
-          test -s bin/firmware
-          test -s bin/firmware.bin
-          test -s bin/firmware.packed.bin
-          python3 -c 'from pathlib import Path; n=Path("bin/firmware.bin").stat().st_size; assert 8 <= n <= 0xF000, f"Invalid firmware size: {n}"; print(f"Raw firmware: {n}/61440 bytes ({61440-n} free)"); print("::warning::Less than 2 KiB free in firmware Flash" if 61440-n < 2048 else "Flash headroom OK")'
+          test -s bin/uvk6/firmware
+          test -s bin/uvk6/firmware.bin
+          test -s bin/uvk6/firmware.packed.bin
+          python3 -c 'from pathlib import Path; n=Path("bin/uvk6/firmware.bin").stat().st_size; assert 8 <= n <= 0xF000, f"Invalid firmware size: {n}"; print(f"Raw firmware: {n}/61440 bytes ({61440-n} free)"); print("::warning::Less than 2 KiB free in firmware Flash" if 61440-n < 2048 else "Flash headroom OK")'
       - name: Upload raw and packed firmware
         uses: actions/upload-artifact@v4
         with:
           name: uvk6-reborn-firmware
           path: |
-            bin/firmware
-            bin/firmware.bin
-            bin/firmware.packed.bin
-            obj/output.map
+            bin/uvk6/firmware
+            bin/uvk6/firmware.bin
+            bin/uvk6/firmware.packed.bin
+            obj/uvk6/output.map

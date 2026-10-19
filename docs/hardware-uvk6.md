@@ -19,9 +19,9 @@
 
 ## 2. MCU 与链接约束
 
-项目面向 DP32G030 平台，构建参数为 ARM Cortex-M0、Thumb、AAPCS。寄存器定义位于 `src/drivers/dp32g030/`。尚未通过本台设备芯片丝印独立确认 MCU 型号。
+项目面向 DP32G030 平台，构建参数为 ARM Cortex-M0、Thumb、AAPCS。寄存器定义位于 `src/drivers/mcu/dp32g030/`。尚未通过本台设备芯片丝印独立确认 MCU 型号。
 
-[链接脚本](../firmware.ld) 定义：
+[链接脚本](../src/boards/uvk6/firmware.ld) 定义：
 
 | 区域 | 起始地址 | 固件允许使用的大小 |
 | --- | --- | --- |
@@ -33,7 +33,7 @@
 
 ## 3. 引脚、键盘与物理标记
 
-主要依据：[GPIO 名称](../src/hal/gpio.h)、[引脚复用初始化](../src/hal/board.c)、[键盘扫描](../src/hal/keyboard.c)。下表为固件预期映射，未经本台 PCB 通断测量。
+主要依据：[引脚号](../src/boards/uvk6/pins.h)、[引脚复用初始化](../src/boards/uvk6/board.c)、[键盘扫描](../src/boards/uvk6/keyboard.c)。下表为固件预期映射，未经本台 PCB 通断测量。
 
 | 功能 | MCU 引脚 | 备注 |
 | --- | --- | --- |
@@ -58,7 +58,7 @@
 
 ### 键盘与键帽依据
 
-按键编号与扫描位置依据 [按键枚举](../src/hal/keyboard.h)、[键盘矩阵](../src/hal/keyboard.c) 和 [GPIO 定义](../src/hal/gpio.h)。键帽主标、副标是物理标记，不等同于当前固件已经绑定的功能；当前短按、长按行为以 [用户手册](user-manual.md#2-主屏幕与按键) 为准。
+按键编号与扫描位置依据 [按键枚举](../src/hal/keyboard.h)、[键盘矩阵](../src/boards/uvk6/keyboard.c) 和 [引脚号](../src/boards/uvk6/pins.h)。键帽主标、副标是物理标记，不等同于当前固件已经绑定的功能；当前短按、长按行为以 [用户手册](user-manual.md#2-主屏幕与按键) 为准。
 
 **键帽依据**：2026-10-12 逐项核对[泉盛官方 UV-K5(8) 产品页](https://en.qsfj.com/products/3268)的清晰正面图（图片文件 `fm-1683793427.png`）。厂家该页面正文称设备为 UV-K6，[对应下载页](https://en.qsfj.com/support/downloads/3268)也包含 UV-K6 资料。`M(A)`、`▲(B)`、`▼(C)`、`1(Band)`、`2(A/B)` 同时与用户提供的本台标记一致。下表完整记录厂家图中的主标与副标；大小写保留键帽写法，换行副标以 `/` 连写。它是原厂面板依据，换装键帽时应同步更新。
 
@@ -209,7 +209,7 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 
 对以上示例的 **2 Mbit EEPROM**，常规数据区需要 18 位地址：最低 16 位是 I²C 字地址两个字节，另外 2 位作为器件地址字的 bank 选择位。对于 **A2=0 的 BL24CM2A 类电路**，128–512 KiB 的组合可使用 7 位地址 `0x50–0x53`（一颗 2 Mbit）、`0x54–0x57`（第二颗 2 Mbit，取决于第二颗的地址脚连接）。这些地址为典型示例，**不能取代芯片具体型号与接线验证**。读写 64 KiB bank 边界必须重新选址，写入必须按该芯片的页边界分割，以免页内地址回绕覆写已有数据。
 
-现有 [EEPROM 驱动](../src/hal/eeprom.c)：
+现有 [EEPROM 驱动](../src/drivers/eeprom-24cxx/eeprom.c)：
 
 - 使用 `0xA0 | ((address >> 15) & 0x0E)` 作为 **8 位 I²C 控制字**；它等价于从每个 64 KiB 区间选择 `0x50`、`0x51` 等 7 位器件地址，对某些大容量 banked EEPROM 有效；**不是所有容量及所有 EEPROM 型号的通用公式**。
 - 使用两字节内部地址及页边界分块；对 BL24C64A 的低 8 KiB 地址范围可使用两字节字地址。目前**即使探测推算出 256 B 物理页，也保守地以最多 32 B 写块提交**，因为 ACK 计数不能确认真实页大小；这会降低写入速度，但避免把 32 B 页器件当成 256 B 页器件时意外回绕覆盖。
@@ -242,7 +242,7 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 
 ### 普通构建写保护
 
-新版固件在 `hal/eeprom-layout.h` 只允许写配置区 `0x0800–0x0FFF`（两份格式 9 各 1024 字节）和频道区 `0xB000–0x113FF`。其他地址只能通过读取接口访问，UART 原始 EEPROM 写命令已经禁用。唯一例外是独立的 UART 维护写（`EEPROM_WriteMaintenance`，命令 0x0570）：只接受 SSB 资源尾区和校准区 `0x1E00–0x1FFF`，写后回读；确认和备份由 `tools/resources.py` 负责，通用写入函数没有放开。所有写入保守按最多 32 B 分块，候选页大小不等于已验证的物理页。
+新版固件在 `boards/uvk6/storage-layout.h` 只允许写配置区 `0x0800–0x0FFF`（两份格式 9 各 1024 字节）和频道区 `0xB000–0x113FF`。其他地址只能通过读取接口访问，UART 原始 EEPROM 写命令已经禁用。唯一例外是独立的 UART 维护写（`EEPROM_WriteMaintenance`，命令 0x0570）：只接受 SSB 资源尾区和校准区 `0x1E00–0x1FFF`，写后回读；确认和备份由 `tools/resources.py` 负责，通用写入函数没有放开。所有写入保守按最多 32 B 分块，候选页大小不等于已验证的物理页。
 
 ## 6. PA 校准与维护例外
 

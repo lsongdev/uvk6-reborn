@@ -1,8 +1,8 @@
 #include "hal/keyboard.h"
-#include "drivers/dp32g030/gpio.h"
+#include "drivers/mcu/dp32g030/gpio.h"
 #include "hal/scheduler.h"
 #include "hal/gpio.h"
-#include "hal/gpio-dp32g030.h"
+#include "boards/uvk6/pins.h"
 #include "hal/systick.h"
 
 static void postKey(KEY_Code_t key, Key_State_t state);

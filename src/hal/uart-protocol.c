@@ -19,7 +19,7 @@ bool UART_CommandValid(const uint8_t *data, uint16_t size) {
     return size > 16 && data[8] <= 128 && size == 16u + data[8];
   default:
     // In particular 0x051d (raw EEPROM write) is not exposed; 0x0570 only
-    // reaches the resource tail and calibration (EEPROM_WriteMaintenance).
+    // reaches the resource tail and calibration (BOARD_MaintenanceWrite).
     return false;
   }
 }

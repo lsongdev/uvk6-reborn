@@ -19,7 +19,7 @@ TAIL = CAPACITY - resources.HEADER_BYTES - resources.SSB_BYTES
 
 
 class FakeFirmware:
-    """Answers 0x0514/0x051B/0x0570 like src/hal/uart.c; writes only the tail
+    """Answers 0x0514/0x051B/0x0570 like src/boards/uvk6/uart.c; writes only the tail
     and the calibration block 0x1E00-0x1FFF."""
 
     def __init__(self):

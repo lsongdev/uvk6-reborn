@@ -29,7 +29,7 @@ CAPACITY = 524288  # UV-K6 512 KiB (AGENTS.md); --capacity for other parts.
 SSB_MAGIC = b'SSBP'
 SSB_BYTES = 8840
 SSB_PATCH = ROOT / 'resources/si4735/patch_init.h'
-# Factory calibration block and its PA rows (src/hal/eeprom-layout.h).
+# Factory calibration block and its PA rows (src/boards/uvk6/storage-layout.h).
 CAL_START, CAL_BYTES = 0x1E00, 0x200
 PA_BASE, PA_BANDS, PA_STRIDE, PA_BYTES = 0x1ED0, 7, 16, 9
 # Reference rows for an erased radio, from three public UV-K5(8) dumps:

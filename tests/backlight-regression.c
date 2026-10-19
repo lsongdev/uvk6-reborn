@@ -1,11 +1,10 @@
-// Mock only PWM output; exercise the actual backlight state machine.
-#include <stdint.h>
-#include "drivers/dp32g030/pwmplus.h"
-#undef PWM_PLUS0_CH0_COMP
-static uint32_t output;
-#define PWM_PLUS0_CH0_COMP output
+// Mock only the board PWM; exercise the actual backlight state machine.
 #include "../src/hal/backlight.c"
 #include <assert.h>
+static uint32_t output;
+void BOARD_BacklightInit(void) {}
+// The UV-K6 duty mapping, so the expected values stay comparable.
+void BOARD_BacklightSetLevel(uint8_t level) { output = (1u << (level + 2)) - 1; }
 DeviceConfig gDeviceConfig = {.preferences=CONFIG_DEFAULT_PREFERENCES};
 uint8_t BL_TIME_VALUES[7]={0,5,10,20,60,120,255};
 int main(void) {
