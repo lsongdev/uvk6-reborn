@@ -241,4 +241,6 @@ void BOARD_ADC_GetBatteryInfo(uint16_t *pVoltage, uint16_t *pCurrent) {
 
 bool BOARD_HasSi4732(void) { return true; }
 
+bool BOARD_BroadcastUsesBkVhfPath(void) { return false; }
+
 BoardRadioChip BOARD_RadioChip(void) { return BOARD_RADIO_BK4819; }

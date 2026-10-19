@@ -49,8 +49,18 @@ void BK4819_SetFilterBandwidth(BK4819_FilterBandwidth_t bw) { (void)bw; }
 void BK4819_SetAGC(uint8_t i) { (void)i; }
 void BK4819_SetAFC(uint8_t n) { (void)n; }
 void BK4819_SetAFCSpeed(uint8_t n) { (void)n; }
-void BK4819_Squelch(uint8_t v, uint8_t a, uint8_t b) { (void)v; (void)a; (void)b; }
-void BK4819_SelectFilterEx(Filter filter) { (void)filter; }
+static SQL lastSquelch;
+void BK4819_SetupSquelch(SQL sq, uint8_t a, uint8_t b) { lastSquelch = sq; (void)a; (void)b; }
+// UV-K1 calibration rows: 0x00 UHF and 0x60 VHF, six rows of 16 bytes.
+static uint8_t calibration[0x200];
+static bool calibrationReadable = true;
+bool STORAGE_Read(StorageArea area, uint32_t offset, void *data, uint16_t size) {
+  if (!calibrationReadable || area != STORAGE_CALIBRATION || offset + size > sizeof(calibration))
+    return false;
+  memcpy(data, calibration + offset, size); return true;
+}
+static Filter lastFilter = FILTER_OFF;
+void BK4819_SelectFilterEx(Filter filter) { lastFilter = filter; }
 void BK4819_TuneTo(uint32_t hz10, bool precise) {
   ++bkTunes; lastBkHz10 = hz10; assert(precise);
 }
@@ -106,9 +116,7 @@ uint16_t BK4819_GetRSSI(void) { return watchRSSI; }
 uint8_t BK4819_GetNoise(void) { return watchNoise; }
 uint8_t BK4819_GetGlitch(void) { return watchGlitch; }
 bool BK4819_CssIsDetected(bool digital) { (void)digital; return watchTone; }
-SQL GetSql(uint8_t level) {
-  assert(level>=4); return (SQL){.ro=108,.no=44,.go=60};
-}
+SQL GetSql(uint8_t level) { return level ? (SQL){.ro=108,.no=44,.go=60} : (SQL){0}; }
 static char audioOrder[16];
 static unsigned audioCount;
 static void audioEvent(char c) { if (audioCount < sizeof(audioOrder)) audioOrder[audioCount++] = c; }
@@ -124,6 +132,8 @@ static unsigned chipProbes, patchSources;
 static bool hasSi = true;
 static bool allowSi = true;
 bool BOARD_HasSi4732(void) { return allowSi; }
+static bool sharedBkPath;
+bool BOARD_BroadcastUsesBkVhfPath(void) { return sharedBkPath; }
 BoardRadioChip BOARD_RadioChip(void) { return allowSi ? BOARD_RADIO_BK4819 : BOARD_RADIO_BK4829; }
 bool isSi4732On;
 bool BK1080_Detect(void) { ++chipProbes; return !hasSi; }
@@ -138,6 +148,30 @@ void SI47XX_SetPatchSource(SI47XX_PatchRead read, uint16_t length) {
 static uint8_t initMic; static uint16_t initDeviation;
 void BK4819_Init(uint8_t mic, uint16_t deviation) { initMic = mic; initDeviation = deviation; }
 void TX_DEVICE_Disable(void) {}
+
+static void testCalibratedSquelch(void) {
+  // BK4829 (allowSi false): level n reads byte n of each row; UHF from 0x00.
+  bool previousSi = allowSi;
+  allowSi = false;
+  for (unsigned i = 0; i < 6; ++i) {
+    calibration[0x00 + 16 * i + 4] = (uint8_t)(0x40 + i);
+    calibration[0x60 + 16 * i + 4] = (uint8_t)(0x50 + i);
+  }
+  SQL sq = squelchFor(4, 438500000u);
+  assert(sq.ro == 0x40 && sq.rc == 0x41 && sq.no == 0x42 && sq.nc == 0x43 && sq.gc == 0x44 && sq.go == 0x45);
+  sq = squelchFor(4, 145500000u);
+  assert(sq.ro == 0x50 && sq.go == 0x55); // VHF rows below 174 MHz.
+  calibration[0x50 + 4] = 0xFF; // Erased byte: the formula takes over.
+  assert(squelchFor(4, 438500000u).ro == 108);
+  calibration[0x50 + 4] = 0x45;
+  calibrationReadable = false;
+  assert(squelchFor(4, 145500000u).ro == 108);
+  calibrationReadable = true;
+  assert(squelchFor(0, 145500000u).ro == 0); // Level 0 stays open.
+  allowSi = true; // BK4819 boards keep the formula.
+  assert(squelchFor(4, 145500000u).ro == 108);
+  allowSi = previousSi;
+}
 
 static void testDetectionAndInit(void) {
   // Probed once, then cached; the SSB patch source is handed to the SI driver.
@@ -183,6 +217,7 @@ int main(int argc, char **argv) {
     assert(siIo == 0 && !speakerOn);
     return 0;
   }
+  testCalibratedSquelch();
   testDetectionAndInit();
   RxPlan bk = plan(100000000, RX_NFM, RX_DEVICE_BK);
   RxPlan native = plan(100000000, RX_WFM, RX_DEVICE_SI);
@@ -232,6 +267,18 @@ int main(int argc, char **argv) {
   assert(broadcastTunes == 3);
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BROADCAST));
   assert(bkTunes == 4 && lastBkHz10 == 10000000u);
+  // UV-K1: broadcast needs the BK VHF LNA; no background BK retune meanwhile.
+  sharedBkPath = true;
+  assert(RX_DEVICE_Apply(&fmRadio, RX_DEVICE_BK));
+  assert(broadcastTunes == 4 && lastFilter == FILTER_VHF);
+  RxPlan uhfWatch = plan(438500000u, RX_NFM, RX_DEVICE_BK);
+  unsigned bkTunesBefore = bkTunes;
+  assert(!RX_DEVICE_ApplyConcurrent(&uhfWatch) && bkTunes == bkTunesBefore);
+  assert(lastFilter == FILTER_VHF);
+  assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BROADCAST)); // Leaving broadcast frees BK.
+  assert(RX_DEVICE_ApplyConcurrent(&uhfWatch));
+  sharedBkPath = false;
+  bkTunes = 4;
   gDeviceConfig.preferences.si4732_power_off = true;
   assert(RX_DEVICE_Apply(&bk, RX_DEVICE_SI));
   assert(siPowerDowns == 1 && bkTunes == 5);
