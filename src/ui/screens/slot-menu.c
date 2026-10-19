@@ -1,4 +1,4 @@
-// Per-slot menu: RX parameters, TX settings, reset and Save as channel.
+// Per-slot menu: RX parameters, TX settings, Save as channel and reset.
 #include "ui/screens/slot-menu.h"
 #include "ui/screens/save-channel.h"
 #include "ui/screens/spectrum.h"
@@ -101,7 +101,7 @@ static void menuRender(void) {
 #if UVK6_ENABLE_SPECTRUM
     "Spectrum",
 #endif
-    "Reset to presets", "Save as channel"
+    "Save as channel", "Reset to presets"
   };
   _Static_assert(sizeof(names)/sizeof(names[0]) == MENU_ITEM_COUNT,
                  "Every slot menu item needs a label");
