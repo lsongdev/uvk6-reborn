@@ -73,6 +73,12 @@ HandlerReset:
 	ldr	r0, =0xE000ED08
 	ldr	r1, =g_pfnVectors
 	str	r1, [r0]
+	@ Its interrupts too: disable and clear every external one before cpsie.
+	ldr	r0, =0xE000E180            @ NVIC_ICER0
+	ldr	r1, =0xFFFFFFFF
+	str	r1, [r0]
+	ldr	r0, =0xE000E280            @ NVIC_ICPR0
+	str	r1, [r0]
 	ldr	r0, =_estack
 	mov	sp, r0
 	bl	DATA_Init
