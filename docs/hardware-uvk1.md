@@ -54,8 +54,8 @@ K1 按住 PTT 开机进入刷机模式后，经 **K 头 UART 线**（`/dev/cu.us
 | LCD 背光 | PF8；TIM7 + DMA 写 BSRR 做软件 PWM，4 kHz | PB6 |
 | BK4829 三线总线 | CS PF9、SCL PB8、SDA PB9 | PC0／PC1／PC2 |
 | BK1080 I²C | PF5／PF6（只用于 BK1080） | PA10／PA11，与键盘共用 |
-| 键盘列（输出） | PB3–PB6 | PA10–PA13 |
-| 键盘行（输入，上拉） | PB12–PB15 | PA3–PA6 |
+| 键盘列（输出） | PB6、PB5、PB4、PB3 依次为第 0–3 列 | PA10–PA13 |
+| 键盘行（输入，上拉） | PB15、PB14、PB13、PB12 依次为第 0–3 行；实测 MENU = PB6／PB15，两侧方向键为 UP（左）／DOWN（右） | PA3–PA6 |
 | PTT | PB10，低电平为按下 | PC5 |
 | 侧键 | 全部列为高电平时读取行线（零列 → SIDE1／SIDE2） | 同样方法 |
 | 音频功放 | PA8 | PC4 |
