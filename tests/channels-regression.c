@@ -2,14 +2,7 @@
 #include "../src/ui/screens/channels.c"
 #include <assert.h>
 
-static uint8_t eeprom[524288];
-uint32_t EEPROM_DetectSize(void) { return sizeof(eeprom); }
-int EEPROM_ReadBuffer(uint32_t at, void *out, uint16_t size) {
-  memcpy(out,eeprom+at,size); return 0;
-}
-bool EEPROM_TryWriteBuffer(uint32_t at, const uint8_t *bytes, uint16_t size) {
-  memcpy(eeprom+at,bytes,size); return true;
-}
+#include "fake-storage.h"
 uint8_t gFrameBuffer[8][128];
 bool gRedrawScreen;
 static char *gTextinputText;
@@ -32,7 +25,7 @@ static void save(uint16_t n, const char *name) {
 }
 
 int main(void) {
-  memset(eeprom,0xff,sizeof(eeprom));
+  memset(fakeArea,0xff,sizeof(fakeArea));
   assert(CHANNEL_STORE_Init());
   enter();render();
   assert(!cursor && channelsScreen.title && !strcmp(channelsScreen.title,"Channels"));

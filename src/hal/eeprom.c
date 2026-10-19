@@ -1,12 +1,16 @@
 #include "hal/eeprom.h"
 #include "hal/eeprom-layout.h"
+#include "hal/storage.h"
 #include "hal/scheduler.h"
 #include "hal/i2c.h"
 #include "hal/system.h"
 #include "hal/systick.h"
 #include <string.h>
 
-bool gEepromWrite = false;
+const char *EEPROM_TYPE_NAMES[7] = {"64 ?", "128", "256", "512", "1024", "M02?", "4Mb?"};
+static const uint32_t EEPROM_SIZES[7] = {8192,16384,32768,65536,131072,262144,524288};
+static const uint16_t PAGE_SIZES[7] = {32,64,64,128,128,256,128};
+
 static bool writes_enabled = false;
 
 void EEPROM_SetWritesEnabled(bool enabled) { writes_enabled = enabled; }
@@ -145,7 +149,7 @@ static bool writeUnchecked(uint32_t address, const uint8_t *pBuffer, uint16_t si
     pBuffer += chunk_size;
     address += chunk_size;
     size -= chunk_size;
-    gEepromWrite = true;
+    gStorageWrite = true;
   }
   return true;
 }

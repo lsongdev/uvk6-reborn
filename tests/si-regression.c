@@ -64,11 +64,10 @@ void TIMER_DelayUs(uint32_t delay) { (void)delay; }
 void SYS_DelayMs(uint32_t delay) { (void)delay; }
 void GPIO_Write(GpioLine line, bool high) { assert(line == GPIO_BK1080); (void)high; }
 bool SETTINGS_IsPatchPresent(void) { return patchPresent; }
-uint32_t SETTINGS_GetEEPROMSize(void) { return 32768; }
-int EEPROM_ReadBuffer(uint32_t address, void *buffer, uint16_t size) {
-  (void)address;
+bool STORAGE_Read(StorageArea area, uint32_t offset, void *buffer, uint16_t size) {
+  assert(area == STORAGE_RESOURCES && offset >= RESOURCE_SSB_PATCH_OFFSET);
   memset(buffer, 0, size);
-  return 0;
+  return true;
 }
 
 int main(void) {

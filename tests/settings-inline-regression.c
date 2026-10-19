@@ -34,7 +34,7 @@ void RADIO_SlotsChanged(void) { ++slotChanges; }
 ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
 TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) { (void)frequency_hz; return (TxCapabilities){0}; }
 TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
-uint32_t EEPROM_DetectSize(void) { return 524288; }
+uint32_t STORAGE_Capacity(void) { return 524288; }
 const Screen bandsScreen = {0}, channelsScreen = {0};
 static const Screen *lastScreen;
 void SCREEN_Push(const Screen *screen) {

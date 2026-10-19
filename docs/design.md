@@ -141,7 +141,7 @@ FC 仅 VFO、BK 频率检测。core/capture 接收 BUSY／INVALID／SAMPLE，同
 
 整份记录填充至 1024 B，CRC32 覆盖整槽，两个副本轮换、按序号选择较新有效副本。写后分块回读，失败不报告成功；候选缓冲顺序复用，避免叠加多个 1 KiB 栈帧。无有效格式 9 时写锁定，用户确认初始化后写入默认配置。物理地址见硬件事实。
 
-频道为 200 个稳定编号，每号两份 64 B，含标记、8 位序号、编号、16 B 名称、RX、TX、CRC32。新副本写入与回读成功才更新状态；加载校验 CRC，坏副本回退；开机只读两份头部建立两个 25 B 位图。删除清两份标记，不能把它等同普通覆盖的断电原子性。名称保留 16 字节容量不表示已有中文编码／渲染。保存时优先预填原名称或广播 PS，没有名称时用紧凑频率；空名称也回退到频率。
+频道为 200 个稳定编号，每号两份 64 B，分别位于频道 A、B 两个存储区，含标记、8 位序号、编号、16 B 名称、RX、TX、CRC32。保存先写较旧的一份并回读，成功后才更新状态，再把同一记录镜像到另一份并回读；断电时要么保留旧版本，要么保留新版本。镜像使两份平时相同，因此在需要整扇区擦除的介质上，擦除一个区时同扇区的其他频道仍能从另一区取到当前内容，不会回滚。加载校验 CRC，坏副本回退；开机只读两份头部建立两个 25 B 位图。删除清两份标记，不能把它等同普通覆盖的断电原子性。名称保留 16 字节容量不表示已有中文编码／渲染。保存时优先预填原名称或广播 PS，没有名称时用紧凑频率；空名称也回退到频率。
 
 全局偏好唯一运行态是 gDeviceConfig.preferences。可编辑项须有合法值、明确消费路径、生效时机和保存反馈；只存在旧字段不作为开放功能依据。显示即时应用，RX 工程项离开设置后重新应用；校准和 Reset prefs 保存成功后提交候选。普通修改 1500 ms 合并保存、失败 5 秒后重试，Pending 可因掉电丢失。
 
@@ -189,4 +189,4 @@ FC 仅 VFO、BK 频率检测。core/capture 接收 BUSY／INVALID／SAMPLE，同
 | 页面按键、菜单与卡片 | [home.c](../src/ui/screens/home.c)、[slot-menu.c](../src/ui/screens/slot-menu.c)、[radio-card.c](../src/ui/radio-card.c) |
 | 守听、回话、TX 许可 | [watch.c](../src/core/watch.c)、[tx.c](../src/radio/tx.c)、[tx-model.c](../src/core/tx-model.c) |
 | Seek／FC／RDS | [seek.c](../src/radio/seek.c)、[capture.c](../src/radio/capture.c)、[rds.c](../src/core/rds.c)、[rds-receiver.c](../src/core/rds-receiver.c) |
-| 编码、写保护与偏好 | [config-store.c](../src/core/config-store.c)、[channel-store.c](../src/core/channel-store.c)、[eeprom-layout.h](../src/hal/eeprom-layout.h)、[settings.c](../src/core/settings.c) |
+| 编码、写保护与偏好 | [config-store.c](../src/core/config-store.c)、[channel-store.c](../src/core/channel-store.c)、[storage.h](../src/hal/storage.h)、[eeprom-layout.h](../src/hal/eeprom-layout.h)、[settings.c](../src/core/settings.c) |

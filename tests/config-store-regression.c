@@ -5,28 +5,29 @@
 #include <string.h>
 
 typedef struct {
-  uint8_t bytes[8192];
+  uint8_t bytes[CONFIG_STORE_SLOTS][CONFIG_STORE_SLOT_SIZE];
   unsigned writes;
   int write_limit;
-} FakeEEPROM;
-static bool readIO(void *ctx, uint32_t at, void *out, uint16_t n) {
-  FakeEEPROM *io = ctx;
-  if (at > sizeof(io->bytes) || n > sizeof(io->bytes)-at) return false;
-  memcpy(out, io->bytes+at, n);
+} FakeSlots;
+static bool readIO(void *ctx, unsigned slot, uint16_t at, void *out, uint16_t n) {
+  FakeSlots *io = ctx;
+  assert(slot < CONFIG_STORE_SLOTS);
+  if (at > CONFIG_STORE_SLOT_SIZE || n > CONFIG_STORE_SLOT_SIZE-at) return false;
+  memcpy(out, io->bytes[slot]+at, n);
   return true;
 }
-static bool writeIO(void *ctx, uint32_t at, const void *data, uint16_t n) {
-  FakeEEPROM *io = ctx;
-  if (at > sizeof(io->bytes) || n > sizeof(io->bytes)-at) return false;
+static bool writeIO(void *ctx, unsigned slot, const void *data, uint16_t n) {
+  FakeSlots *io = ctx;
+  assert(slot < CONFIG_STORE_SLOTS && n == CONFIG_STORE_SLOT_SIZE);
   ++io->writes;
   if (io->write_limit >= 0 && io->write_limit < n) {
-    memcpy(io->bytes+at, data, io->write_limit); // Simulate power loss.
+    memcpy(io->bytes[slot], data, io->write_limit); // Simulate power loss.
     return false;
   }
-  memcpy(io->bytes+at, data, n);
+  memcpy(io->bytes[slot], data, n);
   return true;
 }
-static FakeEEPROM memory;
+static FakeSlots memory;
 static void wipe(void) {
   memset(&memory,0xff,sizeof(memory));memory.writes=0;memory.write_limit=-1;
 }
@@ -62,7 +63,8 @@ int main(void) {
   assert(!EEPROM_CalibrationWriteAllowed(0x2000, 1) && !EEPROM_CalibrationWriteAllowed(0x1e00, 0));
   assert(!EEPROM_CalibrationWriteAllowed(0, 9) && !EEPROM_CalibrationWriteAllowed(CONFIG_STORE_BASE, 16));
   assert(!EEPROM_WriteAllowed(0x1ed0, 9)); // Never through the normal store.
-  assert(RESOURCE_SsbPatchAddress(cap) == 0x7DD78u);
+  assert(EEPROM_ResourceBase(cap) + RESOURCE_SSB_PATCH_OFFSET == 0x7DD78u);
+  assert(EEPROM_ResourceBase(0x1ffffu) == 0); // Small parts hold no resources.
 
   // Round trip of every field family, including the TX shift.
   DeviceConfig original, loaded;
@@ -114,7 +116,7 @@ int main(void) {
   assert(!CONFIG_Decode(record,&loaded,NULL));
 
   // Store: empty, then alternate copies; the newest valid copy loads.
-  ConfigStore io={&memory,readIO,writeIO,sizeof(memory.bytes),0};
+  ConfigStore io={&memory,readIO,writeIO};
   wipe();
   assert(!CONFIG_Load(&io,&loaded,NULL));
   assert(CONFIG_Save(&io,&original,&sequence) && sequence==1);
@@ -130,22 +132,22 @@ int main(void) {
   assert(CONFIG_Load(&io,&loaded,&sequence) && sequence==2 && loaded.radio.selected_slot==2);
   assert(CONFIG_Save(&io,&original,&sequence) && sequence==3);
   // A damaged newest copy falls back to the older one.
-  memory.bytes[CONFIG_STORE_BASE+PAYLOAD_START]^=0xff;
+  memory.bytes[0][PAYLOAD_START]^=0xff;
   assert(CONFIG_Load(&io,&loaded,&sequence) && sequence==2);
   // Sequence numbers compare across the wrap.
   wipe();
   assert(CONFIG_Encode(&original,UINT32_MAX,record));
-  memcpy(memory.bytes+CONFIG_STORE_BASE,record,RECORD_BYTES);
+  memcpy(memory.bytes[0],record,RECORD_BYTES);
   assert(CONFIG_Save(&io,&original,&sequence) && sequence==0);
   assert(CONFIG_Load(&io,&loaded,&sequence) && sequence==0);
   // An old format-8 record is "no configuration": nothing loads.
   wipe();
   assert(CONFIG_Encode(&original,5,record));
   record[HEADER_VERSION]=8;put32(record+HEADER_CRC,crc32(record,RECORD_BYTES));
-  memcpy(memory.bytes+CONFIG_STORE_BASE,record,RECORD_BYTES);
+  memcpy(memory.bytes[0],record,RECORD_BYTES);
   assert(!CONFIG_Load(&io,&loaded,NULL));
-  // Capacity guards.
-  io.capacity=CONFIG_STORE_END-1;
-  assert(!CONFIG_Load(&io,&loaded,NULL) && !CONFIG_Save(&io,&original,NULL));
+  // A store without read or write access refuses.
+  io.write=NULL;assert(!CONFIG_Save(&io,&original,NULL));
+  io.read=NULL;assert(!CONFIG_Load(&io,&loaded,NULL));
   return 0;
 }

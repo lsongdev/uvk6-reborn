@@ -1,6 +1,7 @@
 #include "ui/screens/statusline.h"
 #include "core/device-config.h"
-#include "hal/eeprom.h"
+#include "core/settings.h"
+#include "hal/storage.h"
 #include "drivers/si473x/si473x.h"
 #include "hal/display.h"
 #include "core/battery.h"
@@ -45,12 +46,12 @@ void STATUSLINE_update(void) {
     gRedrawScreen = true;
   }
 
-  if ((bool)lastEepromWrite != gEepromWrite) {
-    lastEepromWrite = gEepromWrite ? Now() : 0;
+  if ((bool)lastEepromWrite != gStorageWrite) {
+    lastEepromWrite = gStorageWrite ? Now() : 0;
     gRedrawScreen = true;
   }
   if (lastEepromWrite && Now() - lastEepromWrite > 500) {
-    lastEepromWrite = gEepromWrite = false;
+    lastEepromWrite = gStorageWrite = false;
     gRedrawScreen = true;
   }
 }
@@ -87,7 +88,7 @@ void STATUSLINE_render(void) {
   // the battery and transient state further left: [F][EEPROM] [SI][lock] bat.
   char icons[8] = {'\0'};
   uint8_t idx = 0;
-  if (gEepromWrite) icons[idx++] = SYM_EEPROM_W;
+  if (gStorageWrite) icons[idx++] = SYM_EEPROM_W;
   if (gReceiver.plan.device == RX_DEVICE_BROADCAST || isSi4732On)
     icons[idx++] = SYM_BROADCAST;
   if (gDeviceConfig.preferences.keylock) icons[idx++] = SYM_LOCK;

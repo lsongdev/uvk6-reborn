@@ -5,14 +5,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// Each channel has two 64-byte copies; a save writes the older copy and
-// reads it back, so power loss keeps the previous version.
-#define CHANNEL_STORE_BASE 0xB000u
+// Each channel has a 64-byte copy in STORAGE_CHANNELS_A and another in
+// STORAGE_CHANNELS_B. A save writes and verifies the older copy, then mirrors
+// it into the other: power loss keeps either the previous or the new version,
+// and channels sharing a flash erase unit keep their current one in the
+// other area.
 #define CHANNEL_STORE_RECORD_BYTES 64u
 #define CHANNEL_STORE_COPY_COUNT 2u
-#define CHANNEL_STORE_BYTES \
-  (USER_CHANNEL_COUNT * CHANNEL_STORE_COPY_COUNT * CHANNEL_STORE_RECORD_BYTES)
-#define CHANNEL_STORE_END (CHANNEL_STORE_BASE + CHANNEL_STORE_BYTES)
+#define CHANNEL_STORE_AREA_BYTES (USER_CHANNEL_COUNT * CHANNEL_STORE_RECORD_BYTES)
 
 // Channel numbers are stable, one-based EEPROM record identifiers.
 bool CHANNEL_STORE_Init(void);

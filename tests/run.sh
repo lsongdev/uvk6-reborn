@@ -146,6 +146,8 @@ esac
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/channel-store-regression.c src/core/crc32.c src/core/resource.c \
   src/core/radio-model.c src/core/tx-model.c -o "$test_binary"
 "$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/storage-regression.c -o "$test_binary"
+"$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/bk-rx-mode-regression.c \
   src/drivers/bk4819/rx.c -o "$test_binary"
 "$test_binary"

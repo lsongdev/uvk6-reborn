@@ -7,7 +7,7 @@
 #include "ui/screens/reset.h"
 #include "ui/screens/settings.h"
 #include "hal/backlight.h"
-#include "hal/eeprom.h"
+#include "hal/storage.h"
 #include "hal/keyboard.h"
 #include "hal/display.h"
 #include "hal/uart.h"
@@ -133,14 +133,14 @@ void SYS_Main() {
 
   SystemMessages n = KEYBOARD_GetKey();
   if (n.key == KEY_EXIT || !SETTINGS_Load()) {
-    // Unknown EEPROM contents are not our config: never write a marker or
+    // Unknown storage contents are not our config: never write a marker or
     // restart automatically. Only explicit initialization may unlock writes.
     initDisplay();
     gDeviceConfig.preferences.battery_calibration = 2000;
     gDeviceConfig.preferences.backlight = 5;
     SCREEN_Reset(&resetScreen);
   } else {
-    EEPROM_SetWritesEnabled(true);
+    STORAGE_SetWritesEnabled(true);
     BATTERY_UpdateBatteryInfo();
 
     initDisplay();

@@ -43,20 +43,6 @@ typedef enum {
   BAT_VOLTAGE,
 } BatteryStyle;
 
-typedef enum {
-  EEPROM_BL24C64,   //
-  EEPROM_BL24C128,  //
-  EEPROM_BL24C256,  //
-  EEPROM_BL24C512,  //
-  EEPROM_BL24C1024, //
-  EEPROM_M24M02,    // 256 KiB
-  EEPROM_4MBIT,     // 512 KiB, eight I2C address banks
-  EEPROM_UNKNOWN,
-} EEPROMType;
-
-extern const char *EEPROM_TYPE_NAMES[7];
-extern const uint32_t EEPROM_SIZES[7];
-extern const uint16_t PAGE_SIZES[7];
 
 
 extern uint8_t BL_TIME_VALUES[7];
@@ -65,7 +51,6 @@ extern const char *BL_SQL_MODE_NAMES[3];
 void SETTINGS_Save();
 bool SETTINGS_Load(void);
 uint32_t SETTINGS_GetFilterBound();
-uint32_t SETTINGS_GetEEPROMSize();
 bool SETTINGS_IsPatchPresent();
 
 uint32_t SETTINGS_GetValue(Setting s);

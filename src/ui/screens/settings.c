@@ -8,6 +8,7 @@
 #include "core/misc.h"
 #include "core/measurements.h"
 #include "core/receiver.h"
+#include "hal/storage.h"
 #include "hal/tx-device.h"
 #include "ui/menu.h"
 #include "ui/graphics.h"
@@ -132,7 +133,7 @@ static void getInfo(const MenuItem *item, char *out, uint8_t size) {
     TEXT_Add(&t,"dev");
 #endif
     break;
-  case 1: TEXT_Number(&t,SETTINGS_GetEEPROMSize()/1024u,1,10); TEXT_Add(&t," KiB"); break;
+  case 1: TEXT_Number(&t,STORAGE_Capacity()/1024u,1,10); TEXT_Add(&t," KiB"); break;
   case 2: TEXT_Add(&t,"UVR2 "); TEXT_Number(&t,CONFIG_STORE_FORMAT,1,10); break;
   case 3: TEXT_Add(&t,capabilities.si ? "Present" : "Missing"); break;
   case 4: TEXT_Add(&t,capabilities.broadcast ? "Present" : "Missing"); break;

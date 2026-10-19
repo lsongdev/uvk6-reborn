@@ -8,8 +8,6 @@
 
 #define CONFIG_STORE_SLOT_SIZE 1024u
 #define CONFIG_STORE_SLOTS 2u
-#define CONFIG_STORE_BASE 0x0800u
-#define CONFIG_STORE_END (CONFIG_STORE_BASE + CONFIG_STORE_SLOT_SIZE*CONFIG_STORE_SLOTS)
 // Older formats are not read: an unknown record means "no configuration".
 #define CONFIG_STORE_FORMAT 9u
 
@@ -37,15 +35,15 @@ typedef struct {
   ConfigPreferences preferences;
 } DeviceConfig;
 
-typedef bool (*ConfigRead)(void *context, uint32_t offset, void *out, uint16_t size);
-typedef bool (*ConfigWrite)(void *context, uint32_t offset, const void *data,
+// Offsets are within one slot; each slot lives in its own storage area.
+typedef bool (*ConfigRead)(void *context, unsigned slot, uint16_t offset, void *out,
+                           uint16_t size);
+typedef bool (*ConfigWrite)(void *context, unsigned slot, const void *data,
                             uint16_t size);
 typedef struct {
   void *context;
   ConfigRead read;
-  ConfigWrite write;
-  uint32_t capacity; // Must be confirmed by the platform's EEPROM driver.
-  uint32_t reserved_tail; // E.g. separately stored SI4732 SSB patch.
+  ConfigWrite write; // Whole slot.
 } ConfigStore;
 
 void CONFIG_Default(DeviceConfig *config);
