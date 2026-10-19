@@ -144,6 +144,8 @@ void BK48X9_TxOn_Beep(void);
 void BK48X9_ExitSubAu(void);
 
 uint16_t BK48X9_GetRSSI(void);
+// RSSI of a sweep point just tuned, as settled as this chip needs it.
+uint16_t BK48X9_GetScanRssi(void);
 uint8_t BK48X9_GetNoise(void);
 uint8_t BK48X9_GetGlitch(void);
 
