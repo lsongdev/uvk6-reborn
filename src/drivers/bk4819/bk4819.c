@@ -317,8 +317,16 @@ void BK4819_SetupSquelch(SQL sq, uint8_t delayOpen, uint8_t delayClose) {
   sq.nc = Clamp(sq.nc, 0, 127);
 
   BK4819_WriteRegister(BK4819_REG_4D, 0xA000 | sq.gc);
+  // BK4829: the reference K1 squelch timing (open 5, close 3) and bit 8,
+  // which the stock BK4829 firmware sets; shorter delays flip the squelch
+  // on every flutter of a strong carrier. The SQL time preferences apply to
+  // the BK4819 only.
+  if (isBk4829()) {
+    delayOpen = 5;
+    delayClose = 3;
+  }
   BK4819_WriteRegister(BK4819_REG_4E, (1u << 14) | (delayOpen << 11) |
-                                          (delayClose << 9) | sq.go);
+                                          (delayClose << 9) | (isBk4829() ? 1u << 8 : 0u) | sq.go);
   BK4819_WriteRegister(BK4819_REG_4F, (sq.nc << 8) | sq.no);
   BK4819_WriteRegister(BK4819_REG_78, (sq.ro << 8) | sq.rc);
   // New thresholds: forget the previous squelch state and re-arm its events.
