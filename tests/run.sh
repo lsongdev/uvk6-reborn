@@ -207,8 +207,10 @@ done
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/bk-capture-regression.c src/drivers/bk48x9/capture.c -o "$test_binary"
 "$test_binary"
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/uvk1-storage-regression.c \
-  src/drivers/py25q16/py25q16.c -o "$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  tests/uvk1-storage-regression.c src/drivers/py25q16/py25q16.c src/store/config-store.c \
+  src/store/channel-store.c src/core/crc32.c src/core/radio-state.c src/core/tx-model.c \
+  src/core/radio-model.c src/core/dcs.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/battery-regression.c \
   src/devices/battery.c -o "$test_binary"
