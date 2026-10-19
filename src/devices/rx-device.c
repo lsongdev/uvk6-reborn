@@ -265,7 +265,7 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
       RadioTone tone = plan->parameters.rx_tone;
       if (!tone) {
         BK4819_ExitSubAu();
-        BK4819_WriteRegister(BK4819_REG_3F, 0);
+        BK4819_CssOff();
       } else {
         DCS_CodeType_t type = TONE_Type(tone);
         if (type == CODE_TYPE_CONTINUOUS_TONE)
