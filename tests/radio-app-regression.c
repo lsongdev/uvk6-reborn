@@ -154,6 +154,8 @@ bool RECEIVER_Apply(const RxPlan *plan) {
   return true;
 }
 static unsigned concurrentPrepares, audioSelects, chipStops;
+static bool broadcastExcludesBk;
+bool RX_DEVICE_BroadcastExcludesBk(void) { return broadcastExcludesBk; }
 bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan) {
   ++concurrentPrepares;
   return !failApply && (!failFrequency || plan->frequency_hz!=failFrequency);
@@ -902,6 +904,18 @@ int main(void) {
     watchSecondSignalFrequency=0;
     for (unsigned j=0;j<50;++j) { update();clockNow+=50; }
     assert(receivingSlot==0 && gReceiver.open && applied==ssbApplies && saveRequests==ssbSaves);
+  }
+  // UV-K1: a BK1080 slot shares the BK front end, so no watch pairs it with
+  // BK slots; the selected FM slot simply keeps playing.
+  {
+    ReceiverCapabilities saved=capabilities;
+    setup(95900000,(RadioParameters){RX_WFM,100000,0,0});
+    capabilities.si=false;capabilities.broadcast=true;broadcastExcludesBk=true;
+    request(95900000,activeSlot.current.parameters);
+    for (unsigned j=0;j<30;++j) { update();clockNow+=50; }
+    assert(watcher.phase==WATCH_OFF && !strcmp(RADIO_WatchStatus(),"DW: off in FM"));
+    assert(runtime.current.device==RX_DEVICE_BROADCAST && receivingSlot==0);
+    broadcastExcludesBk=false;capabilities=saved;
   }
 
   // Broadcast background + BK event: the broadcast plays while B is quiet,
