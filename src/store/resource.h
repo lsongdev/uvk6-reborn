@@ -24,4 +24,8 @@ typedef bool (*ResourceRead)(uint32_t offset, uint8_t *out, uint16_t size);
 // matches its CRC.
 bool RESOURCE_Valid(ResourceRead read, uint32_t data_offset,
                     const char magic[4], uint32_t length);
+// The SSB patch is installed in STORAGE_RESOURCES and matches its CRC.
+bool RESOURCE_SsbPatchPresent(void);
+// Reads patch bytes; false outside the patch or on a storage error.
+bool RESOURCE_SsbPatchRead(uint16_t offset, uint8_t *out, uint16_t size);
 #endif

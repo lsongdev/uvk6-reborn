@@ -5,8 +5,10 @@
 #include "drivers/bk1080/bk1080.h"
 #include "drivers/bk4819/bk4819.h"
 #include "drivers/si473x/si473x.h"
-#include "app/settings.h"
-#include "radio/measurements.h"
+#include "store/preferences.h"
+#include "core/measurements.h"
+#include "devices/tx-device.h"
+#include "store/resource.h"
 #include <string.h>
 
 // BK4819 has no write acknowledgement. Cache only the last *requested*
@@ -15,6 +17,31 @@
 static bool bkCached;
 static RxPlan bkPrevious;
 static uint8_t bkSqlOpenTime, bkSqlCloseTime;
+
+ReceiverCapabilities RX_DEVICE_Capabilities(void) {
+  static bool detected;
+  static ReceiverCapabilities capabilities;
+  if (!detected) {
+    capabilities.broadcast = BK1080_Detect();
+    // Probe each chip through its own driver. A failed BK read is not SI.
+    capabilities.si = !capabilities.broadcast && SI47XX_Detect();
+    capabilities.ssb_patch = capabilities.si && RESOURCE_SsbPatchPresent();
+    if (capabilities.ssb_patch)
+      SI47XX_SetPatchSource(RESOURCE_SsbPatchRead, RESOURCE_SSB_PATCH_BYTES);
+    detected = true;
+  }
+  return capabilities;
+}
+
+void RX_DEVICE_Init(void) {
+  const ConfigPreferences *p = &gDeviceConfig.preferences;
+  BK4819_Init(p->mic, p->deviation);
+  TX_DEVICE_Disable(); // Explicitly keep PA off on startup.
+  BK4819_RX_TurnOn();
+  (void)BK1080_Init(0, false);
+}
+
+bool RX_DEVICE_SiActive(void) { return isSi4732On; }
 
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo) {
   SI47XX_RdsStatus status;
@@ -78,7 +105,7 @@ CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
   if (!hz || raw>RADIO_MAX_HZ/10u) return CAPTURE_INVALID;
   *hz=raw*10u;
   if (*hz<RADIO_MIN_HZ ||
-      ((*hz/10u < SETTINGS_GetFilterBound()) != (range==CAPTURE_RANGE_VHF)))
+      ((*hz/10u < PREFERENCES_FilterBound()) != (range==CAPTURE_RANGE_VHF)))
     return CAPTURE_INVALID;
   return CAPTURE_SAMPLE;
 }
@@ -103,7 +130,7 @@ void RX_DEVICE_SpectrumStart(RxDevice previous) {
 }
 void RX_DEVICE_SpectrumTune(uint32_t frequency_hz) {
   uint32_t frequency = frequency_hz / 10u;
-  bool vhf = frequency < SETTINGS_GetFilterBound();
+  bool vhf = frequency < PREFERENCES_FilterBound();
   if (vhf != spectrumVhf) {
     BK4819_SelectFilterEx(vhf ? FILTER_VHF : FILTER_UHF);
     spectrumVhf = vhf;
@@ -181,9 +208,9 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
       BK4819_Squelch(plan->parameters.squelch, gDeviceConfig.preferences.sql_open_time,
                      gDeviceConfig.preferences.sql_close_time);
     }
-    if (!fastBk || ((oldBkFrequency / 10u < SETTINGS_GetFilterBound()) !=
-                    (frequency < SETTINGS_GetFilterBound())))
-      BK4819_SelectFilterEx(frequency < SETTINGS_GetFilterBound()
+    if (!fastBk || ((oldBkFrequency / 10u < PREFERENCES_FilterBound()) !=
+                    (frequency < PREFERENCES_FilterBound())))
+      BK4819_SelectFilterEx(frequency < PREFERENCES_FilterBound()
                               ? FILTER_VHF : FILTER_UHF);
     if (!fastBk || oldBkFrequency != plan->frequency_hz) {
       RadioTone tone = plan->parameters.rx_tone;

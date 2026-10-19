@@ -6,7 +6,6 @@ static uint8_t lastTune[6];
 static int16_t lastBfo;
 static unsigned tuneCommands;
 static unsigned powerCommands;
-static bool patchPresent = true;
 static bool ack = true;
 static uint8_t rdsResponse[13] = {STATUS_CTS};
 static uint8_t seekResponse[8] = {STATUS_CTS};
@@ -63,14 +62,16 @@ uint32_t GetUptimeMs(void) { static uint32_t time; return ++time; }
 void TIMER_DelayUs(uint32_t delay) { (void)delay; }
 void SYS_DelayMs(uint32_t delay) { (void)delay; }
 void GPIO_Write(GpioLine line, bool high) { assert(line == GPIO_BK1080); (void)high; }
-bool SETTINGS_IsPatchPresent(void) { return patchPresent; }
-bool STORAGE_Read(StorageArea area, uint32_t offset, void *buffer, uint16_t size) {
-  assert(area == STORAGE_RESOURCES && offset >= RESOURCE_SSB_PATCH_OFFSET);
+static unsigned patchBytes;
+static bool readPatch(uint16_t offset, uint8_t *buffer, uint16_t size) {
+  assert(offset == patchBytes && size <= 64);
+  patchBytes += size;
   memset(buffer, 0, size);
   return true;
 }
 
 int main(void) {
+  SI47XX_SetPatchSource(readPatch, 8840);
   si4732mode = SI47XX_FM;
   isSi4732On = false;
   SI47XX_SwitchMode(SI47XX_FM);
@@ -162,7 +163,7 @@ int main(void) {
   ack = true;
 
   SI47XX_PowerDown();
-  patchPresent = false;
+  SI47XX_SetPatchSource(readPatch, 0); // No patch installed.
   SI47XX_SwitchMode(SI47XX_LSB);
   assert(!isSi4732On && si4732mode == SI47XX_LSB);
   ack = false;

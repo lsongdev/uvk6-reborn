@@ -24,6 +24,10 @@
 void BOARD_Init(void);
 void BOARD_ADC_GetBatteryInfo(uint16_t *pVoltage, uint16_t *pCurrent);
 
+// Key matrix outputs after a scan, bit n = GPIO_KEY_OUTn; some boards share
+// these lines with other parts.
+extern const uint8_t BOARD_KEYPAD_IDLE_LEVELS;
+
 // Backlight output; level is the user brightness (0 = off, higher brighter).
 void BOARD_BacklightInit(void);
 void BOARD_BacklightSetLevel(uint8_t level);

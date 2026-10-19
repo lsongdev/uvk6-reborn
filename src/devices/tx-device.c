@@ -1,4 +1,5 @@
 #include "devices/tx-device.h"
+#include "store/preferences.h"
 #include "store/calibration.h"
 #include "hal/storage.h"
 #include "devices/audio.h"
@@ -111,7 +112,7 @@ bool TX_DEVICE_Prepare(const TxPlan *plan) {
   BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_RX_ENABLE, false);
   RX_DEVICE_InvalidateBk();
   BK4819_ConfigureVoiceTx(txFrequency, gDeviceConfig.preferences.mic,
-                         gDeviceConfig.preferences.deviation * 10u);
+                         gDeviceConfig.preferences.deviation * 10u, PREFERENCES_FilterBound());
   if (!plan->tone) BK4819_ExitSubAu();
   else if (TONE_Type(plan->tone) == CODE_TYPE_CONTINUOUS_TONE)
     BK4819_SetCTCSSFrequency(CTCSS_Options[TONE_Code(plan->tone)]);

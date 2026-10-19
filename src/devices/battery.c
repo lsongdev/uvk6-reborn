@@ -2,7 +2,7 @@
 #include "devices/battery.h"
 #include "hal/board.h"
 #include "core/misc.h"
-#include "app/settings.h"
+#include "store/preferences.h"
 
 uint16_t gBatteryVoltage = 0;
 uint16_t gBatteryCurrent = 0;

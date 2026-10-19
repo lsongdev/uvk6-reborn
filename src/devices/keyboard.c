@@ -1,8 +1,7 @@
 #include "devices/keyboard.h"
-#include "drivers/dp32g030/gpio.h"
 #include "hal/scheduler.h"
 #include "hal/gpio.h"
-#include "boards/uvk6/pins.h"
+#include "hal/board.h"
 #include "hal/systick.h"
 
 static void postKey(KEY_Code_t key, Key_State_t state);
@@ -25,60 +24,14 @@ static uint32_t mLongPressRepeatTimer;
 static uint32_t mPttLongPressTimer;
 static uint32_t mPttLongPressRepeatTimer;
 
-typedef const struct {
-  uint16_t setToZeroMask;
-  struct {
-    uint8_t key : 5;
-    uint8_t pin : 3;
-  } pins[4];
-} Keyboard;
-
-static Keyboard keyboard[5] = {
-    /* Zero row  */
-    {.setToZeroMask = 0xffff,
-     .pins =
-         {
-             {.key = KEY_SIDE1, .pin = GPIOA_PIN_KEYBOARD_0},
-             {.key = KEY_SIDE2, .pin = GPIOA_PIN_KEYBOARD_1},
-             {.key = KEY_SIDE2, .pin = GPIOA_PIN_KEYBOARD_1},
-             {.key = KEY_SIDE2, .pin = GPIOA_PIN_KEYBOARD_1},
-         }},
-    /* First row  */
-    {.setToZeroMask = ~(1 << GPIOA_PIN_KEYBOARD_4) & 0xffff,
-     .pins =
-         {
-             {.key = KEY_MENU, .pin = GPIOA_PIN_KEYBOARD_0},
-             {.key = KEY_1, .pin = GPIOA_PIN_KEYBOARD_1},
-             {.key = KEY_4, .pin = GPIOA_PIN_KEYBOARD_2},
-             {.key = KEY_7, .pin = GPIOA_PIN_KEYBOARD_3},
-         }},
-    /* Second row */
-    {.setToZeroMask = ~(1 << GPIOA_PIN_KEYBOARD_5) & 0xffff,
-     .pins =
-         {
-             {.key = KEY_UP, .pin = GPIOA_PIN_KEYBOARD_0},
-             {.key = KEY_2, .pin = GPIOA_PIN_KEYBOARD_1},
-             {.key = KEY_5, .pin = GPIOA_PIN_KEYBOARD_2},
-             {.key = KEY_8, .pin = GPIOA_PIN_KEYBOARD_3},
-         }},
-    /* Third row */
-    {.setToZeroMask = ~(1 << GPIOA_PIN_KEYBOARD_6) & 0xffff,
-     .pins =
-         {
-             {.key = KEY_DOWN, .pin = GPIOA_PIN_KEYBOARD_0},
-             {.key = KEY_3, .pin = GPIOA_PIN_KEYBOARD_1},
-             {.key = KEY_6, .pin = GPIOA_PIN_KEYBOARD_2},
-             {.key = KEY_9, .pin = GPIOA_PIN_KEYBOARD_3},
-         }},
-    /* Fourth row */
-    {.setToZeroMask = ~(1 << GPIOA_PIN_KEYBOARD_7) & 0xffff,
-     .pins =
-         {
-             {.key = KEY_EXIT, .pin = GPIOA_PIN_KEYBOARD_0},
-             {.key = KEY_STAR, .pin = GPIOA_PIN_KEYBOARD_1},
-             {.key = KEY_0, .pin = GPIOA_PIN_KEYBOARD_2},
-             {.key = KEY_F, .pin = GPIOA_PIN_KEYBOARD_3},
-         }},
+// Scan order: index 0 with every output high (side keys), then each output
+// driven low in turn. Inputs read low while pressed. Both boards share it.
+static const KEY_Code_t keyboard[KEYBOARD_ROWS][KEYBOARD_COLS] = {
+    {KEY_SIDE1, KEY_SIDE2, KEY_INVALID, KEY_INVALID},
+    {KEY_MENU, KEY_1, KEY_4, KEY_7},
+    {KEY_UP, KEY_2, KEY_5, KEY_8},
+    {KEY_DOWN, KEY_3, KEY_6, KEY_9},
+    {KEY_EXIT, KEY_STAR, KEY_0, KEY_F},
 };
 
 static void HandlePttKey(void) {
@@ -123,43 +76,47 @@ static void HandlePttKey(void) {
   }
 }
 
-static void ResetKeyboardRow(uint8_t row) {
-  GPIOA->DATA |= (1u << GPIOA_PIN_KEYBOARD_4) | (1u << GPIOA_PIN_KEYBOARD_5) |
-                 (1u << GPIOA_PIN_KEYBOARD_6) | (1u << GPIOA_PIN_KEYBOARD_7);
-  GPIOA->DATA &= keyboard[row].setToZeroMask;
+// Every output high, then output row-1 low (none for row 0).
+static void DriveRow(uint8_t row) {
+  for (uint8_t out = 0; out < KEYBOARD_COLS; ++out)
+    GPIO_Write((GpioLine)(GPIO_KEY_OUT0 + out), true);
+  if (row) GPIO_Write((GpioLine)(GPIO_KEY_OUT0 + row - 1u), false);
 }
 
-static uint16_t ReadStableGpioData(void) {
-  uint16_t reg, reg2;
-  uint8_t ii;
+static uint8_t ReadInputs(void) {
+  uint8_t bits = 0;
+  for (uint8_t in = 0; in < KEYBOARD_COLS; ++in)
+    bits |= (uint8_t)(GPIO_Read((GpioLine)(GPIO_KEY_IN0 + in)) << in);
+  return bits;
+}
 
-  for (ii = 0, reg = 0; ii < 3; ii++) {
+// Three equal reads in a row, 1 us apart.
+static uint8_t ReadStableInputs(void) {
+  uint8_t reg = 0;
+  for (uint8_t same = 0; same < 3; ++same) {
     TIMER_DelayUs(1);
-    reg2 = (uint16_t)GPIOA->DATA;
-    if (reg != reg2) {
-      reg = reg2;
-      ii = 0;
+    uint8_t now = ReadInputs();
+    if (now != reg) {
+      reg = now;
+      same = 0;
     }
   }
   return reg;
 }
 
-static void ResetKeyboardPins(void) {
-  GPIOA->DATA = (GPIOA->DATA & ~(1u << GPIOA_PIN_KEYBOARD_6)) |
-                (1u << GPIOA_PIN_KEYBOARD_7);
+// Outputs return to the board's idle levels (lines shared with other parts).
+static void IdleOutputs(void) {
+  for (uint8_t out = 0; out < KEYBOARD_COLS; ++out)
+    GPIO_Write((GpioLine)(GPIO_KEY_OUT0 + out), BOARD_KEYPAD_IDLE_LEVELS >> out & 1u);
 }
 
 static uint8_t ScanKeyboardMatrix(void) {
   for (uint8_t i = 0; i < KEYBOARD_ROWS; i++) {
-    ResetKeyboardRow(i);
-    uint16_t reg = ReadStableGpioData();
-
-    for (uint8_t j = 0; j < KEYBOARD_COLS; j++) {
-      const uint16_t mask = 1u << keyboard[i].pins[j].pin;
-      if (!(reg & mask)) {
-        return keyboard[i].pins[j].key;
-      }
-    }
+    DriveRow(i);
+    uint8_t reg = ReadStableInputs();
+    for (uint8_t j = 0; j < KEYBOARD_COLS; j++)
+      if (!(reg >> j & 1u) && keyboard[i][j] != KEY_INVALID)
+        return keyboard[i][j];
   }
   return KEY_INVALID;
 }
@@ -167,7 +124,7 @@ static uint8_t ScanKeyboardMatrix(void) {
 void KEYBOARD_Poll(void) {
   HandlePttKey();
   mKeyPressed = ScanKeyboardMatrix();
-  ResetKeyboardPins();
+  IdleOutputs();
 }
 
 // Latches the key event read by KEYBOARD_GetKey.

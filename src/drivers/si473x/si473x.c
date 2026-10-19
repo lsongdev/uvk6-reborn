@@ -1,8 +1,5 @@
-#include "store/resource.h"
 #include "drivers/si473x/si473x.h"
 #include "core/misc.h"
-#include "app/settings.h"
-#include "hal/storage.h"
 #include "hal/gpio.h"
 #include "hal/i2c.h"
 #include "hal/system.h"
@@ -72,17 +69,25 @@ static bool waitToSend(void) {
   return false; // The receiver must never stall the system indefinitely.
 }
 
+static SI47XX_PatchRead patchRead;
+static uint16_t patchLength;
+
+void SI47XX_SetPatchSource(SI47XX_PatchRead read, uint16_t length) {
+  patchRead = length ? read : NULL;
+  patchLength = patchRead ? length : 0;
+}
+
 static bool SI47XX_downloadPatch(void) {
-  if (!SETTINGS_IsPatchPresent())
+  if (!patchRead)
     return false;
 
   uint8_t buf[64]; // 64 is optimal, more has no sense
   const uint16_t BUF_SIZE = ARRAY_SIZE(buf);
 
-  for (uint16_t offset = 0; offset < RESOURCE_SSB_PATCH_BYTES; offset += BUF_SIZE) {
-    const uint32_t rest = RESOURCE_SSB_PATCH_BYTES - offset;
-    const uint16_t n = rest > BUF_SIZE ? BUF_SIZE : (uint16_t)rest;
-    if (!STORAGE_Read(STORAGE_RESOURCES, RESOURCE_SSB_PATCH_OFFSET + offset, buf, n))
+  for (uint16_t offset = 0; offset < patchLength; offset += BUF_SIZE) {
+    const uint16_t rest = patchLength - offset;
+    const uint16_t n = rest > BUF_SIZE ? BUF_SIZE : rest;
+    if (!patchRead(offset, buf, n))
       return false;
 
     for (uint16_t i = 0; i < n; i += 8) {

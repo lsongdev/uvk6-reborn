@@ -26,7 +26,7 @@ void BK4819_EnableFrequencyScanEx(FreqScanTime time) {
   assert(time==F_SC_T_0_2s); ++scanStarts;
 }
 bool BK4819_GetFrequencyScanResult(uint32_t *raw) { *raw=scanRaw; return scanReady; }
-uint32_t SETTINGS_GetFilterBound(void) { return 24000000u; }
+uint32_t PREFERENCES_FilterBound(void) { return 24000000u; }
 bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index) {
   if (hz != 12000 && hz != 6000) return false;
   *index = hz == 12000 ? 4 : 0; return true;
@@ -86,8 +86,10 @@ bool SI47XX_SetVolume(uint8_t v) {
 uint16_t BK1080_ReadRegister(BK1080_Register_t reg) {
   (void)reg; return 0x003f;
 }
+static unsigned broadcastParks;
 bool BK1080_Init(uint32_t hz10, bool enable) {
-  assert(hz10 == 10000000u && enable);
+  if (!enable) { assert(hz10 == 0); ++broadcastParks; return true; } // RX_DEVICE_Init.
+  assert(hz10 == 10000000u);
   ++broadcastTunes; return broadcastOk;
 }
 bool BK1080_Mute(bool mute) {
@@ -115,7 +117,35 @@ static RxPlan plan(uint32_t hz, RxMode mode, RxDevice device) {
   return (RxPlan){device, hz, {mode, mode == RX_WFM ? 100000 : 12500,
     mode == RX_WFM ? 0 : mode == RX_NFM ? 12000 : 6000, 0}};
 }
+static unsigned chipProbes, patchSources;
+static bool hasSi = true;
+bool isSi4732On;
+bool BK1080_Detect(void) { ++chipProbes; return !hasSi; }
+bool SI47XX_Detect(void) { ++chipProbes; return hasSi; }
+bool RESOURCE_SsbPatchPresent(void) { return true; }
+bool RESOURCE_SsbPatchRead(uint16_t offset, uint8_t *out, uint16_t size) {
+  (void)offset; (void)out; (void)size; return true;
+}
+void SI47XX_SetPatchSource(SI47XX_PatchRead read, uint16_t length) {
+  assert(read == RESOURCE_SsbPatchRead && length == RESOURCE_SSB_PATCH_BYTES); ++patchSources;
+}
+static uint8_t initMic; static uint16_t initDeviation;
+void BK4819_Init(uint8_t mic, uint16_t deviation) { initMic = mic; initDeviation = deviation; }
+void TX_DEVICE_Disable(void) {}
+
+static void testDetectionAndInit(void) {
+  // Probed once, then cached; the SSB patch source is handed to the SI driver.
+  ReceiverCapabilities c = RX_DEVICE_Capabilities();
+  assert(c.si && !c.broadcast && c.ssb_patch && chipProbes == 2 && patchSources == 1);
+  c = RX_DEVICE_Capabilities();
+  assert(c.si && chipProbes == 2 && patchSources == 1);
+  gDeviceConfig.preferences.mic = 9; gDeviceConfig.preferences.deviation = 130;
+  RX_DEVICE_Init();
+  assert(initMic == 9 && initDeviation == 130 && broadcastParks == 1);
+}
+
 int main(void) {
+  testDetectionAndInit();
   RxPlan bk = plan(100000000, RX_NFM, RX_DEVICE_BK);
   RxPlan native = plan(100000000, RX_WFM, RX_DEVICE_SI);
   uint32_t found = 0;

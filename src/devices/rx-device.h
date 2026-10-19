@@ -2,12 +2,17 @@
 #define RX_DEVICE_H
 
 #include "core/radio-model.h"
-#include "radio/rds-receiver.h"
+#include "core/rds-receiver.h"
 #include "core/capture.h"
 #include "core/spectrum.h"
 
 // Apply an already validated receive plan once. This is the sole hardware
 // tuning path; callers own the user state and failed-plan recovery.
+// Probes the broadcast chips once; afterwards returns the cached result.
+ReceiverCapabilities RX_DEVICE_Capabilities(void);
+// BK4819 from the stored preferences, PA off, broadcast chip parked.
+void RX_DEVICE_Init(void);
+bool RX_DEVICE_SiActive(void); // SI4732 powered (status line).
 bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous);
 bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan); // Configure muted, keep other chip alive.
 bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open);

@@ -22,13 +22,10 @@ bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open) {
 }
 void LED_SetGreen(bool on) { (void)on; }
 void BACKLIGHT_SetReception(bool open) { (void)open; }
-bool BK1080_Detect(void) { ++probes; return !hasSi; }
-bool SI47XX_Detect(void) { ++probes; return hasSi; }
-bool SETTINGS_IsPatchPresent(void) { return true; }
-void BK4819_Init(void) {}
-void BK4819_RX_TurnOn(void) {}
-void TX_DEVICE_Disable(void) {}
-bool BK1080_Init(uint32_t f, bool on) { (void)f; (void)on; return true; }
+ReceiverCapabilities RX_DEVICE_Capabilities(void) {
+  ++probes; return (ReceiverCapabilities){.si = hasSi, .broadcast = !hasSi, .ssb_patch = hasSi};
+}
+void RX_DEVICE_Init(void) {}
 
 void testFrequencyInput(void);
 
@@ -65,9 +62,6 @@ int main(int argc, char **argv) {
   assert(!RECEIVER_Select(&bk, 1u << RX_DEVICE_SI, true));
   assert(RECEIVER_Select(&bk, (1u << RX_DEVICE_SI) | (1u << RX_DEVICE_BK), true));
   assert(gReceiver.plan.frequency_hz == 438500000u && gReceiver.open && hardwareApplies == 2);
-  unsigned initialProbes = probes;
-  RECEIVER_Capabilities(); RECEIVER_Capabilities();
-  assert(probes == initialProbes);
   testFrequencyInput();
   return 0;
 }

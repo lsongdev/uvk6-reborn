@@ -74,7 +74,7 @@ drivers/<chip>/  芯片驱动平铺；含 mcu.mk 的目录是 MCU（寄存器、
 boards/<board>/  引脚表、初始化顺序、机制不同的小函数、存储布局、链接脚本、board.mk
 ```
 
-依赖方向：app → ui → radio → devices → drivers → hal；radio、devices 可读 store；core 不依赖任何目录；boards 实现 hal，可使用 drivers。共享代码不写 `#if BOARD`：差异是数据（引脚、接线）就放进板级表格，差异是机制（外设、介质）就由板级实现最小的函数。
+依赖方向：app → ui → radio → devices → drivers → hal；radio、devices 可读 store；core 不依赖任何目录；boards 实现 hal，可使用 drivers。`tools/check-layers.py` 按此检查所有 include，由 tests/run.sh 和 CI 执行，违反即失败。共享代码不写 `#if BOARD`：差异是数据（引脚、接线）就放进板级表格，差异是机制（外设、介质）就由板级实现最小的函数。
 
 ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包含 ui，不知道菜单、输入框或 F 前缀。ui 顶层的绘图代码不包含 ui/screens 和 radio，不访问射频全局状态，只绘制传入视图，因此 UI 预览和卡片回归可只编译它们。core/ 内的模型不调用存储、HAL、显示或系统时钟，由调用者传输入／回调。
 

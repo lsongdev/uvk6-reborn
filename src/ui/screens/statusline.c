@@ -1,8 +1,8 @@
 #include "ui/screens/statusline.h"
 #include "store/device-config.h"
-#include "app/settings.h"
+#include "store/preferences.h"
 #include "hal/storage.h"
-#include "drivers/si473x/si473x.h"
+#include "devices/rx-device.h"
 #include "devices/display.h"
 #include "devices/battery.h"
 #include "ui/numnav.h"
@@ -89,7 +89,7 @@ void STATUSLINE_render(void) {
   char icons[8] = {'\0'};
   uint8_t idx = 0;
   if (gStorageWrite) icons[idx++] = SYM_EEPROM_W;
-  if (gReceiver.plan.device == RX_DEVICE_BROADCAST || isSi4732On)
+  if (gReceiver.plan.device == RX_DEVICE_BROADCAST || RX_DEVICE_SiActive())
     icons[idx++] = SYM_BROADCAST;
   if (gDeviceConfig.preferences.keylock) icons[idx++] = SYM_LOCK;
 
