@@ -1,6 +1,8 @@
 #include "store/device-config.h"
 #include "devices/battery.h"
 #include "hal/board.h"
+#include "hal/storage.h"
+#include "store/calibration.h"
 #include "core/misc.h"
 #include "store/preferences.h"
 
@@ -107,6 +109,22 @@ uint8_t BATTERY_VoltsToPercent(const unsigned int voltage_10mV) {
     }
   }
   return 0;
+}
+
+bool BATTERY_UseFactoryCalibration(void) {
+  if (gDeviceConfigReady) return false;
+  uint8_t data[CALIBRATION_BATTERY_POINTS * 2u];
+  if (!STORAGE_Read(STORAGE_CALIBRATION, CALIBRATION_BATTERY_OFFSET, data, sizeof(data)))
+    return false;
+  uint16_t previous = 0, reference = 0;
+  for (unsigned i = 0; i < CALIBRATION_BATTERY_POINTS; ++i) {
+    uint16_t value = (uint16_t)data[i * 2u] | (uint16_t)((uint16_t)data[i * 2u + 1u] << 8);
+    if (value <= previous || value > 4095u) return false;
+    if (i == CALIBRATION_BATTERY_REFERENCE) reference = value;
+    previous = value;
+  }
+  gDeviceConfig.preferences.battery_calibration = reference;
+  return true;
 }
 
 void BATTERY_UpdateBatteryInfo() {

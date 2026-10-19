@@ -5,7 +5,7 @@
 
 DeviceConfig gDeviceConfig;
 static unsigned bkTunes, siTunes, broadcastTunes, bkIdle, siMuted, siPowerDowns;
-static unsigned bkModes, lastBkHz10;
+static unsigned bkModes, lastBkHz10, siIo;
 static bool siTuneOk = true, siBandwidthOk = true, siVolumeOk = true;
 static bool broadcastOk = true, broadcastMuteOk = true;
 static unsigned broadcastMutes;
@@ -70,18 +70,21 @@ bool SI47XX_SetBandwidth(SI47XX_FilterBW bw, bool amp) {
   (void)bw; (void)amp; return siBandwidthOk;
 }
 static bool rsqOK=true;
-bool RSQ_GET(void) { return rsqOK; }
+bool RSQ_GET(void) { ++siIo; return rsqOK; }
+bool SI47XX_ReadRDS(SI47XX_RdsStatus *status, bool clear) {
+  (void)status; (void)clear; ++siIo; return true;
+}
 RSQStatus rsqStatus;
 bool SI47XX_SeekStart(uint32_t lo, uint32_t hi, uint32_t step) {
-  (void)lo; (void)hi; (void)step; return true;
+  (void)lo; (void)hi; (void)step; ++siIo; return true;
 }
 SiSeekResult SI47XX_SeekPoll(uint32_t *frequency_hz) {
-  *frequency_hz = 100100000; return SI_SEEK_FOUND;
+  ++siIo; *frequency_hz = 100100000; return SI_SEEK_FOUND;
 }
-void SI47XX_SeekCancel(void) {}
+void SI47XX_SeekCancel(void) { ++siIo; }
 void SI47XX_PowerDown(void) { ++siPowerDowns; }
 bool SI47XX_SetVolume(uint8_t v) {
-  if (!v) ++siMuted; siVolume=v;return siVolumeOk;
+  ++siIo; if (!v) ++siMuted; siVolume=v;return siVolumeOk;
 }
 uint16_t BK1080_ReadRegister(BK1080_Register_t reg) {
   (void)reg; return 0x003f;
@@ -119,6 +122,9 @@ static RxPlan plan(uint32_t hz, RxMode mode, RxDevice device) {
 }
 static unsigned chipProbes, patchSources;
 static bool hasSi = true;
+static bool allowSi = true;
+bool BOARD_HasSi4732(void) { return allowSi; }
+BoardRadioChip BOARD_RadioChip(void) { return allowSi ? BOARD_RADIO_BK4819 : BOARD_RADIO_BK4829; }
 bool isSi4732On;
 bool BK1080_Detect(void) { ++chipProbes; return !hasSi; }
 bool SI47XX_Detect(void) { ++chipProbes; return hasSi; }
@@ -144,7 +150,39 @@ static void testDetectionAndInit(void) {
   assert(initMic == 9 && initDeviation == 130 && broadcastParks == 1);
 }
 
-int main(void) {
+int main(int argc, char **argv) {
+  if (argc > 1) {
+    allowSi = false;
+    bool broadcast = !strcmp(argv[1], "--uvk1");
+    hasSi = !broadcast;
+    ReceiverCapabilities c = RX_DEVICE_Capabilities();
+    assert(!c.si && !c.ssb_patch && c.broadcast == broadcast && !c.bk_am);
+    assert(c.bk_bandwidth_mask == (RX_BK_BANDWIDTH_6K | RX_BK_BANDWIDTH_12K | RX_BK_BANDWIDTH_26K));
+    RxPlan am = plan(125000000, RX_AM, RX_DEVICE_BK);
+    assert(!RX_DEVICE_Apply(&am, RX_DEVICE_BK));
+    assert(chipProbes == 1 && patchSources == 0); // Never probe SI, even if FM is absent.
+    (void)RX_DEVICE_Capabilities();
+    assert(chipProbes == 1);
+    RxPlan unsupported = plan(100000000, RX_WFM, RX_DEVICE_SI);
+    assert(!RX_DEVICE_Apply(&unsupported, RX_DEVICE_BK));
+    assert(!siTunes && !bkTunes && !bkIdle && !siPowerDowns);
+    RdsPacket packet;
+    assert(!RX_DEVICE_ReadRDS(&packet, false));
+    uint16_t rssi; bool found;
+    uint32_t frequency;
+    assert(!RX_DEVICE_Sample(&unsupported, &rssi, &found));
+    assert(!RX_DEVICE_WatchSignal(&unsupported, &found));
+    assert(!RX_DEVICE_SeekSignal(RX_DEVICE_SI, &found));
+    assert(!RX_DEVICE_SeekNative(&unsupported));
+    assert(!RX_DEVICE_SeekStart(&unsupported, 64000000, 108000000));
+    assert(RX_DEVICE_SeekPoll(RX_DEVICE_SI, &frequency) == RX_SEEK_ERROR);
+    RX_DEVICE_SeekCancel(RX_DEVICE_SI);
+    assert(!RX_DEVICE_SelectAudio(1u << RX_DEVICE_SI, RX_DEVICE_SI, true));
+    isSi4732On = true; // Even stale chip state must not advertise an absent part.
+    assert(!RX_DEVICE_SiActive());
+    assert(siIo == 0 && !speakerOn);
+    return 0;
+  }
   testDetectionAndInit();
   RxPlan bk = plan(100000000, RX_NFM, RX_DEVICE_BK);
   RxPlan native = plan(100000000, RX_WFM, RX_DEVICE_SI);

@@ -11,12 +11,16 @@ backed up first. The firmware refuses writes anywhere else.
 """
 import argparse
 import importlib.util
+import json
+import math
+import os
 from pathlib import Path
 import re
 import struct
 import sys
 import time
 import zlib
+from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parents[1]
 _spec = importlib.util.spec_from_file_location('flasher', Path(__file__).with_name('flash.py'))
@@ -24,6 +28,7 @@ flasher = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(flasher)
 
 HEADER_BYTES = 16
+CHECKPOINT_BYTES = 4096
 CHUNK = 128  # Largest read/write the firmware accepts per command.
 CAPACITY = 524288  # UV-K6 512 KiB (AGENTS.md); --capacity for other parts.
 SSB_MAGIC = b'SSBP'
@@ -58,6 +63,44 @@ def header(magic, data):
     return magic + struct.pack('<II', len(data), zlib.crc32(data)) + b'\xff' * 4
 
 
+def read_to_file(radio, address, size, output, resume=False, progress=None):
+    """Checkpoint read-only exports every 4 KiB; publish only a complete file."""
+    if address < 0 or size <= 0 or address + size > 0x100000000:
+        raise ValueError('Invalid physical storage range')
+    partial = output.with_name(output.name + '.part')
+    metadata = partial.with_name(partial.name + '.json')
+    expected = {'address': address, 'size': size}
+    if output.exists():
+        raise ValueError(f'Output already exists: {output}')
+    if resume:
+        if json.loads(metadata.read_text()) != expected:
+            raise ValueError('Partial export range does not match')
+        done = partial.stat().st_size
+        if done > size or (done != size and done % CHUNK):
+            raise ValueError('Invalid partial export length')
+    else:
+        if partial.exists() or metadata.exists():
+            raise ValueError('Partial export exists; use --resume or another output name')
+        with partial.open('xb'):
+            pass
+        metadata.write_text(json.dumps(expected) + '\n')
+        done = 0
+    with partial.open('ab') as stream:
+        while done < size:
+            n = min(CHECKPOINT_BYTES, size - done)
+            data = radio.read(address + done, n)
+            if len(data) != n:
+                raise IOError('Short read; incomplete checkpoint was not saved')
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+            done += n
+            if progress:
+                progress(done, size)
+    partial.rename(output)
+    metadata.unlink()
+
+
 def ssb_address(capacity):
     if capacity < 0x20000:
         raise ValueError('EEPROM too small for resources')
@@ -69,31 +112,79 @@ def chunks(address, size):
         yield address + offset, min(CHUNK, size - offset)
 
 
+class ReadPolicy(NamedTuple):
+    interval_seconds: float = 0.02
+    timeout_seconds: float = 1.0
+    retries: int = 2           # At most two retries for one chunk.
+    total_retries: int = 6     # Across this connection, including checkpoints.
+    backoff_seconds: float = 0.25
+
+    def validate(self):
+        values = (self.interval_seconds, self.timeout_seconds, self.backoff_seconds)
+        if (not all(math.isfinite(value) for value in values) or
+                min(values) < 0 or not self.timeout_seconds or
+                not isinstance(self.retries, int) or not isinstance(self.total_retries, int) or
+                min(self.retries, self.total_retries) < 0):
+            raise ValueError('Invalid read timing or retry limits')
+
+
 class Radio:
     """Firmware UART: plain frames after the 0x0514 hello, stamped requests."""
 
-    def __init__(self, link):
+    def __init__(self, link, read_policy=ReadPolicy()):
+        read_policy.validate()
+        self.read_policy = read_policy
+        self.read_retries_left = read_policy.total_retries
         self.link = link
         self.stamp = int(time.time()) & 0xffffffff
         version = self.request(struct.pack('<HHI', 0x0514, 4, self.stamp), 0x0515)
         self.version = version[4:20].split(b'\0')[0].decode(errors='replace')
 
-    def request(self, payload, reply_id, timeout=2.0):
+    def request(self, payload, reply_id, timeout=2.0, match=None):
         self.link.send(payload, obfuscate=False)
         deadline = time.monotonic() + timeout
         while True:
             reply = self.link.receive(deadline, obfuscate=False)
-            if int.from_bytes(reply[:2], 'little') == reply_id:
+            if int.from_bytes(reply[:2], 'little') == reply_id and (match is None or match(reply)):
                 return reply
 
-    def read(self, address, size):
+    def info(self):
+        reply = self.request(struct.pack('<HHI', 0x0572, 4, self.stamp), 0x0573)
+        if len(reply) != 32:
+            raise IOError('Bad storage info reply')
+        capacity = struct.unpack_from('<I', reply, 4)[0]
+        name = reply[8:32].split(b'\0')[0].decode(errors='replace')
+        return capacity, name
+
+    def read(self, address, size, progress=None):
         out = bytearray()
         for at, n in chunks(address, size):
-            reply = self.request(struct.pack('<HHIB3xI', 0x051B, 12, at, n, self.stamp), 0x051C)
+            payload = struct.pack('<HHIB3xI', 0x051B, 12, at, n, self.stamp)
+            # Reads are idempotent. Match the address too: a delayed reply
+            # from an earlier attempt must not become the next chunk's data.
+            def expected(reply):
+                return len(reply) >= 12 and struct.unpack_from('<IB', reply, 4) == (at, n)
+            policy = self.read_policy
+            for attempt in range(policy.retries + 1):
+                try:
+                    time.sleep(policy.interval_seconds)
+                    reply = self.request(payload, 0x051C, timeout=policy.timeout_seconds, match=expected)
+                    break
+                except TimeoutError as error:
+                    if not self.read_retries_left:
+                        raise TimeoutError(f'Read retry budget exhausted at 0x{at:06X}; stopped') from error
+                    if attempt == policy.retries:
+                        raise TimeoutError(f'Read timed out at 0x{at:06X} after {attempt + 1} attempts; stopped') from error
+                    self.read_retries_left -= 1
+                    print(f'\nRetrying read at 0x{at:06X} '
+                          f'({self.read_retries_left} connection retries left)', file=sys.stderr, flush=True)
+                    time.sleep(policy.backoff_seconds)
             offset, count = struct.unpack_from('<IB', reply, 4)
             if offset != at or count != n or len(reply) < 12 + n:
                 raise IOError(f'Bad read reply at 0x{at:05X}')
             out += reply[12:12 + n]
+            if progress:
+                progress(len(out), size)
         return bytes(out)
 
     def write(self, address, data, progress=None):
@@ -299,18 +390,33 @@ def main():
         command.add_argument('--backup-dir', type=Path, default=ROOT / 'backups')
     for command in (cal_write, cal_seed, cal_restore):
         command.add_argument('--yes', action='store_true', help='skip the confirmation')
-    read = commands.add_parser('read', help='save an EEPROM range to a file')
+    commands.add_parser('info', help='physical storage capacity and identity (JEDEC ID on SPI)')
+    read = commands.add_parser('read', help='save a physical storage range to a file')
     read.add_argument('address', type=lambda value: int(value, 0))
     read.add_argument('size', type=lambda value: int(value, 0))
     read.add_argument('output', type=Path)
+    read.add_argument('--no-retry', action='store_true', help='stop at the first read timeout')
+    read.add_argument('--resume', action='store_true', help='resume the matching .part export')
     args = parser.parse_args()
 
-    link = flasher.Bootloader(args.port)
+    link = None
     try:
-        radio = Radio(link)
+        link = flasher.Bootloader(args.port)
+        policy = ReadPolicy()
+        if args.command == 'read' and args.no_retry:
+            policy = policy._replace(retries=0, total_retries=0)
+        radio = Radio(link, policy)
         print(f'Firmware {radio.version}')
+        if args.command == 'info':
+            capacity, name = radio.info()
+            print(f'{name}: {capacity} bytes')
+            return 0
         if args.command == 'read':
-            args.output.write_bytes(radio.read(args.address, args.size))
+            def progress(done, total):
+                if done % 65536 == 0 or done == total:
+                    print(f'\rRead {done}/{total} bytes ({done * 100 // total}%)', end='', flush=True)
+            read_to_file(radio, args.address, args.size, args.output, args.resume, progress)
+            print()
             print(f'Saved {args.size} bytes from 0x{args.address:05X} to {args.output}')
             return 0
         if args.command.startswith('cal-'):
@@ -324,15 +430,16 @@ def main():
             radio.reset()
             print('Radio restarting; About → SSB patch should read Present.')
         return 0
-    except TimeoutError:  # Before OSError, its base class.
-        print('No reply: is the radio on with this firmware (not in the bootloader)?',
+    except TimeoutError as error:  # Before OSError, its base class.
+        print(f'No reply: {error}. Check the radio and cable; resume a partial read with --resume.',
               file=sys.stderr)
         return 1
-    except (ValueError, OSError) as error:
+    except (ValueError, OSError, flasher.termios.error) as error:
         print(f'Error: {error}', file=sys.stderr)
         return 1
     finally:
-        link.close()
+        if link is not None:
+            link.close()
 
 
 if __name__ == '__main__':

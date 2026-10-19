@@ -8,6 +8,7 @@
 
 static void configure(SPI_TypeDef *spi, uint32_t prescaler) {
   spi->CR1 = 0;
+  spi->CR2 = 0;
   // Master, mode 3, MSB first, software NSS held high.
   spi->CR1 = SPI_CR1_MSTR | SPI_CR1_CPOL | SPI_CR1_CPHA | SPI_CR1_SSM | SPI_CR1_SSI |
              (prescaler << SPI_CR1_BR_Pos);
@@ -26,6 +27,8 @@ void SPI_Select(bool selected) { GPIO_Write(GPIO_ST7565_CS, !selected); }
 void SPI_Write(uint8_t value) {
   while (!(SPI1->SR & SPI_SR_TXE)) continue;
   DR8(SPI1) = value;
+  while (!(SPI1->SR & SPI_SR_RXNE)) continue;
+  (void)DR8(SPI1); // Drain each byte so the receiver cannot overrun.
 }
 
 void SPI_Flush(void) {

@@ -17,6 +17,8 @@ typedef struct {
   uint8_t bit;
 } Dp32GpioLine;
 
+#define DP32_GPIO_NO_LINE 0xFFu
+#define DP32_GPIO_NONE {DP32_GPIO_NO_LINE, 0}
 #define DP32_GPIO_PORT_A 0u
 #define DP32_GPIO_PORT_B 1u
 #define DP32_GPIO_PORT_C 2u

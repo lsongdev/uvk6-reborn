@@ -38,11 +38,11 @@ K1 按住 PTT 开机进入刷机模式后，经 **K 头 UART 线**（`/dev/cu.us
 | RAM | 16 KiB（`0x20000000`） | 16 KiB |
 | 时钟 | 参考固件按 48 MHz 运行，HSE 宏为 24 MHz | DP32G030 平台配置 |
 | 向量表 | 应用设置 `SCB->VTOR`（M0+ 支持） | 位于 0 地址 |
-| 外部存储 | **PY25Q16 SPI NOR Flash，2 MiB**，扇区擦除 4 KiB，页编程 256 B；SPI2：SCK PA0、MOSI PA1、MISO PA2，CS PA3 | I²C EEPROM 512 KiB |
+| 外部存储 | **2 MiB SPI NOR Flash，本机 JEDEC ID `EB 60 15`（2026-10-19 自编固件实测）；参考驱动名 PY25Q16**，扇区擦除 4 KiB，页编程 256 B；SPI2：SCK PA0、MOSI PA1、MISO PA2，CS PA3 | I²C EEPROM 512 KiB |
 | 射频芯片 | 参考固件只编译 `bk4829.c`，即 **BK4829**（BK4819 的后续型号，寄存器大体相同但有差异） | BK4819 |
 | 广播接收 | BK1080，独立软件 I²C：SCL PF5、SDA PF6 | BK1080 或 SI4732 改装 |
 
-社区站点 [uv-k1.com](https://uv-k1.com/) 也说明换用了新处理器，UV-K5 固件不兼容；并提到 UV-K1(8) 有一个带 8 MB Flash 的型号。本机为 2 MiB 还是 8 MiB，需用 JEDEC ID（`0x9F`）确认；原厂固件没有提供这类读取命令。
+社区站点 [uv-k1.com](https://uv-k1.com/) 也说明换用了新处理器，UV-K5 固件不兼容；并提到 UV-K1(8) 有一个带 8 MB Flash 的型号。本机后续用自编只读固件读取 `0x9F`，返回 `EB 60 15`，与 2 MiB 容量相符；芯片厂商/丝印尚未确认，不能仅凭参考驱动名认定为 Puya。
 
 ## 3. 引脚（参考固件源码，未经本机通断测量）
 
@@ -106,28 +106,22 @@ K1 的 band 2／5 High 档（`91 96 91`）与本项目 `tools/resources.py` 中�
 
 **MCU 内部固件没有备份。**原厂应用协议没有 Flash 读命令，Bootloader 协议也只能写入，只读方式无法导出。如需恢复原厂固件，可使用泉盛官网 [UV-K1 下载页](https://en.qsfj.com/support/downloads/8740) 提供的「CPS + 升级工具 + 固件」包（2026-06-08 版本）。2 MiB SPI Flash 中逻辑视图以外的内容，需要能按物理地址读取的固件才能导出（例如参考固件的 `0x0738` 命令）。
 
-## 5. 当前项目能否直接运行
+## 5. 当前项目适配状态
 
-**不能。**当前 `bin/firmware.bin` 是 DP32G030 镜像：链接地址为 0、外设寄存器和全部引脚都不同，刷入 K1 无法启动。镜像大小（text 57,644 B，RAM 约 6.6 KiB 静态）在 K1 的 118 KiB／16 KiB 预算内，**容量不是问题**；需要移植的是平台层。上层的 `core/`、`radio/`、`ui/` 基本不依赖芯片，可以复用。
+`make BOARD=uvk1` 已可构建 PY32F071 首启只读版本（应用起点 `0x08002800`、118 KiB Flash、16 KiB RAM）。`src/boards/uvk1/` 提供引脚默认状态、GPIO、PF8 背光开关、PF5/PF6 软件 I²C、电池 ADC 和只读存储；SWD 保留。共享 ST7565、键盘和上层 UI 通过 HAL 访问硬件。
 
-需要的改动按依赖顺序：
+- TX 在 `board.mk` 强制关闭，即使命令行指定 `ENABLE_TX=1` 也不会开放。
+- `drivers/py25q16/` 仅实现 `0x9F` JEDEC ID 与 `0x03` 数据读取，完全没有编程、写使能或擦除命令。
+- 接受本机实测 JEDEC ID `EB 60 15`，以及参考型号 ID `85 60 15`，容量均为 2 MiB；未知 ID 不开放读取窗口，UART `info` 仍报告 ID 便于定位。首刷版本因白名单只含后者显示 Storage unknown，修正版已加入本机 ID。
+- 最新离线构建增加 K1 无 SI4732 的板级能力约束，禁止 SI 探测和运行请求；首启电池诊断读取原厂 ADC 校准第 4 点。这些后续改动未刷入、未实测。
+- 仅映射校准区：`STORAGE_CALIBRATION` 偏移 0 对应物理 `0x010000`，长度 512 B。配置、频道、资源区均不提供；普通写入与维护写入无条件返回失败。
+- 没有有效配置时停留在诊断页，显示只读存储、按键编号/状态、电池电压；不进入射频初始化。当前还不是完整 K1 接收固件。
+- UART `0x0572`/`0x0573` 返回物理容量和存储名（包含 SPI JEDEC ID）；`0x051B`/`0x051C` 使用 32 位物理地址，可以导出完整 2 MiB。
+- `tools/flash.py --board uvk1` 校验 K1 向量表并要求 Bootloader 7.x，按参考 `_prog.py` 使用四字节版本握手、16 位小端页号/页数（最多 472 页）。K6 保留实测握手且要求 3.x。K1 跳过 K6 打包，直接输出 raw binary。
 
-1. **平台与构建**：新增 PY32F071 寄存器定义、启动文件、时钟初始化（48 MHz）和 `firmware-k1.ld`（`0x08002800`，118 KiB，设置 VTOR）；Makefile 按 `BOARD=k6|k1` 选择平台目录，`-mcpu=cortex-m0plus`。`tools/flash.py` 的向量表校验、`FLASH_SIZE`，以及 `fw-pack.py` 的打包格式（原厂包在 `0x2000` 插入 16 B 版本字段、128 B XOR 表、CRC16）都要按板型区分。
-2. **驱动脱离 DP32G030**：`drivers/st7565`、`bk1080`、`si473x`、`bk4819` 直接 include `drivers/dp32g030/*.h` 并操作 `GPIOB->DATA`、`SPI0->WDR`。应改为通过 `hal/gpio`、`hal/spi` 的板级接口访问，再为两块板分别提供 `hal/board-*.c`。按 AGENTS.md 可以直接改 HAL API，不保留兼容包装。
-3. **HAL 重写**：gpio／keyboard（新引脚）、spi（SPI1 给 LCD，SPI2 给 Flash）、i2c（PF5／PF6，不再与键盘共用）、adc（PB0／PB1）、backlight（PF8 + 定时器 PWM）、uart（USART1 PA9／PA10）、systick、crc、led、audio（PA8）。
-4. **射频芯片**：BK4819 驱动需要加入 BK4829 变体，至少核对 AGC、REG_43、REG_47 以及 FSK 相关差异（参考固件 `bk4829.c` 中有说明）。TX 必须等 PA 校准接通并做实机测量后才能开放。
-5. **存储层（改动最大）**：`hal/eeprom` 和 `eeprom-layout.h` 假设 I²C EEPROM：可按字节或页覆盖写，地址最大 512 KiB。K1 是 SPI NOR：写前必须整扇区（4 KiB）擦除，只能把 1 改写成 0。
-   - 抽象出与介质无关的存储接口；K1 实现为扇区读-改-擦-写，或改为只追加的日志式记录。
-   - `UVR2` 的两份配置镜像必须放在**不同的 4 KiB 扇区**，否则擦除一个扇区就会同时破坏两份，掉电恢复失效。频道区同理。
-   - 校准扇区物理地址 `0x010000` 加入写保护：普通写入和维护写都**不得擦除这个扇区**；PA 维护写需要整扇区备份后再重写，风险高，建议 K1 首版不开放。
-   - SSB 补丁尾区：K1 没有 SI4732，首版直接不提供该区。
-6. **USB CDC**：数据线连接的是 MCU 的 USB，不是 UART。要让 `tools/resources.py` 这类工具通过同一根线工作，固件需要 USB 全速设备栈和 CDC ACM（参考固件用 CherryUSB），这部分会占用相当的 Flash 和 RAM；也可以首版只用 K 口 UART（PA9／PA10，需要额外的 USB 转串口线）。
-7. **接收能力与菜单**：没有 SI4732，因此 AM、SSB 和 SI 路径的 WFM／RDS 不可用，广播 FM 只有 BK1080。`devices/rx-device` 的能力检测需要能报告这种组合，UI 和设计中的路由规则要适应这一点。整机频段和功放范围需要按 K1 资料和实测重新确定。
-8. **工具与文档**：`tools/resources.py` 的 `CAPACITY`、校准地址、PA 参考值都按 UV-K6 写死，需要按板型参数化；开发文档的验收项要增加 K1 一节。
+首次实机流程和备份命令见 [UV-K1 首启与只读备份](uvk1-bringup.md)。屏幕、按键、电池、UART 与外部 Flash 读取仍须本机验收。**未完成两次完整读取并核对一致前，不得实现任何外部 Flash 写入。**
 
-建议的首个里程碑：只做第 1–3 步，加上只读存储（读取校准，不写配置），点亮屏幕、扫描键盘、背光、电池读数，确认能通过官方升级工具刷入并正常启动；然后再接 BK4829 接收，最后做存储写入和 TX。
-
-**首次刷入的硬性要求**：第一版 K1 固件只能读外部 Flash，不得擦除或写入。它要先通过 UART 提供 JEDEC ID 和整片 SPI Flash 的按物理地址只读导出，把 2 MiB（或 8 MiB）完整备份到 `backups/uvk1/`、读两遍核对一致之后，才允许实现任何写入路径。原厂固件映像不在备份范围内（需要时再从官网获取）；设备相关数据（校准、频道、设置、其余 Flash 内容）必须先备份。
+后续工作：BK4829 接收寄存器差异核对与实测、介质感知的存储布局与掉电恢复、USB CDC、K1 能力/菜单适配。TX 必须等 K1 校准接通且经过实机测量后再考虑；不能使用 K6 PA 参考值。
 
 ## 6. 待确认
 

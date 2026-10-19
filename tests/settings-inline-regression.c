@@ -13,7 +13,7 @@ static unsigned saves, appRuns, requests, reapplications;
 static bool saveWorks=true, applyWorks=true;
 static uint16_t calibrationResult=2100;
 static uint32_t calibratedVoltage;
-static ReceiverCapabilities capabilities;
+static ReceiverCapabilities capabilities = {.bk_am=true, .bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL};
 static char title[40];
 static uint8_t panels[10][8][128];
 static unsigned panelCount;
@@ -55,7 +55,7 @@ static void capture(void) {
 static void choose(KEY_Code_t index) { press(index); press(KEY_MENU); }
 int main(int argc, char **argv) {
   RADIO_STATE_Default(&gDeviceConfig.radio);
-  capabilities=(ReceiverCapabilities){.si=true,.ssb_patch=true};
+  capabilities=(ReceiverCapabilities){.si=true,.ssb_patch=true,.bk_am=true,.bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL};
   enter(); capture();
   choose(KEY_1); capture(); // Display directly contains contrast and all light settings.
   assert(active_menu==&displayMenu && menu_stack_top==1 && active_menu->num_items==5);

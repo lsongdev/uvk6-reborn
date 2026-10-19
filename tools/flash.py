@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Flash a raw DP32G030 UV-K5/K6 image via its 38400-baud bootloader."""
+"""Flash a raw UV-K6 or UV-K1 image via its 38400-baud UART bootloader."""
 import argparse
 import binascii
 import os
@@ -15,7 +15,8 @@ BLOCK_SIZE = 256
 FLASH_SIZE = 0xF000  # Application partition; never overwrite the bootloader.
 # UV-K6 (DP32G030) bootloaders report 3.x; the UV-K1 (PY32F071) reports 7.x.
 # A DP32G030 image on a K1, or the reverse, leaves a radio only SWD can revive.
-BOOTLOADER_PREFIX = '3.'
+BOARDS = {'uvk6': (0, FLASH_SIZE, '3.'),
+          'uvk1': (0x08002800, 118 * 1024, '7.')}
 
 
 def xor(data):
@@ -28,13 +29,14 @@ def packet(payload, obfuscate=True):
     return b'\xab\xcd' + struct.pack('<H', len(payload)) + (xor(body) if obfuscate else body) + b'\xdc\xba'
 
 
-def validate_image(image):
-    if not 8 <= len(image) <= FLASH_SIZE:
-        raise ValueError(f'Raw firmware must be 8..{FLASH_SIZE} bytes')
+def validate_image(image, board='uvk6'):
+    origin, size, _ = BOARDS[board]
+    if not 8 <= len(image) <= size:
+        raise ValueError(f'Raw firmware must be 8..{size} bytes')
     stack, reset = struct.unpack_from('<II', image)
     if not (0x20000000 <= stack <= 0x20004000 and stack % 4 == 0
-            and reset & 1 and 8 <= (reset & ~1) < len(image)):
-        raise ValueError('Invalid DP32G030 vector table; use firmware.bin, not firmware.packed.bin')
+            and reset & 1 and origin + 8 <= (reset & ~1) < origin + len(image)):
+        raise ValueError(f'Invalid {board} vector table; use firmware.bin, not firmware.packed.bin')
 
 
 class Bootloader:
@@ -109,7 +111,7 @@ class Bootloader:
         raise TimeoutError('No valid bootloader reply')
 
 
-def flash(loader, image, wait=45, retries=5):
+def flash(loader, image, wait=45, retries=5, board='uvk6'):
     deadline = time.monotonic() + wait
     next_dot = min(time.monotonic() + 1, deadline)
     print(f'Waiting for Bootloader (up to {wait} seconds; starts immediately on handshake)',
@@ -130,17 +132,32 @@ def flash(loader, image, wait=45, retries=5):
         print(flush=True)
     version = hello[20:36].split(b'\0')[0].decode('ascii', errors='replace')
     print(f'Bootloader: {version}', flush=True)
-    if not version.startswith(BOOTLOADER_PREFIX):
-        raise ValueError(f'Bootloader {version} is not a UV-K6 (expected {BOOTLOADER_PREFIX}x); '
+    prefix = BOARDS[board][2]
+    if not version.startswith(prefix):
+        raise ValueError(f'Bootloader {version} is not {board} (expected {prefix}x); '
                          'nothing was written')
-    loader.send(bytes.fromhex('30051000') + b'*.01.23' + bytes(9))
+    if board == 'uvk1':
+        # Reference _prog.py: 0x0530, four-byte version prefix, on three hellos.
+        handshake = struct.pack('<HH', 0x0530, 4) + version[:4].encode('ascii').ljust(4, b'\0')
+        for attempt in range(3):
+            if attempt:
+                handshake_deadline = time.monotonic() + 3
+                while loader.receive(handshake_deadline)[:4] != bytes.fromhex('18052000'):
+                    pass
+            loader.send(handshake)
+    else:
+        loader.send(bytes.fromhex('30051000') + b'*.01.23' + bytes(9))
     time.sleep(.15)
     end = (len(image) + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1)
     for offset in range(0, len(image), BLOCK_SIZE):
         chunk = image[offset:offset + BLOCK_SIZE]
-        address = bytes([offset >> 8, offset & 255])
-        payload = (bytes.fromhex('19050c018a8d9f1d') + address + bytes([end >> 8, 0])
-                   + struct.pack('<H', len(chunk)) + b'\0\0' + chunk.ljust(BLOCK_SIZE, b'\0'))
+        address = struct.pack('<H', offset // BLOCK_SIZE)
+        # _prog.py leaves the four reserved bytes zero on K1. K6 keeps its
+        # measured short-page length field. Page number/count are both u16 LE.
+        reserved = bytes(4) if board == 'uvk1' else struct.pack('<HH', len(chunk), 0)
+        payload = (bytes.fromhex('19050c018a8d9f1d') + address
+                   + struct.pack('<H', end // BLOCK_SIZE) + reserved
+                   + chunk.ljust(BLOCK_SIZE, b'\0'))
         for attempt in range(retries):
             try:
                 loader.send(payload)
@@ -164,16 +181,17 @@ def flash(loader, image, wait=45, retries=5):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--board', choices=BOARDS, default='uvk6')
     parser.add_argument('--port', required=True, help='e.g. /dev/cu.usbserial-1420 or /dev/ttyUSB0')
-    parser.add_argument('--firmware', type=Path, default=Path('bin/uvk6/firmware.bin'), help='raw image, not packed')
+    parser.add_argument('--firmware', type=Path, default=None, help='raw image, not packed')
     args = parser.parse_args()
     try:
-        image = args.firmware.read_bytes()
-        validate_image(image)
+        image = (args.firmware or Path('bin') / args.board / 'firmware.bin').read_bytes()
+        validate_image(image, args.board)
         print('Hold PTT while powering on to enter Bootloader.', flush=True)
         loader = Bootloader(args.port)
         try:
-            flash(loader, image)
+            flash(loader, image, board=args.board)
         finally:
             loader.close()
     except (OSError, ValueError, TimeoutError) as error:

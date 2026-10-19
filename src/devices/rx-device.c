@@ -2,6 +2,7 @@
 #include "devices/rx-device.h"
 #include "devices/audio.h"
 #include "hal/system.h"
+#include "hal/board.h"
 #include "drivers/bk1080/bk1080.h"
 #include "drivers/bk4819/bk4819.h"
 #include "drivers/si473x/si473x.h"
@@ -22,9 +23,13 @@ ReceiverCapabilities RX_DEVICE_Capabilities(void) {
   static bool detected;
   static ReceiverCapabilities capabilities;
   if (!detected) {
+    bool bk4829 = BOARD_RadioChip() == BOARD_RADIO_BK4829;
+    capabilities.bk_am = !bk4829;
+    capabilities.bk_bandwidth_mask = bk4829 ?
+        RX_BK_BANDWIDTH_6K | RX_BK_BANDWIDTH_12K | RX_BK_BANDWIDTH_26K : RX_BK_BANDWIDTH_ALL;
     capabilities.broadcast = BK1080_Detect();
     // Probe each chip through its own driver. A failed BK read is not SI.
-    capabilities.si = !capabilities.broadcast && SI47XX_Detect();
+    capabilities.si = BOARD_HasSi4732() && !capabilities.broadcast && SI47XX_Detect();
     capabilities.ssb_patch = capabilities.si && RESOURCE_SsbPatchPresent();
     if (capabilities.ssb_patch)
       SI47XX_SetPatchSource(RESOURCE_SsbPatchRead, RESOURCE_SSB_PATCH_BYTES);
@@ -41,11 +46,11 @@ void RX_DEVICE_Init(void) {
   (void)BK1080_Init(0, false);
 }
 
-bool RX_DEVICE_SiActive(void) { return isSi4732On; }
+bool RX_DEVICE_SiActive(void) { return BOARD_HasSi4732() && isSi4732On; }
 
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo) {
   SI47XX_RdsStatus status;
-  if (!packet || !SI47XX_ReadRDS(&status, clear_fifo)) return false;
+  if (!BOARD_HasSi4732() || !packet || !SI47XX_ReadRDS(&status, clear_fifo)) return false;
   memcpy(packet->group.blocks, status.blocks, sizeof(status.blocks));
   memcpy(packet->group.errors, status.errors, sizeof(status.errors));
   packet->fifo_used = status.fifo_used;
@@ -62,6 +67,7 @@ static void leave(RxDevice device) {
     BK4819_Idle();
     break;
   case RX_DEVICE_SI:
+    if (!BOARD_HasSi4732()) break;
     if (gDeviceConfig.preferences.si4732_power_off)
       SI47XX_PowerDown();
     else
@@ -156,13 +162,14 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
 
   switch (plan->device) {
   case RX_DEVICE_BK:
-    if (mode != RX_NFM && mode != RX_AM)
+    if ((mode == RX_AM && BOARD_RadioChip() == BOARD_RADIO_BK4829) ||
+        (mode != RX_NFM && mode != RX_AM))
       return false;
     if (!BK4819_BandwidthFromHz(plan->parameters.bandwidth_hz, &bandwidth))
       return false;
     break;
   case RX_DEVICE_SI:
-    if (mode == RX_NFM || (mode == RX_WFM &&
+    if (!BOARD_HasSi4732() || mode == RX_NFM || (mode == RX_WFM &&
           (plan->frequency_hz < 64000000u || plan->frequency_hz > 108000000u)) ||
         (mode != RX_WFM && plan->frequency_hz > 30000000u))
       return false;
@@ -311,7 +318,7 @@ bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open) {
     return true;
   }
   case RX_DEVICE_SI:
-    if (!RSQ_GET()) return false;
+    if (!BOARD_HasSi4732() || !RSQ_GET()) return false;
     *rssi = rsqStatus.resp.RSSI;
     snr = rsqStatus.resp.SNR;
     break;
@@ -329,6 +336,7 @@ bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open) {
 bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open) {
   // Break before make: never mix audio from two chips. Receiver DSP stays on.
   AUDIO_ToggleSpeaker(false);
+  if (!BOARD_HasSi4732() && (devices & (1u << RX_DEVICE_SI))) return false;
   bool ok=true;
   if (devices&(1u<<RX_DEVICE_BK)) {
     BK4819_SetAF(BK4819_AF_MUTE);
@@ -350,7 +358,7 @@ bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open) {
 }
 
 bool RX_DEVICE_SeekNative(const RxPlan *plan) {
-  if (!plan || plan->device != RX_DEVICE_SI)
+  if (!BOARD_HasSi4732() || !plan || plan->device != RX_DEVICE_SI)
     return false;
   if (plan->parameters.mode == RX_WFM)
     return plan->parameters.step_hz == 50000 ||
@@ -376,7 +384,7 @@ bool RX_DEVICE_SeekStart(const RxPlan *plan, uint32_t lower_hz,
 }
 
 RxSeekResult RX_DEVICE_SeekPoll(RxDevice device, uint32_t *frequency_hz) {
-  if (device != RX_DEVICE_SI)
+  if (!BOARD_HasSi4732() || device != RX_DEVICE_SI)
     return RX_SEEK_ERROR;
   switch (SI47XX_SeekPoll(frequency_hz)) {
   case SI_SEEK_BUSY: return RX_SEEK_BUSY;
@@ -387,7 +395,7 @@ RxSeekResult RX_DEVICE_SeekPoll(RxDevice device, uint32_t *frequency_hz) {
 }
 
 void RX_DEVICE_SeekCancel(RxDevice device) {
-  if (device == RX_DEVICE_SI)
+  if (BOARD_HasSi4732() && device == RX_DEVICE_SI)
     SI47XX_SeekCancel();
 }
 
@@ -399,7 +407,7 @@ bool RX_DEVICE_SeekSignal(RxDevice device, bool *found) {
     *found = BK4819_IsSquelchOpen();
     return true;
   case RX_DEVICE_SI:
-    if (!RSQ_GET()) return false;
+    if (!BOARD_HasSi4732() || !RSQ_GET()) return false;
     *found = rsqStatus.resp.RSSI >= 16 && rsqStatus.resp.SNR >= 7;
     return true;
   case RX_DEVICE_BROADCAST: {
@@ -431,7 +439,7 @@ bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found) {
     return true;
   }
   if (plan->device==RX_DEVICE_SI) {
-    if (!RSQ_GET()) return false;
+    if (!BOARD_HasSi4732() || !RSQ_GET()) return false;
     uint8_t snr=plan->parameters.squelch<7 ? 7 : plan->parameters.squelch+1u;
     *found=rsqStatus.resp.RSSI>=16 && rsqStatus.resp.SNR>=snr;
     return true;

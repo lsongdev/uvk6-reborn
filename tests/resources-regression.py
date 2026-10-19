@@ -14,6 +14,8 @@ spec = importlib.util.spec_from_file_location('resources', Path(__file__).parent
 resources = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(resources)
 
+FAST_READ = resources.ReadPolicy(interval_seconds=0, backoff_seconds=0)
+
 CAPACITY = 524288
 TAIL = CAPACITY - resources.HEADER_BYTES - resources.SSB_BYTES
 
@@ -61,13 +63,137 @@ class ResourceTests(unittest.TestCase):
     def setUp(self):
         self.patch = resources.parse_patch(resources.SSB_PATCH.read_text())
         self.firmware = FakeFirmware()
-        self.radio = resources.Radio(self.firmware)
+        self.radio = resources.Radio(self.firmware, FAST_READ)
         self.address = resources.ssb_address(CAPACITY)
         self.backups = Path(tempfile.mkdtemp())
 
     def install(self):
         return resources.install(self.radio, self.address, resources.SSB_MAGIC, self.patch,
                                  self.backups, log=lambda *a, **k: None)
+
+    def test_k1_info_and_full_physical_flash_read(self):
+        class PhysicalFlash(FakeFirmware):
+            def __init__(self):
+                super().__init__()
+                self.eeprom = bytearray(bytes(range(256)) * 8192)
+                self.reads = 0
+            def send(self, payload, obfuscate=True):
+                kind = int.from_bytes(payload[:2], 'little')
+                if kind == 0x0572:
+                    assert struct.unpack_from('<I', payload, 4)[0] == self.stamp
+                    self.reply = struct.pack('<HHI24s', 0x0573, 28, len(self.eeprom), b'SPI 856015 RO')
+                elif kind == 0x051B:
+                    at, n, stamp = struct.unpack_from('<IB3xI', payload, 4)
+                    assert stamp == self.stamp and 0 < n <= 128 and at + n <= len(self.eeprom)
+                    self.reads += 1
+                    self.reply = struct.pack('<HHIB3x', 0x051C, n + 12, at, n) + self.eeprom[at:at + n]
+                else:
+                    super().send(payload, obfuscate)
+        firmware = PhysicalFlash()
+        radio = resources.Radio(firmware, FAST_READ)
+        self.assertEqual(radio.info(), (2097152, 'SPI 856015 RO'))
+        self.assertEqual(radio.read(0, 2097152), firmware.eeprom)
+        self.assertEqual(firmware.reads, 16384)
+        self.assertEqual(firmware.writes, [])
+
+    def test_read_retries_and_ignores_stale_chunks(self):
+        class Flaky(FakeFirmware):
+            def __init__(self):
+                super().__init__()
+                self.dropped = False
+                self.stale = None
+            def send(self, payload, obfuscate=True):
+                super().send(payload, obfuscate)
+                if int.from_bytes(payload[:2], 'little') == 0x051B:
+                    address = struct.unpack_from('<I', payload, 4)[0]
+                    if not self.dropped:
+                        self.dropped = True
+                        self.reply = None
+                    elif address == 128:
+                        self.stale = struct.pack('<HHIB3x', 0x051C, 140, 0, 128) + bytes(128)
+            def receive(self, deadline, obfuscate=True):
+                if self.stale is not None:
+                    reply, self.stale = self.stale, None
+                    return reply
+                if self.reply is None:
+                    raise TimeoutError()
+                return super().receive(deadline, obfuscate)
+        firmware = Flaky()
+        radio = resources.Radio(firmware, FAST_READ)
+        self.assertEqual(radio.read(0, 256), bytes([255]) * 256)
+        self.assertTrue(firmware.dropped)
+        self.assertEqual(firmware.writes, [])
+
+    def test_export_checkpoints_and_resumes_without_overwriting(self):
+        class Export:
+            def __init__(self):
+                self.calls = []
+                self.fail = True
+            def read(self, address, size):
+                self.calls.append((address, size))
+                if address == 65536 and self.fail:
+                    raise TimeoutError('disconnected')
+                return bytes([address // 65536]) * size
+        radio = Export()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'dump.bin'
+            with self.assertRaises(TimeoutError):
+                resources.read_to_file(radio, 0, 131072, output)
+            self.assertFalse(output.exists())
+            self.assertEqual(output.with_name('dump.bin.part').stat().st_size, 65536)
+            with self.assertRaises(ValueError):
+                resources.read_to_file(radio, 0, 131072, output)
+            with self.assertRaises(ValueError):
+                resources.read_to_file(radio, 128, 131072, output, resume=True)
+            radio.fail = False
+            radio.calls.clear()
+            resources.read_to_file(radio, 0, 131072, output, resume=True)
+            self.assertEqual(radio.calls[0], (65536, resources.CHECKPOINT_BYTES))
+            self.assertEqual(output.read_bytes(), bytes(65536) + bytes([1]) * 65536)
+            self.assertFalse(output.with_name('dump.bin.part').exists())
+            with self.assertRaises(ValueError):
+                resources.read_to_file(radio, 0, 131072, output)
+
+    def test_retry_budget_is_shared_across_checkpoints_and_stops(self):
+        class Intermittent(FakeFirmware):
+            def __init__(self):
+                super().__init__()
+                self.read_requests = 0
+            def send(self, payload, obfuscate=True):
+                super().send(payload, obfuscate)
+                if int.from_bytes(payload[:2], 'little') == 0x051B:
+                    self.read_requests += 1
+                    if self.read_requests % 2:
+                        self.reply = None
+            def receive(self, deadline, obfuscate=True):
+                if self.reply is None:
+                    raise TimeoutError('lost reply')
+                return super().receive(deadline, obfuscate)
+        firmware = Intermittent()
+        radio = resources.Radio(firmware, FAST_READ._replace(total_retries=1))
+        with patch.object(resources.time, 'sleep') as sleep:
+            self.assertEqual(radio.read(0, 128), bytes([255])*128)
+            with self.assertRaisesRegex(TimeoutError, 'budget exhausted'):
+                radio.read(128, 128)
+        self.assertEqual(firmware.read_requests, 3)
+        self.assertEqual(firmware.writes, [])
+
+    def test_read_pacing_and_no_retry(self):
+        radio = resources.Radio(FakeFirmware())
+        with patch.object(resources.time, 'sleep') as sleep:
+            radio.read(0, 256)
+        self.assertEqual(sleep.call_args_list, [unittest.mock.call(0.02)] * 2)
+        policy = FAST_READ._replace(retries=0, total_retries=0)
+        radio = resources.Radio(FakeFirmware(), policy)
+        with patch.object(radio, 'request', side_effect=TimeoutError()) as request:
+            with self.assertRaises(TimeoutError):
+                radio.read(0, 128)
+        self.assertEqual(request.call_count, 1)
+        for bad in (FAST_READ._replace(timeout_seconds=0),
+                    FAST_READ._replace(retries=-1),
+                    FAST_READ._replace(interval_seconds=float('nan'))):
+            with self.assertRaises(ValueError):
+                resources.Radio(None, bad) # Fail before any transport access.
 
     def test_repository_patch(self):
         self.assertEqual(len(self.patch), 8840)
@@ -119,7 +245,7 @@ class CalibrationTests(unittest.TestCase):
     def setUp(self):
         self.firmware = FakeFirmware()
         self.firmware.eeprom[0x1E00:0x2000] = bytes(range(256)) * 2  # Other calibration.
-        self.radio = resources.Radio(self.firmware)
+        self.radio = resources.Radio(self.firmware, FAST_READ)
         self.backups = Path(tempfile.mkdtemp())
         self.log = []
 

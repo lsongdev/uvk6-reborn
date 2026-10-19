@@ -1,5 +1,5 @@
 #include "drivers/bk4819/bk4819.h"
-#include "hal/gpio.h"
+#include "drivers/bk4819/internal.h"
 #include "hal/system.h"
 #include "hal/systick.h"
 #include "hal/uart.h"
@@ -7,11 +7,6 @@
 #include "drivers/bk4819/bk4819-regs.h"
 #include <stdint.h>
 #include <stdio.h>
-
-#define SHORT_DELAY()                                                          \
-  __asm volatile("nop\n nop\n nop\n nop\n nop\n"                               \
-                 "nop\n nop\n nop\n nop\n nop\n"                               \
-                 "nop\n nop\n nop\n"); // ~13 NOPs для ~0.27 мкс @48MHz
 
 // ============================================================================
 // Constants
@@ -78,101 +73,6 @@ static uint32_t gLastFrequency = 0;
 // ============================================================================
 // Low-Level GPIO and SPI Operations
 // ============================================================================
-
-static inline void gpio_set_scn(bool high) { GPIO_Write(GPIO_BK4819_SCN, high); }
-static inline void gpio_set_scl(bool high) { GPIO_Write(GPIO_BK4819_SCL, high); }
-static inline void gpio_set_sda(bool high) { GPIO_Write(GPIO_BK4819_SDA, high); }
-
-static void spi_write_byte(uint8_t data) {
-  gpio_set_scl(false);
-
-  for (uint8_t i = 0; i < 8; i++) {
-    gpio_set_sda(data & 0x80);
-    SHORT_DELAY();
-    gpio_set_scl(true);
-    SHORT_DELAY();
-    data <<= 1;
-    gpio_set_scl(false);
-    SHORT_DELAY();
-  }
-}
-
-static uint16_t spi_read_word(void) {
-  GPIO_SetInput(GPIO_BK4819_SDA, true);
-  TIMER_DelayUs(1);
-
-  uint16_t value = 0;
-  for (uint8_t i = 0; i < 16; i++) {
-    value <<= 1;
-    value |= GPIO_Read(GPIO_BK4819_SDA);
-    gpio_set_scl(true);
-    SHORT_DELAY();
-    gpio_set_scl(false);
-    SHORT_DELAY();
-  }
-
-  GPIO_SetInput(GPIO_BK4819_SDA, false);
-
-  return value;
-}
-
-static void spi_write_word(uint16_t data) {
-  gpio_set_scl(false);
-
-  for (uint8_t i = 0; i < 16; i++) {
-    gpio_set_sda(data & 0x8000);
-    SHORT_DELAY();
-    gpio_set_scl(true);
-    data <<= 1;
-    SHORT_DELAY();
-    gpio_set_scl(false);
-    SHORT_DELAY();
-  }
-}
-
-// ============================================================================
-// Register Access
-// ============================================================================
-
-static uint16_t reg30state = 0xffff;
-
-uint16_t BK4819_ReadRegister(BK4819_REGISTER_t reg) {
-  if (reg == BK4819_REG_30 && reg30state != 0xffff) {
-    return reg30state;
-  }
-  gpio_set_scn(true);
-  gpio_set_scl(false);
-  __asm volatile("nop \n"
-                 "nop \n");
-  gpio_set_scn(false);
-
-  spi_write_byte(reg | 0x80);
-  uint16_t value = spi_read_word();
-
-  gpio_set_scn(true);
-  gpio_set_scl(true);
-  gpio_set_sda(true);
-
-  return value;
-}
-
-void BK4819_WriteRegister(BK4819_REGISTER_t reg, uint16_t data) {
-  if (reg == BK4819_REG_30) {
-    reg30state = data;
-  }
-  gpio_set_scn(true);
-  gpio_set_scl(false);
-  __asm volatile("nop \n"
-                 "nop \n");
-  gpio_set_scn(false);
-
-  spi_write_byte(reg);
-  spi_write_word(data);
-
-  gpio_set_scn(true);
-  gpio_set_scl(true);
-}
-
 
 void BK4819_SetRegValue(RegisterSpec spec, uint16_t value) {
   uint16_t reg = BK4819_ReadRegister(spec.num);
@@ -243,13 +143,28 @@ uint8_t BK4819_GetAttenuation() {
     break;
   }
   uint16_t v = BK4819_ReadRegister(reg);
-  return (uint8_t[]){19, 16, 11, 0}[(v >> 8) & 3] +
+  return (isBk4829() ? (uint8_t[]){28, 24, 19, 0}[(v >> 8) & 3]
+                      : (uint8_t[]){19, 16, 11, 0}[(v >> 8) & 3]) +
          (uint8_t[]){24, 19, 14, 9, 6, 4, 2, 0}[(v >> 5) & 7] +
          (uint8_t[]){8, 6, 3, 0}[(v >> 3) & 3] +
          (uint8_t[]){33, 27, 21, 15, 9, 6, 3, 0}[v & 7];
 }
 
 void BK4819_SetAGC(uint8_t gainIndex) {
+  if (gainIndex >= ARRAY_SIZE(GAIN_TABLE)) return;
+  if (isBk4829()) {
+    // Stock BK4829 profile (reference 5fedc09). Do not overwrite its DC
+    // correction bits with the BK4819 defaults on every tune.
+    static const uint16_t gains[] = {0x0318, 0x033A, 0x03DB, 0x03DF, 0x0210};
+    for (unsigned i = 0; i < ARRAY_SIZE(gains); ++i)
+      BK4819_WriteRegister(BK4819_REG_10 + i, gains[i]);
+    if (gainIndex) BK4819_WriteRegister(BK4819_REG_13, GAIN_TABLE[gainIndex].regValue);
+    BK4819_WriteRegister(BK4819_REG_49, 0x2AB2);
+    BK4819_WriteRegister(BK4819_REG_7B, 0x73DC);
+    uint16_t reg = BK4819_ReadRegister(BK4819_REG_7E);
+    BK4819_WriteRegister(BK4819_REG_7E, (reg & ~0xF000u) | 0x3000u | (gainIndex ? 0x8000u : 0));
+    return;
+  }
   const bool enableAgc = (gainIndex == AUTO_GAIN_INDEX);
   uint16_t regVal = BK4819_ReadRegister(BK4819_REG_7E);
 
@@ -308,6 +223,19 @@ void BK4819_SelectFilter(uint32_t frequency, uint32_t vhfUhfBound) {
 }
 
 void BK4819_SetFilterBandwidth(BK4819_FilterBandwidth_t bw) {
+  if (isBk4829()) {
+    // Project nominal width labels select the three reference presets.
+    // These labels are not measurements of the analog filter's -3 dB width.
+    uint16_t value;
+    switch (bw) {
+    case BK4819_FILTER_BW_6k: value = 0x2058; break;
+    case BK4819_FILTER_BW_12k: value = 0x4048; break;
+    case BK4819_FILTER_BW_26k: value = 0x3028; break;
+    default: return;
+    }
+    BK4819_WriteRegister(BK4819_REG_43, value);
+    return;
+  }
   if (bw > 9)
     return;
 
@@ -376,7 +304,7 @@ void BK4819_TuneTo(uint32_t freq, bool precise) {
 
 
 void BK4819_SetAF(BK4819_AF_Type_t af) {
-  BK4819_WriteRegister(BK4819_REG_47, 0x6040 | (af << 8));
+  BK4819_WriteRegister(BK4819_REG_47, (isBk4829() ? 0x6042u : 0x6040u) | (af << 8));
 }
 
 // ============================================================================
@@ -384,6 +312,7 @@ void BK4819_SetAF(BK4819_AF_Type_t af) {
 // ============================================================================
 
 void BK4819_SetupSquelch(SQL sq, uint8_t delayOpen, uint8_t delayClose) {
+  if (isBk4829()) BK4819_WriteRegister(BK4819_REG_70, 0);
   sq.no = Clamp(sq.no, 0, 127);
   sq.nc = Clamp(sq.nc, 0, 127);
 
@@ -410,12 +339,13 @@ bool BK4819_IsSquelchOpen(void) {
 void BK4819_SetCDCSSCodeWord(uint32_t codeWord) {
   BK4819_WriteRegister(
       BK4819_REG_51,
+      (isBk4829() ? 0xA033u :
       BK4819_REG_51_ENABLE_CxCSS | BK4819_REG_51_GPIO6_PIN2_NORMAL |
           BK4819_REG_51_TX_CDCSS_POSITIVE | BK4819_REG_51_MODE_CDCSS |
           BK4819_REG_51_CDCSS_23_BIT | BK4819_REG_51_1050HZ_NO_DETECTION |
           BK4819_REG_51_AUTO_CDCSS_BW_ENABLE |
           BK4819_REG_51_AUTO_CTCSS_BW_ENABLE |
-          (51U << BK4819_REG_51_SHIFT_CxCSS_TX_GAIN1));
+          (51U << BK4819_REG_51_SHIFT_CxCSS_TX_GAIN1)));
 
   BK4819_WriteRegister(BK4819_REG_07,
                        BK4819_REG_07_MODE_CTC1 |
@@ -428,9 +358,11 @@ void BK4819_SetCDCSSCodeWord(uint32_t codeWord) {
 void BK4819_SetCTCSSFrequency(uint32_t freqControlWord) {
   uint16_t config = (freqControlWord == 2625) ? 0x944A : 0x904A;
 
+  if (isBk4829()) config &= ~0x0Fu;
   BK4819_WriteRegister(BK4819_REG_51, config);
   BK4819_WriteRegister(BK4819_REG_07, BK4819_REG_07_MODE_CTC1 |
-                                          (((freqControlWord * 2065) / 1000)
+                                          ((isBk4829() ? (freqControlWord * 206488u + 50000u) / 100000u
+                                                       : freqControlWord * 2065u / 1000u)
                                            << BK4819_REG_07_SHIFT_FREQUENCY));
 }
 
@@ -477,6 +409,12 @@ void BK4819_ExitTxMute(void) { BK4819_WriteRegister(BK4819_REG_50, 0x3B20); }
 
 void BK4819_RX_TurnOn(void) {
   BK4819_WriteRegister(BK4819_REG_36, 0x0000);
+  if (isBk4829()) {
+    BK4819_WriteRegister(BK4819_REG_37, 0x9F1F);
+    BK4819_WriteRegister(BK4819_REG_30, 0);
+    BK4819_WriteRegister(BK4819_REG_30, 0xBFF1);
+    return;
+  }
   BK4819_WriteRegister(BK4819_REG_37, 0x1F0F);
   BK4819_WriteRegister(BK4819_REG_30, 0x0200);
 
@@ -584,6 +522,7 @@ void BK4819_XtalSet(XtalMode mode) {
  * @param level 0 = off (disable AFC), 1..8 = range
  */
 void BK4819_SetAFC(uint8_t level) {
+  if (isBk4829()) return; // Keep the reference 0x4691 until K1 RF validation.
   if (level > 8) {
     level = 8;
   }
@@ -613,6 +552,7 @@ void BK4819_SetAFC(uint8_t level) {
  * @param level 0(slow)..63(fast)
  */
 void BK4819_SetAFCSpeed(uint8_t speed) {
+  if (isBk4829()) return;
   if (speed > 63) {
     speed = 63;
   }
@@ -688,12 +628,6 @@ void BK4819_ToggleAFDAC(bool enable) {
 // Initialization
 // ============================================================================
 
-static void initialize_gpio_pins(void) {
-  gpio_set_scn(true);
-  gpio_set_scl(true);
-  gpio_set_sda(true);
-}
-
 static void initialize_dtmf_coefficients(void) {
   for (uint8_t i = 0; i < ARRAY_SIZE(DTMF_COEFFS); ++i) {
     BK4819_WriteRegister(0x09, (i << 12) | DTMF_COEFFS[i]);
@@ -704,6 +638,25 @@ static void initialize_registers(void) {
   // soft reset
   BK4819_WriteRegister(BK4819_REG_00, 0x8000);
   BK4819_WriteRegister(BK4819_REG_00, 0x0000);
+  if (isBk4829()) {
+    // Reference: armel/uv-k1-k5v3-firmware-custom, 5fedc09, bk4829.c.
+    // Keep the PA bias/gate disabled, including during initialization.
+    static const struct { uint8_t reg; uint16_t value; } init[] = {
+      {0x37,0x9D1F}, {0x36,0}, {0x7D,0xE920}, {0x40,0x3516},
+      {0x1C,0x07C0}, {0x1D,0xE555}, {0x1E,0x4C58}, {0x1F,0xC65A},
+      {0x3E,0x94C6}, {0x73,0x4691}, {0x77,0x88EF}, {0x19,0x1041},
+      {0x28,0x0B40}, {0x29,0xAA00}, {0x2A,0x6600}, {0x2C,0x1822},
+      {0x2F,0x9890}, {0x53,0x2028}, {0x7E,0x303E}, {0x46,0x600A},
+      {0x4A,0x5430}, {0x07,0x61CE},
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(init); ++i)
+      BK4819_WriteRegister(init[i].reg, init[i].value);
+    gGpioOutState = 0x9000;
+    BK4819_WriteRegister(BK4819_REG_33, gGpioOutState);
+    BK4819_SetAGC(AUTO_GAIN_INDEX);
+    BK4819_WriteRegister(BK4819_REG_3F, 0);
+    return;
+  }
   // power up rf
   BK4819_WriteRegister(BK4819_REG_37, 0x1D0F);
 
@@ -725,7 +678,7 @@ static void initialize_registers(void) {
 
 static void initialize_audio(void) {
   BK4819_WriteRegister(BK4819_REG_48,
-                       (11u << 12) |   // Reserved
+                       ((isBk4829() ? 3u : 11u) << 12) | // Reserved
                            (0 << 10) | // AF Rx ATT-1: 0..-18dB (-6dB/step)
                            (58 << 4) | // AF Rx Gain-2 (-26..5.5 dB, 0.5dB/step)
                            (8 << 0)    // AF DAC Gain (0..15max 2dB/step)
@@ -755,7 +708,7 @@ void BK4819_Init(uint8_t mic, uint16_t deviation) {
   gSelectedFilter = 255;
   gLastFrequency = 0;
   BK4819_InvalidateRxMode();
-  initialize_gpio_pins();
+  BK4819_BusInit();
   initialize_registers();
   initialize_dtmf_coefficients();
   initialize_audio();
@@ -763,10 +716,12 @@ void BK4819_Init(uint8_t mic, uint16_t deviation) {
     BK4819_Idle();
     return;
   }
-  BK4819_ConfigureMicrophone(mic);
+  if (!isBk4829()) BK4819_ConfigureMicrophone(mic);
   configure_receiver();
 
   BK4819_DisableDTMF();
+
+  if (isBk4829()) { isInitialized = true; return; } // No K1 TX setup.
 
   // Set deviation
   BK4819_WriteRegister(0x40, (BK4819_ReadRegister(0x40) & ~(0x7FF)) |
@@ -778,7 +733,9 @@ void BK4819_Init(uint8_t mic, uint16_t deviation) {
 static const uint16_t bandwidthHz[] = {6000,7000,9000,10000,12000,14000,17000,20000,23000,26000};
 bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index) {
   for (uint8_t i = 0; i < ARRAY_SIZE(bandwidthHz); ++i) {
-    if (bandwidthHz[i] == hz) {
+    if (bandwidthHz[i] == hz &&
+        (!isBk4829() || i == BK4819_FILTER_BW_6k ||
+         i == BK4819_FILTER_BW_12k || i == BK4819_FILTER_BW_26k)) {
       *index = i;
       return true;
     }

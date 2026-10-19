@@ -3,10 +3,25 @@
 #include <string.h>
 
 int main(void) {
-  ReceiverCapabilities si = {true, false, true};
-  ReceiverCapabilities bk1080 = {false, true, false};
-  ReceiverCapabilities none = {false, false, false};
+  ReceiverCapabilities si = {true, false, true, true, RX_BK_BANDWIDTH_ALL};
+  ReceiverCapabilities bk1080 = {false, true, false, true, RX_BK_BANDWIDTH_ALL};
+  ReceiverCapabilities none = {false, false, false, true, RX_BK_BANDWIDTH_ALL};
+  ReceiverCapabilities k1 = {.broadcast=true, .bk_bandwidth_mask=
+      RX_BK_BANDWIDTH_6K | RX_BK_BANDWIDTH_12K | RX_BK_BANDWIDTH_26K};
   RxPlan plan;
+  RadioParameters k1fm = {RX_NFM,12500,12000,0,0};
+  assert(RADIO_MODEL_Plan(145500000,k1fm,k1,&plan) == RX_OK);
+  k1fm.mode = RX_AM;
+  assert(RADIO_MODEL_Plan(125000000,k1fm,k1,&plan) == RX_UNSUPPORTED_MODE);
+  k1fm.mode = RX_NFM; k1fm.bandwidth_hz = 10000;
+  assert(RADIO_MODEL_Plan(145500000,k1fm,k1,&plan) == RX_INVALID_PARAMETERS);
+  k1fm.bandwidth_hz = 6000;
+  assert(RADIO_MODEL_Adjust(145500000,&k1fm,k1,RADIO_FIELD_BANDWIDTH,true));
+  assert(k1fm.bandwidth_hz == 12000);
+  assert(RADIO_MODEL_Adjust(145500000,&k1fm,k1,RADIO_FIELD_BANDWIDTH,true));
+  assert(k1fm.bandwidth_hz == 26000);
+  assert(RADIO_MODEL_Adjust(145500000,&k1fm,k1,RADIO_FIELD_BANDWIDTH,true));
+  assert(k1fm.bandwidth_hz == 6000);
   RadioParameters parameters = radioBands[RADIO_MODEL_BandAt(95925000)].preset;
   assert(parameters.mode == RX_WFM);
   assert(RADIO_MODEL_Plan(95925000, parameters, si, &plan) == RX_OK);
