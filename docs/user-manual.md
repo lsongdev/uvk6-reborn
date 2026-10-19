@@ -232,11 +232,11 @@ Slot 菜单 → Spectrum。上方是当前 Slot 的卡片，显示光标处的�
 | Lock PTT too | 锁键时是否同时屏蔽 PTT |
 | Battery | Show charge（Icon／Percent／Voltage）、Charge curve（1600／2200／3500 估算曲线）、Cal voltage（输入实测 5.00–8.60 V） |
 | Band presets／Channels | 独立频段预设／频道列表、改名和删除 |
-| About | Firmware、Storage（容量）、Config、FM chip（SI4732／BK1080）、SSB patch（仅 SI4732 构建）、TX status、Save status、Reset factory |
+| About | Firmware、Storage（容量）、Config、FM chip（SI4732／BK1080）、SSB patch（仅 SI4732 构建）、TX status、Save status、Reset to defaults |
 
 Brightness 降低时限制 Idle light 不高于它；Light time 的 Off／Always 优先于接收触发。电池曲线不是容量测量。SQL 时序只显示档位，不承诺毫秒数；Auto（默认）采用接收芯片的推荐值：K6 BK4819 为 1／1，K1 BK4829 为 5／3（原厂值）。SI idle 在下次离开 SI 时使用；滤波和 SQL 工程参数离开设置时重新应用，失败回退。设置、文本页面期间接收持续。
 
-Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留原值。Reset factory 需 MENU 确认，恢复显示和 TX 保护等普通偏好，保留当前键盘锁、电池校准／曲线、RX 工程参数、Mic／Deviation、Slot 和频道，不是整机初始化。
+Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留原值。Reset to defaults 需 MENU 确认，恢复显示和 TX 保护等普通偏好，保留当前键盘锁、电池校准／曲线、RX 工程参数、Mic／Deviation、Slot 和频道，不是整机初始化。
 
 普通修改在最后变更后约 1500 ms 合并写入，离开设置也尝试提交；失败约每 5 秒重试。About → Save status 显示 Read only／Saved／Pending／Failed／RAM only，MENU 立即保存或重试。Pending 时掉电可能丢失最近修改。
 
