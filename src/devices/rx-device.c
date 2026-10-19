@@ -50,6 +50,8 @@ void RX_DEVICE_Init(void) {
 
 bool RX_DEVICE_SiActive(void) { return BOARD_HasSi4732() && isSi4732On; }
 
+bool RX_DEVICE_BroadcastExcludesBk(void) { return BOARD_BroadcastUsesBkVhfPath(); }
+
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo) {
   SI47XX_RdsStatus status;
   if (!BOARD_HasSi4732() || !packet || !SI47XX_ReadRDS(&status, clear_fifo)) return false;

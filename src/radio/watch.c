@@ -111,6 +111,12 @@ void watchUpdate(void) {
       }
       targets[count++]=(WatchTarget){id,plan};
     }
+    bool broadcast=false;
+    for (uint8_t i=0; i<count; ++i) broadcast |= targets[i].plan.device==RX_DEVICE_BROADCAST;
+    if (broadcast && RX_DEVICE_BroadcastExcludesBk()) {
+      // UV-K1: FM shares the BK front end, so only the selected slot plays.
+      watchStatus="DW: off in FM"; watchDelay=true; watchResumeAt=Now()+WATCH_RETRY_MS; return;
+    }
     if (!WATCH_Start(&watcher,targets,count,selectedSlot,Now())) {
       // Duplicates and extra broadcasts collapse: one source is not a watch.
       // Expected (e.g. two FM broadcasts), so the user manual explains it.

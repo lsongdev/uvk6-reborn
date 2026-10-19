@@ -104,10 +104,16 @@ uint16_t BK1080_GetRSSI() {
   return (BK1080_ReadRegister(BK1080_REG_10) & 0xFF) << 1;
 }
 
+// Probed once per boot, early after power-up: a part still starting may
+// miss the first read, so retry a few times before declaring it absent.
 bool BK1080_Detect(void) {
   GPIO_Write(GPIO_BK1080, false);
   SYS_DelayMs(10);
-  bool present = BK1080_ReadRegister(1) == 0x1080;
+  bool present = false;
+  for (uint8_t attempt = 0; attempt < 5 && !present; ++attempt) {
+    if (attempt) SYS_DelayMs(50);
+    present = BK1080_ReadRegister(1) == 0x1080;
+  }
   GPIO_Write(GPIO_BK1080, true);
   return present;
 }

@@ -13,6 +13,9 @@ ReceiverCapabilities RX_DEVICE_Capabilities(void);
 // BK4819 from the stored preferences, PA off, broadcast chip parked.
 void RX_DEVICE_Init(void);
 bool RX_DEVICE_SiActive(void); // SI4732 powered (status line).
+// While the broadcast chip plays, BK cannot be tuned elsewhere (shared LNA
+// switch on the UV-K1), so watch must not pair a broadcast with BK slots.
+bool RX_DEVICE_BroadcastExcludesBk(void);
 bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous);
 bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan); // Configure muted, keep other chip alive.
 bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open);
