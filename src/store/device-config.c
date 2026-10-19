@@ -10,7 +10,7 @@ DeviceConfig gDeviceConfig;
 bool gDeviceConfigReady;
 static uint32_t committedSequence;
 static uint32_t saveAt;
-static bool dirty, saveFailed;
+static bool dirty, saveFailed, volatileConfig;
 
 static StorageArea area(unsigned slot) { return slot ? STORAGE_CONFIG_B : STORAGE_CONFIG_A; }
 static bool readStorage(void *context, unsigned slot, uint16_t offset, void *data,
@@ -68,9 +68,22 @@ void DEVICE_RequestSave(void) {
     saveAt = Now() + 1500u;
   }
 }
+bool DEVICE_UseVolatile(void) {
+  if (!STORAGE_Ready() || STORAGE_Size(STORAGE_CONFIG_A) || STORAGE_Size(STORAGE_CONFIG_B))
+    return false;
+  CONFIG_Default(&gDeviceConfig);
+  gDeviceConfigReady = volatileConfig = true;
+  saveAt = 0;
+  dirty = saveFailed = false;
+  return true;
+}
 bool DEVICE_SaveNow(void) {
   if (!gDeviceConfigReady)
     return false;
+  if (volatileConfig) { // Accepted in RAM only.
+    dirty = false;
+    return true;
+  }
   ConfigStore io = storage();
   if (!CONFIG_Save(&io, &gDeviceConfig, &committedSequence)) {
     dirty = saveFailed = true;
@@ -88,6 +101,7 @@ void DEVICE_Update(void) {
 
 DeviceSaveStatus DEVICE_GetSaveStatus(void) {
   if (!gDeviceConfigReady) return DEVICE_UNAVAILABLE;
+  if (volatileConfig) return DEVICE_VOLATILE;
   if (saveFailed) return DEVICE_SAVE_FAILED;
   return dirty ? DEVICE_PENDING : DEVICE_SAVED;
 }

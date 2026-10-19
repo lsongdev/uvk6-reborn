@@ -133,7 +133,10 @@ void SYS_Main() {
   BATTERY_UpdateBatteryInfo();
 
   SystemMessages n = KEYBOARD_GetKey();
-  if (n.key == KEY_EXIT || !DEVICE_Load()) {
+  // EXIT held at power-on forces the reset screen. Without a configuration
+  // area (read-only bring-up storage) the radio runs on RAM defaults.
+  bool ready = n.key != KEY_EXIT && (DEVICE_Load() || DEVICE_UseVolatile());
+  if (!ready) {
     // Unknown storage contents are not our config: never write a marker or
     // restart automatically. Only explicit initialization may unlock writes.
     // Diagnostics may use the board-mapped factory calibration even though
