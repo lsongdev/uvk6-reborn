@@ -234,7 +234,7 @@ Slot 菜单 → Spectrum。上方是当前 Slot 的卡片，显示光标处的�
 | Band presets／Channels | 独立频段预设／频道列表、改名和删除 |
 | About | Firmware、Storage（容量）、Config、FM chip（SI4732／BK1080）、SSB patch（仅 SI4732 构建）、TX status、Save status、Reset prefs |
 
-Brightness 降低时限制 Idle light 不高于它；Light time 的 Off／Always 优先于接收触发。电池曲线不是容量测量。SQL 时序只显示档位，不承诺毫秒数；Auto（默认）采用接收芯片的推荐值：K6 BK4819 为 1／1，K1 BK4829 为 5／3（原厂值，更短时强信号下静噪会反复开关）。SI idle 在下次离开 SI 时使用；滤波和 SQL 工程参数离开设置时重新应用，失败回退。设置、文本页面期间接收持续。
+Brightness 降低时限制 Idle light 不高于它；Light time 的 Off／Always 优先于接收触发。电池曲线不是容量测量。SQL 时序只显示档位，不承诺毫秒数；Auto（默认）采用接收芯片的推荐值：K6 BK4819 为 1／1，K1 BK4829 为 5／3（原厂值）。SI idle 在下次离开 SI 时使用；滤波和 SQL 工程参数离开设置时重新应用，失败回退。设置、文本页面期间接收持续。
 
 Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留原值。Reset prefs 需 MENU 确认，恢复显示和 TX 保护等普通偏好，保留当前键盘锁、电池校准／曲线、RX 工程参数、Mic／Deviation、Slot 和频道，不是整机初始化。
 
