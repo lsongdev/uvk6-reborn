@@ -328,10 +328,15 @@ static void usbSend(const void *data, uint32_t size) {
   for (uint32_t i = 0; i < size; ++i) {
     if (!configured || !hostOpen) return; // Nobody listening: drop.
     uint16_t next = (uint16_t)((txHead + 1u) & (TX_RING_BYTES - 1u));
-    // A host that stopped reading must not freeze the main loop.
+    // A host that stopped reading must not freeze the main loop: drop the
+    // stale output instead. Not a mute: tools keep DTR up across sessions,
+    // so the next request must still get its reply.
     for (uint32_t spins = 200000u; next == txTail; ) {
       __disable_irq(); kick(); __enable_irq();
-      if (!--spins) { hostOpen = false; return; }
+      if (!--spins) {
+        __disable_irq(); txTail = txHead; __enable_irq();
+        return;
+      }
     }
     txRing[txHead] = bytes[i];
     txHead = next;
