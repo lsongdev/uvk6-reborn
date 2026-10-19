@@ -9,7 +9,7 @@ Tune by band, frequency, and explicit demodulation mode. Features include multi-
 - [User Manual](docs/user-manual.md): installation, controls, menus, and everyday use.
 - [Design](docs/design.md): feature behavior, data model, and roadmap.
 - [Development](docs/development.md): build, flashing, source code, tools, and checks.
-- [Hardware Facts](docs/hardware.md): device, chips, controls, and storage references.
+- [Hardware Facts](docs/hardware-uvk6.md): device, chips, controls, and storage references.
 
 ## Quick Start
 
