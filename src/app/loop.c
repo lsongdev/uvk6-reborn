@@ -31,6 +31,12 @@ static uint32_t appsKeyboardTimer;
 static uint32_t radioTimer;
 
 static uint32_t lastUartDataTime;
+static LoopStats stats;
+
+void LOOP_TakeStats(LoopStats *out) {
+  *out = stats;
+  stats.loopMaxMs = 0;
+}
 
 static bool isUartWaiting() {
   return lastUartDataTime && Now() - lastUartDataTime < 5000;
@@ -100,6 +106,9 @@ static void processKeyboard() {
   SystemMessages n = KEYBOARD_GetKey();
   // Process system notifications
   if (n.message == MSG_KEYPRESSED) {
+    ++stats.keyEvents;
+    stats.lastKey = (uint8_t)n.key;
+    stats.lastKeyState = (uint8_t)n.state;
     // Release cannot be swallowed by keylock, menu, or UART activity.
     if (n.key == KEY_PTT && n.state == KEY_RELEASED)
       RADIO_PttRelease();
@@ -160,7 +169,9 @@ void SYS_Main() {
     SCREEN_Reset(&homeScreen);
   }
 
+  bool wasOpen = gReceiver.open;
   for (;;) {
+    uint32_t loopStart = Now();
 
     // Highest-priority half-duplex safety check, even when another app owns
     // the UI. Physical PA shutoff must not depend on VFO repaint cadence.
@@ -197,6 +208,14 @@ void SYS_Main() {
       UART_HandleCommand();
       lastUartDataTime = Now();
     }
+
+    if (gReceiver.open != wasOpen) {
+      wasOpen = gReceiver.open;
+      ++stats.squelchChanges;
+    }
+    uint32_t took = Now() - loopStart;
+    if (took > stats.loopMaxMs) stats.loopMaxMs = took > UINT16_MAX ? UINT16_MAX : (uint16_t)took;
+    ++stats.loops;
 
   }
 }

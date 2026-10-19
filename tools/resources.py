@@ -156,6 +156,17 @@ class Radio:
         name = reply[8:32].split(b'\0')[0].decode(errors='replace')
         return capacity, name
 
+    def stats(self):
+        """Main-loop and receiver diagnostics (firmware command 0x0574)."""
+        reply = self.request(struct.pack('<HHI', 0x0574, 4, self.stamp), 0x0575)
+        if len(reply) != 32:
+            raise IOError('Bad diagnostics reply')
+        fields = struct.unpack_from('<IHHHBBIBBBBHHHH', reply, 4)
+        names = ('loops', 'loop_max_ms', 'key_events', 'squelch_changes', 'last_key',
+                 'last_key_state', 'frequency_hz', 'device', 'open', 'broadcast', 'si',
+                 'rssi', 'noise', 'glitch', 'status')
+        return dict(zip(names, fields))
+
     def read(self, address, size, progress=None):
         out = bytearray()
         for at, n in chunks(address, size):
@@ -391,6 +402,8 @@ def main():
     for command in (cal_write, cal_seed, cal_restore):
         command.add_argument('--yes', action='store_true', help='skip the confirmation')
     commands.add_parser('info', help='physical storage capacity and identity (JEDEC ID on SPI)')
+    stats = commands.add_parser('stats', help='main-loop and receiver diagnostics')
+    stats.add_argument('--every', type=float, default=0, help='repeat every N seconds')
     read = commands.add_parser('read', help='save a physical storage range to a file')
     read.add_argument('address', type=lambda value: int(value, 0))
     read.add_argument('size', type=lambda value: int(value, 0))
@@ -411,6 +424,12 @@ def main():
             capacity, name = radio.info()
             print(f'{name}: {capacity} bytes')
             return 0
+        if args.command == 'stats':
+            while True:
+                print(' '.join(f'{k}={v}' for k, v in radio.stats().items()), flush=True)
+                if not args.every:
+                    return 0
+                time.sleep(args.every)
         if args.command == 'read':
             def progress(done, total):
                 if done % 65536 == 0 or done == total:

@@ -1,4 +1,7 @@
 #include "hal/uart.h"
+#include "app/loop.h"
+#include "drivers/bk4819/bk4819.h"
+#include "radio/receiver.h"
 #include "app/link/uart-link.h"
 #include "hal/board.h"
 #include "hal/storage.h"
@@ -238,6 +241,28 @@ static void CMD_0572(const uint8_t *buffer) {
   SendReply(&reply, sizeof(reply));
 }
 
+// Diagnostics: main-loop health, the receive plan and raw BK4819/BK4829
+// status registers (RSSI 0x67, noise 0x65, glitch 0x63, interrupt 0x0C).
+static void CMD_0574(const uint8_t *buffer) {
+  const CMD_0514_t *cmd = (const CMD_0514_t *)buffer;
+  if (cmd->Timestamp != Timestamp) return;
+  struct {
+    Header_t Header;
+    LoopStats Loop;
+    uint32_t Frequency;
+    uint8_t Device, Open, Broadcast, Si;
+    uint16_t Rssi, Noise, Glitch, Status;
+  } reply = {{0x0575, 0}, {0}, gReceiver.plan.frequency_hz,
+      (uint8_t)gReceiver.plan.device, gReceiver.open, RECEIVER_Capabilities().broadcast,
+      RECEIVER_Capabilities().si, BK4819_ReadRegister(BK4819_REG_67) & 0x1FFu,
+      BK4819_ReadRegister(BK4819_REG_65) & 0x7Fu, BK4819_ReadRegister(BK4819_REG_63) & 0xFFu,
+      BK4819_ReadRegister(BK4819_REG_0C)};
+  _Static_assert(sizeof(reply) == 4 + 12 + 4 + 4 + 8, "0x0575 layout is naturally aligned");
+  LOOP_TakeStats(&reply.Loop);
+  reply.Header.Size = sizeof(reply) - sizeof(reply.Header);
+  SendReply(&reply, sizeof(reply));
+}
+
 static void CMD_0570(const uint8_t *pBuffer) {
   const CMD_0570_t *pCmd = (const CMD_0570_t *)pBuffer;
   REPLY_0570_t Reply = {0};
@@ -370,6 +395,10 @@ void UART_HandleCommand(void) {
     // RESOURCE WRITE
   case 0x0572:
     CMD_0572(UART_Command.Buffer);
+    break;
+
+  case 0x0574:
+    CMD_0574(UART_Command.Buffer);
     break;
 
   case 0x0570:

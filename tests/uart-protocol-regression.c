@@ -20,6 +20,8 @@ int main(void) {
   buf[0] = 0x14; assert(UART_CommandValid(buf, 8));
   assert(!UART_CommandValid(buf, 16));
   buf[0] = 0x2f; assert(UART_CommandValid(buf, 8));
+  buf[0] = 0x74; assert(UART_CommandValid(buf, 8)); // Diagnostics.
+  assert(!UART_CommandValid(buf, 12));
   buf[0] = 0xdd; assert(UART_CommandValid(buf, 4));
   assert(!UART_CommandValid(buf, 8));
   buf[0] = 0x70; buf[1] = 0x05; // Resource write: length byte matches the payload.
