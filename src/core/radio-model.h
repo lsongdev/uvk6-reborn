@@ -45,8 +45,17 @@ extern const RadioBand radioBands[];
 extern const uint8_t radioBandCount;
 extern const char *const rxModeNames[RX_MODE_COUNT];
 uint8_t RADIO_MODEL_BandAt(uint32_t frequency_hz);
-bool RADIO_MODEL_BkCovers(uint32_t frequency_hz); // BK4819 receive range.
-uint8_t RADIO_MODEL_NextBand(uint8_t current);
+bool RADIO_MODEL_BkCovers(uint32_t frequency_hz); // BK4819/BK4829 receive range.
+// A contiguous frequency range, end exclusive.
+typedef struct { uint32_t start_hz, end_hz; } RadioSpan;
+// Whether some mode of this hardware receives the frequency.
+bool RADIO_MODEL_Covers(uint32_t frequency_hz, ReceiverCapabilities capabilities);
+// The receivable part of a band holding the frequency, else the nearest
+// such part; false when this hardware receives nothing in the band.
+bool RADIO_MODEL_BandSpan(uint8_t band, uint32_t frequency_hz,
+                          ReceiverCapabilities capabilities, RadioSpan *span);
+// Next shortcut band that this hardware can receive in.
+uint8_t RADIO_MODEL_NextBand(uint8_t current, ReceiverCapabilities capabilities);
 RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
                           ReceiverCapabilities capabilities, RxPlan *plan);
 uint32_t RADIO_MODEL_Resolution(RxDevice device, RxMode mode);

@@ -58,8 +58,10 @@ void RADIO_StartSeek(void) {
     return;
   }
   seekOrigin = runtime.current;
-  if (!SEEK_Start(&seek, &radioBands[activeSlot.active_band],
-                  seekOrigin.frequency_hz, seekOrigin.parameters.step_hz)) {
+  RadioSpan span;
+  if (!RADIO_MODEL_BandSpan(activeSlot.active_band, seekOrigin.frequency_hz,
+                            RECEIVER_Capabilities(), &span) ||
+      !SEEK_Start(&seek, span, seekOrigin.frequency_hz, seekOrigin.parameters.step_hz)) {
     notify("Seek failed");
     return;
   }

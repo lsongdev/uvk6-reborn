@@ -88,7 +88,23 @@ int main(void) {
   assert(strcmp(radioBands[RADIO_MODEL_BandAt(148000000)].name, "VHF") == 0);
   assert(strcmp(radioBands[RADIO_MODEL_BandAt(439999990)].name, "70cm") == 0);
   assert(strcmp(radioBands[RADIO_MODEL_BandAt(440000000)].name, "UHF") == 0);
-  assert(RADIO_MODEL_NextBand(6) == 0);
+  // Bands and ranges follow the fitted chips. Band order: LW, MW, SW, FM Radio, Airband, 2m, 70cm.
+  assert(RADIO_MODEL_NextBand(6, si) == 0); // SI4732 receives LW.
+  assert(RADIO_MODEL_NextBand(6, k1) == 2 && RADIO_MODEL_NextBand(2, k1) == 3); // K1 skips LW and MW.
+  assert(RADIO_MODEL_NextBand(6, none) == 2 && RADIO_MODEL_NextBand(2, none) == 3); // BK NFM still covers 64-108 MHz.
+  assert(RADIO_MODEL_Covers(225000, si) && !RADIO_MODEL_Covers(225000, k1));
+  assert(!RADIO_MODEL_Covers(17999999, k1) && RADIO_MODEL_Covers(18000000, k1));
+  assert(RADIO_MODEL_Covers(95900000, k1) && RADIO_MODEL_Covers(95900000, none)); // BK NFM.
+  assert(!RADIO_MODEL_Covers(700000000, si) && RADIO_MODEL_Covers(1300000000, si));
+  assert(!RADIO_MODEL_Covers(1300000001, si));
+  RadioSpan span;
+  assert(!RADIO_MODEL_BandSpan(0, 225000, k1, &span));
+  assert(RADIO_MODEL_BandSpan(2, 7100000, k1, &span) && span.start_hz == 18000000 && span.end_hz == 30000001);
+  assert(RADIO_MODEL_BandSpan(2, 7100000, si, &span) && span.start_hz == 1800000 && span.end_hz == 30000001);
+  // UHF holds two BK spans; the one nearest the frequency wins.
+  assert(RADIO_MODEL_BandSpan(8, 445000000, k1, &span) && span.start_hz == 300000000 && span.end_hz == 660000001);
+  assert(RADIO_MODEL_BandSpan(8, 800000000, k1, &span) && span.start_hz == 840000000 && span.end_hz == 1300000001);
+  assert(RADIO_MODEL_BandSpan(8, 700000000, k1, &span) && span.end_hz == 660000001);
   assert(RADIO_MODEL_Step(107950000, 100000, true) == 108050000);
   assert(RADIO_MODEL_Step(RADIO_MAX_HZ, UINT32_MAX, true) == RADIO_MAX_HZ);
   assert(RADIO_MODEL_Step(RADIO_MIN_HZ, UINT32_MAX, false) == RADIO_MIN_HZ);

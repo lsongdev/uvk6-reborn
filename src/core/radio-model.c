@@ -32,10 +32,57 @@ uint8_t RADIO_MODEL_BandAt(uint32_t frequency_hz) {
   return best;
 }
 
-uint8_t RADIO_MODEL_NextBand(uint8_t current) {
+// Receivable ranges, sorted and merged: BK NFM (and AM where supported),
+// SI4732 AM/SSB up to 30 MHz, and SI4732 or BK1080 broadcast FM.
+static uint8_t coverage(ReceiverCapabilities c, RadioSpan out[4]) {
+  RadioSpan all[4];
+  uint8_t n = 0;
+  if (c.si) all[n++] = (RadioSpan){RADIO_MIN_HZ, 30000001u};
+  all[n++] = (RadioSpan){18000000u, 660000001u};
+  if (c.si || c.broadcast) all[n++] = (RadioSpan){64000000u, 108000001u};
+  all[n++] = (RadioSpan){840000000u, 1300000001u};
+  uint8_t count = 0;
+  for (uint8_t i = 0; i < n; ++i) { // Already in start order.
+    if (count && all[i].start_hz <= out[count-1].end_hz) {
+      if (all[i].end_hz > out[count-1].end_hz) out[count-1].end_hz = all[i].end_hz;
+    } else out[count++] = all[i];
+  }
+  return count;
+}
+
+bool RADIO_MODEL_Covers(uint32_t frequency_hz, ReceiverCapabilities capabilities) {
+  RadioSpan spans[4];
+  uint8_t n = coverage(capabilities, spans);
+  for (uint8_t i = 0; i < n; ++i)
+    if (frequency_hz >= spans[i].start_hz && frequency_hz < spans[i].end_hz) return true;
+  return false;
+}
+
+bool RADIO_MODEL_BandSpan(uint8_t band, uint32_t frequency_hz,
+                          ReceiverCapabilities capabilities, RadioSpan *span) {
+  if (band >= radioBandCount) return false;
+  RadioSpan spans[4];
+  uint8_t n = coverage(capabilities, spans);
+  uint32_t best = UINT32_MAX;
+  for (uint8_t i = 0; i < n; ++i) {
+    RadioSpan part = {spans[i].start_hz > radioBands[band].start_hz ? spans[i].start_hz : radioBands[band].start_hz,
+                      spans[i].end_hz < radioBands[band].end_hz ? spans[i].end_hz : radioBands[band].end_hz};
+    if (part.start_hz >= part.end_hz) continue;
+    uint32_t distance = frequency_hz < part.start_hz ? part.start_hz - frequency_hz
+                      : frequency_hz >= part.end_hz ? frequency_hz - (part.end_hz - 1u) : 0;
+    if (distance < best) {
+      best = distance;
+      if (span) *span = part;
+    }
+  }
+  return best != UINT32_MAX;
+}
+
+uint8_t RADIO_MODEL_NextBand(uint8_t current, ReceiverCapabilities capabilities) {
   for (uint8_t offset = 1; offset <= radioBandCount; ++offset) {
     uint8_t i = (unsigned)(current + offset) % radioBandCount;
-    if (radioBands[i].shortcut)
+    if (radioBands[i].shortcut &&
+        RADIO_MODEL_BandSpan(i, radioBands[i].initial_hz, capabilities, NULL))
       return i;
   }
   return current;

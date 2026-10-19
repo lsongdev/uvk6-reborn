@@ -70,8 +70,11 @@ bool RADIO_Clock(uint16_t *minute) {
   return true;
 }
 
-static const char *unavailable(RxResult result) {
-  return result == RX_PATCH_MISSING ? "SSB patch missing" : "RX unavailable";
+// "Out of range" when no mode of this hardware receives the frequency at
+// all, "RX unavailable" when only the chosen mode cannot.
+static const char *unavailable(RxResult result, uint32_t frequency_hz) {
+  if (result == RX_PATCH_MISSING) return "SSB patch missing";
+  return RADIO_MODEL_Covers(frequency_hz, RECEIVER_Capabilities()) ? "RX unavailable" : "Out of range";
 }
 
 // The selected slot is now the one being heard.
@@ -147,7 +150,7 @@ void RADIO_Reverse(void) {
   RxResult result = TUNING_ExactPlan(target, activeSlot.current.parameters,
                                      RECEIVER_Capabilities(), &plan);
   if (result != RX_OK || !TX_MODEL_ConfigValid(&tx)) {
-    notify(result != RX_OK ? unavailable(result) : "Invalid value");
+    notify(result != RX_OK ? unavailable(result, target) : "Invalid value");
     return;
   }
   TxConfig *stored = &gDeviceConfig.radio.slots[selectedSlot].tx;
@@ -174,7 +177,7 @@ void request(uint32_t target, RadioParameters values) {
     activeSlot.current.parameters = values;
     activeSlot.active_band = RADIO_MODEL_BandAt(target);
     RX_RuntimeStop(&runtime, stopReceiver, NULL);
-    notify(unavailable(result));
+    notify(unavailable(result, target));
     return;
   }
   if (RADIO_MODEL_BandAt(plan.frequency_hz) != RADIO_MODEL_BandAt(target)) {
@@ -214,7 +217,7 @@ static bool tuneExact(uint32_t frequency_hz, RadioParameters parameters) {
   RxResult result = TUNING_ExactPlan(frequency_hz, parameters,
                                      RECEIVER_Capabilities(), &plan);
   if (result != RX_OK) {
-    notify(unavailable(result));
+    notify(unavailable(result, frequency_hz));
     return false;
   }
   return tuneDirect(&plan);
@@ -420,9 +423,16 @@ void RADIO_SwitchSlot(void) { selectSlot(RADIO_STATE_NextSlot(&gDeviceConfig.rad
 
 void RADIO_NextBand(void) {
   if (!requireVfoSource()) return;
-  uint8_t band = RADIO_MODEL_NextBand(activeSlot.active_band);
-  const BandState *saved = &activeSlot.bands[band];
-  request(saved->frequency_hz, gDeviceConfig.radio.presets[band]);
+  ReceiverCapabilities capabilities = RECEIVER_Capabilities();
+  uint8_t band = RADIO_MODEL_NextBand(activeSlot.active_band, capabilities);
+  uint32_t frequency = activeSlot.bands[band].frequency_hz;
+  // A remembered frequency this hardware cannot receive moves into the
+  // nearest receivable part of the band (UV-K1 SW starts at 18 MHz).
+  RadioSpan span;
+  if (RADIO_MODEL_BandSpan(band, frequency, capabilities, &span))
+    frequency = frequency < span.start_hz ? span.start_hz
+              : frequency >= span.end_hz ? span.end_hz - 1u : frequency;
+  request(frequency, gDeviceConfig.radio.presets[band]);
 }
 
 void RADIO_NextMode(void) { RADIO_AdjustRx(RADIO_FIELD_MODE, true); }

@@ -3,7 +3,7 @@
 #include "ui/screens/screen.h"
 #include "core/spectrum.h"
 
-// Per-slot menu: RX parameters, TX settings, Reset to defaults and Save as
+// Per-slot menu: RX parameters, TX settings, Reset to presets and Save as
 // channel. Item order matches RadioParameterField for the RX items.
 enum {
   MENU_RX_MODE, MENU_RX_STEP, MENU_RX_BANDWIDTH, MENU_RX_SQUELCH, MENU_RX_TONE,

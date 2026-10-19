@@ -542,16 +542,21 @@ int main(void) {
 
   setup(438500000, fm);
   capabilities = (ReceiverCapabilities){false, false, false, true, RX_BK_BANDWIDTH_ALL};
+  // Bands follow the hardware: LW and MW are skipped, SW starts where BK
+  // coverage begins.
   press(KEY_SIDE1);
-  assert(!runtime.active && activeSlot.current.frequency_hz == 225000 && routed == 1);
-  assert(gReceiver.plan.frequency_hz==438500000u); // Unsupported target was not committed.
+  assert(runtime.active && activeSlot.current.frequency_hz == 18000000 &&
+         activeSlot.current.parameters.mode == RX_AM && gReceiver.plan.device == RX_DEVICE_BK);
   press(KEY_UP);
-  assert(activeSlot.current.frequency_hz == 226000 && !runtime.active);
-  press(KEY_SIDE1); // MW has no receiver.
-  press(KEY_SIDE1); // SW has no receiver.
-  press(KEY_SIDE1); // Broadcast has no receiver.
+  assert(activeSlot.current.frequency_hz == 18005000 && runtime.active);
+  press(KEY_SIDE1); // FM Radio stays (BK NFM covers it) but its WFM preset has no receiver.
+  assert(!runtime.active && activeSlot.current.frequency_hz == 95900000 && !strcmp(message, "RX unavailable"));
+  assert(gReceiver.plan.frequency_hz==18005000u); // Unsupported target was not committed.
   press(KEY_SIDE1); // Airband is available on BK.
   assert(runtime.active && activeSlot.current.frequency_hz == 125000000 && activeSlot.current.parameters.mode == RX_AM);
+  // A frequency no mode can receive says so.
+  request(225000, (RadioParameters){RX_AM, 1000, 6000, 0, 0});
+  assert(!runtime.active && !strcmp(message, "Out of range"));
 
   setup(438500000, fm);
   press(KEY_MENU);
@@ -777,7 +782,7 @@ int main(void) {
   press(KEY_DOWN);assert(menuIndex==MENU_TX_TONE);
   press(KEY_MENU);assert(gDeviceConfig.radio.slots[0].tx.tone==1);
   press(KEY_F);assert(gDeviceConfig.radio.slots[0].tx.tone==0);
-  // Reset to defaults: the band preset comes back, frequency and TX stay.
+  // Reset to presets: the band preset comes back, frequency and TX stay.
   press(KEY_DOWN);assert(menuIndex==MENU_SPECTRUM);
   press(KEY_DOWN);assert(menuIndex==MENU_RESET);
   activeSlot.current.parameters.squelch=9;
