@@ -925,7 +925,7 @@ int main(void) {
     capabilities.si=false;capabilities.broadcast=true;broadcastExcludesBk=true;
     request(95900000,activeSlot.current.parameters);
     for (unsigned j=0;j<30;++j) { update();clockNow+=50; }
-    assert(watcher.phase==WATCH_OFF && !strcmp(RADIO_WatchStatus(),"DW: shared RF"));
+    assert(watcher.phase==WATCH_OFF && !RADIO_WatchStatus()); // Expected, no status.
     assert(runtime.current.device==RX_DEVICE_BROADCAST && receivingSlot==0);
     assert(RADIO_STATE_SetCount(&gDeviceConfig.radio,3));
     assert(RADIO_STATE_Set(&gDeviceConfig.radio,2,145600000,fm));
