@@ -61,8 +61,13 @@ bool RECEIVER_Select(const RxPlan *plan, bool open) {
 }
 
 bool RECEIVER_Measure(void) {
-  bool open;
-  (void)RX_DEVICE_Sample(&gReceiver.plan, &gReceiver.rssi, &open);
+  // A failed I2C / serial sample is not a closed squelch. Preserve the
+  // last valid meter value and audio gate until a valid sample arrives.
+  uint16_t rssi;
+  bool open = gReceiver.open;
+  if (!RX_DEVICE_Sample(&gReceiver.plan, &rssi, &open))
+    return gReceiver.open;
+  gReceiver.rssi = rssi;
   return open;
 }
 

@@ -4,13 +4,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// How often the main loop samples signal and squelch, in ms. The BK1080
-// is read only once a second: on the UV-K1 every I2C burst to it is
-// faintly audible in the broadcast audio, and the reference reads it never
-// during playback. Its SNR squelch and meter need no faster updates.
+#define SQL_DELAY 50
+// BK1080 I2C reads can be audible on the UV-K1 during broadcast playback.
+// Preserve main's slower sampling cadence for ordinary squelch checks.
 static inline uint32_t RECEIVER_SamplePeriodMs(RxDevice device) {
-  return device == RX_DEVICE_BROADCAST ? 1000u : 50u;
+  return device == RX_DEVICE_BROADCAST ? 1000u : SQL_DELAY;
 }
+#define WATCH_METER_POLL_MS 200u
+// SI4732 FM SQ0 audio is continuous; RSQ is only a signal meter. Zero
+// disables its periodic I2C reads for a hardware-noise comparison.
+#ifndef UVK6_FM_RSQ_POLL_MS
+#define UVK6_FM_RSQ_POLL_MS 500u
+#endif
 
 // What the receiver hardware is doing now. Any owner (user tune, Seek,
 // Watch, TX restore) changes it only through RECEIVER_Apply/Select, so the

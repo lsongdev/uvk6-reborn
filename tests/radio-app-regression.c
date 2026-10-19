@@ -177,7 +177,8 @@ bool RECEIVER_Select(const RxPlan *plan, bool open) {
   gReceiver.open=open;
   return true;
 }
-bool RECEIVER_Measure(void) { return gReceiver.open; }
+static unsigned receiverMeasurements;
+bool RECEIVER_Measure(void) { ++receiverMeasurements; return gReceiver.open; }
 static uint32_t watchSignalFrequency;
 static bool watchSignalOK=true;
 static uint32_t watchSecondSignalFrequency;
@@ -961,6 +962,14 @@ int main(void) {
   assert(watcher.has_background && watcher.background.id==0 && watcher.count==1);
   assert(WATCH_Owner(&watcher)==0 && receivingSlot==0 && gReceiver.open);
   assert(concurrentPrepares>=1 && applied==broadcastApplies); // Polls never retune SI.
+  // Many main-loop iterations at one instant must not hammer SI RSQ.
+  watchMeterAt = clockNow;
+  unsigned meterBefore = receiverMeasurements;
+  for (unsigned i=0; i<20; ++i) update();
+  assert(receiverMeasurements == meterBefore+1);
+  clockNow += UVK6_FM_RSQ_POLL_MS-1u;
+  update(); assert(receiverMeasurements == meterBefore+1);
+  clockNow++; update(); assert(receiverMeasurements == meterBefore+2);
   SCREEN_Render();assert(!strcmp(statusText,"DW A"));
   watchSecondSignalFrequency=438500000;
   for(unsigned i=0;i<20;++i) { update();clockNow+=50; }

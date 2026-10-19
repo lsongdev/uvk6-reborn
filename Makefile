@@ -105,6 +105,10 @@ ENABLE_SI4732 ?= 0
 ENABLE_FC ?= 1
 # Slot menu → Spectrum: BK4819 sweep around the slot. ENABLE_SPECTRUM=0 drops it.
 ENABLE_SPECTRUM ?= 1
+# FM noise isolation: 0 disables periodic SI4732 signal-quality reads.
+FM_RSQ_POLL_MS ?= 500
+# Disable RDS FIFO polling for a second independent FM comparison.
+ENABLE_RDS_POLL ?= 1
 
 # Debug/Release specific flags
 DEBUG_FLAGS   := -g3 -DDEBUG -Og
@@ -117,7 +121,9 @@ DEFINES  := -DGIT_HASH=\"$(GIT_HASH)\" \
             -DUVK6_ENABLE_TX=$(ENABLE_TX) \
             -DUVK6_ENABLE_SI4732=$(ENABLE_SI4732) \
             -DUVK6_ENABLE_FC=$(ENABLE_FC) \
-            -DUVK6_ENABLE_SPECTRUM=$(ENABLE_SPECTRUM)
+            -DUVK6_ENABLE_SPECTRUM=$(ENABLE_SPECTRUM) \
+            -DUVK6_FM_RSQ_POLL_MS=$(FM_RSQ_POLL_MS) \
+            -DUVK6_ENABLE_RDS_POLL=$(ENABLE_RDS_POLL)
 
 # Include paths
 INC_DIRS := -I./src \
@@ -209,6 +215,7 @@ $(TARGET): $(OBJS) | $(BIN_DIR)
 # switches are dropped: make 3.81 timestamps are too coarse to rely on.
 BUILD_FLAGS := ENABLE_TX=$(ENABLE_TX) ENABLE_SI4732=$(ENABLE_SI4732) \
                ENABLE_FC=$(ENABLE_FC) ENABLE_SPECTRUM=$(ENABLE_SPECTRUM) \
+               FM_RSQ_POLL_MS=$(FM_RSQ_POLL_MS) ENABLE_RDS_POLL=$(ENABLE_RDS_POLL) \
                BUILD_TYPE=$(BUILD_TYPE)
 FLAGS_FILE := $(OBJ_DIR)/build-flags
 ifneq ($(BUILD_FLAGS),$(shell cat $(FLAGS_FILE) 2>/dev/null))
