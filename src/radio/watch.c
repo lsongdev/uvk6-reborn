@@ -136,11 +136,7 @@ void watchUpdate(void) {
   // background could continuously hammer the shared I2C bus.
   // Watch owns the audio gate; these samples update the display only.
   if (WATCH_Owner(&watcher)!=UINT8_MAX) {
-    uint32_t interval = gReceiver.plan.device == RX_DEVICE_SI &&
-                        gReceiver.plan.parameters.mode == RX_WFM
-                          ? UVK6_FM_RSQ_POLL_MS :
-                        gReceiver.plan.device == RX_DEVICE_BROADCAST
-                          ? 1000u : WATCH_METER_POLL_MS;
+    uint32_t interval = RECEIVER_MeterPeriodMs(&gReceiver.plan);
     if (interval && (int32_t)(Now()-watchMeterAt)>=0) {
       watchMeterAt = Now()+interval;
       (void)RECEIVER_Measure();

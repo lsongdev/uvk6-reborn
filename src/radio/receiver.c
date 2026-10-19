@@ -78,3 +78,26 @@ void RECEIVER_UpdateSquelch(void) {
     gRedrawScreen = true;
   }
 }
+
+void RECEIVER_Poll(uint32_t now) {
+  static uint32_t squelchAt, meterAt;
+  const RxPlan *plan = &gReceiver.plan;
+  if (!plan->parameters.squelch && !plan->parameters.rx_tone) {
+    // A failed initial route is retried at the squelch cadence.
+    if (!gReceiver.open && now - squelchAt >= SQL_DELAY) {
+      squelchAt = now;
+      RECEIVER_SetOpen(true);
+      gRedrawScreen = true;
+    }
+    uint32_t period = RECEIVER_MeterPeriodMs(plan);
+    if (period && now - meterAt >= period) {
+      meterAt = now;
+      (void)RECEIVER_Measure();
+    }
+    return;
+  }
+  uint32_t period = plan->device == RX_DEVICE_BROADCAST ? RECEIVER_MeterPeriodMs(plan) : SQL_DELAY;
+  if (now - squelchAt < period) return;
+  squelchAt = now;
+  RECEIVER_UpdateSquelch();
+}

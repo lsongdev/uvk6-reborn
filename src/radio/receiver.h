@@ -4,15 +4,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// Squelch decisions are sampled every 50 ms. Samples that only refresh the
+// signal meter are slower: each bus burst to a receiver chip can be faintly
+// audible (BK1080 on the UV-K1, SI4732 RSQ on modified radios).
 #define SQL_DELAY 50
-// BK1080 I2C reads can be audible on the UV-K1 during broadcast playback.
-// Preserve main's slower sampling cadence for ordinary squelch checks.
-static inline uint32_t RECEIVER_SamplePeriodMs(RxDevice device) {
-  return device == RX_DEVICE_BROADCAST ? 1000u : SQL_DELAY;
-}
-#define WATCH_METER_POLL_MS 200u
-// SI4732 FM SQ0 audio is continuous; RSQ is only a signal meter. Zero
-// disables its periodic I2C reads for a hardware-noise comparison.
+// SI4732 meter period; 0 stops its RSQ reads for a hardware-noise A/B.
 #ifndef UVK6_FM_RSQ_POLL_MS
 #define UVK6_FM_RSQ_POLL_MS 500u
 #endif
@@ -40,4 +36,14 @@ void RECEIVER_Mute(void);
 // Sample RSSI/squelch; returns whether squelch is open.
 bool RECEIVER_Measure(void);
 void RECEIVER_UpdateSquelch(void);
+// How often a meter-only sample of this plan may touch its chip, in ms;
+// 0 never. The BK1080 is read once a second whatever its squelch.
+static inline uint32_t RECEIVER_MeterPeriodMs(const RxPlan *plan) {
+  return plan->device == RX_DEVICE_BROADCAST ? 1000u
+       : plan->device == RX_DEVICE_SI ? UVK6_FM_RSQ_POLL_MS : 200u;
+}
+// Main-loop receiver upkeep. SQ0 without a receive tone has nothing to
+// decide: it stays open and samples only for the meter. Otherwise squelch
+// is sampled every SQL_DELAY (BK1080: once a second).
+void RECEIVER_Poll(uint32_t now);
 #endif
