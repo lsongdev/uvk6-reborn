@@ -1,7 +1,7 @@
 #include "hal/board.h"
 #include "hal/system.h"
-#include "drivers/mcu/dp32g030/portcon.h"
-#include "drivers/mcu/dp32g030/pwmplus.h"
+#include "drivers/dp32g030/portcon.h"
+#include "drivers/dp32g030/pwmplus.h"
 
 // PB6 driven by PWM_PLUS0 channel 0 at 25 kHz, 10-bit period.
 void BOARD_BacklightInit(void) {

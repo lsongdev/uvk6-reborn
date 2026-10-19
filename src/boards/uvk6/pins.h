@@ -19,7 +19,7 @@
 #ifndef BOARDS_UVK6_PINS_H
 #define BOARDS_UVK6_PINS_H
 
-#include "drivers/mcu/dp32g030/gpio-bits.h"
+#include "drivers/dp32g030/gpio-bits.h"
 
 enum GPIOA_PINS {
 	GPIOA_PIN_KEYBOARD_0 = 3,

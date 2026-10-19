@@ -1,5 +1,5 @@
 // 200 channels, two 64-byte copies each; start-up reads only headers.
-#include "../src/core/channel-store.c"
+#include "../src/store/channel-store.c"
 #include "fake-storage.h"
 #include <assert.h>
 

@@ -1,5 +1,5 @@
 // Real Settings, preferences, input and framebuffer; only hardware/storage mocked.
-#include "../src/core/settings.c"
+#include "../src/app/settings.c"
 #include "../src/ui/screens/settings.c"
 #include "../src/ui/menu.c"
 #include <assert.h>

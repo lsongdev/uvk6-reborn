@@ -1,4 +1,4 @@
-#include "core/device-config.h"
+#include "store/device-config.h"
 // Exercise the real radio controller and its screens; only hardware and
 // drawing are mocked. Unity build keeps private state reachable.
 #include "../src/radio/radio.c"

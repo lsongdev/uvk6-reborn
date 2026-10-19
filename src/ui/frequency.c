@@ -1,6 +1,6 @@
 #include "ui/frequency.h"
-#include "core/receiver.h"
-#include "core/measurements.h"
+#include "radio/receiver.h"
+#include "radio/measurements.h"
 #include "core/text.h"
 #include <string.h>
 

@@ -2,7 +2,7 @@
 
 #define MENU_H
 
-#include "hal/keyboard.h"
+#include "devices/keyboard.h"
 #include "ui/number-input.h"
 #include <stdbool.h>
 #include <stdint.h>

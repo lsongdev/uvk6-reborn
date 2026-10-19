@@ -1,6 +1,6 @@
-#include "core/device-config.h"
+#include "store/device-config.h"
 // Mock concrete RF drivers, not the receive-planning and apply logic.
-#include "../src/hal/rx-device.c"
+#include "../src/devices/rx-device.c"
 #include <assert.h>
 
 DeviceConfig gDeviceConfig;

@@ -113,7 +113,7 @@ K1 的 band 2／5 High 档（`91 96 91`）与本项目 `tools/resources.py` 中�
 需要的改动按依赖顺序：
 
 1. **平台与构建**：新增 PY32F071 寄存器定义、启动文件、时钟初始化（48 MHz）和 `firmware-k1.ld`（`0x08002800`，118 KiB，设置 VTOR）；Makefile 按 `BOARD=k6|k1` 选择平台目录，`-mcpu=cortex-m0plus`。`tools/flash.py` 的向量表校验、`FLASH_SIZE`，以及 `fw-pack.py` 的打包格式（原厂包在 `0x2000` 插入 16 B 版本字段、128 B XOR 表、CRC16）都要按板型区分。
-2. **驱动脱离 DP32G030**：`drivers/st7565`、`bk1080`、`si473x`、`bk4819` 直接 include `drivers/mcu/dp32g030/*.h` 并操作 `GPIOB->DATA`、`SPI0->WDR`。应改为通过 `hal/gpio`、`hal/spi` 的板级接口访问，再为两块板分别提供 `hal/board-*.c`。按 AGENTS.md 可以直接改 HAL API，不保留兼容包装。
+2. **驱动脱离 DP32G030**：`drivers/st7565`、`bk1080`、`si473x`、`bk4819` 直接 include `drivers/dp32g030/*.h` 并操作 `GPIOB->DATA`、`SPI0->WDR`。应改为通过 `hal/gpio`、`hal/spi` 的板级接口访问，再为两块板分别提供 `hal/board-*.c`。按 AGENTS.md 可以直接改 HAL API，不保留兼容包装。
 3. **HAL 重写**：gpio／keyboard（新引脚）、spi（SPI1 给 LCD，SPI2 给 Flash）、i2c（PF5／PF6，不再与键盘共用）、adc（PB0／PB1）、backlight（PF8 + 定时器 PWM）、uart（USART1 PA9／PA10）、systick、crc、led、audio（PA8）。
 4. **射频芯片**：BK4819 驱动需要加入 BK4829 变体，至少核对 AGC、REG_43、REG_47 以及 FSK 相关差异（参考固件 `bk4829.c` 中有说明）。TX 必须等 PA 校准接通并做实机测量后才能开放。
 5. **存储层（改动最大）**：`hal/eeprom` 和 `eeprom-layout.h` 假设 I²C EEPROM：可按字节或页覆盖写，地址最大 512 KiB。K1 是 SPI NOR：写前必须整扇区（4 KiB）擦除，只能把 1 改写成 0。
@@ -122,7 +122,7 @@ K1 的 band 2／5 High 档（`91 96 91`）与本项目 `tools/resources.py` 中�
    - 校准扇区物理地址 `0x010000` 加入写保护：普通写入和维护写都**不得擦除这个扇区**；PA 维护写需要整扇区备份后再重写，风险高，建议 K1 首版不开放。
    - SSB 补丁尾区：K1 没有 SI4732，首版直接不提供该区。
 6. **USB CDC**：数据线连接的是 MCU 的 USB，不是 UART。要让 `tools/resources.py` 这类工具通过同一根线工作，固件需要 USB 全速设备栈和 CDC ACM（参考固件用 CherryUSB），这部分会占用相当的 Flash 和 RAM；也可以首版只用 K 口 UART（PA9／PA10，需要额外的 USB 转串口线）。
-7. **接收能力与菜单**：没有 SI4732，因此 AM、SSB 和 SI 路径的 WFM／RDS 不可用，广播 FM 只有 BK1080。`hal/rx-device` 的能力检测需要能报告这种组合，UI 和设计中的路由规则要适应这一点。整机频段和功放范围需要按 K1 资料和实测重新确定。
+7. **接收能力与菜单**：没有 SI4732，因此 AM、SSB 和 SI 路径的 WFM／RDS 不可用，广播 FM 只有 BK1080。`devices/rx-device` 的能力检测需要能报告这种组合，UI 和设计中的路由规则要适应这一点。整机频段和功放范围需要按 K1 资料和实测重新确定。
 8. **工具与文档**：`tools/resources.py` 的 `CAPACITY`、校准地址、PA 参考值都按 UV-K6 写死，需要按板型参数化；开发文档的验收项要增加 K1 一节。
 
 建议的首个里程碑：只做第 1–3 步，加上只读存储（读取校准，不写配置），点亮屏幕、扫描键盘、背光、电池读数，确认能通过官方升级工具刷入并正常启动；然后再接 BK4829 接收，最后做存储写入和 TX。

@@ -1,7 +1,7 @@
 #ifndef UI_SCREENS_STATUSLINE_H
 #define UI_SCREENS_STATUSLINE_H
 
-#include "core/receiver.h"
+#include "radio/receiver.h"
 
 void STATUSLINE_update();
 void STATUSLINE_render();

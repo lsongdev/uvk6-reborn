@@ -1,7 +1,7 @@
 // Verify preference validation and side effects before touching hardware.
 // Patch fixture: resource header (magic, length, CRC-32 0x5026026f) at the
 // start of the resources area, then the patch preamble followed by zeros.
-#include "../src/core/settings.c"
+#include "../src/app/settings.c"
 #include <assert.h>
 static bool patchCorrupted, patchReadFails;
 static bool badMagic;

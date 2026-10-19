@@ -1,5 +1,5 @@
 // Mock only the board PWM; exercise the actual backlight state machine.
-#include "../src/hal/backlight.c"
+#include "../src/devices/backlight.c"
 #include <assert.h>
 static uint32_t output;
 void BOARD_BacklightInit(void) {}

@@ -1,7 +1,7 @@
 // Deliberately opt in for exercising the experimental TX HAL.
 #define UVK6_ENABLE_TX 1
 // Real board HAL and voice configuration; GPIO, EEPROM and RF writes mocked.
-#include "../src/hal/tx-device.c"
+#include "../src/devices/tx-device.c"
 #include "../src/drivers/bk4819/tx.c"
 #include <assert.h>
 #include <string.h>

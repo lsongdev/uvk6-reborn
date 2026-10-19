@@ -1,5 +1,5 @@
-#ifndef DRIVER_UART_H
-#define DRIVER_UART_H
+#ifndef HAL_UART_H
+#define HAL_UART_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -12,10 +12,5 @@ extern uint8_t gUartRxRing[UART_RX_RING_BYTES];
 void UART_Init(void);
 void UART_Send(const void *pBuffer, uint32_t Size);
 uint16_t UART_RxHead(void);
-
-// PC link protocol (hal/uart.c).
-
-bool UART_IsCommandAvailable(void);
-void UART_HandleCommand(void);
 
 #endif

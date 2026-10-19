@@ -1,12 +1,12 @@
-#include "core/device-config.h"
+#include "store/device-config.h"
 #include "drivers/bk4819/bk4819.h"
 #include "hal/gpio.h"
 #include "hal/system.h"
 #include "hal/systick.h"
 #include "hal/uart.h"
 #include "core/misc.h"
-#include "core/settings.h"
-#include "hal/audio.h"
+#include "app/settings.h"
+#include "devices/audio.h"
 #include "drivers/bk4819/bk4819-regs.h"
 #include <stdint.h>
 #include <stdio.h>

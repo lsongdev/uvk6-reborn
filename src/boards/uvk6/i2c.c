@@ -1,7 +1,7 @@
 #include "hal/i2c.h"
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
-#include "drivers/mcu/dp32g030/gpio.h"
-#include "drivers/mcu/dp32g030/portcon.h"
+#include "drivers/dp32g030/gpio.h"
+#include "drivers/dp32g030/portcon.h"
 #include "boards/uvk6/pins.h"
 #include "hal/systick.h"
 
