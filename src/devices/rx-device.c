@@ -65,8 +65,8 @@ bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo) {
 
 // Silence the previous RF chip when moving to another receiver. The audio
 // output is already muted by RECEIVER_Mute() before this entry point.
-// BK4829 squelch levels come from the factory calibration like the stock
-// firmware: from offset 0x60 below 174 MHz, else 0x00; six 16-byte rows
+// BK4829 squelch levels come from the factory calibration like the
+// reference firmware: from offset 0x60 below 174 MHz, else 0x00; six 16-byte rows
 // (RSSI open, RSSI close, noise open, noise close, glitch close, glitch
 // open), byte n for level n (1-9). The generic formula suits the BK4819
 // scale only. Unreadable or erased calibration falls back to the formula.
@@ -79,8 +79,17 @@ static SQL squelchFor(uint8_t level, uint32_t hz) {
   for (uint8_t i = 0; i < 6; ++i)
     if (!STORAGE_Read(STORAGE_CALIBRATION, base + 16u * i, &row[i], 1) || row[i] == 0xFF)
       return formula;
-  return (SQL){.ro = row[0], .rc = row[1], .no = row[2] > 127 ? 127 : row[2],
-               .nc = row[3] > 127 ? 127 : row[3], .gc = row[4], .go = row[5]};
+  // The reference K1 build (ENABLE_SQUELCH_MORE_SENSITIVE, default on)
+  // halves the RSSI open level, doubles the noise and glitch open levels and
+  // keeps the close levels apart when they meet. Copied as is: it is the
+  // tuning that has run on K1 hardware.
+  uint16_t ro = row[0] / 2u, rc = row[1], no = row[2] * 2u, nc = row[3];
+  uint16_t go = row[5] * 2u, gc = row[4];
+  if (rc == ro && rc >= 2) rc -= 2;
+  if (nc == no && nc <= 125) nc += 2;
+  if (gc == go && gc <= 253) gc += 2;
+  return (SQL){.ro = ro, .rc = rc, .no = no > 127 ? 127 : (uint8_t)no,
+               .nc = nc > 127 ? 127 : (uint8_t)nc, .gc = (uint8_t)gc, .go = go > 255 ? 255 : (uint8_t)go};
 }
 
 // The broadcast chip is tuned and its RF path depends on the BK VHF LNA
