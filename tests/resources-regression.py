@@ -20,7 +20,7 @@ TAIL = CAPACITY - resources.HEADER_BYTES - resources.SSB_BYTES
 
 class FakeFirmware:
     """Answers 0x0514/0x051B/0x0570 like src/hal/uart.c; writes only the tail
-    and the 9 PA bytes of each calibration band record."""
+    and the calibration block 0x1E00-0x1FFF."""
 
     def __init__(self):
         self.eeprom = bytearray(b'\xff' * CAPACITY)
@@ -42,9 +42,8 @@ class FakeFirmware:
         elif kind == 0x0570:
             at, n, stamp = struct.unpack_from('<IB3xI', payload, 4)
             assert stamp == self.stamp and len(payload) == 16 + n
-            row = at - resources.PA_BASE
-            pa = 0 <= row < 7 * 16 and row % 16 + n <= 9
-            ok = TAIL <= at and at + n <= CAPACITY or pa
+            cal = 0x1E00 <= at and at + n <= 0x2000
+            ok = TAIL <= at and at + n <= CAPACITY or cal
             if ok:
                 self.eeprom[at:at + n] = payload[16:]
                 self.writes.append((at, n))
@@ -107,7 +106,7 @@ class ResourceTests(unittest.TestCase):
 
     def test_refused_write_raises(self):
         with self.assertRaises(IOError):
-            self.radio.write(0x1E00, b'\0' * 16)  # Only the PA rows of calibration.
+            self.radio.write(0x1DF8, b'\0' * 16)  # Starts before calibration.
 
     def test_verify_reports_damage(self):
         self.install()
@@ -166,9 +165,19 @@ class CalibrationTests(unittest.TestCase):
         with patch('builtins.input', return_value='no'), redirect_stdout(io.StringIO()):
             resources.calibration(self.radio, args)
         self.assertEqual(self.pa(2), bytes.fromhex('40' * 9))
+        self.firmware.eeprom[0x1F40:0x1F4C] = bytes(12)  # Battery calibration too.
         with patch('builtins.input', return_value='yes'), redirect_stdout(io.StringIO()):
             resources.calibration(self.radio, args)
-        self.assertEqual(self.pa(2), resources.pa_rows(backup.read_bytes())[2])
+        self.assertEqual(bytes(self.firmware.eeprom[0x1E00:0x2000]), backup.read_bytes())
+        self.assertTrue(all(0x1E00 <= at and at + n <= 0x2000 for at, n in self.firmware.writes))
+
+    def test_restore_refuses_blank_or_short_backups(self):
+        for data in (bytes(512), b'\xff' * 512, bytes(range(256)), bytes(0x1F0) + b'\x50' * 16):
+            path = self.backups / 'bad.bin'
+            path.write_bytes(data)
+            with self.assertRaises(ValueError):
+                self.run_command('cal-restore', file=path)
+        self.assertEqual(list(self.backups.iterdir()), [path])  # Refused before any backup.
 
 
 if __name__ == '__main__':

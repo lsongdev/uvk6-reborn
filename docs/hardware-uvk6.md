@@ -224,7 +224,7 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 | --- | --- | --- |
 | `0x0800–0x0FFF` | UVR2 格式 9 双 1024 B 槽，已定义内容 825 B | 配置写入；CRC 与序号回读校验 |
 | `0xB000–0x113FF` | 用户频道：200 个 × 两份 64 B 副本（标记、序号、名称 16 B、RX、TX Shift／频差／Split、CRC32） | 频道写入；开机只读每份的 2 字节头部 |
-| `0x1E00–0x1FFF` | 原机校准备份范围。工具 [K5TOOL](https://github.com/qrp73/K5TOOL) 提供读取 `0x1E00` 长度 `0x0200`，并说明其用于校准；[k5prog](https://github.com/sq5bpf/k5prog) 也警告全片覆写的风险 | 普通配置和频道写入绝不触及；`tools/resources.py` 只能经 UART 改 `0x1ED0 + band × 16` 起的 PA 九字节，且先备份整个区 |
+| `0x1E00–0x1FFF` | 原机校准备份范围。工具 [K5TOOL](https://github.com/qrp73/K5TOOL) 提供读取 `0x1E00` 长度 `0x0200`，并说明其用于校准；[k5prog](https://github.com/sq5bpf/k5prog) 也警告全片覆写的风险 | 普通配置和频道写入绝不触及；只有 `tools/resources.py` 经 UART 维护写修改：单行 PA 或从备份整块恢复，且先备份整个区 |
 | `[容量 - 8856, 容量)` | SI4732 SSB 资源：16 B `SSBP` 头位于 `0x7DD68–0x7DD77`，8840 B 数据位于 `0x7DD78–0x7FFFF`；见 [resource.h](../src/core/resource.h) | 补丁不随固件打包；由 `tools/resources.py ssb-write` 通过正常固件 UART 安装（先清头、写数据、最后写头），完整回读后重启，启动校验长度及全量 CRC；驱动只读加载，不等于 LOSEHU patch。用法见[开发文档](development.md#eeprom-资源与校准工具) |
 | `0x3C228–0x3FFFF` | LOSEHU **2 Mbit** 固件的 15,832 B SI4732 patch 区 | 仅作为其他固件的布局参考，不自动识别为本项目的 patch |
 
@@ -242,7 +242,7 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 
 ### 普通构建写保护
 
-新版固件在 `hal/eeprom-layout.h` 只允许写配置区 `0x0800–0x0FFF`（两份格式 9 各 1024 字节）和频道区 `0xB000–0x113FF`。其他地址只能通过读取接口访问，UART 原始 EEPROM 写命令已经禁用。唯一例外是独立的 UART 维护写（`EEPROM_WriteMaintenance`，命令 0x0570）：只接受 SSB 资源尾区和七个 PA 行的前 9 字节，写后回读；确认和备份由 `tools/resources.py` 负责，通用写入函数没有放开。所有写入保守按最多 32 B 分块，候选页大小不等于已验证的物理页。
+新版固件在 `hal/eeprom-layout.h` 只允许写配置区 `0x0800–0x0FFF`（两份格式 9 各 1024 字节）和频道区 `0xB000–0x113FF`。其他地址只能通过读取接口访问，UART 原始 EEPROM 写命令已经禁用。唯一例外是独立的 UART 维护写（`EEPROM_WriteMaintenance`，命令 0x0570）：只接受 SSB 资源尾区和校准区 `0x1E00–0x1FFF`，写后回读；确认和备份由 `tools/resources.py` 负责，通用写入函数没有放开。所有写入保守按最多 32 B 分块，候选页大小不等于已验证的物理页。
 
 ## 6. PA 校准与维护例外
 
@@ -255,6 +255,8 @@ TX Shift／Offset／Split 与 TX Tone 进入独立发射方案，Off 或未设�
 
 每档三个值都不是 00／FF 才视为可用，按实际 TX 频率插值，下降曲线也支持。档位不是未经测量的固定瓦数。Mic 默认 16，Deviation 默认 130（驱动乘 10）；软件没有写入 REG_3B 晶振校准，已删除旧代码固定减 1270 Hz 的频偏。供电检查来自电池测量，物理 PTT 为 PC5 低电平，PA gate 由 BK GPIO 控制。
 
-**固件自身从不写校准。** 只有 `tools/resources.py` 经 UART 维护命令写入上述 PA 九字节行：先备份 `0x1E00–0x1FFF`，列出新旧值并确认，写后回读。`cal-seed` 只给全 00／FF 的行写参考值（三份公开 UV-K5(8) dump，High 取逐锚点最小值），已有数据不覆盖；这不是本机个体校准，不能把参考值视为 RF 验收。原先的 `SEED_PA_CAL` 维护镜像已删除。用法见[开发文档](development.md#eeprom-资源与校准工具)。
+**固件自身从不写校准。** 只有 `tools/resources.py` 经 UART 维护命令写校准：`cal-write` 改单个 PA 行，`cal-restore` 从 512 B 备份恢复整个 `0x1E00–0x1FFF`；都先备份当前区块、列出新旧值并确认，写后回读。`cal-seed` 只给全 00／FF 的行写参考值（三份公开 UV-K5(8) dump，High 取逐锚点最小值），已有数据不覆盖；这不是本机个体校准，不能把参考值视为 RF 验收。原先的 `SEED_PA_CAL` 维护镜像已删除。用法见[开发文档](development.md#eeprom-资源与校准工具)。
+
+**本台校准记录**：此前整个 `0x1E00–0x1FFF` 曾被清零，2026-10-13 只给 band 2／5 写入了参考值。2026-10-19 找到本机 2024-10-24 的原厂备份（含 `UV-K6` 设置字串，与同次完整 dump 一致，SHA-256 `4ea83726…5cc94`），用 `cal-restore` 恢复了整个区块，并独立读回、逐字节一致。现在 PA、RSSI、电池、VOX、晶振等均为本机原厂值；备份在 `backups/uvk6/`（不入库）。原厂值同样不能代替功率计验收。
 
 当前文档未记录可证明本台功率、频偏、杂散、温度保护或最大关断时延通过验收的测量。后续将实测日期、条件和结果写入本节，并同步开发文档验收项，不用主机 Mock 代替实测。
