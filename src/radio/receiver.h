@@ -4,7 +4,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define SQL_DELAY 50
+// How often the main loop samples signal and squelch, in ms. The BK1080
+// is read only once a second: on the UV-K1 every I2C burst to it is
+// faintly audible in the broadcast audio, and the reference reads it never
+// during playback. Its SNR squelch and meter need no faster updates.
+static inline uint32_t RECEIVER_SamplePeriodMs(RxDevice device) {
+  return device == RX_DEVICE_BROADCAST ? 1000u : 50u;
+}
 
 // What the receiver hardware is doing now. Any owner (user tune, Seek,
 // Watch, TX restore) changes it only through RECEIVER_Apply/Select, so the
