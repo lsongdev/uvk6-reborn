@@ -1,4 +1,5 @@
 #include "boards/uvk6/pins.h"
+#include "hal/board.h"
 #include "hal/gpio.h"
 
 const Dp32GpioLine GPIO_LINES[] = {
@@ -10,4 +11,16 @@ const Dp32GpioLine GPIO_LINES[] = {
     [GPIO_BK1080] = DP32_GPIO_LINE(B, GPIOB_PIN_BK1080),
     [GPIO_AUDIO_PATH] = DP32_GPIO_LINE(C, GPIOC_PIN_AUDIO_PATH),
     [GPIO_PTT] = DP32_GPIO_LINE(C, GPIOC_PIN_PTT),
+    [GPIO_KEY_OUT0] = DP32_GPIO_LINE(A, GPIOA_PIN_KEYBOARD_4),
+    [GPIO_KEY_OUT1] = DP32_GPIO_LINE(A, GPIOA_PIN_KEYBOARD_5),
+    [GPIO_KEY_OUT2] = DP32_GPIO_LINE(A, GPIOA_PIN_KEYBOARD_6),
+    [GPIO_KEY_OUT3] = DP32_GPIO_LINE(A, GPIOA_PIN_KEYBOARD_7),
+    [GPIO_KEY_IN0] = DP32_GPIO_LINE(A, GPIOA_PIN_KEYBOARD_0),
+    [GPIO_KEY_IN1] = DP32_GPIO_LINE(A, GPIOA_PIN_KEYBOARD_1),
+    [GPIO_KEY_IN2] = DP32_GPIO_LINE(A, GPIOA_PIN_KEYBOARD_2),
+    [GPIO_KEY_IN3] = DP32_GPIO_LINE(A, GPIOA_PIN_KEYBOARD_3),
 };
+
+// PA10/PA11 double as the EEPROM I2C bus (idle high); PA12/PA13 go to the
+// voice chip, which the stock firmware leaves at PA12 low, PA13 high.
+const uint8_t BOARD_KEYPAD_IDLE_LEVELS = 0x0B;

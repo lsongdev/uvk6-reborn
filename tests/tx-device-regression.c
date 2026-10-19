@@ -42,7 +42,10 @@ void BK4819_DisableDTMF(void) { assert(!paOn); }
 void BK4819_SetFilterBandwidth(BK4819_FilterBandwidth_t bw) {
   assert(!paOn && bw==BK4819_FILTER_BW_9k);
 }
-void BK4819_SelectFilter(uint32_t hz10) { assert(!paOn);filterFrequency=hz10; }
+void BK4819_SelectFilter(uint32_t hz10, uint32_t bound) {
+  assert(!paOn && bound==PREFERENCES_FILTER_BOUND_240);filterFrequency=hz10;
+}
+uint32_t PREFERENCES_FilterBound(void) { return PREFERENCES_FILTER_BOUND_240; }
 void BK4819_SetFrequency(uint32_t hz10) { assert(!paOn);tuned=hz10; }
 void BK4819_SetCTCSSFrequency(uint32_t value) { assert(!paOn && value); }
 void BK4819_SetCDCSSCodeWord(uint32_t value) { assert(!paOn && value); }

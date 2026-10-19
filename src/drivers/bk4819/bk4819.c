@@ -1,12 +1,9 @@
-#include "store/device-config.h"
 #include "drivers/bk4819/bk4819.h"
 #include "hal/gpio.h"
 #include "hal/system.h"
 #include "hal/systick.h"
 #include "hal/uart.h"
 #include "core/misc.h"
-#include "app/settings.h"
-#include "devices/audio.h"
 #include "drivers/bk4819/bk4819-regs.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -304,9 +301,8 @@ void BK4819_SelectFilterEx(Filter filter) {
   BK4819_WriteRegister(BK4819_REG_33, gGpioOutState);
 }
 
-void BK4819_SelectFilter(uint32_t frequency) {
-  Filter filter =
-      (frequency < SETTINGS_GetFilterBound()) ? FILTER_VHF : FILTER_UHF;
+void BK4819_SelectFilter(uint32_t frequency, uint32_t vhfUhfBound) {
+  Filter filter = (frequency < vhfUhfBound) ? FILTER_VHF : FILTER_UHF;
 
   BK4819_SelectFilterEx(filter);
 }
@@ -752,7 +748,7 @@ static void configure_receiver(void) {
 
 static bool isInitialized = false;
 
-void BK4819_Init(void) {
+void BK4819_Init(uint8_t mic, uint16_t deviation) {
   if (isInitialized) {
     return;
   }
@@ -767,14 +763,14 @@ void BK4819_Init(void) {
     BK4819_Idle();
     return;
   }
-  BK4819_ConfigureMicrophone(gDeviceConfig.preferences.mic);
+  BK4819_ConfigureMicrophone(mic);
   configure_receiver();
 
   BK4819_DisableDTMF();
 
   // Set deviation
   BK4819_WriteRegister(0x40, (BK4819_ReadRegister(0x40) & ~(0x7FF)) |
-                                 (gDeviceConfig.preferences.deviation * 10) | (1 << 12));
+                                 (deviation * 10u) | (1 << 12));
   isInitialized = true;
 }
 

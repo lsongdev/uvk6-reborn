@@ -569,6 +569,9 @@ typedef union {
 
 bool SI47XX_Detect(void);
 bool SI47XX_PowerUp();
+// SSB patch bytes (PATCH_ARGS/PATCH_DATA lines); length 0 means none.
+typedef bool (*SI47XX_PatchRead)(uint16_t offset, uint8_t *out, uint16_t size);
+void SI47XX_SetPatchSource(SI47XX_PatchRead read, uint16_t length);
 bool SI47XX_PatchPowerUp();
 void SI47XX_PowerDown();
 bool SI47XX_SetFreq(uint16_t freq);

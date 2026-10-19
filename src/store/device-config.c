@@ -2,7 +2,7 @@
 #include "store/channel-store.h"
 #include "hal/storage.h"
 #include "hal/scheduler.h"
-#include "app/settings.h"
+#include "store/preferences.h"
 
 // The boot entry point initializes defaults before touching peripherals.
 // Keeping this in BSS avoids copying the full configuration into Flash.

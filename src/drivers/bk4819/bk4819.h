@@ -2,7 +2,7 @@
 #define DRIVER_BK4819_h
 
 #include "drivers/bk4819/bk4819-regs.h"
-#include "radio/measurements.h"
+#include "core/measurements.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -90,7 +90,8 @@ extern const Gain GAIN_TABLE[32];
 // extern const uint8_t SQ[2][6][11];
 
 bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index);
-void BK4819_Init(void);
+// mic: REG_7D gain (0..31); deviation: in 10 Hz units.
+void BK4819_Init(uint8_t mic, uint16_t deviation);
 uint16_t BK4819_ReadRegister(BK4819_REGISTER_t Register);
 void BK4819_WriteRegister(BK4819_REGISTER_t Register, uint16_t Data);
 void BK4819_WriteU8(uint8_t Data);
@@ -115,7 +116,7 @@ void BK4819_Squelch(uint8_t sql, uint8_t OpenDelay, uint8_t CloseDelay);
 void BK4819_SetAF(BK4819_AF_Type_t AF);
 void BK4819_RX_TurnOn(void);
 void BK4819_SelectFilterEx(Filter filter);
-void BK4819_SelectFilter(uint32_t Frequency);
+void BK4819_SelectFilter(uint32_t Frequency, uint32_t vhfUhfBound);
 void BK4819_DisableDTMF(void);
 void BK4819_EnterTxMute(void);
 void BK4819_ExitTxMute(void);
@@ -124,7 +125,8 @@ void BK4819_Idle(void);
 void BK4819_ExitBypass(void);
 void BK4819_PrepareTransmit(void);
 void BK4819_ConfigureMicrophone(uint8_t mic);
-void BK4819_ConfigureVoiceTx(uint32_t frequency, uint8_t mic, uint16_t deviation);
+void BK4819_ConfigureVoiceTx(uint32_t frequency, uint8_t mic, uint16_t deviation,
+                             uint32_t vhfUhfBound);
 void BK4819_TxOn_Beep(void);
 void BK4819_ExitSubAu(void);
 

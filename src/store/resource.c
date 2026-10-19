@@ -1,5 +1,6 @@
 #include "store/resource.h"
 #include "core/crc32.h"
+#include "hal/storage.h"
 #include <string.h>
 
 static uint32_t get32(const uint8_t *p) {
@@ -20,4 +21,20 @@ bool RESOURCE_Valid(ResourceRead read, uint32_t data_offset,
     crc = CRC32_Update(crc, buf, count);
   }
   return ~crc == expected;
+}
+
+static bool readArea(uint32_t offset, uint8_t *out, uint16_t size) {
+  return STORAGE_Read(STORAGE_RESOURCES, offset, out, size);
+}
+
+// Installed by tools/resources.py; its header carries the length and CRC.
+bool RESOURCE_SsbPatchPresent(void) {
+  return STORAGE_Size(STORAGE_RESOURCES) >= RESOURCE_TAIL_BYTES &&
+         RESOURCE_Valid(readArea, RESOURCE_SSB_PATCH_OFFSET, RESOURCE_SSB_PATCH_MAGIC,
+                        RESOURCE_SSB_PATCH_BYTES);
+}
+
+bool RESOURCE_SsbPatchRead(uint16_t offset, uint8_t *out, uint16_t size) {
+  return offset < RESOURCE_SSB_PATCH_BYTES && size <= RESOURCE_SSB_PATCH_BYTES - offset &&
+         readArea(RESOURCE_SSB_PATCH_OFFSET + offset, out, size);
 }

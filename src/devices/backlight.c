@@ -1,6 +1,6 @@
 #include "store/device-config.h"
 #include "devices/backlight.h"
-#include "app/settings.h"
+#include "store/preferences.h"
 #include "hal/board.h"
 
 static uint8_t duration = 2;

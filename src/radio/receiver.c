@@ -1,8 +1,4 @@
 #include "radio/receiver.h"
-#include "app/settings.h"
-#include "drivers/bk1080/bk1080.h"
-#include "drivers/bk4819/bk4819.h"
-#include "drivers/si473x/si473x.h"
 #include "devices/backlight.h"
 #include "devices/led.h"
 #include "devices/rx-device.h"
@@ -11,28 +7,14 @@
 
 Receiver gReceiver;
 
-ReceiverCapabilities RECEIVER_Capabilities(void) {
-  static bool detected;
-  static ReceiverCapabilities capabilities;
-  if (!detected) {
-    capabilities.broadcast = BK1080_Detect();
-    // Probe each chip through its own driver. A failed BK read is not SI.
-    capabilities.si = !capabilities.broadcast && SI47XX_Detect();
-    capabilities.ssb_patch = capabilities.si && SETTINGS_IsPatchPresent();
-    detected = true;
-  }
-  return capabilities;
-}
+ReceiverCapabilities RECEIVER_Capabilities(void) { return RX_DEVICE_Capabilities(); }
 
 void RECEIVER_Init(void) {
   static bool initialized;
   if (initialized) return;
   initialized = true;
   gReceiver = (Receiver){.plan = {RX_DEVICE_BK, 145500000u, {RX_NFM, 12500u, 12500u, 0, 0}}};
-  BK4819_Init();
-  TX_DEVICE_Disable(); // Explicitly keep PA off on startup.
-  BK4819_RX_TurnOn();
-  (void)BK1080_Init(0, false);
+  RX_DEVICE_Init();
 }
 
 void RECEIVER_SetOpen(bool open) {

@@ -2,7 +2,7 @@
 #include "store/device-config.h"
 #include "hal/storage.h"
 #include "hal/system.h"
-#include "app/settings.h"
+#include "store/preferences.h"
 #include "ui/graphics.h"
 #include "ui/screens/statusline.h"
 

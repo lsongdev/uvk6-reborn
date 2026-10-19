@@ -16,7 +16,7 @@
 #include "ui/menu.h"
 #include "radio/receiver.h"
 #include "hal/scheduler.h"
-#include "app/settings.h"
+#include "store/preferences.h"
 #include "ui/graphics.h"
 #include "ui/screens/statusline.h"
 
@@ -84,7 +84,7 @@ static bool checkKeylock(Key_State_t state, KEY_Code_t key) {
   if (isLongPressF) {
     HOME_CancelShortcut();
     gDeviceConfig.preferences.keylock = !gDeviceConfig.preferences.keylock;
-    SETTINGS_Save();
+    (void)DEVICE_SaveNow();
     return true;
   }
 
@@ -133,7 +133,7 @@ void SYS_Main() {
   BATTERY_UpdateBatteryInfo();
 
   SystemMessages n = KEYBOARD_GetKey();
-  if (n.key == KEY_EXIT || !SETTINGS_Load()) {
+  if (n.key == KEY_EXIT || !DEVICE_Load()) {
     // Unknown storage contents are not our config: never write a marker or
     // restart automatically. Only explicit initialization may unlock writes.
     initDisplay();
@@ -159,7 +159,7 @@ void SYS_Main() {
     // Highest-priority half-duplex safety check, even when another app owns
     // the UI. Physical PA shutoff must not depend on VFO repaint cadence.
     RADIO_TxSafetyUpdate();
-    SETTINGS_UpdateSave();
+    DEVICE_Update();
 
     if (RADIO_IsReceiving() && !RADIO_IsWatching() && Now()-radioTimer >= SQL_DELAY) {
       RECEIVER_UpdateSquelch();

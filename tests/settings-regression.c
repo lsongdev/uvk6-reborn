@@ -1,7 +1,9 @@
 // Verify preference validation and side effects before touching hardware.
 // Patch fixture: resource header (magic, length, CRC-32 0x5026026f) at the
 // start of the resources area, then the patch preamble followed by zeros.
-#include "../src/app/settings.c"
+#include "../src/ui/screens/preferences.c"
+#include "hal/storage.h"
+#include "store/resource.h"
 #include <assert.h>
 static bool patchCorrupted, patchReadFails;
 static bool badMagic;
@@ -36,10 +38,10 @@ void BACKLIGHT_ApplySettings(void) {
 }
 void DISPLAY_Init(bool full, uint8_t contrast) { (void)full; assert(contrast<=15); ++contrasts; }
 int main(void) {
-  assert(SETTINGS_IsPatchPresent());
-  patchCorrupted=true; assert(!SETTINGS_IsPatchPresent()); patchCorrupted=false;
-  patchReadFails=true; assert(!SETTINGS_IsPatchPresent()); patchReadFails=false;
-  badMagic=true; assert(!SETTINGS_IsPatchPresent()); badMagic=false;
+  assert(RESOURCE_SsbPatchPresent());
+  patchCorrupted=true; assert(!RESOURCE_SsbPatchPresent()); patchCorrupted=false;
+  patchReadFails=true; assert(!RESOURCE_SsbPatchPresent()); patchReadFails=false;
+  badMagic=true; assert(!RESOURCE_SsbPatchPresent()); badMagic=false;
   assert(!SETTINGS_SetValue(SETTING_BACKLIGHT,7));
   assert(!SETTINGS_SetValue(SETTING_CONTRAST,16));
   assert(!SETTINGS_SetValue(SETTING_BATTERYCALIBRATION,1899));

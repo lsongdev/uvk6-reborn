@@ -14,6 +14,9 @@ typedef enum {
   GPIO_BK1080,     // BK1080 enable (low = on); SI4732 reset on the mod.
   GPIO_AUDIO_PATH, // Speaker amplifier.
   GPIO_PTT,        // Input, low while pressed.
+  // Key matrix, in devices/keyboard.c scan order; each group contiguous.
+  GPIO_KEY_OUT0, GPIO_KEY_OUT1, GPIO_KEY_OUT2, GPIO_KEY_OUT3,
+  GPIO_KEY_IN0, GPIO_KEY_IN1, GPIO_KEY_IN2, GPIO_KEY_IN3,
 } GpioLine;
 
 void GPIO_Write(GpioLine line, bool high);

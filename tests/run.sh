@@ -2,6 +2,7 @@
 # Run host regressions with hardware calls mocked; no device is accessed.
 set -eu
 cd "$(dirname "$0")/.."
+python3 tools/check-layers.py
 python3 tests/flash-regression.py
 python3 tests/resources-regression.py
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
@@ -33,7 +34,7 @@ esac
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/radio-app-regression.c src/core/tuning.c src/ui/number-input.c src/core/dcs.c src/core/text.c src/core/radio-model.c src/core/radio-state.c src/radio/rx-runtime.c src/core/watch.c src/core/tx-model.c src/radio/tx-runtime.c src/core/seek.c src/core/capture.c src/core/spectrum.c \
-  src/core/rds.c src/radio/rds-receiver.c src/ui/frequency.c "$dead_strip" -o "$test_binary"
+  src/core/rds.c src/core/rds-receiver.c src/ui/frequency.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 # ENABLE_FC=0 must keep compiling: FC branches fold to a constant phase.
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
@@ -87,7 +88,7 @@ esac
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/rx-runtime-regression.c \
   src/radio/rx-runtime.c -o "$test_binary"
 "$test_binary"
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/config-store-regression.c src/core/crc32.c src/store/resource.c \
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/config-store-regression.c src/core/crc32.c \
   src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
@@ -104,7 +105,7 @@ esac
   src/ui/signal.c src/ui/frequency.c src/core/radio-model.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/rds-regression.c \
-  src/core/rds.c src/radio/rds-receiver.c -o "$test_binary"
+  src/core/rds.c src/core/rds-receiver.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
   tests/tone-regression.c src/drivers/bk4819/css.c src/core/dcs.c src/core/text.c -o "$test_binary"
@@ -117,18 +118,18 @@ esac
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/screen-regression.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections tests/menu-regression.c src/ui/number-input.c src/core/text.c \
-  src/ui/numnav.c src/radio/measurements.c "$dead_strip" -o "$test_binary"
+  src/ui/numnav.c src/core/measurements.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/settings-regression.c src/radio/measurements.c src/core/crc32.c src/store/resource.c "$dead_strip" -o "$test_binary"
+  tests/settings-regression.c src/core/measurements.c src/core/crc32.c src/store/resource.c src/store/preferences.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   \
-  -Wno-missing-field-initializers tests/settings-inline-regression.c src/core/crc32.c src/store/resource.c src/ui/number-input.c src/ui/numnav.c \
-  src/radio/measurements.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c src/ui/graphics.c src/core/text.c "$dead_strip" -o "$test_binary"
+  -Wno-missing-field-initializers tests/settings-inline-regression.c src/core/crc32.c src/store/resource.c src/store/preferences.c src/ui/number-input.c src/ui/numnav.c \
+  src/core/measurements.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c src/ui/graphics.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/device-config-regression.c src/store/resource.c \
   src/store/config-store.c src/core/crc32.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"

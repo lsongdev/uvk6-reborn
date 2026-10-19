@@ -1,21 +1,16 @@
-#include "app/settings.h"
-#include "store/resource.h"
+#include "ui/screens/preferences.h"
 #include "store/device-config.h"
 #include "devices/battery.h"
 #include "core/misc.h"
-#include "radio/measurements.h"
-#include "drivers/bk4819/bk4819.h"
+#include "core/measurements.h"
 #include "devices/backlight.h"
 #include "devices/display.h"
-#include "hal/storage.h"
 #include "core/text.h"
 #include <stddef.h>
 #include <string.h>
 
 // Only retired driver-local controls remain here. Persisted preferences have
 // exactly one runtime owner: gDeviceConfig.preferences.
-uint8_t BL_TIME_VALUES[7] = {0, 5, 10, 20, 60, 120, 255};
-const char *BL_SQL_MODE_NAMES[3] = {"Off", "Timed", "Receiving"};
 
 // Small descriptors avoid duplicated enum/boolean handlers. Bounds are
 // checked before writing the native field or invoking a hardware effect.
@@ -145,21 +140,4 @@ bool SETTINGS_ResetPreferences(void) {
   DISPLAY_Init(false, next.contrast);
   BACKLIGHT_ApplySettings();
   return true;
-}
-void SETTINGS_Save(void) { (void)DEVICE_SaveNow(); }
-bool SETTINGS_Load(void) {
-  return DEVICE_Load();
-}
-void SETTINGS_UpdateSave(void) { DEVICE_Update(); }
-uint32_t SETTINGS_GetFilterBound(void) {
-  return gDeviceConfig.preferences.bound_240_280 ? VHF_UHF_BOUND2 : VHF_UHF_BOUND1;
-}
-static bool readResource(uint32_t offset, uint8_t *out, uint16_t size) {
-  return STORAGE_Read(STORAGE_RESOURCES, offset, out, size);
-}
-// Installed by tools/resources.py; its header carries the length and CRC.
-bool SETTINGS_IsPatchPresent(void) {
-  return STORAGE_Size(STORAGE_RESOURCES) >= RESOURCE_TAIL_BYTES &&
-         RESOURCE_Valid(readResource, RESOURCE_SSB_PATCH_OFFSET, RESOURCE_SSB_PATCH_MAGIC,
-                                   RESOURCE_SSB_PATCH_BYTES);
 }

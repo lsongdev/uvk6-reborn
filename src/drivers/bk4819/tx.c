@@ -7,7 +7,8 @@ __attribute__((noinline)) void BK4819_ConfigureMicrophone(uint8_t mic) {
   BK4819_WriteRegister(0x74, 0xAF1F);
 }
 
-void BK4819_ConfigureVoiceTx(uint32_t frequency, uint8_t mic, uint16_t deviation) {
+void BK4819_ConfigureVoiceTx(uint32_t frequency, uint8_t mic, uint16_t deviation,
+                             uint32_t vhfUhfBound) {
   BK4819_EnterTxMute();
   BK4819_Idle();
   BK4819_SetRxMode(false);
@@ -18,6 +19,6 @@ void BK4819_ConfigureVoiceTx(uint32_t frequency, uint8_t mic, uint16_t deviation
   BK4819_ConfigureMicrophone(mic);
   BK4819_WriteRegister(BK4819_REG_40,
     (BK4819_ReadRegister(BK4819_REG_40) & ~0x7FFu) | (deviation & 0x7FFu) | (1u << 12));
-  BK4819_SelectFilter(frequency);
+  BK4819_SelectFilter(frequency, vhfUhfBound);
   BK4819_SetFrequency(frequency);
 }

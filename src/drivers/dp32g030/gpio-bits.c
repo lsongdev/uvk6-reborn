@@ -17,28 +17,38 @@
 #include "drivers/dp32g030/gpio-bits.h"
 #include "hal/gpio.h"
 
+_Static_assert(GPIOB_BASE_ADDR - GPIOA_BASE_ADDR == 0x800u &&
+               GPIOC_BASE_ADDR - GPIOB_BASE_ADDR == 0x800u, "GPIO bank stride");
+_Static_assert(PORTCON_PORTB_IE_ADDR - PORTCON_PORTA_IE_ADDR == 4u &&
+               PORTCON_PORTC_IE_ADDR - PORTCON_PORTB_IE_ADDR == 4u, "PORTCON IE stride");
+
+static volatile GPIO_Bank_t *bank(const Dp32GpioLine *l) {
+  return (volatile GPIO_Bank_t *)(GPIOA_BASE_ADDR + 0x800u * l->port);
+}
+
 void GPIO_Write(GpioLine line, bool high) {
   const Dp32GpioLine *l = &GPIO_LINES[line];
   if (high)
-    GPIO_SetBit(&l->bank->DATA, l->bit);
+    GPIO_SetBit(&bank(l)->DATA, l->bit);
   else
-    GPIO_ClearBit(&l->bank->DATA, l->bit);
+    GPIO_ClearBit(&bank(l)->DATA, l->bit);
 }
 
 bool GPIO_Read(GpioLine line) {
   const Dp32GpioLine *l = &GPIO_LINES[line];
-  return GPIO_CheckBit(&l->bank->DATA, l->bit);
+  return GPIO_CheckBit(&bank(l)->DATA, l->bit);
 }
 
 void GPIO_SetInput(GpioLine line, bool input) {
   const Dp32GpioLine *l = &GPIO_LINES[line];
+  volatile uint32_t *inputEnable = (volatile uint32_t *)(PORTCON_PORTA_IE_ADDR + 4u * l->port);
   // Input buffer on only while reading, as the DP32G030 pin muxing expects.
   if (input) {
-    *l->inputEnable |= 1U << l->bit;
-    l->bank->DIR &= ~(1U << l->bit);
+    *inputEnable |= 1U << l->bit;
+    bank(l)->DIR &= ~(1U << l->bit);
   } else {
-    *l->inputEnable &= ~(1U << l->bit);
-    l->bank->DIR |= 1U << l->bit;
+    *inputEnable &= ~(1U << l->bit);
+    bank(l)->DIR |= 1U << l->bit;
   }
 }
 
