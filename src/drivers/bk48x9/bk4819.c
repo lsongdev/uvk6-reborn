@@ -262,3 +262,5 @@ void BK48X9_Init(uint8_t mic,uint16_t deviation) {
   BK48X9_WriteRegister(0x40,(BK48X9_ReadRegister(0x40)&~0x7FFu) | (deviation*10u) | (1u<<12));
   BK48X9_EndInit();
 }
+
+uint16_t BK48X9_GetScanRssi(void) { return BK48X9_GetRSSI(); }

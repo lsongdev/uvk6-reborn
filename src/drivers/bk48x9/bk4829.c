@@ -1,6 +1,7 @@
 #include "drivers/bk48x9/bk48x9.h"
 #include "drivers/bk48x9/internal.h"
 #include "core/misc.h"
+#include "hal/systick.h"
 
 // Statically selected chip backend; register values preserved by trace regressions.
 const BK48X9Chip BK48X9_CHIP={
@@ -185,4 +186,13 @@ void BK48X9_Init(uint8_t mic,uint16_t deviation) {
   BK48X9_DisableDTMF();
   (void)mic;(void)deviation;
   BK48X9_EndInit();
+}
+
+// Reference K1 spectrum (5fedc09 GetRssi): let the glitch count fall below
+// 200 (at most ~50 us), then discard the first RSSI read after a retune,
+// which may still reflect the previous point.
+uint16_t BK48X9_GetScanRssi(void) {
+  for (uint8_t guard = 50; guard-- && BK48X9_GetGlitch() >= 200; ) TIMER_DelayUs(1);
+  (void)BK48X9_GetRSSI();
+  return BK48X9_GetRSSI();
 }

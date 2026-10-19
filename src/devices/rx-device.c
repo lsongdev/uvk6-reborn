@@ -200,7 +200,7 @@ void RX_DEVICE_SpectrumTune(uint32_t frequency_hz) {
   }
   BK48X9_TuneTo(frequency, true);
 }
-uint16_t RX_DEVICE_SpectrumRssi(void) { return BK48X9_GetRSSI(); }
+uint16_t RX_DEVICE_SpectrumRssi(void) { return BK48X9_GetScanRssi(); }
 void RX_DEVICE_SpectrumStop(void) { RX_DEVICE_InvalidateBk(); }
 #endif
 

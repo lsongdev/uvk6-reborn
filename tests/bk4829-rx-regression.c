@@ -11,7 +11,11 @@ static unsigned transitions;
 void BK48X9_BusInit(void) {}
 void BK48X9_ConfigureMicrophone(uint8_t mic) { (void)mic; }
 void SYS_DelayMs(uint32_t ms) { (void)ms; }
+static unsigned rssiReads, glitchHigh, delays;
+void TIMER_DelayUs(uint32_t us) { delays += us; }
 uint16_t BK48X9_ReadRegister(BK48X9_REGISTER_t reg) {
+  if (reg == BK48X9_REG_67) return (uint16_t)(++rssiReads == 1 ? 50 : 120); // Stale, then settled.
+  if (reg == BK48X9_REG_63) return glitchHigh ? (glitchHigh--, 250) : 10;
   if (reg == BK48X9_REG_0C) return event ? 1 : 0;
   if (reg == BK48X9_REG_02) { uint16_t result = event; event = 0; return result; }
   return regs[reg];
@@ -80,8 +84,16 @@ int main(void) {
   BK48X9_SetRxMode(false);
   assert(!(regs[0x31] & 1) && regs[0x42] == 0x6B5A && !(regs[0x73] & 0x10));
   BK48X9_SetFilterBandwidth(BK48X9_FILTER_BW_6k); assert(regs[0x43] == 0x2058);
+  // A sweep point waits for the glitch count to settle, then drops the
+  // first RSSI read as the reference spectrum does.
+  rssiReads = 0; glitchHigh = 3; delays = 0;
+  assert(BK48X9_GetScanRssi() == 120 && rssiReads == 2 && delays == 3);
+  rssiReads = 0; glitchHigh = 1000; delays = 0;
+  (void)BK48X9_GetScanRssi(); assert(delays == 50); // Bounded wait.
 #else
   // The BK4819 backend keeps its original VCO restart and AF routing.
+  rssiReads = 0; glitchHigh = 5;
+  assert(BK48X9_GetScanRssi() == 50 && rssiReads == 1); // K6 sweep reads once.
   BK48X9Capabilities caps = BK48X9_GetCapabilities();
   assert(caps.am && caps.squelch_open_delay == 1 && caps.squelch_close_delay == 1); // Auto = K6's 1/1.
   BK48X9_RX_TurnOn(); BK48X9_TuneTo(14550000u, true);
