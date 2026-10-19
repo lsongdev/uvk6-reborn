@@ -100,7 +100,7 @@ static bool openBands(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
 }
 static void getSaveStatus(const MenuItem *item, char *out, uint8_t size) {
   (void)item;
-  static const char *names[] = {"Read only","Saved","Pending","Failed"};
+  static const char *names[] = {"Read only","Saved","Pending","Failed","RAM only"};
   TEXT_Copy(out,size,names[DEVICE_GetSaveStatus()]);
 }
 static bool saveNow(const MenuItem *item, KEY_Code_t key, Key_State_t state) {

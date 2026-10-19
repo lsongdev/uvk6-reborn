@@ -53,5 +53,18 @@ int main(void) {
   assert(DEVICE_SaveNow());
   assert(DEVICE_Load() && gDeviceConfig.preferences.brightness_low==3);
   assert(DEVICE_GetSaveStatus()==DEVICE_PENDING);
+  // Storage with a configuration area never runs volatile.
+  assert(!DEVICE_UseVolatile());
+  // Read-only bring-up storage (no configuration area): RAM defaults, and
+  // saves succeed without a single storage write.
+  fakeSize[STORAGE_CONFIG_A]=fakeSize[STORAGE_CONFIG_B]=0;
+  assert(!DEVICE_Load() && DEVICE_UseVolatile());
+  assert(gDeviceConfigReady && DEVICE_GetSaveStatus()==DEVICE_VOLATILE);
+  assert(gDeviceConfig.preferences.contrast==8); // CONFIG_DEFAULT_PREFERENCES.
+  savedWrites=writes;
+  gDeviceConfig.preferences.contrast=11; DEVICE_RequestSave();
+  clockNow+=2000; DEVICE_Update();
+  assert(DEVICE_SaveNow() && writes==savedWrites && DEVICE_GetSaveStatus()==DEVICE_VOLATILE);
+  fakeReady=false; assert(!DEVICE_UseVolatile()); // Missing storage stays unavailable.
   return 0;
 }
