@@ -5,9 +5,9 @@ calibration through the running firmware's UART, and read them back.
 The radio runs normal firmware (not the bootloader). Resources live in the
 reserved tail at the top of the EEPROM, each behind a 16-byte header
 (magic, length, CRC-32) that is written last; see src/core/resource.h.
-Calibration writes reach only the 9 PA bytes of each band record at
-0x1ED0 + band*16; the whole 0x1E00-0x1FFF block is backed up first.
-The firmware refuses writes anywhere else.
+Calibration writes stay within 0x1E00-0x1FFF: single PA rows at
+0x1ED0 + band*16, or a whole block restored from a backup; the block is
+backed up first. The firmware refuses writes anywhere else.
 """
 import argparse
 import importlib.util
@@ -218,8 +218,38 @@ def write_rows(radio, block, rows, confirm, log=print):
     return True
 
 
+def restore_block(radio, block, backup, confirm, log=print):
+    """Writes the 16-byte lines of backup that differ from block; read back."""
+    if len(backup) != CAL_BYTES:
+        raise ValueError(f'Calibration block must be {CAL_BYTES} bytes')
+    lines = [at for at in range(0, CAL_BYTES, 16) if block[at:at + 16] != backup[at:at + 16]]
+    if not lines:
+        log('Nothing to change.')
+        return False
+    for at in lines:
+        log(f'  0x{CAL_START + at:04X} now  {block[at:at + 16].hex(" ")}')
+        log(f'         new  {backup[at:at + 16].hex(" ")}')
+    if not confirm():
+        log('Cancelled; nothing written.')
+        return False
+    for at in lines:
+        radio.write(CAL_START + at, backup[at:at + 16])
+    if radio.read(CAL_START, CAL_BYTES) != backup:
+        raise IOError('Read-back differs after restoring the calibration block')
+    log(f'Restored and verified: {len(lines)} lines of 0x{CAL_START:04X}-0x{CAL_START + CAL_BYTES - 1:04X}')
+    return True
+
+
+def check_backup(data):
+    """A 512-byte block that is not blank and carries the band 2/5 PA rows."""
+    rows = pa_rows(data)
+    if data in (b'\0' * CAL_BYTES, b'\xff' * CAL_BYTES) or erased(rows[2]) or erased(rows[5]):
+        raise ValueError('Not a calibration backup: blank, or band 2/5 PA rows erased')
+    return data
+
+
 def ask():
-    return input('Write these PA rows? Type yes: ').strip().lower() == 'yes'
+    return input('Write these changes? Type yes: ').strip().lower() == 'yes'
 
 
 def calibration(radio, args):
@@ -229,12 +259,15 @@ def calibration(radio, args):
         return 0
     # Check the input before touching the radio.
     if args.command == 'cal-restore':
-        rows = pa_rows(args.file.read_bytes())
+        backup = check_backup(args.file.read_bytes())
     elif args.command == 'cal-write':
         pa_address(args.band)
         rows = {args.band: parse_row(args.row)}
     block = backup_calibration(radio, args.backup_dir)
     confirm = (lambda: True) if args.yes else ask
+    if args.command == 'cal-restore':
+        restore_block(radio, block, backup, confirm)
+        return 0
     if args.command == 'cal-seed':
         # Only erased rows of the bands TX uses; measured values never change.
         rows = {band: row for band, row in PA_REFERENCE.items() if erased(pa_rows(block)[band])}
@@ -260,7 +293,7 @@ def main():
     cal_write.add_argument('band', type=int, help='0-6; TX uses 2 (136-174 MHz) and 5 (400-470 MHz)')
     cal_write.add_argument('row', help="9 hex bytes, Low/Medium/High x3, e.g. '5f5f5f 696969 7a8b7f'")
     cal_seed = commands.add_parser('cal-seed', help='reference values into erased band 2/5 rows')
-    cal_restore = commands.add_parser('cal-restore', help='PA rows from a cal-read backup')
+    cal_restore = commands.add_parser('cal-restore', help='the whole block from a 512-byte backup')
     cal_restore.add_argument('file', type=Path)
     for command in (cal_read, cal_write, cal_seed, cal_restore):
         command.add_argument('--backup-dir', type=Path, default=ROOT / 'backups')

@@ -158,7 +158,7 @@ typedef struct {
 } REPLY_051D_t;
 
 // Maintenance write (tools/resources.py): the firmware accepts only the
-// resource tail and the PA calibration rows, and replies after reading back.
+// resource tail and the calibration block, and replies after reading back.
 typedef struct {
   Header_t Header;
   uint32_t Offset;
