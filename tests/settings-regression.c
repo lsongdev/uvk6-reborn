@@ -1,24 +1,25 @@
 // Verify preference validation and side effects before touching hardware.
-// Patch fixture: resource header (magic, length, CRC-32 0x5026026f) at
-// 0x7DD68, then the patch preamble followed by zero bytes.
+// Patch fixture: resource header (magic, length, CRC-32 0x5026026f) at the
+// start of the resources area, then the patch preamble followed by zeros.
 #include "../src/core/settings.c"
 #include <assert.h>
 static bool patchCorrupted, patchReadFails;
-uint32_t EEPROM_DetectSize(void) { return 524288u; }
 static bool badMagic;
-int EEPROM_ReadBuffer(uint32_t address, void *out, uint16_t n) {
-  const uint32_t start=524288u-RESOURCE_TAIL_BYTES;
-  if (patchReadFails || address<start || address+n>524288u) return -1;
+uint32_t STORAGE_Size(StorageArea area) {
+  return area == STORAGE_RESOURCES ? RESOURCE_TAIL_BYTES : 0;
+}
+bool STORAGE_Read(StorageArea area, uint32_t address, void *out, uint16_t n) {
+  if (patchReadFails || area != STORAGE_RESOURCES || address+n>RESOURCE_TAIL_BYTES) return false;
   static const uint8_t image[24]={'S','S','B','P', 0x88,0x22,0,0, 0x6f,0x02,0x26,0x50,
       0xff,0xff,0xff,0xff, 0x15,0x00,0x03,0x74,0x0b,0xd4,0x84,0x60};
   uint8_t *buf=out;
   for (unsigned i=0;i<n;++i) {
-    uint32_t offset=address-start+i;
+    uint32_t offset=address+i;
     buf[i]=offset<sizeof(image) ? image[offset] : 0;
     if (patchCorrupted && offset==116) buf[i]^=1;
     if (badMagic && offset==0) buf[i]='X';
   }
-  return 0;
+  return true;
 }
 DeviceConfig gDeviceConfig = {.preferences = CONFIG_DEFAULT_PREFERENCES};
 static unsigned requests, lights, contrasts;

@@ -13,11 +13,12 @@ static unsigned paStarts, invalidations, writeCount;
 static uint16_t registers[128];
 static uint32_t tuned, filterFrequency, calibrationAddress;
 static uint8_t bias;
-int EEPROM_ReadBuffer(uint32_t address, void *data, uint16_t size) {
-  assert(size==9 && (address==0x1EF0 || address==0x1F20));
-  calibrationAddress=address;
-  if (!readOK) return -1;
-  memcpy(data,calibration,size);return 0;
+bool STORAGE_Read(StorageArea area, uint32_t offset, void *data, uint16_t size) {
+  // Bands 2 and 5 of the PA table: 0x1EF0 and 0x1F20 on the UV-K5 layout.
+  assert(area==STORAGE_CALIBRATION && size==9 && (offset==0xF0 || offset==0x120));
+  calibrationAddress=0x1E00+offset;
+  if (!readOK) return false;
+  memcpy(data,calibration,size);return true;
 }
 bool GPIO_Read(GpioLine line) {
   assert(line==GPIO_PTT);return !pressed;

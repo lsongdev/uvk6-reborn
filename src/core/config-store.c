@@ -17,7 +17,6 @@
 #define PREFERENCE_BYTES 21u
 #define PAYLOAD_BYTES (2u + SLOT_BYTES*RADIO_SLOT_CAPACITY + PRESET_BYTES*RADIO_STATE_BANDS + PREFERENCE_BYTES)
 _Static_assert(PAYLOAD_START + PAYLOAD_BYTES <= RECORD_BYTES, "Configuration must fit in a slot");
-_Static_assert(CONFIG_STORE_END <= 0x1e00u, "Never overlap RF calibration");
 
 static void put16(uint8_t *p, uint16_t n) {
   p[0] = n & 255u; p[1] = n >> 8;
@@ -169,15 +168,14 @@ bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
   return true;
 }
 static bool ready(const ConfigStore *store) {
-  return store && store->read && store->capacity >= CONFIG_STORE_END &&
-         store->reserved_tail <= store->capacity-CONFIG_STORE_END;
+  return store && store->read;
 }
 static bool later(uint32_t a, uint32_t b) { return (int32_t)(a-b)>0; }
 // Reads one copy into config (scratch on failure).
 static bool slotRead(const ConfigStore *store, unsigned slot, DeviceConfig *config,
                      uint32_t *sequence) {
   uint8_t bytes[RECORD_BYTES];
-  return store->read(store->context, CONFIG_STORE_BASE + slot*RECORD_BYTES, bytes, RECORD_BYTES) &&
+  return store->read(store->context, slot, 0, bytes, RECORD_BYTES) &&
          CONFIG_Decode(bytes, config, sequence);
 }
 // Index of the newer valid copy, or -1; out (if given) receives it.
@@ -201,12 +199,11 @@ bool CONFIG_Load(const ConfigStore *store, DeviceConfig *config, uint32_t *seque
 static bool __attribute__((noinline)) writeRecord(const ConfigStore *store,
     const DeviceConfig *config, unsigned slot, uint32_t sequence) {
   uint8_t bytes[RECORD_BYTES];
-  uint32_t address=CONFIG_STORE_BASE+slot*RECORD_BYTES;
   if (!CONFIG_Encode(config,sequence,bytes) ||
-      !store->write(store->context,address,bytes,RECORD_BYTES)) return false;
+      !store->write(store->context,slot,bytes,RECORD_BYTES)) return false;
   for (uint16_t at=0; at<RECORD_BYTES; at+=32) {
     uint8_t check[32];
-    if (!store->read(store->context,address+at,check,sizeof(check)) ||
+    if (!store->read(store->context,slot,at,check,sizeof(check)) ||
         memcmp(check,bytes+at,sizeof(check))) return false;
   }
   return true;

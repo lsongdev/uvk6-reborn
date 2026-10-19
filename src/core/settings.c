@@ -7,7 +7,7 @@
 #include "drivers/bk4819/bk4819.h"
 #include "hal/backlight.h"
 #include "hal/display.h"
-#include "hal/eeprom.h"
+#include "hal/storage.h"
 #include "core/text.h"
 #include <stddef.h>
 #include <string.h>
@@ -16,9 +16,6 @@
 // exactly one runtime owner: gDeviceConfig.preferences.
 uint8_t BL_TIME_VALUES[7] = {0, 5, 10, 20, 60, 120, 255};
 const char *BL_SQL_MODE_NAMES[3] = {"Off", "Timed", "Receiving"};
-const char *EEPROM_TYPE_NAMES[7] = {"64 ?", "128", "256", "512", "1024", "M02?", "4Mb?"};
-const uint32_t EEPROM_SIZES[7] = {8192,16384,32768,65536,131072,262144,524288};
-const uint16_t PAGE_SIZES[7] = {32,64,64,128,128,256,128};
 
 // Small descriptors avoid duplicated enum/boolean handlers. Bounds are
 // checked before writing the native field or invoking a hardware effect.
@@ -157,13 +154,12 @@ void SETTINGS_UpdateSave(void) { DEVICE_Update(); }
 uint32_t SETTINGS_GetFilterBound(void) {
   return gDeviceConfig.preferences.bound_240_280 ? VHF_UHF_BOUND2 : VHF_UHF_BOUND1;
 }
-uint32_t SETTINGS_GetEEPROMSize(void) { return EEPROM_DetectSize(); }
-static bool readEeprom(uint32_t address, uint8_t *out, uint16_t size) {
-  return EEPROM_ReadBuffer(address, out, size) == 0;
+static bool readResource(uint32_t offset, uint8_t *out, uint16_t size) {
+  return STORAGE_Read(STORAGE_RESOURCES, offset, out, size);
 }
 // Installed by tools/resources.py; its header carries the length and CRC.
 bool SETTINGS_IsPatchPresent(void) {
-  uint32_t address = RESOURCE_SsbPatchAddress(SETTINGS_GetEEPROMSize());
-  return address && RESOURCE_Valid(readEeprom, address, RESOURCE_SSB_PATCH_MAGIC,
+  return STORAGE_Size(STORAGE_RESOURCES) >= RESOURCE_TAIL_BYTES &&
+         RESOURCE_Valid(readResource, RESOURCE_SSB_PATCH_OFFSET, RESOURCE_SSB_PATCH_MAGIC,
                                    RESOURCE_SSB_PATCH_BYTES);
 }

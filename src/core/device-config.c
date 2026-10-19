@@ -1,7 +1,6 @@
 #include "core/device-config.h"
 #include "core/channel-store.h"
-#include "core/resource.h"
-#include "hal/eeprom.h"
+#include "hal/storage.h"
 #include "hal/scheduler.h"
 #include "core/settings.h"
 
@@ -13,25 +12,24 @@ static uint32_t committedSequence;
 static uint32_t saveAt;
 static bool dirty, saveFailed;
 
-static bool readStorage(void *context, uint32_t address, void *data, uint16_t size) {
+static StorageArea area(unsigned slot) { return slot ? STORAGE_CONFIG_B : STORAGE_CONFIG_A; }
+static bool readStorage(void *context, unsigned slot, uint16_t offset, void *data,
+                        uint16_t size) {
   (void)context;
-  return EEPROM_ReadBuffer(address, data, size) == 0;
+  return STORAGE_Read(area(slot), offset, data, size);
 }
-static bool writeStorage(void *context, uint32_t address, const void *data,
-                         uint16_t size) {
+static bool writeStorage(void *context, unsigned slot, const void *data, uint16_t size) {
   (void)context;
-  return EEPROM_TryWriteBuffer(address, data, size);
+  return STORAGE_Write(area(slot), 0, data, size);
 }
 static ConfigStore storage(void) {
-  uint32_t size = EEPROM_DetectSize();
-  return (ConfigStore){.read = readStorage, .write = writeStorage,
-      .capacity = size, .reserved_tail = RESOURCE_SsbPatchAddress(size) ? RESOURCE_TAIL_BYTES : 0};
+  return (ConfigStore){.read = readStorage, .write = writeStorage};
 }
 bool DEVICE_Load(void) {
   gDeviceConfigReady = false;
   dirty = saveFailed = false;
   CONFIG_Default(&gDeviceConfig);
-  if (EEPROM_DetectType() == EEPROM_UNKNOWN)
+  if (!STORAGE_Ready())
     return false;
   ConfigStore io = storage();
   if (!CONFIG_Load(&io, &gDeviceConfig, &committedSequence))
@@ -49,7 +47,7 @@ bool DEVICE_Load(void) {
   return true;
 }
 bool DEVICE_Initialize(void) {
-  if (EEPROM_DetectType() == EEPROM_UNKNOWN)
+  if (!STORAGE_Ready())
     return false;
   CONFIG_Default(&gDeviceConfig);
   ConfigStore io = storage();

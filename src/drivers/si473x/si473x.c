@@ -2,7 +2,7 @@
 #include "drivers/si473x/si473x.h"
 #include "core/misc.h"
 #include "core/settings.h"
-#include "hal/eeprom.h"
+#include "hal/storage.h"
 #include "hal/gpio.h"
 #include "hal/i2c.h"
 #include "hal/system.h"
@@ -78,15 +78,14 @@ static bool SI47XX_downloadPatch(void) {
 
   uint8_t buf[64]; // 64 is optimal, more has no sense
   const uint16_t BUF_SIZE = ARRAY_SIZE(buf);
-  const uint32_t PATCH_START = RESOURCE_SsbPatchAddress(SETTINGS_GetEEPROMSize());
 
   for (uint16_t offset = 0; offset < RESOURCE_SSB_PATCH_BYTES; offset += BUF_SIZE) {
     const uint32_t rest = RESOURCE_SSB_PATCH_BYTES - offset;
-    const uint32_t eepromN = rest > BUF_SIZE ? BUF_SIZE : rest;
-    if (EEPROM_ReadBuffer(PATCH_START + offset, buf, eepromN) != 0)
+    const uint16_t n = rest > BUF_SIZE ? BUF_SIZE : (uint16_t)rest;
+    if (!STORAGE_Read(STORAGE_RESOURCES, RESOURCE_SSB_PATCH_OFFSET + offset, buf, n))
       return false;
 
-    for (uint16_t i = 0; i < eepromN; i += 8) {
+    for (uint16_t i = 0; i < n; i += 8) {
       if (!waitToSend() || !SI47XX_WriteBuffer(buf + i, 8))
         return false;
     }

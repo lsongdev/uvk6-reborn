@@ -1,6 +1,6 @@
 #include "ui/screens/reset.h"
 #include "core/device-config.h"
-#include "hal/eeprom.h"
+#include "hal/storage.h"
 #include "hal/system.h"
 #include "core/settings.h"
 #include "ui/graphics.h"
@@ -12,13 +12,11 @@ static bool failed;
 static void enter(void) {
   confirm = failed = false;
   gDeviceConfig.preferences.keylock = false;
-  STATUSLINE_SetText(EEPROM_DetectType() < EEPROM_UNKNOWN
-                                 ? EEPROM_TYPE_NAMES[EEPROM_DetectType()]
-                                 : "EEPROM unknown");
+  STATUSLINE_SetText(STORAGE_Ready() ? STORAGE_Name() : "Storage unknown");
 }
 static void render(void) {
-  if (EEPROM_DetectType() == EEPROM_UNKNOWN) {
-    PrintMedium(2, 20, "EEPROM unknown");
+  if (!STORAGE_Ready()) {
+    PrintMedium(2, 20, "Storage unknown");
     PrintMedium(2, 32, "Cannot initialize");
   } else if (failed) {
     PrintMedium(2, 20, "Write/verify failed");
@@ -28,7 +26,7 @@ static void render(void) {
     PrintMedium(2, 32, "1: YES  EXIT: NO");
   } else {
     PrintMedium(2, 20, "No UVR2 config");
-    PrintMedium(2, 32, "Back up EEPROM!");
+    PrintMedium(2, 32, "Back up first!");
     PrintMedium(2, 44, "0: Initialize");
   }
 }
@@ -39,17 +37,17 @@ static bool key(KEY_Code_t key, Key_State_t state) {
     confirm = failed = false;
     return true;
   }
-  if (EEPROM_DetectType() == EEPROM_UNKNOWN)
+  if (!STORAGE_Ready())
     return true;
   if (!confirm && key == KEY_0) {
     confirm = true;
     failed = false;
   } else if (confirm && key == KEY_1) {
-    EEPROM_SetWritesEnabled(true); // Only after explicit user confirmation.
+    STORAGE_SetWritesEnabled(true); // Only after explicit user confirmation.
     if (DEVICE_Initialize())
       SYS_Reset();
     else {
-      EEPROM_SetWritesEnabled(false);
+      STORAGE_SetWritesEnabled(false);
       failed = true;
       confirm = false;
     }

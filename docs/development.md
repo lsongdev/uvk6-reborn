@@ -89,7 +89,8 @@ ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包�
 | core/rx-runtime.c、tx-runtime.c | 接收失败回滚／TX 半双工生命周期 |
 | core/radio-state.c、tuning.c | 保存状态、来源解析、跨频段步进、精确方案 |
 | core/device-config.c、config-store.c | dirty／重试、UVR2 固定字节格式、双副本 |
-| core/channel-store.c | 频道双副本、占用位图、CRC、删除 |
+| core/channel-store.c | 频道双副本（写旧份后镜像）、占用位图、CRC、删除 |
+| hal/storage.c、eeprom-layout.h | 存储区到 UV-K6 EEPROM 地址的映射与写保护 |
 | hal/rx-device.c | 芯片单位／带宽／信号口径／亚音、音频门、Seek／FC 适配 |
 | hal/tx-device.c | 板级范围、校准读取与插值、物理 PTT／供电、PA 顺序 |
 | drivers/{bk4819,si473x,bk1080,st7565,dp32g030}/ | 芯片命令及外围寄存器 |
@@ -97,6 +98,8 @@ ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包�
 依赖只向下。HAL 抽象按键、屏幕、LED、音频、背光、EEPROM／总线等资源，也集中跨芯片适配；driver 不读取产品配置或实现菜单。上层不依赖芯片单位、增益索引或寄存器号。
 
 芯片驱动（drivers/ 下除 dp32g030 外）和 hal/ 以外的代码不得包含 MCU 寄存器头：单根信号经 hal/gpio.h 的 `GpioLine`（`GPIO_Write`／`GPIO_Read`／`GPIO_SetInput`），显示总线经 hal/spi.h，复位经 `SYS_Reset`，整机初始化经 `BOARD_Init`。端口、引脚号与寄存器只出现在 hal/ 的板级实现中（hal/gpio.c 的线路表、hal/gpio-dp32g030.h、board.c、keyboard.c、i2c.c 等），换板时只替换这些文件。
+
+持久数据同理：core 与驱动只经 hal/storage.h 按“区域 + 区内偏移”读写（配置 A／B、频道 A／B、只读校准、只读资源区），不出现绝对地址。区域契约：断电时一次写入最多波及同一区域内的其他字节（闪存擦除单元），绝不影响其他区域；因此一条记录的两份必须放在不同区域，写完一份再写另一份。UV-K6 的 hal/storage.c 把各区映射回原有 EEPROM 地址（频道两份仍交错存放），布局只写在 hal/eeprom-layout.h，并由 storage-regression 校验。UART 原始读和维护写属于板级工具通道，仍按 EEPROM 绝对地址。
 
 selectedSlot 是操作对象，receivingSlot 是接收归属，txSlot 可是回话对象，gReceiver.plan 是实际硬件镜像，runtime.current 是接收事务的运行方案。临时调谐不得把硬件镜像回写用户记忆。MR 的有效参数只读，保存频道是独立显式动作。
 

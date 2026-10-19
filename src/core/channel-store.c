@@ -1,9 +1,7 @@
 #include "core/channel-store.h"
 #include "core/crc32.h"
-#include "core/resource.h"
 #include "core/radio-model.h"
-#include "core/config-store.h"
-#include "hal/eeprom.h"
+#include "hal/storage.h"
 #include <string.h>
 
 // Record: tag, sequence, number, flags, name[16], RX (14 B), TX (11 B),
@@ -13,11 +11,6 @@
 #define CRC_AT (RECORD - 4u)
 #define NAME_AT 4u
 #define NAME_LEN (USER_CHANNEL_NAME_BYTES - 1u)
-
-_Static_assert(CONFIG_STORE_END <= CHANNEL_STORE_BASE,
-               "User channels must not overlap the configuration slots");
-_Static_assert(CHANNEL_STORE_BASE >= 0x2000u,
-               "User channel storage must not overlap factory calibration");
 
 static uint8_t occupied[(USER_CHANNEL_COUNT + 7) / 8], newer[(USER_CHANNEL_COUNT + 7) / 8];
 static bool initialized;
@@ -32,10 +25,8 @@ static uint32_t get32(const uint8_t *p) { return get16(p) | (uint32_t)get16(p + 
 static void put16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
 static void put32(uint8_t *p, uint32_t v) { put16(p, (uint16_t)v); put16(p + 2, (uint16_t)(v >> 16)); }
 static uint32_t crc32(const uint8_t *p) { return ~CRC32_Update(CRC32_INIT, p, CRC_AT); }
-static uint32_t address(uint16_t number, uint8_t copy) {
-  return CHANNEL_STORE_BASE +
-      (((uint32_t)number - 1u) * CHANNEL_STORE_COPY_COUNT + copy) * RECORD;
-}
+static StorageArea area(uint8_t copy) { return copy ? STORAGE_CHANNELS_B : STORAGE_CHANNELS_A; }
+static uint32_t offset(uint16_t number) { return ((uint32_t)number - 1u) * RECORD; }
 static bool valid(const UserChannel *ch) {
   return ch && RADIO_MODEL_BandAt(ch->frequency_hz) != UINT8_MAX &&
       (unsigned)ch->rx.mode < RX_MODE_COUNT && ch->rx.step_hz &&
@@ -86,12 +77,12 @@ static void encode(uint8_t b[RECORD], uint16_t number, uint8_t sequence, const U
 }
 static bool readCopy(uint16_t number, uint8_t copy, UserChannel *out) {
   uint8_t b[RECORD];
-  return EEPROM_ReadBuffer(address(number, copy), b, RECORD) == 0 && decode(b, number, out);
+  return STORAGE_Read(area(copy), offset(number), b, RECORD) && decode(b, number, out);
 }
 // Tag and sequence of one copy; false when the copy is not a channel.
 static bool header(uint16_t number, uint8_t copy, uint8_t *sequence) {
   uint8_t h[2];
-  if (EEPROM_ReadBuffer(address(number, copy), h, 2) || h[0] != TAG) return false;
+  if (!STORAGE_Read(area(copy), offset(number), h, 2) || h[0] != TAG) return false;
   *sequence = h[1];
   return true;
 }
@@ -109,7 +100,8 @@ static bool same(const UserChannel *a, const UserChannel *b) {
 
 bool CHANNEL_STORE_Init(void) {
   initialized = false;
-  if (EEPROM_DetectSize() < CHANNEL_STORE_END + RESOURCE_TAIL_BYTES) return false;
+  if (STORAGE_Size(STORAGE_CHANNELS_A) < CHANNEL_STORE_AREA_BYTES ||
+      STORAGE_Size(STORAGE_CHANNELS_B) < CHANNEL_STORE_AREA_BYTES) return false;
   memset(occupied, 0, sizeof(occupied));
   memset(newer, 0, sizeof(newer));
   for (uint16_t n = 1; n <= USER_CHANNEL_COUNT; ++n) {
@@ -134,26 +126,30 @@ bool CHANNEL_STORE_Load(uint16_t number, UserChannel *channel) {
   setBit(occupied, number, false);
   return false;
 }
+static bool writeCopy(uint16_t number, uint8_t copy, const uint8_t b[RECORD],
+                      const UserChannel *channel) {
+  UserChannel verify;
+  return STORAGE_Write(area(copy), offset(number), b, RECORD) &&
+         readCopy(number, copy, &verify) && same(&verify, channel);
+}
 bool CHANNEL_STORE_Save(uint16_t number, const UserChannel *channel) {
   if (!initialized || number < 1 || number > USER_CHANNEL_COUNT || !valid(channel))
     return false;
   uint8_t copy = current(number), sequence = 0, target = 0;
   if (bit(occupied, number) && header(number, copy, &sequence)) target = copy ^ 1u;
   uint8_t b[RECORD];
-  UserChannel verify;
   encode(b, number, (uint8_t)(sequence + 1u), channel);
-  if (!EEPROM_TryWriteBuffer(address(number, target), b, RECORD) ||
-      !readCopy(number, target, &verify) || !same(&verify, channel))
-    return false;
+  if (!writeCopy(number, target, b, channel)) return false;
   setBit(occupied, number, true);
   setBit(newer, number, target);
-  return true;
+  // The new version is safe; now make the other copy match it.
+  return writeCopy(number, target ^ 1u, b, channel);
 }
 bool CHANNEL_STORE_Delete(uint16_t number) {
   if (!CHANNEL_STORE_IsOccupied(number)) return false;
   static const uint8_t erased = 0;
   for (uint8_t copy = 0; copy < CHANNEL_STORE_COPY_COUNT; ++copy)
-    if (!EEPROM_TryWriteBuffer(address(number, copy), &erased, 1)) return false;
+    if (!STORAGE_Write(area(copy), offset(number), &erased, 1)) return false;
   setBit(occupied, number, false);
   return true;
 }
