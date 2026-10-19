@@ -136,8 +136,11 @@ void SYS_Main() {
   if (n.key == KEY_EXIT || !DEVICE_Load()) {
     // Unknown storage contents are not our config: never write a marker or
     // restart automatically. Only explicit initialization may unlock writes.
+    // Diagnostics may use the board-mapped factory calibration even though
+    // no writable configuration exists yet. Saved user calibration is untouched.
+    (void)BATTERY_UseFactoryCalibration();
+    BATTERY_UpdateBatteryInfo();
     initDisplay();
-    gDeviceConfig.preferences.battery_calibration = 2000;
     gDeviceConfig.preferences.backlight = 5;
     SCREEN_Reset(&resetScreen);
   } else {

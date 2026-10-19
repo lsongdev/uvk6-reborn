@@ -3,6 +3,10 @@
 
 void PY32_ADC_Init(void) {
   RCC->CR = (RCC->CR & ~RCC_CR_ADC_DIV) | RCC_CR_ADC_DIV_0; // PCLK/4.
+  ADC1->CR1 = 0;
+  ADC1->CR2 = 0;
+  ADC1->SQR1 = 0;
+  ADC1->SQR2 = 0;
   // Regular group on the software trigger (EXTSEL 111).
   ADC1->CR2 = (ADC1->CR2 & ~ADC_CR2_EXTSEL) | ADC_CR2_EXTSEL;
   ADC1->CR2 |= ADC_CR2_CAL;

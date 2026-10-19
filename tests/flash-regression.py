@@ -29,6 +29,45 @@ class FlashTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 flasher.validate_image(bad)
 
+    def test_k1_vectors_and_full_472_pages(self):
+        image = struct.pack('<II', 0x20004000, 0x08002809) + bytes(118 * 1024 - 8)
+        flasher.validate_image(image, 'uvk1')
+        with self.assertRaises(ValueError):
+            flasher.validate_image(image, 'uvk6')
+        with self.assertRaises(ValueError):
+            flasher.validate_image(image + b'x', 'uvk1')
+        with self.assertRaises(ValueError):
+            flasher.validate_image(struct.pack('<II', 0x20004000, 9) + bytes(300), 'uvk1')
+
+        class Fake:
+            def __init__(self):
+                self.sent = []
+            def send(self, payload):
+                self.sent.append(payload)
+            def receive(self, deadline):
+                if len(self.sent) <= 2:
+                    return bytes.fromhex('18052000') + bytes(16) + b'7.02.02'.ljust(16, b'\0')
+                return bytes.fromhex('1a050800') + self.sent[-1][4:10] + bytes(2)
+        loader = Fake()
+        with patch.object(flasher.time, 'sleep'), patch('builtins.print'):
+            flasher.flash(loader, image, board='uvk1')
+        self.assertEqual(loader.sent[:3], [bytes.fromhex('30050400') + b'7.02'] * 3)
+        self.assertEqual(len(loader.sent), 3 + 472)
+        self.assertEqual(loader.sent[3][8:16], struct.pack('<HHI', 0, 472, 0))
+        self.assertEqual(loader.sent[3 + 256][8:16], struct.pack('<HHI', 256, 472, 0))
+        self.assertEqual(loader.sent[-1][8:16], struct.pack('<HHI', 471, 472, 0))
+        self.assertEqual(len(loader.sent[-1]), 272)
+
+    def test_k1_rejects_k6_before_handshake(self):
+        class Fake:
+            def send(self, payload):
+                self.fail = True
+                raise AssertionError('must not send to wrong board')
+            def receive(self, deadline):
+                return bytes.fromhex('18052000') + bytes(16) + b'3.00.02'.ljust(16, b'\0')
+        with patch('builtins.print'), self.assertRaises(ValueError):
+            flasher.flash(Fake(), bytes(300), board='uvk1')
+
     def test_fragmented_frames_bad_crc_and_placeholder_crc(self):
         loader = flasher.Bootloader.__new__(flasher.Bootloader)
         loader.fd = -1

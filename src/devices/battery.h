@@ -30,6 +30,9 @@ extern bool gChargingWithTypeC;
 extern const char *BATTERY_TYPE_NAMES[3];
 extern const char *BATTERY_STYLE_NAMES[3];
 
+// For first-boot diagnostics with no saved configuration. Invalid/absent
+// factory data leaves the current default unchanged; never writes storage.
+bool BATTERY_UseFactoryCalibration(void);
 void BATTERY_UpdateBatteryInfo();
 uint32_t BATTERY_GetPreciseVoltage(uint16_t cal);
 uint16_t BATTERY_GetCal(uint32_t v);

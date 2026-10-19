@@ -28,6 +28,7 @@ static volatile GPIO_Bank_t *bank(const Dp32GpioLine *l) {
 
 void GPIO_Write(GpioLine line, bool high) {
   const Dp32GpioLine *l = &GPIO_LINES[line];
+  if (l->port == DP32_GPIO_NO_LINE) return;
   if (high)
     GPIO_SetBit(&bank(l)->DATA, l->bit);
   else
@@ -36,11 +37,12 @@ void GPIO_Write(GpioLine line, bool high) {
 
 bool GPIO_Read(GpioLine line) {
   const Dp32GpioLine *l = &GPIO_LINES[line];
-  return GPIO_CheckBit(&bank(l)->DATA, l->bit);
+  return l->port != DP32_GPIO_NO_LINE && GPIO_CheckBit(&bank(l)->DATA, l->bit);
 }
 
 void GPIO_SetInput(GpioLine line, bool input) {
   const Dp32GpioLine *l = &GPIO_LINES[line];
+  if (l->port == DP32_GPIO_NO_LINE) return;
   volatile uint32_t *inputEnable = (volatile uint32_t *)(PORTCON_PORTA_IE_ADDR + 4u * l->port);
   // Input buffer on only while reading, as the DP32G030 pin muxing expects.
   if (input) {

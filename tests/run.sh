@@ -64,6 +64,8 @@ esac
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
   tests/rx-device-regression.c src/core/dcs.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
+"$test_binary" --uvk1
+"$test_binary" --uvk1-no-broadcast
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/tuning-regression.c \
   src/core/tuning.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
@@ -158,5 +160,11 @@ esac
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/capture-regression.c src/core/capture.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/bk-capture-regression.c src/drivers/bk4819/capture.c -o "$test_binary"
+"$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/uvk1-storage-regression.c \
+  src/drivers/py25q16/py25q16.c -o "$test_binary"
+"$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/battery-regression.c \
+  src/devices/battery.c -o "$test_binary"
 "$test_binary"
 echo 'Radio, multi-VFO UI, storage, receiver plans, FC capture, RDS, and RX/TX regressions passed.'

@@ -6,7 +6,7 @@ DeviceConfig gDeviceConfig;
 bool gDeviceConfigReady = true;
 static bool saveWorks = true;
 static unsigned saves, exits;
-static ReceiverCapabilities capabilities = {true, false, true};
+static ReceiverCapabilities capabilities = {true, false, true, true, RX_BK_BANDWIDTH_ALL};
 bool DEVICE_SaveNow(void) { ++saves; return saveWorks; }
 ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
 bool SCREEN_Pop(void) { ++exits; return true; }
@@ -62,7 +62,7 @@ int main(void) {
   press(KEY_STAR);
   assert(draft.bandwidth_hz == 0 && message);
   field = FIELD_SAVE;
-  capabilities = (ReceiverCapabilities){0};
+  capabilities = (ReceiverCapabilities){.bk_am=true, .bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL};
   unsigned before = saves;
   press(KEY_MENU);
   assert(editing && saves == before); // Unavailable receiver cannot be saved.

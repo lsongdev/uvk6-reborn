@@ -40,7 +40,7 @@ void PrintMedium(uint8_t x, uint8_t y, const char *pattern) {
 void PrintMediumEx(uint8_t x, uint8_t y, TextPos pos, Color c, const char *pattern) {
   (void)x; (void)y; (void)pos; (void)c; (void)pattern;
 }
-static ReceiverCapabilities capabilities = {true, false, true};
+static ReceiverCapabilities capabilities = {true, false, true, true, RX_BK_BANDWIDTH_ALL};
 static unsigned applied, applyAttempts;
 static unsigned routed;
 static unsigned appRuns;
@@ -262,7 +262,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   nativeFrequency = 100100000;
   nativeReply = RX_SEEK_FOUND;
   nativeStarts = nativeCancels = 0;
-  capabilities = (ReceiverCapabilities){true, false, true};
+  capabilities = (ReceiverCapabilities){true, false, true, true, RX_BK_BANDWIDTH_ALL};
   RADIO_Init();
 }
 static void press(KEY_Code_t key) { assert(SCREEN_Key(key, KEY_RELEASED)); }
@@ -527,7 +527,7 @@ int main(void) {
   assert(gReceiver.plan.device == RX_DEVICE_BK);
 
   setup(438500000, fm);
-  capabilities = (ReceiverCapabilities){false, false, false};
+  capabilities = (ReceiverCapabilities){false, false, false, true, RX_BK_BANDWIDTH_ALL};
   press(KEY_SIDE1);
   assert(!runtime.active && activeSlot.current.frequency_hz == 225000 && routed == 1);
   assert(gReceiver.plan.frequency_hz==438500000u); // Unsupported target was not committed.
@@ -1225,7 +1225,7 @@ int main(void) {
   for (unsigned chip=0;chip<2;++chip) {
     setup(95900000,(RadioParameters){RX_WFM,100000,0,0});
     if (chip) {
-      capabilities=(ReceiverCapabilities){false,true,false};
+      capabilities=(ReceiverCapabilities){false,true,false, true, RX_BK_BANDWIDTH_ALL};
       request(95900000,activeSlot.current.parameters);
     }
     fcOrigin=gDeviceConfig.radio.slots[0];fcSaves=saveRequests;
@@ -1237,7 +1237,7 @@ int main(void) {
     press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145500000;
     clockNow+=20;update();clockNow+=20;update();
     assert(!capturing && gReceiver.plan.device==RX_DEVICE_BK && runtime.current.frequency_hz==145500000);
-    capabilities=(ReceiverCapabilities){true,false,true};captureReply=CAPTURE_BUSY;
+    capabilities=(ReceiverCapabilities){true,false,true, true, RX_BK_BANDWIDTH_ALL};captureReply=CAPTURE_BUSY;
   }
   // An unsupported candidate is ignored; a failed tune restores the origin
   // and never commits the candidate.

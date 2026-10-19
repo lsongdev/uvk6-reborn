@@ -4,11 +4,13 @@
 #include <stdbool.h>
 
 // Board signals driven or read one at a time. Each board maps them to its
-// own port and pin; drivers never name ports or registers.
+// own port and pin; drivers never name ports or registers. A line a board
+// lacks ignores writes and reads false.
 typedef enum {
   GPIO_BK4819_SCN,
   GPIO_BK4819_SCL,
   GPIO_BK4819_SDA, // Bidirectional: see GPIO_SetInput.
+  GPIO_ST7565_CS, // Optional: hardware chip select on UV-K6.
   GPIO_ST7565_A0,
   GPIO_ST7565_RES,
   GPIO_BK1080,     // BK1080 enable (low = on); SI4732 reset on the mod.

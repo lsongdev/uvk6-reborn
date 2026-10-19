@@ -28,6 +28,9 @@ int main(void) {
   buf[8] = 1; assert(UART_CommandValid(buf, 17));
   buf[8] = 0; assert(!UART_CommandValid(buf, 16));
   buf[8] = 129; assert(!UART_CommandValid(buf, 145));
+  buf[0] = 0x72; assert(UART_CommandValid(buf, 8));
+  assert(!UART_CommandValid(buf, 4));
+  assert(!UART_CommandValid(buf, 16));
   buf[0] = 0xff; assert(!UART_CommandValid(buf, 4));
   return 0;
 }

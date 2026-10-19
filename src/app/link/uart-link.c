@@ -1,6 +1,7 @@
 #include "hal/uart.h"
 #include "app/link/uart-link.h"
 #include "hal/board.h"
+#include "hal/storage.h"
 #include "hal/crc.h"
 #include "hal/system.h"
 #include "app/link/uart-protocol.h"
@@ -224,6 +225,19 @@ static void CMD_051B(const uint8_t *pBuffer) {
   SendReply(&Reply, pCmd->Size + 8 + 4);
 }
 
+// Read-only physical storage information; name includes JEDEC ID on SPI boards.
+static void CMD_0572(const uint8_t *buffer) {
+  const CMD_0514_t *cmd = (const CMD_0514_t *)buffer;
+  if (cmd->Timestamp != Timestamp) return;
+  struct {
+    Header_t Header;
+    uint32_t Capacity;
+    char Name[24];
+  } reply = {{0x0573, 28}, BOARD_RawSize(), {0}};
+  strncpy(reply.Name, STORAGE_Name(), sizeof(reply.Name) - 1);
+  SendReply(&reply, sizeof(reply));
+}
+
 static void CMD_0570(const uint8_t *pBuffer) {
   const CMD_0570_t *pCmd = (const CMD_0570_t *)pBuffer;
   REPLY_0570_t Reply = {0};
@@ -354,6 +368,10 @@ void UART_HandleCommand(void) {
     break;
 
     // RESOURCE WRITE
+  case 0x0572:
+    CMD_0572(UART_Command.Buffer);
+    break;
+
   case 0x0570:
     CMD_0570(UART_Command.Buffer);
     break;

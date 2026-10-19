@@ -23,7 +23,14 @@ typedef struct {
   bool shortcut;
   RadioParameters preset;
 } RadioBand;
-typedef struct { bool si; bool broadcast; bool ssb_patch; } ReceiverCapabilities;
+// Bits follow the common nominal BK bandwidth list (6,7,9,10,12,14,17,20,23,26 kHz).
+enum { RX_BK_BANDWIDTH_6K = 1u << 0, RX_BK_BANDWIDTH_12K = 1u << 4,
+       RX_BK_BANDWIDTH_26K = 1u << 9, RX_BK_BANDWIDTH_ALL = (1u << 10) - 1u };
+typedef struct {
+  bool si, broadcast, ssb_patch;
+  bool bk_am;
+  uint16_t bk_bandwidth_mask;
+} ReceiverCapabilities;
 typedef struct {
   RxDevice device;
   uint32_t frequency_hz;

@@ -238,3 +238,7 @@ void BOARD_ADC_GetBatteryInfo(uint16_t *pVoltage, uint16_t *pCurrent) {
   *pCurrent = ADC_GetValue(ADC_CH9);
 }
 
+
+bool BOARD_HasSi4732(void) { return true; }
+
+BoardRadioChip BOARD_RadioChip(void) { return BOARD_RADIO_BK4819; }

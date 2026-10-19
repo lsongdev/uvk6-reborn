@@ -24,6 +24,13 @@
 void BOARD_Init(void);
 void BOARD_ADC_GetBatteryInfo(uint16_t *pVoltage, uint16_t *pCurrent);
 
+typedef enum { BOARD_RADIO_BK4819, BOARD_RADIO_BK4829 } BoardRadioChip;
+BoardRadioChip BOARD_RadioChip(void);
+
+// Whether an SI4732 may be fitted; false on boards with only BK1080.
+// This is a wiring capability, not a detection result.
+bool BOARD_HasSi4732(void);
+
 // Key matrix outputs after a scan, bit n = GPIO_KEY_OUTn; some boards share
 // these lines with other parts.
 extern const uint8_t BOARD_KEYPAD_IDLE_LEVELS;

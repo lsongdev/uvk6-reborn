@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// The display bus: write-only, mode 3, chip select driven by hardware.
+// The display bus: write-only, mode 3, board-controlled chip select.
 void SPI_Init(void);
 void SPI_Select(bool selected);
 void SPI_Write(uint8_t value); // Queues one byte; waits only for FIFO space.

@@ -1,5 +1,7 @@
 #include "drivers/bk4819/bk4819.h"
 #include <assert.h>
+#include "hal/board.h"
+BoardRadioChip BOARD_RadioChip(void) { return BOARD_RADIO_BK4819; }
 
 static uint16_t registers[128];
 static struct { uint8_t reg; uint16_t value; } writes[16];

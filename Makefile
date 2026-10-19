@@ -9,6 +9,7 @@ BOARD_DIR := src/boards/$(BOARD)
 ifeq ($(wildcard $(BOARD_DIR)/board.mk),)
   $(error Unknown BOARD=$(BOARD): no $(BOARD_DIR)/board.mk)
 endif
+PACK_FIRMWARE := 1
 include $(BOARD_DIR)/board.mk
 MCU_DIR := src/drivers/$(MCU)
 include $(MCU_DIR)/mcu.mk
@@ -158,16 +159,26 @@ debug:
 	@$(MAKE) BUILD_TYPE=debug all
 
 # Release сборка с копированием
+RELEASE_PREFIX ?= UVK6-Reborn
+
 release: clean
 	@$(MAKE) BUILD_TYPE=release all
-	@cp $(TARGET).packed.bin $(BIN_DIR)/UVK6-Reborn-$(BUILD_TAG).bin
-	@echo "Release firmware: $(BIN_DIR)/UVK6-Reborn-$(BUILD_TAG).bin"
+	@cp $(RELEASE_IMAGE) $(BIN_DIR)/$(RELEASE_PREFIX)-$(BUILD_TAG).bin
+	@echo "Release firmware: $(BIN_DIR)/$(RELEASE_PREFIX)-$(BUILD_TAG).bin"
+
+ifeq ($(PACK_FIRMWARE),1)
+RELEASE_IMAGE := $(TARGET).packed.bin
+else
+RELEASE_IMAGE := $(TARGET).bin
+endif
 
 # Генерация бинарного файла
 $(TARGET).bin: $(TARGET) tools/fw-pack.py
 	@echo "Creating binary file..."
 	$(OBJCOPY) -O binary $< $@
+ifeq ($(PACK_FIRMWARE),1)
 	$(PYTHON) tools/fw-pack.py $@ $(GIT_HASH) $(TARGET).packed.bin
+endif
 
 # Линковка
 $(TARGET): $(OBJS) | $(BIN_DIR)
@@ -182,7 +193,7 @@ $(TARGET): $(OBJS) | $(BIN_DIR)
 	fi
 	@echo ""
 	$(SIZE) $@
-	arm-none-eabi-nm --size-sort -r $(BIN_DIR)/$(PROJECT_NAME) | head -20
+	arm-none-eabi-nm --size-sort -r $(TARGET) | head -20
 	@echo ""
 
 # Компиляция C файлов
@@ -215,7 +226,7 @@ $(BIN_DIR) $(OBJ_DIR):
 # Flash the raw image through the stock UV-K5/K6 serial bootloader.
 flash: $(TARGET).bin
 	@test -n "$(PORT)" || { echo "Usage: make flash PORT=/dev/cu.usbserial-1420 (Linux: /dev/ttyUSB0)"; exit 1; }
-	$(PYTHON) tools/flash.py --port "$(PORT)" --firmware "$(TARGET).bin"
+	$(PYTHON) tools/flash.py --board $(BOARD) --port "$(PORT)" --firmware "$(TARGET).bin"
 
 # Показать информацию о сборке
 info:
@@ -263,7 +274,7 @@ help:
 	@echo "  make release      # Build and package release"
 	@echo "  make BUILD_TYPE=debug  # Alternative debug build"
 	@echo "  make flash PORT=/dev/cu.usbserial-1420  # Hold PTT while powering on"
-	@echo "  make BOARD=uvk6   # Board: uvk6 (default)"
+	@echo "  make BOARD=uvk6   # Board: uvk6 (default) or uvk1"
 
 # =============================================================================
 # Dependencies

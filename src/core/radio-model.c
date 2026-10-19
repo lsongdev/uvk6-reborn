@@ -49,7 +49,7 @@ uint32_t RADIO_MODEL_Resolution(RxDevice device, RxMode mode) {
   return 1000;
 }
 
-static bool bandwidthSupported(RxDevice device, RxMode mode, uint32_t width) {
+static bool bandwidthSupported(RxDevice device, RxMode mode, uint32_t width, uint16_t bk_mask) {
   static const uint16_t bk[] = {6000,7000,9000,10000,12000,14000,17000,20000,23000,26000};
   static const uint16_t am[] = {6000,4000,3000,2000,1000,1800,2500};
   static const uint16_t ssb[] = {1200,2200,3000,4000,500,1000};
@@ -60,7 +60,7 @@ static bool bandwidthSupported(RxDevice device, RxMode mode, uint32_t width) {
                                        : (mode == RX_AM ? sizeof(am)/sizeof(am[0]) : sizeof(ssb)/sizeof(ssb[0]));
   for (uint8_t i = 0; i < count; ++i)
     if (width == values[i])
-      return true;
+      return device != RX_DEVICE_BK || (bk_mask & (1u << i));
   return false;
 }
 
@@ -105,7 +105,7 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
     }
     // Fall through to BK where its existing AM implementation is available.
     // No BK pseudo-SSB fallback is exposed as a supported SSB receiver.
-    if (!RADIO_MODEL_BkCovers(frequency_hz))
+    if (!capabilities.bk_am || !RADIO_MODEL_BkCovers(frequency_hz))
       return RX_UNSUPPORTED_MODE;
     device = RX_DEVICE_BK;
     break;
@@ -121,7 +121,7 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
   }
   uint32_t resolution = RADIO_MODEL_Resolution(device, parameters.mode);
   if (parameters.step_hz < resolution ||
-      !bandwidthSupported(device, parameters.mode, parameters.bandwidth_hz))
+      !bandwidthSupported(device, parameters.mode, parameters.bandwidth_hz, capabilities.bk_bandwidth_mask))
     return RX_INVALID_PARAMETERS;
   uint32_t actual = ((frequency_hz + resolution/2) / resolution) * resolution;
   if (actual < RADIO_MIN_HZ || actual > RADIO_MAX_HZ)
