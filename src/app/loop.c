@@ -29,7 +29,7 @@ static uint32_t secondTimer;
 static uint32_t appsKeyboardTimer;
 static uint32_t radioTimer;
 
-static uint32_t lastUartDataTime;
+static uint32_t lastPlugLinkTime;
 static LoopStats stats;
 
 void LOOP_TakeStats(LoopStats *out) {
@@ -37,8 +37,9 @@ void LOOP_TakeStats(LoopStats *out) {
   stats.loopMaxMs = 0;
 }
 
-static bool isUartWaiting() {
-  return lastUartDataTime && Now() - lastUartDataTime < 5000;
+// Keys pause for 5 s after K-plug link traffic (see SerialPort.on_audio_jack).
+static bool isPlugLinkActive() {
+  return lastPlugLinkTime && Now() - lastPlugLinkTime < 5000;
 }
 
 static void appRender() {
@@ -108,10 +109,10 @@ static void processKeyboard() {
     ++stats.keyEvents;
     stats.lastKey = (uint8_t)n.key;
     stats.lastKeyState = (uint8_t)n.state;
-    // Release cannot be swallowed by keylock, menu, or UART activity.
+    // Release cannot be swallowed by keylock, menu, or K-plug link activity.
     if (n.key == KEY_PTT && n.state == KEY_RELEASED)
       RADIO_PttRelease();
-    if (isUartWaiting()) return;
+    if (isPlugLinkActive()) return;
     BACKLIGHT_On();
 
     if (checkKeylock(n.state, n.key)) {
@@ -205,7 +206,7 @@ void SYS_Main() {
 
     while (LINK_IsCommandAvailable()) {
       LINK_HandleCommand();
-      lastUartDataTime = Now();
+      if (LINK_CommandPort()->on_audio_jack) lastPlugLinkTime = Now();
     }
 
     if (gReceiver.open != wasOpen) {

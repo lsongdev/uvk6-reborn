@@ -152,7 +152,7 @@ python3 tools/resources.py --port /dev/cu.usbserial-1410 ssb-verify
 python3 tools/resources.py --port /dev/cu.usbserial-1410 read 0x1E00 0x200 cal.bin
 ```
 
-K1 也可以不用 K 头线，直接用 USB-C 数据线连接正常开机的对讲机，端口为 `/dev/cu.usbmodem<序列号>1`（序列号取芯片 UID），命令完全相同；刷机仍须用 K 头线。
+K1 也可以不用 K 头线，直接用 USB-C 数据线连接正常开机的对讲机，端口为 `/dev/cu.usbmodem<序列号>1`（序列号取芯片 UID），命令完全相同，且通信期间按键照常可用（K 头线通信后按键会暂停 5 秒）；刷机仍须用 K 头线。
 
 ssb-write 在尾区非空时先把原内容存到 backups/（已被 .gitignore 忽略），内容相同则不写。read 可保存任意地址范围，每次最多按 128 B 读取。
 

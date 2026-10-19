@@ -12,6 +12,9 @@ typedef struct {
   uint16_t ring_bytes;
   uint16_t (*head)(void);
   void (*send)(const void *data, uint32_t size);
+  // Runs over the K-plug, whose lines are also the mic, speaker and PTT:
+  // keys pause while it talks so the cable cannot key or confuse the radio.
+  bool on_audio_jack;
 } SerialPort;
 
 // The board's link transports: the UART, plus USB CDC where fitted.
