@@ -135,8 +135,8 @@ Slot 菜单 ▲／▼选择，* 或 MENU 增加／执行，F（键帽副标 #）
 | TX Offset／TX Freq | +／- 时编辑频差，Split 时编辑发射频率；Off 时 --、不可编辑 |
 | TX Tone | 独立发射 CTCSS／DCS，Off 关闭 |
 | Spectrum | 打开频谱（见第 7 章），`ENABLE_SPECTRUM=0` 时没有此项 |
-| Reset to presets | 恢复当前频段 RX 预设，频率和 TX 设置不变 |
 | Save as channel | 选择编号、确认覆盖、输入名称并保存 |
+| Reset to presets | 恢复当前频段 RX 预设，频率和 TX 设置不变 |
 
 RX Tone 与静噪条件同时满足才开音频，SQ0 也不绕过亚音。CTCSS 如 67.0 Hz，DCS 如 D023N／D023I；没有自动亚音扫描。
 

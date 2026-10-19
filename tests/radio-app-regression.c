@@ -782,19 +782,19 @@ int main(void) {
   press(KEY_DOWN);assert(menuIndex==MENU_TX_TONE);
   press(KEY_MENU);assert(gDeviceConfig.radio.slots[0].tx.tone==1);
   press(KEY_F);assert(gDeviceConfig.radio.slots[0].tx.tone==0);
-  // Reset to presets: the band preset comes back, frequency and TX stay.
   press(KEY_DOWN);assert(menuIndex==MENU_SPECTRUM);
-  press(KEY_DOWN);assert(menuIndex==MENU_RESET);
-  activeSlot.current.parameters.squelch=9;
-  press(KEY_MENU);
-  assert(activeSlot.current.parameters.squelch==gDeviceConfig.radio.presets[activeSlot.active_band].squelch);
-  assert(activeSlot.current.frequency_hz==438500000 && activeSlot.tx.split_hz==438600000);
   unsigned savesBeforePlaceholder=saveRequests;
   appliesBefore=applied;
   press(KEY_DOWN);assert(menuIndex==MENU_SAVE_CHANNEL);
   press(KEY_MENU);assert((SCREEN_Top()==&saveChannelScreen));press(KEY_EXIT);assert(!(SCREEN_Top()==&saveChannelScreen));
   assert(saveRequests==savesBeforePlaceholder && applied==appliesBefore);
   assert(inMenu && !confirming);
+  // Reset to presets, the last item: the band preset comes back, frequency and TX stay.
+  press(KEY_DOWN);assert(menuIndex==MENU_RESET && MENU_RESET==MENU_ITEM_COUNT-1);
+  activeSlot.current.parameters.squelch=9;
+  press(KEY_MENU);
+  assert(activeSlot.current.parameters.squelch==gDeviceConfig.radio.presets[activeSlot.active_band].squelch);
+  assert(activeSlot.current.frequency_hz==438500000 && activeSlot.tx.split_hz==438600000);
   press(KEY_DOWN);assert(menuIndex==MENU_RX_MODE); // Menu cycles through RX/TX settings and channel actions.
   // Dual VFO: selection is a receive transaction, not an alias to one state.
   setup(145500000, fm);
