@@ -31,6 +31,11 @@ BoardRadioChip BOARD_RadioChip(void);
 // This is a wiring capability, not a detection result.
 bool BOARD_HasSi4732(void);
 
+// The BK1080's antenna path runs through the BK4819/BK4829 VHF LNA switch
+// (UV-K1): broadcast reception needs that switch on VHF, so the BK chip
+// cannot be retuned in the background while the broadcast chip plays.
+bool BOARD_BroadcastUsesBkVhfPath(void);
+
 // Key matrix outputs after a scan, bit n = GPIO_KEY_OUTn; some boards share
 // these lines with other parts.
 extern const uint8_t BOARD_KEYPAD_IDLE_LEVELS;

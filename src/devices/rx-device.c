@@ -10,6 +10,8 @@
 #include "core/measurements.h"
 #include "devices/tx-device.h"
 #include "store/resource.h"
+#include "store/calibration.h"
+#include "hal/storage.h"
 #include <string.h>
 
 // BK4819 has no write acknowledgement. Cache only the last *requested*
@@ -61,6 +63,28 @@ bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo) {
 
 // Silence the previous RF chip when moving to another receiver. The audio
 // output is already muted by RECEIVER_Mute() before this entry point.
+// BK4829 squelch levels come from the factory calibration like the stock
+// firmware: from offset 0x60 below 174 MHz, else 0x00; six 16-byte rows
+// (RSSI open, RSSI close, noise open, noise close, glitch close, glitch
+// open), byte n for level n (1-9). The generic formula suits the BK4819
+// scale only. Unreadable or erased calibration falls back to the formula.
+static SQL squelchFor(uint8_t level, uint32_t hz) {
+  SQL formula = GetSql(level);
+  if (!level || BOARD_RadioChip() != BOARD_RADIO_BK4829) return formula;
+  if (level > 9) level = 9;
+  uint8_t row[6];
+  uint32_t base = (hz < 174000000u ? CALIBRATION_SQUELCH_VHF_OFFSET : CALIBRATION_SQUELCH_UHF_OFFSET) + level;
+  for (uint8_t i = 0; i < 6; ++i)
+    if (!STORAGE_Read(STORAGE_CALIBRATION, base + 16u * i, &row[i], 1) || row[i] == 0xFF)
+      return formula;
+  return (SQL){.ro = row[0], .rc = row[1], .no = row[2] > 127 ? 127 : row[2],
+               .nc = row[3] > 127 ? 127 : row[3], .gc = row[4], .go = row[5]};
+}
+
+// The broadcast chip is tuned and its RF path depends on the BK VHF LNA
+// (BOARD_BroadcastUsesBkVhfPath).
+static bool broadcastHoldsBkPath;
+
 static void leave(RxDevice device) {
   switch (device) {
   case RX_DEVICE_BK:
@@ -75,6 +99,7 @@ static void leave(RxDevice device) {
     break;
   case RX_DEVICE_BROADCAST:
     BK1080_Mute(true);
+    broadcastHoldsBkPath = false;
     break;
   }
 }
@@ -156,6 +181,11 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
       (plan->parameters.rx_tone && (plan->device != RX_DEVICE_BK || plan->parameters.mode != RX_NFM)))
     return false;
 
+  // A background BK retune would move the LNA switch off VHF and cut the
+  // broadcast chip's antenna path.
+  if (plan->device == RX_DEVICE_BK && !audible && broadcastHoldsBkPath)
+    return false;
+
   const uint32_t frequency = plan->frequency_hz / 10u; // Drivers use 10 Hz.
   const RxMode mode = plan->parameters.mode;
   uint16_t bandwidth = 0;
@@ -212,8 +242,9 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
       BK4819_SetAGC(AUTO_GAIN_INDEX);
       BK4819_SetAFC(8);
       BK4819_SetAFCSpeed(63);
-      BK4819_Squelch(plan->parameters.squelch, gDeviceConfig.preferences.sql_open_time,
-                     gDeviceConfig.preferences.sql_close_time);
+      BK4819_SetupSquelch(squelchFor(plan->parameters.squelch, plan->frequency_hz),
+                          gDeviceConfig.preferences.sql_open_time,
+                          gDeviceConfig.preferences.sql_close_time);
     }
     if (!fastBk || ((oldBkFrequency / 10u < PREFERENCES_FilterBound()) !=
                     (frequency < PREFERENCES_FilterBound())))
@@ -270,6 +301,10 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
     if (!BK1080_Mute(!audible)) {
       (void)BK1080_Mute(true);
       return false;
+    }
+    if (BOARD_BroadcastUsesBkVhfPath()) {
+      BK4819_SelectFilterEx(FILTER_VHF);
+      broadcastHoldsBkPath = true;
     }
     return true;
   }
@@ -430,7 +465,7 @@ bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found) {
   *found=false;
   if (plan->device==RX_DEVICE_BK) {
     uint8_t level=plan->parameters.squelch;
-    SQL floor=GetSql(level<4 ? 4 : level);
+    SQL floor=squelchFor(level<4 ? 4 : level, plan->frequency_hz);
     bool carrier=BK4819_GetRSSI()>=floor.ro && BK4819_GetNoise()<=floor.no &&
                  BK4819_GetGlitch()<=floor.go;
     RadioTone tone=plan->parameters.rx_tone;
