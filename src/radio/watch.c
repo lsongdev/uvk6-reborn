@@ -114,10 +114,10 @@ void watchUpdate(void) {
       if (result!=RX_OK) {
         watchStatus="DW: unavailable"; continue;
       }
-      if (plan.device!=selected.device && !RX_DEVICE_CanRunTogether(selected.device,plan.device)) {
-        watchStatus="DW: shared RF";
+      // Paths sharing the selected slot's front end sit out; expected on the
+      // K1 (FM and BK), so the user manual explains it instead of a status.
+      if (plan.device!=selected.device && !RX_DEVICE_CanRunTogether(selected.device,plan.device))
         continue;
-      }
       targets[count++]=(WatchTarget){id,plan};
     }
     if (!WATCH_Start(&watcher,targets,count,selectedSlot,Now())) {
