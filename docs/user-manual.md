@@ -103,9 +103,9 @@
 
 | 模式 | 软件接收路径 |
 | --- | --- |
-| NFM | BK4819：18–660 MHz、840–1300 MHz |
-| WFM | 64–108 MHz；优先 SI4732，否则探测到的 BK1080 |
-| AM | ≤30 MHz 且有 SI4732 时优先 SI；其余 BK 支持范围用 BK AM 实现 |
+| NFM | BK4819（K6）／BK4829（K1）：18–660 MHz、840–1300 MHz |
+| WFM | 64–108 MHz；SI4732 构建用 SI4732，否则用 BK1080（K1 固定 BK1080） |
+| AM | ≤30 MHz 且有 SI4732 时优先 SI；其余 BK 支持范围用 BK AM 实现。K1 的 BK4829 AM 采用原厂寄存器值，6k／12k 带宽使用原厂 AM 滤波预设，26k 使用宽带预设 |
 | LSB／USB | ≤30 MHz 的 SI4732；须安装全量 CRC 校验通过的 EEPROM 补丁 |
 
 输入允许 150 kHz–1340 MHz，仍须通过模式和能力校验。芯片标称范围与整机效果见[硬件事实](hardware-uvk6.md#4-接收芯片与能力边界)。
@@ -214,7 +214,7 @@ Slot 菜单 → Spectrum。上方是当前 Slot 的卡片，显示光标处的�
 
 ## 8. 发射
 
-默认构建开放 K6 BK4819／K1 BK4829 NFM TX，TX Enable 为 On 后才可申请；每槽默认 Off。软件范围为 **136 ≤ f < 174 MHz、400 ≤ f < 470 MHz**，实际 TX Hz 由 Shift／Offset／Split 计算。WFM、AM、LSB、USB 不自动转为 NFM 发射。K1 使用本机 SPI Flash 中的原厂 PA 校准，配置仍只存在 RAM，重启后需重新开启该槽 TX Enable。K1 发射期间暂停全部接收路径，松键后恢复对讲接收和后续守听。
+默认构建开放 K6 BK4819／K1 BK4829 NFM TX，TX Enable 为 On 后才可申请；每槽默认 Off。软件范围为 **136 ≤ f < 174 MHz、400 ≤ f < 470 MHz**，实际 TX Hz 由 Shift／Offset／Split 计算。WFM、AM、LSB、USB 不自动转为 NFM 发射。K1 使用本机 SPI Flash 中的原厂 PA 校准。K1 发射期间暂停全部接收路径，松键后恢复对讲接收和后续守听。
 
 还检查功率校准、供电（当前 6.00–9.00 V）、锁键、忙信道和 TOT；默认 TOT 120 秒、Block if busy On。缺某档校准则拒绝该档。松键、TOT 或供电异常先关 PA，再恢复 RX；TOT 后按住不自动重发，需松键。Low／Medium／High 是校准档，不代表已测瓦数。
 
@@ -227,18 +227,18 @@ Slot 菜单 → Spectrum。上方是当前 Slot 的卡片，显示光标处的�
 | 菜单 | 项目与说明 |
 | --- | --- |
 | Display | Contrast（-8～+7）、Light time（Off、5/10/20/60/120 秒、Always）、Brightness／Idle light（0–15）、Light on RX（Off／Timed／Receiving） |
-| Receive | Slot count（1–4）、SQL open delay（Level 0–7）、SQL close delay（Level 0–3）、SI4732 idle（Mute／Power off）、Filter split（240／280 MHz） |
+| Receive | Slot count（1–4）、SQL open delay（Level 0–7／Auto）、SQL close delay（Level 0–3／Auto）、SI4732 idle（Mute／Power off，仅 SI4732 构建）、Filter split（240／280 MHz） |
 | Transmit | Time limit（30/60/120/180/300/600 秒）、Block if busy、Mic gain（0–31，默认 16） |
 | Lock PTT too | 锁键时是否同时屏蔽 PTT |
 | Battery | Show charge（Icon／Percent／Voltage）、Charge curve（1600／2200／3500 估算曲线）、Cal voltage（输入实测 5.00–8.60 V） |
 | Band presets／Channels | 独立频段预设／频道列表、改名和删除 |
-| About | Firmware、EEPROM、Config、SI4732、BK1080、SSB patch、TX status、Save status、Reset prefs |
+| About | Firmware、Storage（容量）、Config、FM chip（SI4732／BK1080）、SSB patch（仅 SI4732 构建）、TX status、Save status、Reset prefs |
 
-Brightness 降低时限制 Idle light 不高于它；Light time 的 Off／Always 优先于接收触发。电池曲线不是容量测量。SQL 时序只显示档位，不承诺毫秒数。SI idle 在下次离开 SI 时使用，无 SI 时不可改；滤波和 SQL 工程参数离开设置时重新应用，失败回退。设置、文本页面期间接收持续。
+Brightness 降低时限制 Idle light 不高于它；Light time 的 Off／Always 优先于接收触发。电池曲线不是容量测量。SQL 时序只显示档位，不承诺毫秒数；Auto（默认）采用接收芯片的推荐值：K6 BK4819 为 1／1，K1 BK4829 为 5／3（原厂值，更短时强信号下静噪会反复开关）。SI idle 在下次离开 SI 时使用；滤波和 SQL 工程参数离开设置时重新应用，失败回退。设置、文本页面期间接收持续。
 
 Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留原值。Reset prefs 需 MENU 确认，恢复显示和 TX 保护等普通偏好，保留当前键盘锁、电池校准／曲线、RX 工程参数、Mic／Deviation、Slot 和频道，不是整机初始化。
 
-普通修改在最后变更后约 1500 ms 合并写入，离开设置也尝试提交；失败约每 5 秒重试。About → Save status 显示 Read only／Saved／Pending／Failed，MENU 立即保存或重试。Pending 时掉电可能丢失最近修改。
+普通修改在最后变更后约 1500 ms 合并写入，离开设置也尝试提交；失败约每 5 秒重试。About → Save status 显示 Read only／Saved／Pending／Failed／RAM only，MENU 立即保存或重试。Pending 时掉电可能丢失最近修改。
 
 ## 10. 提示与排查
 

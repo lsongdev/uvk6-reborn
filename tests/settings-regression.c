@@ -27,6 +27,7 @@ DeviceConfig gDeviceConfig = {.preferences = CONFIG_DEFAULT_PREFERENCES};
 static unsigned requests, lights, contrasts;
 static bool saveWorks = true;
 void DEVICE_RequestSave(void) { ++requests; }
+uint32_t BATTERY_GetPreciseVoltage(uint16_t cal) { return cal * 4u; }
 bool DEVICE_SavePreferences(const ConfigPreferences *next) {
   if (!saveWorks) return false;
   gDeviceConfig.preferences=*next; return true;
@@ -63,13 +64,20 @@ int main(void) {
   assert(gDeviceConfig.preferences.brightness_low==3);
   SETTINGS_IncDecValue(SETTING_BRIGHTNESS_L,true); assert(gDeviceConfig.preferences.brightness_low==0);
   SETTINGS_IncDecValue(SETTING_BRIGHTNESS_L,false); assert(gDeviceConfig.preferences.brightness_low==3);
+  // Squelch delays: register levels, then Auto (the chip's recommendation).
+  char text[16];
   SETTINGS_SetValue(SETTING_SQLOPENTIME,7); SETTINGS_IncDecValue(SETTING_SQLOPENTIME,true);
-  assert(gDeviceConfig.preferences.sql_open_time==0);
+  assert(gDeviceConfig.preferences.sql_open_time==PREFERENCES_SQL_OPEN_AUTO);
+  SETTINGS_GetValueText(SETTING_SQLOPENTIME,text,sizeof(text)); assert(!strcmp(text,"Auto"));
+  SETTINGS_IncDecValue(SETTING_SQLOPENTIME,true); assert(gDeviceConfig.preferences.sql_open_time==0);
+  SETTINGS_IncDecValue(SETTING_SQLOPENTIME,false);
   SETTINGS_IncDecValue(SETTING_SQLOPENTIME,false); assert(gDeviceConfig.preferences.sql_open_time==7);
+  SETTINGS_GetValueText(SETTING_SQLOPENTIME,text,sizeof(text)); assert(!strcmp(text,"Level 7"));
   SETTINGS_SetValue(SETTING_SQLCLOSETIME,3); SETTINGS_IncDecValue(SETTING_SQLCLOSETIME,true);
-  assert(gDeviceConfig.preferences.sql_close_time==0);
-  assert(!SETTINGS_SetValue(SETTING_SQLCLOSETIME,4));
-  assert(!SETTINGS_SetValue(SETTING_SQLOPENTIME,8));
+  assert(gDeviceConfig.preferences.sql_close_time==PREFERENCES_SQL_CLOSE_AUTO);
+  SETTINGS_IncDecValue(SETTING_SQLCLOSETIME,true); assert(gDeviceConfig.preferences.sql_close_time==0);
+  assert(!SETTINGS_SetValue(SETTING_SQLCLOSETIME,5));
+  assert(!SETTINGS_SetValue(SETTING_SQLOPENTIME,9));
   for(unsigned i=0;i<6;++i) SETTINGS_IncDecValue(SETTING_TX_TIMEOUT,true);
   assert(gDeviceConfig.preferences.tx_timeout_seconds==120);
   gDeviceConfig.preferences.battery_calibration=2100;

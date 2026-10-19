@@ -27,6 +27,11 @@ typedef enum {
 extern uint8_t BL_TIME_VALUES[7];
 extern const char *BL_SQL_MODE_NAMES[3];
 
+// Squelch delay preferences one past the register range mean "the
+// receiver chip's recommended delay".
+#define PREFERENCES_SQL_OPEN_AUTO 8u
+#define PREFERENCES_SQL_CLOSE_AUTO 4u
+
 // VHF/UHF front-end filter boundary in 10 Hz units: 240 or 280 MHz.
 #define PREFERENCES_FILTER_BOUND_240 24000000u
 #define PREFERENCES_FILTER_BOUND_280 28000000u

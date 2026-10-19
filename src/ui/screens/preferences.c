@@ -1,5 +1,6 @@
 #include "ui/screens/preferences.h"
 #include "store/device-config.h"
+#include "store/preferences.h"
 #include "devices/battery.h"
 #include "core/misc.h"
 #include "core/measurements.h"
@@ -29,8 +30,8 @@ static const Preference preferences[SETTING_COUNT] = {
     PREF(SETTING_KEYLOCK, keylock, 0, 1),
     PREF(SETTING_PTT_LOCK, ptt_lock, 0, 1),
     PREF(SETTING_SI4732POWEROFF, si4732_power_off, 0, 1),
-    PREF(SETTING_SQLOPENTIME, sql_open_time, 0, 7),
-    PREF(SETTING_SQLCLOSETIME, sql_close_time, 0, 3),
+    PREF(SETTING_SQLOPENTIME, sql_open_time, 0, PREFERENCES_SQL_OPEN_AUTO),
+    PREF(SETTING_SQLCLOSETIME, sql_close_time, 0, PREFERENCES_SQL_CLOSE_AUTO),
     PREF(SETTING_BOUND240_280, bound_240_280, 0, 1),
     PREF(SETTING_TX_TIMEOUT, tx_timeout_seconds, 15, 600),
     PREF(SETTING_TX_BUSY_LOCK, tx_busy_lockout, 0, 1),
@@ -110,7 +111,11 @@ void SETTINGS_GetValueText(Setting id, char *out, uint8_t size) {
   case SETTING_KEYLOCK:
   case SETTING_TX_BUSY_LOCK: text = value ? "On" : "Off"; break;
   case SETTING_SQLOPENTIME:
-  case SETTING_SQLCLOSETIME: TEXT_Add(&t,"Level "); TEXT_Number(&t,value,1,10); return;
+  case SETTING_SQLCLOSETIME:
+    if (value == (id == SETTING_SQLOPENTIME ? PREFERENCES_SQL_OPEN_AUTO : PREFERENCES_SQL_CLOSE_AUTO)) {
+      text = "Auto"; break;
+    }
+    TEXT_Add(&t,"Level "); TEXT_Number(&t,value,1,10); return;
   case SETTING_CONTRAST: // Stored 0..15, shown centred on 0.
     if (value < 8) TEXT_Char(&t,'-');
     TEXT_Number(&t,value < 8 ? 8-value : value-8,1,10); return;

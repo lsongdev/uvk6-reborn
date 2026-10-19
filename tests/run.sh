@@ -149,13 +149,15 @@ done
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/settings-regression.c src/core/measurements.c src/core/crc32.c src/store/resource.c src/store/preferences.c "$dead_strip" -o "$test_binary"
+  tests/settings-regression.c src/core/measurements.c src/core/crc32.c src/store/resource.c src/store/preferences.c src/core/text.c src/core/dcs.c "$dead_strip" -o "$test_binary"
 "$test_binary"
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
-  \
-  -Wno-missing-field-initializers tests/settings-inline-regression.c src/core/crc32.c src/store/resource.c src/store/preferences.c src/ui/number-input.c src/ui/numnav.c \
-  src/core/measurements.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c src/ui/graphics.c src/core/text.c "$dead_strip" -o "$test_binary"
-"$test_binary"
+for settings_si in 0 1; do
+  "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+    -DUVK6_ENABLE_SI4732="$settings_si" \
+    -Wno-missing-field-initializers tests/settings-inline-regression.c src/core/crc32.c src/store/resource.c src/store/preferences.c src/ui/number-input.c src/ui/numnav.c \
+    src/core/measurements.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c src/ui/graphics.c src/core/text.c "$dead_strip" -o "$test_binary"
+  "$test_binary"
+done
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/device-config-regression.c src/store/resource.c \
   src/store/config-store.c src/core/crc32.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
@@ -189,7 +191,8 @@ for chip in bk4819 bk4829; do
   "$test_binary"
 done
 # Register-write traces captured from the pre-split runtime-selected driver.
-for chip in bk4819:0:173:0x672c4eae bk4829:1:184:0xfcd48715; do
+# BK4829 since then: user squelch delays reach REG_4E, and AM is configured.
+for chip in bk4819:0:173:0x672c4eae bk4829:1:202:0x2740c8e2; do
   IFS=: read -r name k1 writes trace <<EOF_TRACE
 $chip
 EOF_TRACE

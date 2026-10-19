@@ -72,8 +72,8 @@ static bool valid(const DeviceConfig *config) {
          p->ptt_lock <= 1 && p->beep <= 1 && p->si4732_power_off <= 1 &&
          p->mic <= 31 && p->deviation <= 204 &&
           p->bound_240_280 <= 1 &&
-         p->brightness_low <= 15 && p->sql_open_time <= 7 &&
-         p->sql_close_time <= 3;
+         p->brightness_low <= 15 && p->sql_open_time <= PREFERENCES_SQL_OPEN_AUTO &&
+         p->sql_close_time <= PREFERENCES_SQL_CLOSE_AUTO;
 }
 bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
                    uint8_t bytes[RECORD_BYTES]) {
