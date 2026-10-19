@@ -67,7 +67,7 @@ int main(void) {
   WatchTarget bgs[]={open0,fm};
   assert(WATCH_Start(&r,bgs,2,UINT8_MAX,now)==false); // Two backgrounds, no event.
   WatchTarget mix[]={open0,b,fm};
-  assert(WATCH_Start(&r,mix,3,UINT8_MAX,now) && r.background.id==0 && r.count==1);
+  assert(WATCH_Start(&r,mix,3,UINT8_MAX,now) && r.background.id==3 && r.count==1);
   assert(WATCH_Start(&r,mix,3,3,now) && r.background.id==3);
   // Polling starts at the selected event.
   assert(WATCH_Start(&r,four,4,1,now) && r.events[r.cursor].id==1);
@@ -129,6 +129,14 @@ int main(void) {
   prepareOK=true; tick(&r,10); assert(bkTuned==0 && !r.background_ready);
   run(&r,WATCH_RETRY_MS); assert(r.background_ready && heard==3);
 
+  // A failed background audio route also backs off instead of preparing
+  // the auxiliary chip on every main-loop iteration.
+  reset();selectOK=false;
+  assert(WATCH_Start(&r,withFm,2,3,now));
+  tick(&r,0);assert(!r.background_ready && siPrepares==1);
+  run(&r,WATCH_RETRY_MS-100);assert(siPrepares==1);
+  selectOK=true;run(&r,200);assert(r.background_ready && heard==3);
+
   // SSB is a continuous SI background, never a polled target. BK audio
   // takeovers and hang expiry leave its frequency and patch untouched.
   const uint32_t ssbFrequencies[]={7074000u,14074000u};
@@ -149,24 +157,19 @@ int main(void) {
     }
   }
 
-  // BK background (squelch 0): heard between rounds of event checks.
+  // SQ0 selected: exclusive continuous BK listening, no home/scan cycle.
   reset();
   WatchTarget sharedBk[]={open0,b,c};
-  assert(WATCH_Start(&r,sharedBk,3,UINT8_MAX,now) && r.count==2 && r.devices==(1u<<RX_DEVICE_BK));
-  tick(&r,0); assert(bkTuned==1 && heard==UINT8_MAX); // A first round of checks.
-  run(&r,2*WATCH_SETTLE_MS+40);
-  assert(r.phase==WATCH_HOME && bkTuned==0 && heard==0);
-  run(&r,WATCH_HOME_MS-30); assert(heard==0);
-  run(&r,40); assert(heard==UINT8_MAX && bkTuned!=0); // Silenced before retuning.
-  talking[2]=true; run(&r,2*WATCH_SETTLE_MS+WATCH_VERIFY_MS+60);
-  assert(heard==2);
-  talking[2]=false; run(&r,WATCH_SAMPLE_MS+WATCH_HANG_MS+10);
-  assert(r.phase==WATCH_HOME && heard==0); // Back home after the talk.
-
-  // Suspending BK silences a BK background too; resuming goes home again.
-  WATCH_SuspendBk(&r,true,now,&ops); assert(heard==UINT8_MAX);
-  WATCH_SuspendBk(&r,false,now,&ops);
-  run(&r,2*WATCH_SETTLE_MS+60); assert(r.phase==WATCH_HOME && heard==0);
+  WatchRuntime exclusive={0};
+  assert(!WATCH_Start(&exclusive,sharedBk,3,0,now));
+  run(&exclusive,10000); assert(prepares==0 && samples==0);
+  // Unselected SQ0 is paused, so the two event channels can still watch.
+  assert(WATCH_Start(&r,sharedBk,3,1,now));
+  assert(!r.has_background && r.count==2 && r.devices==(1u<<RX_DEVICE_BK));
+  talking[2]=true;run(&r,2*WATCH_SETTLE_MS+WATCH_VERIFY_MS+50);
+  assert(heard==2 && bkTuned==2);
+  WatchTarget selectedMonitor[]={open0,b,fm};
+  assert(!WATCH_Start(&exclusive,selectedMonitor,3,0,now));
 
   // Failures block a target for a while; all blocked retries later.
   reset();

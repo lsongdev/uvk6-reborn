@@ -16,10 +16,11 @@ make
 
 | 选项／目标 | 行为 |
 | --- | --- |
-| make／make all | 默认 release；ENABLE_TX=1、ENABLE_FC=1 |
+| make／make all | 默认 release；ENABLE_TX=1、ENABLE_FC=1；K6 ENABLE_SI4732=1 |
 | make -B -j4 all | 强制重编，测预算或改变编译选项时使用 |
 | make -B -j4 all ENABLE_TX=0 | 仅接收，TX HAL 只保留关 PA 路径 |
 | make -B -j4 all ENABLE_FC=0 | 去掉 FC，F→4 提示 Not supported |
+| make ENABLE_SI4732=0 | K6 改用 BK1080 广播（原装板）；不编入 SI4732、RDS 与 SSB 路径。K1 的 board.mk 固定为 0 |
 | make debug | 调试构建；不作为 release 容量基线 |
 | make release | 清理、构建，并生成带时间戳 packed 文件 |
 | make info／make help | 构建信息／目标说明 |
@@ -98,13 +99,16 @@ ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包�
 | boards/uvk6/storage.c、storage-layout.h | 存储区到 UV-K6 EEPROM 地址的映射、写保护、维护通道 |
 | devices/rx-device.c | 芯片单位／带宽／信号口径／亚音、音频门、Seek／FC 适配 |
 | devices/tx-device.c | 板级范围、校准读取与插值、物理 PTT／供电、PA 顺序 |
-| drivers/{bk4819,si473x,bk1080,st7565,eeprom-24cxx}/ | 外部芯片命令 |
+| drivers/bk48x9/ | BK4819／BK4829 共用代码（common、rx、tx、css、bus、capture）＋按 `RADIO_CHIP` 只链接一个芯片后端 bk4819.c／bk4829.c |
+| drivers/{si473x,bk1080,st7565,eeprom-24cxx}/ | 外部芯片命令 |
 | drivers/dp32g030/ | DP32G030 寄存器、启动、时钟、定时器、SPI、UART 收发、ADC、CRC |
 | app/link/uart-link.c | PC 链路帧格式、混淆与命令；原始读／维护写交给板级 |
 
 driver 不读取产品配置或实现菜单；devices 集中跨芯片适配，上层不依赖芯片单位、增益索引或寄存器号。
 
 构建按板选择：`make BOARD=uvk6`（默认）读取 boards/uvk6/board.mk 得到 `MCU=dp32g030`，再引入 drivers/dp32g030/mcu.mk（CPU 与 CMSIS 选项），编译该板和该 MCU 目录下的源文件，产物在 bin/uvk6/、obj/uvk6/。MCU 驱动不认识具体引脚，板级不重复实现外设驱动；同一 MCU 的新机型只需新增 boards/ 目录。
+
+芯片在构建时确定，运行时不探测型号：board.mk 用 `RADIO_CHIP`（bk4819／bk4829）选 BK 后端，用 `ENABLE_SI4732` 二选一广播芯片（1 = SI4732，0 = BK1080）。这些开关或 BUILD_TYPE 变化时，Makefile 会删除 obj/<board>/ 下的旧目标文件再编译，不用手动 `-B`。主机回归按后端和广播芯片分别编译；`bk48x9-trace-regression` 以拆分前驱动的完整寄存器写入序列为基线。
 
 只有 boards/ 与 MCU 驱动目录可以包含 MCU 寄存器头。其余代码经 hal 接口访问硬件：单根信号经 hal/gpio.h 的 `GpioLine`（`GPIO_Write`／`GPIO_Read`／`GPIO_SetInput`，线路表由板级定义），显示总线经 hal/spi.h，背光输出经 `BOARD_BacklightSetLevel`，复位经 `SYS_Reset`，整机初始化经 `BOARD_Init`。
 

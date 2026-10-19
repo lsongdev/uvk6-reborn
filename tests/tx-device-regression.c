@@ -2,7 +2,8 @@
 #define UVK6_ENABLE_TX 1
 // Real board HAL and voice configuration; GPIO, EEPROM and RF writes mocked.
 #include "../src/devices/tx-device.c"
-#include "../src/drivers/bk4819/tx.c"
+#include "../src/drivers/bk48x9/tx.c"
+#include "../src/boards/uvk6/calibration.c"
 #include <assert.h>
 #include <string.h>
 DeviceConfig gDeviceConfig = {.preferences=CONFIG_DEFAULT_PREFERENCES};
@@ -13,6 +14,8 @@ static unsigned paStarts, invalidations, writeCount;
 static uint16_t registers[128];
 static uint32_t tuned, filterFrequency, calibrationAddress;
 static uint8_t bias;
+static bool stopOK=true;
+bool RX_DEVICE_StopAll(void) { assert(!paOn); return stopOK; }
 bool STORAGE_Read(StorageArea area, uint32_t offset, void *data, uint16_t size) {
   // Bands 2 and 5 of the PA table: 0x1EF0 and 0x1F20 on the UV-K5 layout.
   assert(area==STORAGE_CALIBRATION && size==9 && (offset==0xF0 || offset==0x120));
@@ -23,34 +26,45 @@ bool STORAGE_Read(StorageArea area, uint32_t offset, void *data, uint16_t size) 
 bool GPIO_Read(GpioLine line) {
   assert(line==GPIO_PTT);return !pressed;
 }
-void BK4819_ToggleGpioOut(BK4819_GPIO_PIN_t pin, bool on) {
-  if(pin==BK4819_GPIO1_PIN29_PA_ENABLE) {
+void BK48X9_ToggleGpioOut(BK48X9_GPIO_PIN_t pin, bool on) {
+  if(pin==BK48X9_GPIO1_PIN29_PA_ENABLE) {
     if(on) { assert(dspOn && !rxEnabled && bias && pressed);++paStarts; }
     paOn=on;
-  } else { assert(pin==BK4819_GPIO0_PIN28_RX_ENABLE);rxEnabled=on; }
+  } else { assert(pin==BK48X9_GPIO0_PIN28_RX_ENABLE);rxEnabled=on; }
 }
-void BK4819_WriteRegister(BK4819_REGISTER_t reg, uint16_t value) {
+void BK48X9_WriteRegister(BK48X9_REGISTER_t reg, uint16_t value) {
   assert(!paOn);registers[reg]=value;++writeCount;
 }
-uint16_t BK4819_ReadRegister(BK4819_REGISTER_t reg) { return registers[reg]; }
-void BK4819_EnterTxMute(void) { assert(!paOn); }
-void BK4819_Idle(void) { assert(!paOn);dspOn=false; }
-void BK4819_ExitSubAu(void) { assert(!paOn); }
-void BK4819_SetRxMode(bool am) { assert(!paOn && !am); }
-void BK4819_SetAF(BK4819_AF_Type_t af) { assert(!paOn && af==BK4819_AF_MUTE); }
-void BK4819_DisableDTMF(void) { assert(!paOn); }
-void BK4819_SetFilterBandwidth(BK4819_FilterBandwidth_t bw) {
-  assert(!paOn && bw==BK4819_FILTER_BW_9k);
+uint16_t BK48X9_ReadRegister(BK48X9_REGISTER_t reg) { return registers[reg]; }
+void BK48X9_EnterTxMute(void) { assert(!paOn); }
+void BK48X9_Idle(void) { assert(!paOn);dspOn=false; }
+void BK48X9_ExitSubAu(void) { assert(!paOn); }
+void BK48X9_SetRxMode(bool am) { assert(!paOn && !am); }
+void BK48X9_SetAF(BK48X9_AF_Type_t af) { assert(!paOn && af==BK48X9_AF_MUTE); }
+void BK48X9_DisableDTMF(void) { assert(!paOn); }
+void BK48X9_SetFilterBandwidth(BK48X9_FilterBandwidth_t bw) {
+  assert(!paOn && bw==BK48X9_FILTER_BW_9k);
 }
-void BK4819_SelectFilter(uint32_t hz10, uint32_t bound) {
+// BK4819 backend TX audio (drivers/bk48x9/bk4819.c), linked by RADIO_CHIP.
+void BK48X9_ConfigureMicrophone(uint8_t mic) {
+  BK48X9_WriteRegister(BK48X9_REG_19, 0x1041);
+  BK48X9_WriteRegister(BK48X9_REG_7D, 0xE940 | (mic & 31u));
+  BK48X9_WriteRegister(0x74, 0xAF1F);
+}
+void BK48X9_ConfigureTxAudio(uint8_t mic, uint16_t deviation) {
+  BK48X9_SetFilterBandwidth(BK48X9_FILTER_BW_9k);
+  BK48X9_ConfigureMicrophone(mic);
+  BK48X9_WriteRegister(BK48X9_REG_40,(BK48X9_ReadRegister(BK48X9_REG_40)&~0x7FFu) | (deviation&0x7FFu) | (1u<<12));
+}
+void BK48X9_SelectFilter(uint32_t hz10, uint32_t bound) {
   assert(!paOn && bound==PREFERENCES_FILTER_BOUND_240);filterFrequency=hz10;
 }
 uint32_t PREFERENCES_FilterBound(void) { return PREFERENCES_FILTER_BOUND_240; }
-void BK4819_SetFrequency(uint32_t hz10) { assert(!paOn);tuned=hz10; }
-void BK4819_SetCTCSSFrequency(uint32_t value) { assert(!paOn && value); }
-void BK4819_SetCDCSSCodeWord(uint32_t value) { assert(!paOn && value); }
-void BK4819_PrepareTransmit(void) { assert(!paOn);dspOn=true; }
-void BK4819_SetupPowerAmplifier(uint8_t value, uint32_t hz10) {
+void BK48X9_SetFrequency(uint32_t hz10) { assert(!paOn);tuned=hz10; }
+void BK48X9_SetCTCSSFrequency(uint32_t value) { assert(!paOn && value); }
+void BK48X9_SetCDCSSCodeWord(uint32_t value) { assert(!paOn && value); }
+void BK48X9_PrepareTransmit(void) { assert(!paOn);dspOn=true; }
+void BK48X9_SetupPowerAmplifier(uint8_t value, uint32_t hz10) {
   assert(!paOn && dspOn && hz10==tuned);bias=value;
 }
 void AUDIO_ToggleSpeaker(bool on) { assert(!on); }
@@ -72,9 +86,9 @@ int main(void) {
   TxPlan plan={.frequency_hz=438500000,.power=TX_POWER_MEDIUM,.tone=1};
   assert(TX_DEVICE_Prepare(&plan) && !paOn && !dspOn && prepared);
   assert(tuned==43850000 && filterFrequency==tuned && paBias==82);
-  assert(registers[BK4819_REG_7D]==(0xE940|gDeviceConfig.preferences.mic) && gDeviceConfig.preferences.mic==16 && registers[0x74]==0xAF1F && writeCount);
+  assert(registers[BK48X9_REG_7D]==(0xE940|gDeviceConfig.preferences.mic) && gDeviceConfig.preferences.mic==16 && registers[0x74]==0xAF1F && writeCount);
   assert(TX_DEVICE_Enable() && paOn && paStarts==1 && dspOn);
-  TX_DEVICE_Disable();assert(!paOn && !prepared && !dspOn && registers[BK4819_REG_36]==0);
+  TX_DEVICE_Disable();assert(!paOn && !prepared && !dspOn && registers[BK48X9_REG_36]==0);
   TX_DEVICE_Disable();assert(!paOn && invalidations>=2);
   plan.frequency_hz=150000000;plan.power=TX_POWER_HIGH;
   assert(TX_DEVICE_Prepare(&plan) && paBias==140 && calibrationAddress==0x1EF0);
@@ -86,6 +100,7 @@ int main(void) {
   gBatteryVoltage=0;assert(!TX_DEVICE_Prepare(&plan) && !paOn);
   gBatteryVoltage=760;pressed=false;assert(!TX_DEVICE_Prepare(&plan));pressed=true;
   readOK=false;assert(!TX_DEVICE_Prepare(&plan));readOK=true;
+  stopOK=false;assert(!TX_DEVICE_Prepare(&plan) && !prepared && !paOn);stopOK=true;
   plan.frequency_hz=95000000;assert(!TX_DEVICE_Prepare(&plan) && !paOn);
   plan.frequency_hz=136000000;plan.power=TX_POWER_LOW;
   assert(TX_DEVICE_Prepare(&plan) && paBias==30);TX_DEVICE_Disable();

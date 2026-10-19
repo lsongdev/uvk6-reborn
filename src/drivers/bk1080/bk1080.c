@@ -42,32 +42,35 @@ bool BK1080_SetFrequency(uint32_t f) {
   return true;
 }
 
-bool BK1080_Init(uint32_t f, bool bEnable) {
+bool BK1080_TuneTo(uint32_t f) {
   uint8_t i;
 
-  if (bEnable) {
-    GPIO_Write(GPIO_BK1080, false);
+  GPIO_Write(GPIO_BK1080, false);
 
-    if (!gIsInitBK1080) {
-      for (i = 0; i < ARRAY_SIZE(BK1080_RegisterTable); i++) {
-        if (!BK1080_WriteRegister(i, BK1080_RegisterTable[i]))
-          return false;
-      }
-      SYS_DelayMs(250);
-      if (!BK1080_WriteRegister(BK1080_REG_25_INTERNAL, 0xA83C) ||
-          !BK1080_WriteRegister(BK1080_REG_25_INTERNAL, 0xA8BC))
+  if (!gIsInitBK1080) {
+    for (i = 0; i < ARRAY_SIZE(BK1080_RegisterTable); i++) {
+      if (!BK1080_WriteRegister(i, BK1080_RegisterTable[i]))
         return false;
-      SYS_DelayMs(60);
-      gIsInitBK1080 = true;
-    } else if (!BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x0201)) {
-      return false;
     }
-    currentF = 0;
-    return BK1080_SetFrequency(f);
+    SYS_DelayMs(250);
+    if (!BK1080_WriteRegister(BK1080_REG_25_INTERNAL, 0xA83C) ||
+        !BK1080_WriteRegister(BK1080_REG_25_INTERNAL, 0xA8BC))
+      return false;
+    SYS_DelayMs(60);
+    gIsInitBK1080 = true;
+  } else if (!BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x0201)) {
+    return false;
   }
-  bool ok = BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x0241);
-  GPIO_Write(GPIO_BK1080, true);
   currentF = 0;
+  return BK1080_SetFrequency(f);
+}
+
+bool BK1080_Standby(void) {
+  bool ok = BK1080_WriteRegister(BK1080_REG_02_POWER_CONFIGURATION, 0x0241);
+  if (ok) {
+    GPIO_Write(GPIO_BK1080, true);
+    currentF = 0;
+  }
   return ok;
 }
 
@@ -106,14 +109,4 @@ uint16_t BK1080_GetRSSI() {
 
 // Probed once per boot, early after power-up: a part still starting may
 // miss the first read, so retry a few times before declaring it absent.
-bool BK1080_Detect(void) {
-  GPIO_Write(GPIO_BK1080, false);
-  SYS_DelayMs(10);
-  bool present = false;
-  for (uint8_t attempt = 0; attempt < 5 && !present; ++attempt) {
-    if (attempt) SYS_DelayMs(50);
-    present = BK1080_ReadRegister(1) == 0x1080;
-  }
-  GPIO_Write(GPIO_BK1080, true);
-  return present;
-}
+

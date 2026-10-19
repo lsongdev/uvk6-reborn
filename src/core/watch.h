@@ -4,21 +4,22 @@
 
 // Multi-slot watch over every enabled slot. Sources are split by behaviour,
 // not by chip:
-// - one background (SI including SSB, BK1080, or BK with squelch 0) plays
+// - one auxiliary background (SI including SSB, or BK1080) plays
 //   whenever nothing else talks; the selected slot wins, else the first;
 // - squelched BK channels are events: polled in turn, and the first one with
 //   a confirmed signal takes the speaker until it ends plus a hang time.
+// Selected BK SQ0 is exclusive: no interrupted continuous listening.
 // Events never interrupt each other; the selected slot has no audio priority.
 typedef struct { uint8_t id; RxPlan plan; } WatchTarget;
 typedef enum { WATCH_OFF, WATCH_POLL, WATCH_SETTLE, WATCH_VERIFY,
-               WATCH_HOLD, WATCH_HANG, WATCH_HOME, WATCH_RETRY } WatchPhase;
+               WATCH_HOLD, WATCH_HANG, WATCH_RETRY } WatchPhase;
 typedef enum { WATCH_QUIET, WATCH_BACKGROUND, WATCH_EVENT } WatchAudio;
 typedef struct {
   WatchTarget events[RADIO_WATCH_LIMIT];
   WatchTarget background; // Valid when has_background.
   uint32_t deadline, hang_until, background_retry;
   uint32_t blocked_until[RADIO_WATCH_LIMIT];
-  uint8_t count, cursor, visited, blocked, devices;
+  uint8_t count, cursor, blocked, devices;
   WatchPhase phase;
   WatchAudio audio;
   bool has_background, background_ready;
@@ -37,11 +38,10 @@ typedef struct {
 #define WATCH_SETTLE_MS 180u
 #define WATCH_VERIFY_MS 80u
 #define WATCH_HANG_MS 2000u
-#define WATCH_HOME_MS 1000u
 #define WATCH_RETRY_MS 2000u
 #define WATCH_SAMPLE_MS 50u
 
-bool WATCH_IsBackground(const RxPlan *plan);
+bool WATCH_IsEvent(const RxPlan *plan);
 bool WATCH_SameReceiver(const RxPlan *a, const RxPlan *b);
 // False when fewer than two distinct sources remain to watch.
 bool WATCH_Start(WatchRuntime *runtime, const WatchTarget *targets, uint8_t count,
@@ -51,8 +51,8 @@ void WATCH_Update(WatchRuntime *runtime, uint32_t now, const WatchOperations *op
 // Slot owning the speaker, or UINT8_MAX while everything is quiet.
 uint8_t WATCH_Owner(const WatchRuntime *runtime);
 bool WATCH_IsProbing(const WatchRuntime *runtime);
-// Take every BK slot out of the watch (an event talk or a BK background
-// goes quiet) while a broadcast background keeps playing; resuming puts
+// Take every BK event out of the watch while an independent auxiliary
+// background keeps playing; resuming puts
 // them back and polling starts over.
 void WATCH_SuspendBk(WatchRuntime *runtime, bool suspend, uint32_t now, const WatchOperations *ops);
 // The event being heard or in its reply window: PTT answers it (talkback).

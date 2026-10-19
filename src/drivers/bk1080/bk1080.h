@@ -21,8 +21,8 @@ typedef enum {
   BK1080_CHSP_50,
 } BK1080_ChannelSpacing;
 
-bool BK1080_Detect(void);
-bool BK1080_Init(uint32_t Frequency, bool bEnable);
+bool BK1080_TuneTo(uint32_t frequency);
+bool BK1080_Standby(void); // Stop reception; mute alone leaves the RX active.
 uint16_t BK1080_ReadRegister(BK1080_Register_t Register);
 bool BK1080_WriteRegister(BK1080_Register_t Register, uint16_t Value);
 bool BK1080_Mute(bool Mute);

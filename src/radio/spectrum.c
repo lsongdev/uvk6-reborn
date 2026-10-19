@@ -14,7 +14,11 @@ void RADIO_StartSpectrum(void) {
   RECEIVER_Mute();
   receivingSlot = UINT8_MAX;
   resetRds();
-  RX_DEVICE_SpectrumStart(gReceiver.plan.device);
+  if (!RX_DEVICE_SpectrumStart()) {
+    if (!applyReceiver(NULL,&runtime.current)) RX_RuntimeStop(&runtime,stopReceiver,NULL);
+    notify("RX error");
+    return;
+  }
   SPECTRUM_Start(&spectrum, activeSlot.current.frequency_hz,
                  activeSlot.current.parameters.step_hz);
   spectrumOn = true;

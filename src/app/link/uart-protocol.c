@@ -12,6 +12,7 @@ bool UART_CommandValid(const uint8_t *data, uint16_t size) {
   case 0x052f:
   case 0x0572: // Physical storage info, timestamp.
   case 0x0574: // Diagnostics, timestamp.
+  case 0x0576: // Read-only RF register snapshot, timestamp.
     return size == 8;
   case 0x051b: // EEPROM read: 16-byte request, at most 128-byte response.
     return size == 16 && data[8] > 0 && data[8] <= 128;

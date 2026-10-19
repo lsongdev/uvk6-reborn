@@ -35,6 +35,11 @@ BUILD_TAG     := $(shell date -u +'%Y%m%d_%H%M')
 # =============================================================================
 OTHER_MCUS := $(filter-out $(MCU_DIR)/,$(dir $(wildcard $(SRC_DIR)/drivers/*/mcu.mk)))
 DRIVER_SRC := $(filter-out $(addsuffix %,$(OTHER_MCUS)),$(wildcard $(SRC_DIR)/drivers/*/*.c))
+BK48X9_BACKEND := $(SRC_DIR)/drivers/bk48x9/$(RADIO_CHIP).c
+ifeq ($(wildcard $(BK48X9_BACKEND)),)
+  $(error Unknown RADIO_CHIP=$(RADIO_CHIP))
+endif
+DRIVER_SRC := $(filter-out $(SRC_DIR)/drivers/bk48x9/bk4819.c $(SRC_DIR)/drivers/bk48x9/bk4829.c,$(DRIVER_SRC)) $(BK48X9_BACKEND)
 
 SRC := $(wildcard $(SRC_DIR)/app/*.c) \
        $(wildcard $(SRC_DIR)/app/link/*.c) \
@@ -91,8 +96,11 @@ CFLAGS   := $(COMMON_FLAGS) $(OPTIMIZATION) \
             -finline-functions-called-once \
             -MMD -MP
 
-# BK4819 NFM transmit and PA control. ENABLE_TX=0 builds a receive-only image.
+# BK4819/BK4829 NFM TX and PA control. ENABLE_TX=0 builds an RX-only image.
 ENABLE_TX ?= 1
+# Exclusive auxiliary receiver selection: 1 = SI4732, 0 = BK1080.
+# No runtime chip-type detection; each board.mk sets its fitted chip.
+ENABLE_SI4732 ?= 0
 # F→4 frequency capture (FC). ENABLE_FC=0 drops it and frees about 1.3 KiB.
 ENABLE_FC ?= 1
 # Slot menu → Spectrum: BK4819 sweep around the slot. ENABLE_SPECTRUM=0 drops it.
@@ -107,6 +115,7 @@ DEFINES  := -DGIT_HASH=\"$(GIT_HASH)\" \
             -DTIME_STAMP=\"$(BUILD_TIME)\" \
             $(MCU_DEFINES) \
             -DUVK6_ENABLE_TX=$(ENABLE_TX) \
+            -DUVK6_ENABLE_SI4732=$(ENABLE_SI4732) \
             -DUVK6_ENABLE_FC=$(ENABLE_FC) \
             -DUVK6_ENABLE_SPECTRUM=$(ENABLE_SPECTRUM)
 
@@ -195,6 +204,16 @@ $(TARGET): $(OBJS) | $(BIN_DIR)
 	$(SIZE) $@
 	arm-none-eabi-nm --size-sort -r $(TARGET) | head -20
 	@echo ""
+
+# Feature switches select code at compile time. Objects built with other
+# switches are dropped: make 3.81 timestamps are too coarse to rely on.
+BUILD_FLAGS := ENABLE_TX=$(ENABLE_TX) ENABLE_SI4732=$(ENABLE_SI4732) \
+               ENABLE_FC=$(ENABLE_FC) ENABLE_SPECTRUM=$(ENABLE_SPECTRUM) \
+               BUILD_TYPE=$(BUILD_TYPE)
+FLAGS_FILE := $(OBJ_DIR)/build-flags
+ifneq ($(BUILD_FLAGS),$(shell cat $(FLAGS_FILE) 2>/dev/null))
+$(shell find $(OBJ_DIR) -name '*.o' -delete 2>/dev/null; mkdir -p $(OBJ_DIR) && echo '$(BUILD_FLAGS)' > $(FLAGS_FILE))
+endif
 
 # Компиляция C файлов
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(BSP_HEADERS) $(OBJ_DIR)

@@ -60,13 +60,13 @@ static bool watchPrepare(void *unused, const WatchTarget *target) {
   // retuned by polling, so it is always configured again.
   if (target->plan.device!=RX_DEVICE_BK && runtime.active &&
       WATCH_SameReceiver(&runtime.current,&target->plan)) return true;
-  if (!RX_DEVICE_ApplyConcurrent(&target->plan)) return false;
+  if (!RX_DEVICE_Prepare(&target->plan)) return false;
   if (target->plan.device==RX_DEVICE_SI) resetRds();
   return true;
 }
 static bool watchSelect(void *unused, const WatchTarget *target, bool open) {
   (void)unused;
-  if (!RECEIVER_Select(&target->plan,watcher.devices,open)) {
+  if (!RECEIVER_Select(&target->plan,open)) {
     gReceiver.open=false;runtime.active=false;receivingSlot=UINT8_MAX;
     gRedrawScreen=true;return false;
   }
@@ -96,6 +96,11 @@ void watchUpdate(void) {
   if (watcher.phase==WATCH_OFF) {
     if (!runtime.active) return;
     WatchTarget targets[RADIO_WATCH_LIMIT];
+    RxPlan selected;
+    if (TUNING_ExactPlan(activeSlot.current.frequency_hz, activeSlot.current.parameters,
+        RECEIVER_Capabilities(), &selected)!=RX_OK) {
+      watchDelay=true; watchResumeAt=Now()+WATCH_RETRY_MS; return;
+    }
     uint8_t count=0;
     watchStatus=NULL;
     for (uint8_t id=0; id<gDeviceConfig.radio.slot_count; ++id) {
@@ -109,13 +114,11 @@ void watchUpdate(void) {
       if (result!=RX_OK) {
         watchStatus="DW: unavailable"; continue;
       }
+      if (plan.device!=selected.device && !RX_DEVICE_CanRunTogether(selected.device,plan.device)) {
+        watchStatus="DW: shared RF";
+        continue;
+      }
       targets[count++]=(WatchTarget){id,plan};
-    }
-    bool broadcast=false;
-    for (uint8_t i=0; i<count; ++i) broadcast |= targets[i].plan.device==RX_DEVICE_BROADCAST;
-    if (broadcast && RX_DEVICE_BroadcastExcludesBk()) {
-      // UV-K1: FM shares the BK front end, so only the selected slot plays.
-      watchStatus="DW: off in FM"; watchDelay=true; watchResumeAt=Now()+WATCH_RETRY_MS; return;
     }
     if (!WATCH_Start(&watcher,targets,count,selectedSlot,Now())) {
       // Duplicates and extra broadcasts collapse: one source is not a watch.

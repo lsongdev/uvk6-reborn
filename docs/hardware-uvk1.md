@@ -59,6 +59,7 @@ K1 按住 PTT 开机进入刷机模式后，经 **K 头 UART 线**（`/dev/cu.us
 | PTT | PB10，低电平为按下 | PC5 |
 | 侧键 | 全部列为高电平时读取行线（零列 → SIDE1／SIDE2） | 同样方法 |
 | 音频功放 | PA8 | PC4 |
+| 射频状态灯 | BK4829 REG33：bit0 红、bit1 绿；参考映射与用户实机反色现象一致 | BK4819 REG33：bit1 红、bit0 绿 |
 | 手电／辅助 LED | PC13 | PC3 |
 | 电池 ADC | PB0／PB1 模拟输入，参考固件读 ADC1 CH8 | PA9／PA14 |
 | UART（K 型耳机口） | USART1：TX PA9、RX PA10 | UART1：PA7／PA8 |
@@ -110,7 +111,7 @@ K1 的 band 2／5 High 档（`91 96 91`）与本项目 `tools/resources.py` 中�
 
 `make BOARD=uvk1` 已可构建 PY32F071 首启只读版本（应用起点 `0x08002800`、118 KiB Flash、16 KiB RAM）。`src/boards/uvk1/` 提供引脚默认状态、GPIO、PF8 背光开关、PF5/PF6 软件 I²C、电池 ADC 和只读存储；SWD 保留。共享 ST7565、键盘和上层 UI 通过 HAL 访问硬件。
 
-- TX 在 `board.mk` 强制关闭，即使命令行指定 `ENABLE_TX=1` 也不会开放。
+- TX 已接通 BK4829 NFM 路径，默认随共享构建使用 `ENABLE_TX=1`；每槽 TX Enable 默认 Off。功率读取本机原厂 PA 记录；`ENABLE_TX=0` 仍生成仅接收镜像。代码、回归和实机测量边界见 [K1 发射核对](uvk1-tx-audit.md)。
 - `drivers/py25q16/` 仅实现 `0x9F` JEDEC ID 与 `0x03` 数据读取，完全没有编程、写使能或擦除命令。
 - 接受本机实测 JEDEC ID `EB 60 15`，以及参考型号 ID `85 60 15`，容量均为 2 MiB；未知 ID 不开放读取窗口，UART `info` 仍报告 ID 便于定位。首刷版本因白名单只含后者显示 Storage unknown，修正版已加入本机 ID。
 - 最新离线构建增加 K1 无 SI4732 的板级能力约束，禁止 SI 探测和运行请求；首启电池诊断读取原厂 ADC 校准第 4 点。这些后续改动未刷入、未实测。
@@ -121,7 +122,7 @@ K1 的 band 2／5 High 档（`91 96 91`）与本项目 `tools/resources.py` 中�
 
 首次实机流程和备份命令见 [UV-K1 首启与只读备份](uvk1-bringup.md)。屏幕、按键、电池、UART 与外部 Flash 读取仍须本机验收。**未完成两次完整读取并核对一致前，不得实现任何外部 Flash 写入。**
 
-后续工作：BK4829 接收寄存器差异核对与实测、介质感知的存储布局与掉电恢复、USB CDC、K1 能力/菜单适配。TX 必须等 K1 校准接通且经过实机测量后再考虑；不能使用 K6 PA 参考值。
+后续工作：介质感知的存储布局与掉电恢复、USB CDC、K1 能力/菜单适配。BK4829／BK1080 两路接收及切换已有实机听音确认。TX 校准已接通，当前进入实机验收阶段；功率、频偏和杂散尚未测量，不能使用 K6 PA 参考值。
 
 ## 6. 待确认
 

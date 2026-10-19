@@ -23,7 +23,7 @@ void RECEIVER_Init(void);
 // the previous plan is kept so the caller may restore it.
 bool RECEIVER_Apply(const RxPlan *plan);
 // Watch: route audio between chips already configured concurrently.
-bool RECEIVER_Select(const RxPlan *plan, uint8_t devices, bool open);
+bool RECEIVER_Select(const RxPlan *plan, bool open);
 void RECEIVER_SetOpen(bool open);
 void RECEIVER_Mute(void);
 // Sample RSSI/squelch; returns whether squelch is open.

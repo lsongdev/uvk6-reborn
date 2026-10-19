@@ -18,10 +18,10 @@ void RECEIVER_Init(void) {
 }
 
 void RECEIVER_SetOpen(bool open) {
-  gReceiver.open = open;
-  RX_DEVICE_SetAudio(gReceiver.plan.device, open);
-  LED_SetGreen(open);
-  BACKLIGHT_SetReception(open);
+  bool ok = RX_DEVICE_RouteAudio(gReceiver.plan.device, open);
+  gReceiver.open = open && ok;
+  LED_SetGreen(gReceiver.open);
+  BACKLIGHT_SetReception(gReceiver.open);
 }
 
 void RECEIVER_Mute(void) {
@@ -44,19 +44,19 @@ bool RECEIVER_Apply(const RxPlan *plan) {
       resolved.frequency_hz != plan->frequency_hz)
     return false;
   RECEIVER_Mute();
-  if (!RX_DEVICE_Apply(plan, gReceiver.plan.device))
+  if (!RX_DEVICE_Activate(plan))
     return false;
   commit(plan);
   return true;
 }
 
-bool RECEIVER_Select(const RxPlan *plan, uint8_t devices, bool open) {
-  if (!plan || !RX_DEVICE_SelectAudio(devices, plan->device, open))
+bool RECEIVER_Select(const RxPlan *plan, bool open) {
+  if (!plan || !RX_DEVICE_RouteAudio(plan->device, open))
     return false;
   commit(plan);
   gReceiver.open = open;
-  LED_SetGreen(open);
-  BACKLIGHT_SetReception(open);
+  LED_SetGreen(gReceiver.open);
+  BACKLIGHT_SetReception(gReceiver.open);
   return true;
 }
 

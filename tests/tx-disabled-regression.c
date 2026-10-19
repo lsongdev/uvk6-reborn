@@ -5,12 +5,12 @@ DeviceConfig gDeviceConfig = {.preferences=CONFIG_DEFAULT_PREFERENCES};
 uint16_t gBatteryVoltage=760;
 static unsigned paStarts,paStops;
 bool GPIO_Read(GpioLine line) { (void)line; return false; }
-void BK4819_ToggleGpioOut(BK4819_GPIO_PIN_t pin, bool enable) {
-  assert(pin==BK4819_GPIO1_PIN29_PA_ENABLE);
+void BK48X9_ToggleGpioOut(BK48X9_GPIO_PIN_t pin, bool enable) {
+  assert(pin==BK48X9_GPIO1_PIN29_PA_ENABLE);
   if(enable) ++paStarts; else ++paStops;
 }
-void BK4819_WriteRegister(BK4819_REGISTER_t reg,uint16_t value) {
-  assert(reg==BK4819_REG_36 && value==0);
+void BK48X9_WriteRegister(BK48X9_REGISTER_t reg,uint16_t value) {
+  assert(reg==BK48X9_REG_36 && value==0);
 }
 void LED_SetRed(bool on) { assert(!on); }
 int main(void) {

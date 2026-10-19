@@ -33,12 +33,12 @@ static void render(void) {
   UI_SpectrumRender(GRAPH_Y, LCD_HEIGHT - GRAPH_Y, s);
 }
 
-// UP/DOWN move the cursor (panning at the edges), * and # widen and narrow
+// Arrows move the cursor (panning at the edges), * and # widen and narrow
 // the span, MENU tunes the slot to the cursor, EXIT goes back unchanged.
 static bool key(KEY_Code_t key, Key_State_t state) {
   bool released = state == KEY_RELEASED;
   if ((key == KEY_UP || key == KEY_DOWN) && (released || state == KEY_LONG_PRESSED_CONT)) {
-    RADIO_SpectrumMove(key == KEY_UP);
+    RADIO_SpectrumMove(KEYBOARD_FrequencyIncreases(key));
     return true;
   }
   if (key == KEY_MENU && state == KEY_LONG_PRESSED) return false; // Settings.

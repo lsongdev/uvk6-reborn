@@ -14,6 +14,10 @@
 #define CALIBRATION_SQUELCH_UHF_OFFSET 0x00u // 174 MHz and above.
 #define CALIBRATION_SQUELCH_VHF_OFFSET 0x60u // Below 174 MHz.
 
+// s16 crystal trim, two reserved u16s, u8 AF volume gain, u8 DAC gain.
+#define CALIBRATION_RX_MISC_OFFSET 0x188u
+#define CALIBRATION_RX_MISC_BYTES 8u
+
 #define CALIBRATION_PA_OFFSET 0xD0u
 #define CALIBRATION_PA_BANDS 7u
 #define CALIBRATION_PA_STRIDE 16u

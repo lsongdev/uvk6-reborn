@@ -5,6 +5,7 @@ CaptureRuntime capture;
 #if UVK6_ENABLE_FC
 bool capturing;
 static uint32_t capturePollAt;
+static bool captureInterruptedAudio;
 
 // Runtime keeps the committed origin until a carrier is confirmed.
 static bool capturePlan(uint32_t hz, RxPlan *plan) {
@@ -18,7 +19,7 @@ void cancelCapture(const char *status) {
   capturing=false;
   if (watcher.phase!=WATCH_OFF) { // BK slots rejoin the watch.
     suspendWatchBk(false);
-  } else if (gReceiver.plan.device!=RX_DEVICE_BK) { // The broadcast never stopped.
+  } else if (!captureInterruptedAudio) { // An independent broadcast never stopped.
     runtime.active=true;
     receivingSlot=selectedSlot;
   } else if (!applyReceiver(NULL, &runtime.current)) {
@@ -36,12 +37,16 @@ void cancelCapture(const char *status) {
 
 // FC borrows BK alone: a receiver on BK goes quiet, a broadcast chip plays on.
 static void captureAttempt(void) {
-  if (gReceiver.plan.device==RX_DEVICE_BK) {
+  captureInterruptedAudio = !RX_DEVICE_CanRunTogether(RX_DEVICE_BK,gReceiver.plan.device);
+  if (captureInterruptedAudio) {
     RECEIVER_Mute();
     receivingSlot=UINT8_MAX;
     resetRds();
   }
-  RX_DEVICE_CaptureStart(capture.range, RX_DEVICE_BK);
+  if (!RX_DEVICE_CaptureStart(capture.range)) {
+    cancelCapture("RX error");
+    return;
+  }
   capturing=true;
   capturePollAt=Now();
   message=NULL;

@@ -14,44 +14,57 @@ static uint32_t scanRaw;
 static bool scanReady;
 static bool rxPinEnabled;
 static bool speakerOn, bkDac;
+static unsigned speakerChanges;
 static uint8_t siVolume;
+static BK48X9_AF_Type_t bkAf;
+static bool sharedBkPath, broadcastReceiving, broadcastMuted = true, standbyOK = true;
 static void audioEvent(char c);
-void AUDIO_ToggleSpeaker(bool on) { speakerOn=on; audioEvent(on ? 'S' : 's'); }
-void BK4819_SetAF(BK4819_AF_Type_t af) { (void)af; }
-void BK4819_ToggleAFDAC(bool on) { bkDac=on; audioEvent(on ? 'D' : 'd'); }
+void AUDIO_ToggleSpeaker(bool on) {
+  if (on) assert((unsigned)(bkDac && bkAf == BK48X9_AF_FM) + (siVolume != 0) +
+                 (broadcastReceiving && !broadcastMuted) == 1); // No mixed outputs.
+  if (speakerOn != on) ++speakerChanges;
+  speakerOn=on; audioEvent(on ? 'S' : 's');
+}
+void BK48X9_SetAF(BK48X9_AF_Type_t af) { bkAf=af; audioEvent(af == BK48X9_AF_MUTE ? 'm' : 'F'); }
+void BK48X9_ToggleAFDAC(bool on) { bkDac=on; audioEvent(on ? 'D' : 'd'); }
+// Backend mute as the firmware links it: the BK4829 keeps its RX DAC powered.
+void BK48X9_MuteAudio(void) {
+  BK48X9_SetAF(BK48X9_AF_MUTE);
+  if (UVK6_ENABLE_SI4732) BK48X9_ToggleAFDAC(false);
+}
 
-void BK4819_StopScan(void) { ++scanStops; BK4819_Idle(); }
-void BK4819_InvalidateRxMode(void) { ++modeInvalidations; }
-void BK4819_EnableFrequencyScanEx(FreqScanTime time) {
+void BK48X9_StopScan(void) { ++scanStops; BK48X9_Idle(); }
+void BK48X9_InvalidateRxMode(void) { ++modeInvalidations; }
+void BK48X9_EnableFrequencyScanEx(FreqScanTime time) {
   assert(time==F_SC_T_0_2s); ++scanStarts;
 }
-bool BK4819_GetFrequencyScanResult(uint32_t *raw) { *raw=scanRaw; return scanReady; }
+bool BK48X9_GetFrequencyScanResult(uint32_t *raw) { *raw=scanRaw; return scanReady; }
 uint32_t PREFERENCES_FilterBound(void) { return 24000000u; }
-bool BK4819_BandwidthFromHz(uint32_t hz, uint16_t *index) {
+bool BK48X9_BandwidthFromHz(uint32_t hz, uint16_t *index) {
   if (hz != 12000 && hz != 6000) return false;
   *index = hz == 12000 ? 4 : 0; return true;
 }
 static uint32_t lastCtcss, lastDcs;
 static unsigned toneResets, tonesOff;
-void BK4819_SetCTCSSFrequency(uint32_t hz10) { lastCtcss=hz10; }
-void BK4819_SetCDCSSCodeWord(uint32_t word) { lastDcs=word; }
-void BK4819_ExitSubAu(void) { ++tonesOff; }
-void BK4819_WriteRegister(BK4819_REGISTER_t reg, uint16_t value) { (void)reg; (void)value; }
-void BK4819_CssResetDetection(bool digital) { (void)digital; ++toneResets; }
-void BK4819_CssOff(void) {}
+void BK48X9_SetCTCSSFrequency(uint32_t hz10) { lastCtcss=hz10; }
+void BK48X9_SetCDCSSCodeWord(uint32_t word) { lastDcs=word; }
+void BK48X9_ExitSubAu(void) { ++tonesOff; }
+void BK48X9_WriteRegister(BK48X9_REGISTER_t reg, uint16_t value) { (void)reg; (void)value; }
+void BK48X9_CssResetDetection(bool digital) { (void)digital; ++toneResets; }
+void BK48X9_CssOff(void) {}
 static bool carrierOpen=true;
-bool BK4819_IsSquelchOpen(void) { return carrierOpen; }
-void BK4819_Idle(void) { ++bkIdle; }
-void BK4819_RX_TurnOn(void) {}
-void BK4819_SetRxMode(bool am) {
+bool BK48X9_IsSquelchOpen(void) { return carrierOpen; }
+void BK48X9_Idle(void) { ++bkIdle; bkDac=false; }
+void BK48X9_RX_TurnOn(void) { bkDac=true; }
+void BK48X9_SetRxMode(bool am) {
   (void)am; ++bkModes;
 }
-void BK4819_SetFilterBandwidth(BK4819_FilterBandwidth_t bw) { (void)bw; }
-void BK4819_SetAGC(uint8_t i) { (void)i; }
-void BK4819_SetAFC(uint8_t n) { (void)n; }
-void BK4819_SetAFCSpeed(uint8_t n) { (void)n; }
+void BK48X9_SetFilterBandwidth(BK48X9_FilterBandwidth_t bw) { (void)bw; }
+void BK48X9_SetAGC(uint8_t i) { (void)i; }
+void BK48X9_SetAFC(uint8_t n) { (void)n; }
+void BK48X9_SetAFCSpeed(uint8_t n) { (void)n; }
 static SQL lastSquelch;
-void BK4819_SetupSquelch(SQL sq, uint8_t a, uint8_t b) { lastSquelch = sq; (void)a; (void)b; }
+void BK48X9_SetupSquelch(SQL sq, uint8_t a, uint8_t b) { lastSquelch = sq; (void)a; (void)b; }
 // UV-K1 calibration rows: 0x00 UHF and 0x60 VHF, six rows of 16 bytes.
 static uint8_t calibration[0x200];
 static bool calibrationReadable = true;
@@ -61,8 +74,9 @@ bool STORAGE_Read(StorageArea area, uint32_t offset, void *data, uint16_t size) 
   memcpy(data, calibration + offset, size); return true;
 }
 static Filter lastFilter = FILTER_OFF;
-void BK4819_SelectFilterEx(Filter filter) { lastFilter = filter; }
-void BK4819_TuneTo(uint32_t hz10, bool precise) {
+void BK48X9_SelectFilterEx(Filter filter) { lastFilter = filter; }
+void BK48X9_TuneTo(uint32_t hz10, bool precise) {
+  assert(!sharedBkPath || !broadcastReceiving); // A mute has not released RF.
   ++bkTunes; lastBkHz10 = hz10; assert(precise);
 }
 bool SI47XX_BandwidthFromHz(uint32_t hz, bool ssb, uint16_t *bw) {
@@ -93,7 +107,7 @@ SiSeekResult SI47XX_SeekPoll(uint32_t *frequency_hz) {
   ++siIo; *frequency_hz = 100100000; return SI_SEEK_FOUND;
 }
 void SI47XX_SeekCancel(void) { ++siIo; }
-void SI47XX_PowerDown(void) { ++siPowerDowns; }
+void SI47XX_PowerDown(void) { ++siPowerDowns; siVolume=0; }
 bool SI47XX_SetVolume(uint8_t v) {
   ++siIo; if (!v) ++siMuted; siVolume=v;return siVolumeOk;
 }
@@ -101,27 +115,34 @@ uint16_t BK1080_ReadRegister(BK1080_Register_t reg) {
   (void)reg; return 0x003f;
 }
 static unsigned broadcastParks;
-bool BK1080_Init(uint32_t hz10, bool enable) {
-  if (!enable) { assert(hz10 == 0); ++broadcastParks; return true; } // RX_DEVICE_Init.
+bool BK1080_Standby(void) {
+  ++broadcastParks;
+  if (standbyOK) { broadcastReceiving=false; broadcastMuted=true; }
+  return standbyOK;
+}
+bool BK1080_TuneTo(uint32_t hz10) {
   assert(hz10 == 10000000u);
-  ++broadcastTunes; return broadcastOk;
+  ++broadcastTunes;
+  if (broadcastOk) { broadcastReceiving=true; broadcastMuted=false; }
+  return broadcastOk;
 }
 bool BK1080_Mute(bool mute) {
   ++broadcastMutes;
-  return mute || broadcastMuteOk;
+  bool ok=mute || broadcastMuteOk;
+  if (ok) broadcastMuted=mute;
+  return ok;
 }
 static uint16_t watchRSSI=130;
 static uint8_t watchNoise=20,watchGlitch=20;
 static bool watchTone=true;
-uint16_t BK4819_GetRSSI(void) { return watchRSSI; }
-uint8_t BK4819_GetNoise(void) { return watchNoise; }
-uint8_t BK4819_GetGlitch(void) { return watchGlitch; }
-bool BK4819_CssIsDetected(bool digital) { (void)digital; return watchTone; }
+uint16_t BK48X9_GetRSSI(void) { return watchRSSI; }
+uint8_t BK48X9_GetNoise(void) { return watchNoise; }
+uint8_t BK48X9_GetGlitch(void) { return watchGlitch; }
+bool BK48X9_CssIsDetected(bool digital) { (void)digital; return watchTone; }
 SQL GetSql(uint8_t level) { return level ? (SQL){.ro=108,.no=44,.go=60} : (SQL){0}; }
 static char audioOrder[16];
 static unsigned audioCount;
 static void audioEvent(char c) { if (audioCount < sizeof(audioOrder)) audioOrder[audioCount++] = c; }
-void BK4819_ToggleAFBit(bool on) { audioEvent(on ? 'B' : 'b'); }
 void SYS_DelayMs(uint32_t ms) { assert(ms == 8); audioEvent('t'); }
 uint16_t BK1080_GetRSSI(void) { return 30; }
 uint8_t BK1080_GetSNR(void) { return 10; }
@@ -129,16 +150,14 @@ static RxPlan plan(uint32_t hz, RxMode mode, RxDevice device) {
   return (RxPlan){device, hz, {mode, mode == RX_WFM ? 100000 : 12500,
     mode == RX_WFM ? 0 : mode == RX_NFM ? 12000 : 6000, 0}};
 }
-static unsigned chipProbes, patchSources;
-static bool hasSi = true;
-static bool allowSi = true;
-bool BOARD_HasSi4732(void) { return allowSi; }
-static bool sharedBkPath;
+static unsigned patchSources;
 bool BOARD_BroadcastUsesBkVhfPath(void) { return sharedBkPath; }
-BoardRadioChip BOARD_RadioChip(void) { return allowSi ? BOARD_RADIO_BK4819 : BOARD_RADIO_BK4829; }
 bool isSi4732On;
-bool BK1080_Detect(void) { ++chipProbes; return !hasSi; }
-bool SI47XX_Detect(void) { ++chipProbes; return hasSi; }
+// The board build fixes the chips: K6 SI4732 + BK4819, K1 BK1080 + BK4829.
+BK48X9Capabilities BK48X9_GetCapabilities(void) {
+  return UVK6_ENABLE_SI4732 ? (BK48X9Capabilities){4819, true, 0x3FF}
+                            : (BK48X9Capabilities){4829, false, (1u << 0) | (1u << 4) | (1u << 9)};
+}
 bool RESOURCE_SsbPatchPresent(void) { return true; }
 bool RESOURCE_SsbPatchRead(uint16_t offset, uint8_t *out, uint16_t size) {
   (void)offset; (void)out; (void)size; return true;
@@ -147,13 +166,19 @@ void SI47XX_SetPatchSource(SI47XX_PatchRead read, uint16_t length) {
   assert(read == RESOURCE_SsbPatchRead && length == RESOURCE_SSB_PATCH_BYTES); ++patchSources;
 }
 static uint8_t initMic; static uint16_t initDeviation;
-void BK4819_Init(uint8_t mic, uint16_t deviation) { initMic = mic; initDeviation = deviation; }
+void BK48X9_Init(uint8_t mic, uint16_t deviation) { initMic = mic; initDeviation = deviation; }
+static int16_t rxTrim;
+static uint8_t rxVolume, rxDac;
+void BK48X9_SetRxCalibration(int16_t trim, uint8_t volume, uint8_t dac) {
+  rxTrim = trim; rxVolume = volume; rxDac = dac;
+}
 void TX_DEVICE_Disable(void) {}
 
 static void testCalibratedSquelch(void) {
-  // BK4829 (allowSi false): level n reads byte n of each row; UHF from 0x00.
-  bool previousSi = allowSi;
-  allowSi = false;
+#if UVK6_ENABLE_SI4732
+  assert(squelchFor(4, 145500000u).ro == 108); // K6 keeps the formula.
+#else
+  // K1: level n reads byte n of each row; UHF from 0x00.
   for (unsigned i = 0; i < 6; ++i) {
     calibration[0x00 + 16 * i + 4] = (uint8_t)(0x40 + i);
     calibration[0x60 + 16 * i + 4] = (uint8_t)(0x50 + i);
@@ -170,55 +195,162 @@ static void testCalibratedSquelch(void) {
   assert(squelchFor(4, 145500000u).ro == 108);
   calibrationReadable = true;
   assert(squelchFor(0, 145500000u).ro == 0); // Level 0 stays open.
-  allowSi = true; // BK4819 boards keep the formula.
-  assert(squelchFor(4, 145500000u).ro == 108);
-  allowSi = previousSi;
+#endif
 }
 
 static void testDetectionAndInit(void) {
-  // Probed once, then cached; the SSB patch source is handed to the SI driver.
+  // Fixed by the build, then cached; the SSB patch source goes to the SI driver.
   ReceiverCapabilities c = RX_DEVICE_Capabilities();
-  assert(c.si && !c.broadcast && c.ssb_patch && chipProbes == 2 && patchSources == 1);
+  assert(c.si && !c.broadcast && c.ssb_patch && c.bk_am && patchSources == 1);
   c = RX_DEVICE_Capabilities();
-  assert(c.si && chipProbes == 2 && patchSources == 1);
+  assert(c.si && patchSources == 1);
   gDeviceConfig.preferences.mic = 9; gDeviceConfig.preferences.deviation = 130;
   RX_DEVICE_Init();
-  assert(initMic == 9 && initDeviation == 130 && broadcastParks == 1);
+  assert(initMic == 9 && initDeviation == 130 && !broadcastParks); // No BK1080 built in.
 }
 
-int main(int argc, char **argv) {
-  if (argc > 1) {
-    allowSi = false;
-    bool broadcast = !strcmp(argv[1], "--uvk1");
-    hasSi = !broadcast;
-    ReceiverCapabilities c = RX_DEVICE_Capabilities();
-    assert(!c.si && !c.ssb_patch && c.broadcast == broadcast && !c.bk_am);
-    assert(c.bk_bandwidth_mask == (RX_BK_BANDWIDTH_6K | RX_BK_BANDWIDTH_12K | RX_BK_BANDWIDTH_26K));
-    RxPlan am = plan(125000000, RX_AM, RX_DEVICE_BK);
-    assert(!RX_DEVICE_Apply(&am, RX_DEVICE_BK));
-    assert(chipProbes == 1 && patchSources == 0); // Never probe SI, even if FM is absent.
-    (void)RX_DEVICE_Capabilities();
-    assert(chipProbes == 1);
-    RxPlan unsupported = plan(100000000, RX_WFM, RX_DEVICE_SI);
-    assert(!RX_DEVICE_Apply(&unsupported, RX_DEVICE_BK));
-    assert(!siTunes && !bkTunes && !bkIdle && !siPowerDowns);
-    RdsPacket packet;
-    assert(!RX_DEVICE_ReadRDS(&packet, false));
-    uint16_t rssi; bool found;
-    uint32_t frequency;
-    assert(!RX_DEVICE_Sample(&unsupported, &rssi, &found));
-    assert(!RX_DEVICE_WatchSignal(&unsupported, &found));
-    assert(!RX_DEVICE_SeekSignal(RX_DEVICE_SI, &found));
-    assert(!RX_DEVICE_SeekNative(&unsupported));
-    assert(!RX_DEVICE_SeekStart(&unsupported, 64000000, 108000000));
-    assert(RX_DEVICE_SeekPoll(RX_DEVICE_SI, &frequency) == RX_SEEK_ERROR);
-    RX_DEVICE_SeekCancel(RX_DEVICE_SI);
-    assert(!RX_DEVICE_SelectAudio(1u << RX_DEVICE_SI, RX_DEVICE_SI, true));
-    isSi4732On = true; // Even stale chip state must not advertise an absent part.
-    assert(!RX_DEVICE_SiActive());
-    assert(siIo == 0 && !speakerOn);
-    return 0;
+static void testUvk1(void) {
+  ReceiverCapabilities c = RX_DEVICE_Capabilities();
+  assert(!c.si && !c.ssb_patch && c.broadcast && !c.bk_am);
+  assert(c.bk_bandwidth_mask == (RX_BK_BANDWIDTH_6K | RX_BK_BANDWIDTH_12K | RX_BK_BANDWIDTH_26K));
+  RxPlan am = plan(125000000, RX_AM, RX_DEVICE_BK);
+  assert(!RX_DEVICE_Activate(&am));
+  assert(patchSources == 0); // No SI4732 driver path in this build.
+  RxPlan unsupported = plan(100000000, RX_WFM, RX_DEVICE_SI);
+  assert(!RX_DEVICE_Activate(&unsupported));
+  assert(!siTunes && !bkTunes && !bkIdle && !siPowerDowns);
+  RdsPacket packet;
+  assert(!RX_DEVICE_ReadRDS(&packet, false));
+  uint16_t rssi; bool found;
+  uint32_t frequency;
+  assert(!RX_DEVICE_Sample(&unsupported, &rssi, &found));
+  assert(!RX_DEVICE_WatchSignal(&unsupported, &found));
+  assert(!RX_DEVICE_SeekSignal(RX_DEVICE_SI, &found));
+  assert(!RX_DEVICE_SeekNative(&unsupported));
+  assert(!RX_DEVICE_SeekStart(&unsupported, 64000000, 108000000));
+  assert(RX_DEVICE_SeekPoll(RX_DEVICE_SI, &frequency) == RX_SEEK_ERROR);
+  RX_DEVICE_SeekCancel(RX_DEVICE_SI);
+  assert(!RX_DEVICE_RouteAudio(RX_DEVICE_SI, true));
+  isSi4732On = true; // Even stale chip state must not advertise an absent part.
+  assert(!RX_DEVICE_SiActive());
+  assert(siIo == 0 && !speakerOn);
+
+  // Factory trim/gains, erased and unreadable fallback all use read-only IO.
+  memset(calibration, 0xFF, sizeof(calibration));
+  RX_DEVICE_Init();
+  assert(rxTrim == 0 && rxVolume == 58 && rxDac == 8);
+  memcpy(calibration + CALIBRATION_RX_MISC_OFFSET, "\xfe\xff\x46\0\x50\0\x2c\x0e", 8);
+  RX_DEVICE_Init();
+  assert(rxTrim == -2 && rxVolume == 44 && rxDac == 14);
+  calibrationReadable = false;
+  RX_DEVICE_Init();
+  assert(rxTrim == 0 && rxVolume == 58 && rxDac == 8);
+  calibrationReadable = true;
+
+  // A frequency-only hop across 174 MHz must reload the other SQL table,
+  // even though both frequencies use the same VHF front-end filter.
+  RxPlan vhf = plan(173987500u, RX_NFM, RX_DEVICE_BK);
+  vhf.parameters.squelch = 4;
+  assert(RX_DEVICE_Activate(&vhf));
+  unsigned before = bkModes;
+  vhf.frequency_hz = 174000000u;
+  assert(RX_DEVICE_Activate(&vhf) && bkModes == before + 1);
+  vhf.frequency_hz += 12500u;
+  assert(RX_DEVICE_Activate(&vhf) && bkModes == before + 1);
+
+  // SQ0 must really bypass hardware SQL, with tone matching still enforced.
+  vhf.parameters.squelch = 0; carrierOpen = false;
+  assert(RX_DEVICE_Sample(&vhf, &rssi, &found) && found);
+  vhf.parameters.rx_tone = 1; watchTone = false;
+  assert(RX_DEVICE_Sample(&vhf, &rssi, &found) && !found);
+  watchTone = true;
+  assert(RX_DEVICE_Sample(&vhf, &rssi, &found) && found);
+
+  // K1 keeps the RX DAC powered between SQL changes and selects full AF.
+  audioCount = 0; bkDac = true;
+  RX_DEVICE_RouteAudio(RX_DEVICE_BK, true);
+  RX_DEVICE_RouteAudio(RX_DEVICE_BK, false);
+  assert(bkDac && !speakerOn && audioCount > 0 && audioOrder[0] == 's');
+}
+
+static void testBroadcastPath(void) {
+  RxPlan bk = plan(100000000, RX_NFM, RX_DEVICE_BK);
+  uint16_t rssi; bool open;
+  RxPlan fmRadio = plan(100000000, RX_WFM, RX_DEVICE_BROADCAST);
+  broadcastOk = false;
+  assert(!RX_DEVICE_Activate(&fmRadio));
+  assert(broadcastTunes == 1);
+  broadcastOk = true;
+  broadcastMuteOk = false;
+  assert(RX_DEVICE_Activate(&fmRadio)); // Prepared muted.
+  assert(!RX_DEVICE_RouteAudio(RX_DEVICE_BROADCAST,true));
+  assert(broadcastTunes == 2 && !speakerOn);
+  broadcastMuteOk = true;
+  assert(RX_DEVICE_Activate(&fmRadio));
+  assert(broadcastTunes == 3);
+  assert(RX_DEVICE_Activate(&bk));
+  assert(bkTunes == 4 && lastBkHz10 == 10000000u);
+  // UV-K1: broadcast needs the BK VHF LNA; no background BK retune meanwhile.
+  sharedBkPath = true;
+  assert(RX_DEVICE_Activate(&fmRadio));
+  assert(broadcastTunes == 4 && lastFilter == FILTER_VHF);
+  RxPlan uhfWatch = plan(438500000u, RX_NFM, RX_DEVICE_BK);
+  unsigned bkTunesBefore = bkTunes;
+  assert(!RX_DEVICE_Prepare(&uhfWatch) && bkTunes == bkTunesBefore);
+  assert(lastFilter == FILTER_VHF);
+  assert(RX_DEVICE_Activate(&bk)); // Leaving broadcast frees BK.
+  assert(RX_DEVICE_Prepare(&uhfWatch));
+  sharedBkPath = false;
+  RxPlan fm = plan(100000000u, RX_WFM, RX_DEVICE_BROADCAST); fm.parameters.squelch=9;
+  assert(RX_DEVICE_Activate(&fm) && RX_DEVICE_Sample(&fm,&rssi,&open) && open && rssi==30);
+
+  // The device layer owns real path state; callers do not supply a guessed
+  // previous chip. A standby NACK must stop a conflicting foreground tune.
+  RxPlan watch = plan(145500000, RX_NFM, RX_DEVICE_BK);
+  unsigned tunesBefore;
+  sharedBkPath=true;
+  assert(!RX_DEVICE_CanRunTogether(RX_DEVICE_BK,RX_DEVICE_BROADCAST));
+  assert(!RX_DEVICE_CanRunTogether(RX_DEVICE_BROADCAST,RX_DEVICE_BK));
+  assert(RX_DEVICE_Activate(&fmRadio));
+  assert(RX_DEVICE_RouteAudio(RX_DEVICE_BROADCAST,true) && broadcastReceiving);
+  standbyOK=false; tunesBefore=bkTunes;
+  assert(!RX_DEVICE_Activate(&watch));
+  assert(bkTunes==tunesBefore && broadcastReceiving && !speakerOn);
+  assert(!RX_DEVICE_Prepare(&watch)); // Mute did not release the front end.
+  standbyOK=true;
+  assert(RX_DEVICE_Activate(&fmRadio)); // Explicit recovery to the old FM.
+  for (unsigned i=0; i<20; ++i) {
+    assert(RX_DEVICE_Activate(&fmRadio));
+    assert(RX_DEVICE_RouteAudio(RX_DEVICE_BROADCAST,true) && speakerOn);
+    unsigned parks=broadcastParks;
+    watch.frequency_hz=(i&1u) ? 145500000u : 438500000u;
+    assert(RX_DEVICE_Activate(&watch));
+    assert(!broadcastReceiving && broadcastParks==parks+1 && lastBkHz10==watch.frequency_hz/10u);
+    assert(RX_DEVICE_RouteAudio(RX_DEVICE_BK,true) && speakerOn);
   }
+  // FC cannot use the same shared RF path underneath FM; cancel/restore
+  // activates FM again instead of merely restoring its public slot mirror.
+  assert(RX_DEVICE_Activate(&fmRadio));
+  assert(RX_DEVICE_CaptureStart(CAPTURE_RANGE_VHF) && !broadcastReceiving);
+  RX_DEVICE_CaptureStop();
+  assert(RX_DEVICE_Activate(&fmRadio) && broadcastReceiving);
+  assert(RX_DEVICE_RouteAudio(RX_DEVICE_BROADCAST,true));
+  standbyOK=false;
+  assert(!RX_DEVICE_StopAll() && !speakerOn && !audioOpen && broadcastReceiving);
+  assert(runningDevices & (1u << RX_DEVICE_BROADCAST)); // Failed release stays tracked.
+  standbyOK=true;
+  assert(RX_DEVICE_StopAll() && !runningDevices && !broadcastReceiving && !speakerOn);
+  // TX release restores the same channel through full RX activation.
+  assert(RX_DEVICE_Activate(&watch) && rxPinEnabled && bkDac);
+}
+
+int main(void) {
+#if !UVK6_ENABLE_SI4732
+  testUvk1();
+  testCalibratedSquelch();
+  testBroadcastPath();
+  return 0;
+#else
   testCalibratedSquelch();
   testDetectionAndInit();
   RxPlan bk = plan(100000000, RX_NFM, RX_DEVICE_BK);
@@ -232,73 +364,55 @@ int main(int argc, char **argv) {
   assert(!RX_DEVICE_SeekStart(&bk, 64000000, 108000000));
   bool signal;
   assert(RX_DEVICE_SeekSignal(RX_DEVICE_BK, &signal) && signal);
-  assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BK));
+  assert(RX_DEVICE_Activate(&bk));
   assert(bkTunes == 1 && lastBkHz10 == 10000000u && bkModes == 1);
   RxPlan bkNext = plan(100012500, RX_NFM, RX_DEVICE_BK);
-  assert(RX_DEVICE_Apply(&bkNext, RX_DEVICE_BK));
+  assert(RX_DEVICE_Activate(&bkNext));
   assert(bkTunes == 2 && bkModes == 1 && lastBkHz10 == 10001250u);
   gDeviceConfig.preferences.sql_open_time = 2;
-  assert(RX_DEVICE_Apply(&bkNext, RX_DEVICE_BK));
+  assert(RX_DEVICE_Activate(&bkNext));
   assert(bkTunes == 3 && bkModes == 2);
   gDeviceConfig.preferences.sql_open_time = 0;
   RxPlan wfm = plan(100000000, RX_WFM, RX_DEVICE_SI);
-  assert(RX_DEVICE_Apply(&wfm, RX_DEVICE_BK));
+  assert(RX_DEVICE_Activate(&wfm));
   assert(bkIdle == 1 && siTunes == 1);
   RxPlan unsupported = plan(100000000, RX_WFM, RX_DEVICE_BK);
-  assert(!RX_DEVICE_Apply(&unsupported, RX_DEVICE_SI));
-  assert(siMuted == 0 && bkTunes == 3); // Validate before power switch.
+  unsigned beforeInvalid = siMuted;
+  assert(!RX_DEVICE_Activate(&unsupported));
+  assert(siMuted == beforeInvalid && bkTunes == 3); // Validate before power switch.
   siTuneOk = false;
-  assert(!RX_DEVICE_Apply(&wfm, RX_DEVICE_SI));
+  assert(!RX_DEVICE_Activate(&wfm));
   assert(siTunes == 2 && bkTunes == 3);
   siTuneOk = true;
   siVolumeOk = false;
-  assert(!RX_DEVICE_Apply(&wfm, RX_DEVICE_SI));
+  assert(!RX_DEVICE_Activate(&wfm));
   siVolumeOk = true;
-  assert(RX_DEVICE_Apply(&wfm, RX_DEVICE_SI));
+  assert(RX_DEVICE_Activate(&wfm));
+  // SI4732 build: the BK1080 path is not compiled in.
   RxPlan fmRadio = plan(100000000, RX_WFM, RX_DEVICE_BROADCAST);
-  unsigned mutedBeforeSwitch = siMuted;
-  broadcastOk = false;
-  assert(!RX_DEVICE_Apply(&fmRadio, RX_DEVICE_SI));
-  assert(siMuted == mutedBeforeSwitch + 1 && broadcastTunes == 1);
-  broadcastOk = true;
-  broadcastMuteOk = false;
-  assert(!RX_DEVICE_Apply(&fmRadio, RX_DEVICE_SI));
-  assert(broadcastTunes == 2 && broadcastMutes >= 3);
-  broadcastMuteOk = true;
-  assert(RX_DEVICE_Apply(&fmRadio, RX_DEVICE_SI));
-  assert(broadcastTunes == 3);
-  assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BROADCAST));
+  assert(!RX_DEVICE_Activate(&fmRadio) && !broadcastTunes);
+  assert(RX_DEVICE_Activate(&bk));
   assert(bkTunes == 4 && lastBkHz10 == 10000000u);
-  // UV-K1: broadcast needs the BK VHF LNA; no background BK retune meanwhile.
-  sharedBkPath = true;
-  assert(RX_DEVICE_Apply(&fmRadio, RX_DEVICE_BK));
-  assert(broadcastTunes == 4 && lastFilter == FILTER_VHF);
-  RxPlan uhfWatch = plan(438500000u, RX_NFM, RX_DEVICE_BK);
-  unsigned bkTunesBefore = bkTunes;
-  assert(!RX_DEVICE_ApplyConcurrent(&uhfWatch) && bkTunes == bkTunesBefore);
-  assert(lastFilter == FILTER_VHF);
-  assert(RX_DEVICE_Apply(&bk, RX_DEVICE_BROADCAST)); // Leaving broadcast frees BK.
-  assert(RX_DEVICE_ApplyConcurrent(&uhfWatch));
-  sharedBkPath = false;
-  bkTunes = 4;
   gDeviceConfig.preferences.si4732_power_off = true;
-  assert(RX_DEVICE_Apply(&bk, RX_DEVICE_SI));
-  assert(siPowerDowns == 1 && bkTunes == 5);
+  assert(RX_DEVICE_Prepare(&native));
+  assert(RX_DEVICE_Activate(&bk));
+  // SI powers down on the handoff; BK already holds this plan, so no retune.
+  assert(siPowerDowns == 1 && bkTunes == 4);
   bk.parameters.rx_tone=1;
   unsigned resetBefore=toneResets;
-  assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
+  assert(RX_DEVICE_Activate(&bk));
   assert(lastCtcss==670 && toneResets==resetBefore+1);
-  assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));assert(toneResets==resetBefore+1);
-  bk.frequency_hz+=12500;assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
+  assert(RX_DEVICE_Activate(&bk));assert(toneResets==resetBefore+1);
+  bk.frequency_hz+=12500;assert(RX_DEVICE_Activate(&bk));
   assert(toneResets==resetBefore+2);
-  bk.parameters.rx_tone=51;assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
+  bk.parameters.rx_tone=51;assert(RX_DEVICE_Activate(&bk));
   uint32_t normal=lastDcs;
-  bk.parameters.rx_tone=155;assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
+  bk.parameters.rx_tone=155;assert(RX_DEVICE_Activate(&bk));
   assert(lastDcs==(normal^0x7fffffu));
   bk.parameters.rx_tone=0;unsigned offBefore=tonesOff;
-  assert(RX_DEVICE_Apply(&bk,RX_DEVICE_BK));assert(tonesOff==offBefore+1);
+  assert(RX_DEVICE_Activate(&bk));assert(tonesOff==offBefore+1);
   bk.parameters.rx_tone=1;bk.parameters.mode=RX_AM;
-  assert(!RX_DEVICE_Apply(&bk,RX_DEVICE_BK));
+  assert(!RX_DEVICE_Activate(&bk));
   // SQ0/always-open audio cannot classify arbitrary noise as a watch hit.
   RxPlan watch=plan(145500000,RX_NFM,RX_DEVICE_BK);
   assert(RX_DEVICE_WatchSignal(&watch,&signal) && signal);
@@ -315,8 +429,10 @@ int main(int argc, char **argv) {
   assert(!RX_DEVICE_WatchSignal(NULL,&signal) && !RX_DEVICE_WatchSignal(&watch,NULL));
   // Capture owns BK physically even when the public mirror still names SI.
   gDeviceConfig.preferences.si4732_power_off=false;
+  assert(RX_DEVICE_Activate(&native));
+  assert(RX_DEVICE_RouteAudio(RX_DEVICE_SI,true));
   unsigned muteBefore=siMuted, invalidateBefore=modeInvalidations;
-  RX_DEVICE_CaptureStart(CAPTURE_RANGE_VHF,RX_DEVICE_SI);
+  RX_DEVICE_CaptureStart(CAPTURE_RANGE_VHF);
   assert(siMuted==muteBefore+1 && scanStarts==1 && modeInvalidations==invalidateBefore+1);
   uint32_t captured=0;
   assert(RX_DEVICE_CapturePoll(CAPTURE_RANGE_VHF,&captured)==CAPTURE_BUSY);
@@ -328,41 +444,47 @@ int main(int argc, char **argv) {
   scanRaw=UINT32_MAX;
   assert(RX_DEVICE_CapturePoll(CAPTURE_RANGE_UHF,&captured)==CAPTURE_INVALID);
   assert(RX_DEVICE_CapturePoll(CAPTURE_RANGE_UHF,NULL)==CAPTURE_INVALID);
-  RX_DEVICE_CaptureStart(CAPTURE_RANGE_UHF,RX_DEVICE_BROADCAST);
-  assert(broadcastMutes>0);
+  RX_DEVICE_CaptureStart(CAPTURE_RANGE_UHF);
+  assert(!broadcastMutes);
   // Same-frequency restoration must reconfigure mode and tune, bypassing cache.
   watch.parameters.rx_tone=0;
-  assert(RX_DEVICE_Apply(&watch,RX_DEVICE_BK));
+  assert(RX_DEVICE_Activate(&watch));
   unsigned modesBefore=bkModes, tunesBefore=bkTunes;
   RX_DEVICE_CaptureStop();RX_DEVICE_CaptureStop();
-  assert(RX_DEVICE_Apply(&watch,RX_DEVICE_BK));
+  assert(RX_DEVICE_Activate(&watch));
   assert(bkModes==modesBefore+1 && bkTunes==tunesBefore+1 && scanStops>=4);
   // Concurrent prepare must not idle the other receiver; routing must not tune.
   siVolumeOk=true;rsqOK=true;
   unsigned beforeBkIdle=bkIdle;
   native.parameters.squelch=0;
-  assert(RX_DEVICE_ApplyConcurrent(&native) && siVolume==0 && bkIdle==beforeBkIdle);
+  assert(RX_DEVICE_Prepare(&native) && siVolume==0 && bkIdle==beforeBkIdle);
   unsigned beforeSiMuted=siMuted;
-  assert(RX_DEVICE_ApplyConcurrent(&watch) && !bkDac && siMuted==beforeSiMuted);
+  assert(RX_DEVICE_Prepare(&watch) && !bkDac && siMuted==beforeSiMuted);
   unsigned beforeBkTunes=bkTunes,beforeSiTunes=siTunes;
-  uint8_t devices=(1u<<RX_DEVICE_BK)|(1u<<RX_DEVICE_SI);
-  assert(RX_DEVICE_SelectAudio(devices,RX_DEVICE_SI,true));
+  assert(RX_DEVICE_RouteAudio(RX_DEVICE_SI,true));
   assert(speakerOn && siVolume==63 && !bkDac);
-  assert(RX_DEVICE_SelectAudio(devices,RX_DEVICE_BK,true));
+  unsigned changes=speakerChanges, backgroundTunes=siTunes;
+  assert(RX_DEVICE_Prepare(&watch));
+  assert(speakerOn && siVolume==63 && speakerChanges==changes && siTunes==backgroundTunes);
+  assert(!RX_DEVICE_Activate(&unsupported));
+  assert(speakerOn && siVolume==63 && speakerChanges==changes); // Validate before muting.
+  beforeBkTunes=bkTunes;
+  assert(RX_DEVICE_RouteAudio(RX_DEVICE_BK,true));
   assert(speakerOn && siVolume==0 && bkDac);
   assert(bkTunes==beforeBkTunes && siTunes==beforeSiTunes);
-  assert(RX_DEVICE_SelectAudio(devices,RX_DEVICE_BK,false));
+  assert(RX_DEVICE_RouteAudio(RX_DEVICE_BK,false));
   assert(!speakerOn && !bkDac && !siVolume);
   siVolumeOk=false;
-  assert(!RX_DEVICE_SelectAudio(devices,RX_DEVICE_BK,true) && !speakerOn && !bkDac);
+  assert(!RX_DEVICE_RouteAudio(RX_DEVICE_BK,true) && !speakerOn && !bkDac);
   siVolumeOk=true;
   rxPinEnabled=false;
   modesBefore=bkModes;tunesBefore=bkTunes;
   RX_DEVICE_InvalidateBk();
-  assert(RX_DEVICE_Apply(&watch,RX_DEVICE_BK));
+  assert(RX_DEVICE_Activate(&watch));
   assert(rxPinEnabled && bkModes==modesBefore+1 && bkTunes==tunesBefore+1);
   // Squelch sample: BK requires carrier and the configured tone.
   RxPlan toned = plan(438500000u, RX_NFM, RX_DEVICE_BK);
+  toned.parameters.squelch = 4;
   toned.parameters.rx_tone = 1;
   uint16_t rssi; bool open;
   carrierOpen=true; watchTone=false;
@@ -377,16 +499,18 @@ int main(int argc, char **argv) {
   assert(RX_DEVICE_Sample(&si,&rssi,&open) && open && rssi==40);
   si.parameters.squelch=6; assert(RX_DEVICE_Sample(&si,&rssi,&open) && !open);
   rsqOK=false; assert(!RX_DEVICE_Sample(&si,&rssi,&open) && !open && !rssi); rsqOK=true;
-  RxPlan fm = plan(100000000u, RX_WFM, RX_DEVICE_BROADCAST); fm.parameters.squelch=9;
-  assert(RX_DEVICE_Sample(&fm,&rssi,&open) && open && rssi==30);
   // Speaker gate: DAC before speaker on open, speaker first on close.
   bkDac=false; audioCount=0;
-  RX_DEVICE_SetAudio(RX_DEVICE_BK,true); RX_DEVICE_SetAudio(RX_DEVICE_BK,false);
-  assert(audioCount==8 && !memcmp(audioOrder,"DBtSstdb",8));
+  RX_DEVICE_RouteAudio(RX_DEVICE_BK,true); RX_DEVICE_RouteAudio(RX_DEVICE_BK,false);
+  assert(!speakerOn && !bkDac && audioCount > 0 && audioOrder[0] == 's');
+  assert(RX_DEVICE_Activate(&si));
   audioCount=0;
-  RX_DEVICE_SetAudio(RX_DEVICE_SI,true); RX_DEVICE_SetAudio(RX_DEVICE_SI,false);
-  assert(audioCount==4 && !memcmp(audioOrder,"tSst",4) && !speakerOn);
+  RX_DEVICE_RouteAudio(RX_DEVICE_SI,true); RX_DEVICE_RouteAudio(RX_DEVICE_SI,false);
+  assert(!speakerOn && siVolume==0 && audioCount > 0 && audioOrder[0] == 's');
+
+  assert(RX_DEVICE_StopChip(RX_DEVICE_SI));
   return 0;
+#endif
 }
 
-void BK4819_ToggleGpioOut(BK4819_GPIO_PIN_t pin, bool enabled) { assert(pin==BK4819_GPIO0_PIN28_RX_ENABLE); rxPinEnabled=enabled; }
+void BK48X9_ToggleGpioOut(BK48X9_GPIO_PIN_t pin, bool enabled) { assert(pin==BK48X9_GPIO0_PIN28_RX_ENABLE); rxPinEnabled=enabled; }

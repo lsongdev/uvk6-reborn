@@ -167,7 +167,6 @@ int main(void) {
   SI47XX_SwitchMode(SI47XX_LSB);
   assert(!isSi4732On && si4732mode == SI47XX_LSB);
   ack = false;
-  assert(!SI47XX_Detect());
   SI47XX_PowerDown();
   assert(!SI47XX_SwitchMode(SI47XX_FM));
   assert(!isSi4732On);

@@ -4,16 +4,15 @@
 #include <string.h>
 bool gRedrawScreen;
 
-static bool hasSi = true, hardwareApplyOk = true;
+static bool hasSi = true, hardwareApplyOk = true, routeOK = true;
 static unsigned probes, hardwareApplies, mutes;
 static RxDevice lastPrevious;
-bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
-  (void)plan; lastPrevious = previous; ++hardwareApplies;
+bool RX_DEVICE_Activate(const RxPlan *plan) {
+  (void)plan; lastPrevious = gReceiver.plan.device; ++hardwareApplies;
   return hardwareApplyOk;
 }
-void RX_DEVICE_SetAudio(RxDevice device, bool open) { (void)device; if (!open) ++mutes; }
-bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open) {
-  (void)open; return devices & (1u << selected);
+bool RX_DEVICE_RouteAudio(RxDevice device, bool open) {
+  (void)device; if (!open) ++mutes; return routeOK;
 }
 static uint16_t sampleRssi = 42;
 static bool sampleOpen;
@@ -25,7 +24,8 @@ void BACKLIGHT_SetReception(bool open) { (void)open; }
 ReceiverCapabilities RX_DEVICE_Capabilities(void) {
   ++probes; return (ReceiverCapabilities){.si = hasSi, .broadcast = !hasSi, .ssb_patch = hasSi, .bk_am=true, .bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL};
 }
-void RX_DEVICE_Init(void) {}
+static unsigned chipInitializations;
+void RX_DEVICE_Init(void) { ++chipInitializations; }
 
 void testFrequencyInput(void);
 
@@ -33,6 +33,8 @@ int main(int argc, char **argv) {
   (void)argv;
   hasSi = argc == 1;
   RECEIVER_Init();
+  RECEIVER_Init();
+  assert(chipInitializations == 1); // Re-entering the UI must not reset RF.
   assert(gReceiver.plan.device == RX_DEVICE_BK && gReceiver.plan.frequency_hz == 145500000u);
   RxPlan plan;
   assert(RADIO_MODEL_Plan(100000000, (RadioParameters){RX_WFM, 100000, 0, 0},
@@ -59,8 +61,10 @@ int main(int argc, char **argv) {
   RECEIVER_UpdateSquelch(); assert(mutes == before + 1);
   // Watch routing commits the selected plan without retuning.
   RxPlan bk = {RX_DEVICE_BK, 438500000u, {RX_NFM, 12500, 12000, 1, 0}};
-  assert(!RECEIVER_Select(&bk, 1u << RX_DEVICE_SI, true));
-  assert(RECEIVER_Select(&bk, (1u << RX_DEVICE_SI) | (1u << RX_DEVICE_BK), true));
+  routeOK = false;
+  assert(!RECEIVER_Select(&bk,true));
+  routeOK = true;
+  assert(RECEIVER_Select(&bk,true));
   assert(gReceiver.plan.frequency_hz == 438500000u && gReceiver.open && hardwareApplies == 2);
   testFrequencyInput();
   return 0;

@@ -1,5 +1,5 @@
 #include "devices/audio.h"
-#include "drivers/bk4819/bk4819.h"
+#include "drivers/bk48x9/bk48x9.h"
 #include "hal/gpio.h"
 #include "hal/system.h"
 

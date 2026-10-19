@@ -51,9 +51,9 @@ enum GPIOB_PINS {
 };
 
 enum GPIOC_PINS {
-	GPIOC_PIN_BK4819_SCN = 0,
-	GPIOC_PIN_BK4819_SCL = 1,
-	GPIOC_PIN_BK4819_SDA = 2,
+	GPIOC_PIN_BK48X9_SCN = 0,
+	GPIOC_PIN_BK48X9_SCL = 1,
+	GPIOC_PIN_BK48X9_SDA = 2,
 
 	GPIOC_PIN_AUX_LED = 3, // Original flashlight position, modified to LED.
 

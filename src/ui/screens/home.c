@@ -218,7 +218,7 @@ static bool homeKey(KEY_Code_t key, Key_State_t state) {
     return true;
   }
   if ((key == KEY_UP || key == KEY_DOWN) && (released || state == KEY_LONG_PRESSED_CONT)) {
-    RADIO_Step(key == KEY_UP);
+    RADIO_Step(KEYBOARD_FrequencyIncreases(key));
     return true;
   }
   if (!released) return false;

@@ -3,8 +3,9 @@
 #include "devices/audio.h"
 #include "hal/system.h"
 #include "hal/board.h"
+#include "hal/features.h"
 #include "drivers/bk1080/bk1080.h"
-#include "drivers/bk4819/bk4819.h"
+#include "drivers/bk48x9/bk48x9.h"
 #include "drivers/si473x/si473x.h"
 #include "store/preferences.h"
 #include "core/measurements.h"
@@ -20,21 +21,24 @@
 static bool bkCached;
 static RxPlan bkPrevious;
 static uint8_t bkSqlOpenTime, bkSqlCloseTime;
+// Paths requested active, including a partially prepared path after an error.
+// The audio mirror is separate: muting never releases a receiver's RF path.
+static uint8_t runningDevices;
+static RxDevice audioDevice;
+static bool audioOpen;
 
 ReceiverCapabilities RX_DEVICE_Capabilities(void) {
   static bool detected;
   static ReceiverCapabilities capabilities;
   if (!detected) {
-    bool bk4829 = BOARD_RadioChip() == BOARD_RADIO_BK4829;
-    capabilities.bk_am = !bk4829;
-    capabilities.bk_bandwidth_mask = bk4829 ?
-        RX_BK_BANDWIDTH_6K | RX_BK_BANDWIDTH_12K | RX_BK_BANDWIDTH_26K : RX_BK_BANDWIDTH_ALL;
-    capabilities.broadcast = BK1080_Detect();
-    // Probe each chip through its own driver. A failed BK read is not SI.
-    capabilities.si = BOARD_HasSi4732() && !capabilities.broadcast && SI47XX_Detect();
-    capabilities.ssb_patch = capabilities.si && RESOURCE_SsbPatchPresent();
-    if (capabilities.ssb_patch)
-      SI47XX_SetPatchSource(RESOURCE_SsbPatchRead, RESOURCE_SSB_PATCH_BYTES);
+    BK48X9Capabilities bk=BK48X9_GetCapabilities();
+    capabilities.bk_am=bk.am;
+    capabilities.bk_bandwidth_mask=bk.bandwidth_mask;
+    capabilities.si=UVK6_ENABLE_SI4732;
+    capabilities.broadcast=!UVK6_ENABLE_SI4732;
+    capabilities.ssb_patch=UVK6_ENABLE_SI4732 && RESOURCE_SsbPatchPresent();
+    if (UVK6_ENABLE_SI4732 && capabilities.ssb_patch)
+      SI47XX_SetPatchSource(RESOURCE_SsbPatchRead,RESOURCE_SSB_PATCH_BYTES);
     detected = true;
   }
   return capabilities;
@@ -42,19 +46,28 @@ ReceiverCapabilities RX_DEVICE_Capabilities(void) {
 
 void RX_DEVICE_Init(void) {
   const ConfigPreferences *p = &gDeviceConfig.preferences;
-  BK4819_Init(p->mic, p->deviation);
+  BK48X9_Init(p->mic, p->deviation);
+  BoardRxCalibration calibration;
+  if (BOARD_RxCalibration(&calibration))
+    BK48X9_SetRxCalibration(calibration.trim,calibration.volume,calibration.dac);
   TX_DEVICE_Disable(); // Explicitly keep PA off on startup.
-  BK4819_RX_TurnOn();
-  (void)BK1080_Init(0, false);
+  BK48X9_RX_TurnOn();
+  runningDevices |= 1u << RX_DEVICE_BK;
+  if (!UVK6_ENABLE_SI4732) (void)BK1080_Standby();
 }
 
-bool RX_DEVICE_SiActive(void) { return BOARD_HasSi4732() && isSi4732On; }
+bool RX_DEVICE_SiActive(void) { return UVK6_ENABLE_SI4732 && isSi4732On; }
 
-bool RX_DEVICE_BroadcastExcludesBk(void) { return BOARD_BroadcastUsesBkVhfPath(); }
+bool RX_DEVICE_CanRunTogether(RxDevice a, RxDevice b) {
+  if (a == b) return false;
+  bool shared = (a == RX_DEVICE_BK && b == RX_DEVICE_BROADCAST) ||
+                (b == RX_DEVICE_BK && a == RX_DEVICE_BROADCAST);
+  return !shared || !BOARD_BroadcastUsesBkVhfPath();
+}
 
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo) {
   SI47XX_RdsStatus status;
-  if (!BOARD_HasSi4732() || !packet || !SI47XX_ReadRDS(&status, clear_fifo)) return false;
+  if (!UVK6_ENABLE_SI4732 || !packet || !SI47XX_ReadRDS(&status, clear_fifo)) return false;
   memcpy(packet->group.blocks, status.blocks, sizeof(status.blocks));
   memcpy(packet->group.errors, status.errors, sizeof(status.errors));
   packet->fifo_used = status.fifo_used;
@@ -70,80 +83,86 @@ bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo) {
 // (RSSI open, RSSI close, noise open, noise close, glitch close, glitch
 // open), byte n for level n (1-9). The generic formula suits the BK4819
 // scale only. Unreadable or erased calibration falls back to the formula.
-static SQL squelchFor(uint8_t level, uint32_t hz) {
-  SQL formula = GetSql(level);
-  if (!level || BOARD_RadioChip() != BOARD_RADIO_BK4829) return formula;
-  if (level > 9) level = 9;
-  uint8_t row[6];
-  uint32_t base = (hz < 174000000u ? CALIBRATION_SQUELCH_VHF_OFFSET : CALIBRATION_SQUELCH_UHF_OFFSET) + level;
-  for (uint8_t i = 0; i < 6; ++i)
-    if (!STORAGE_Read(STORAGE_CALIBRATION, base + 16u * i, &row[i], 1) || row[i] == 0xFF)
-      return formula;
-  // The reference K1 build (ENABLE_SQUELCH_MORE_SENSITIVE, default on)
-  // halves the RSSI open level, doubles the noise and glitch open levels and
-  // keeps the close levels apart when they meet. Copied as is: it is the
-  // tuning that has run on K1 hardware.
-  uint16_t ro = row[0] / 2u, rc = row[1], no = row[2] * 2u, nc = row[3];
-  uint16_t go = row[5] * 2u, gc = row[4];
-  if (rc == ro && rc >= 2) rc -= 2;
-  if (nc == no && nc <= 125) nc += 2;
-  if (gc == go && gc <= 253) gc += 2;
-  return (SQL){.ro = ro, .rc = rc, .no = no > 127 ? 127 : (uint8_t)no,
-               .nc = nc > 127 ? 127 : (uint8_t)nc, .gc = (uint8_t)gc, .go = go > 255 ? 255 : (uint8_t)go};
+static SQL squelchFor(uint8_t level,uint32_t hz) {
+  BoardSquelchCalibration calibrated;
+  if (!BOARD_SquelchCalibration(hz,level,&calibrated)) return GetSql(level);
+  return (SQL){.ro=calibrated.rssi_open,.rc=calibrated.rssi_close,
+    .no=calibrated.noise_open,.nc=calibrated.noise_close,
+    .go=calibrated.glitch_open,.gc=calibrated.glitch_close};
 }
 
-// The broadcast chip is tuned and its RF path depends on the BK VHF LNA
-// (BOARD_BroadcastUsesBkVhfPath).
-static bool broadcastHoldsBkPath;
-
-static void leave(RxDevice device) {
+bool RX_DEVICE_StopChip(RxDevice device) {
+  if (!(runningDevices & (1u << device))) return true;
+  bool ok = true;
+  if (audioOpen && audioDevice == device) {
+    AUDIO_ToggleSpeaker(false);
+    audioOpen = false;
+  }
   switch (device) {
   case RX_DEVICE_BK:
-    BK4819_Idle();
+    RX_DEVICE_InvalidateBk();
+    BK48X9_Idle();
     break;
   case RX_DEVICE_SI:
-    if (!BOARD_HasSi4732()) break;
-    if (gDeviceConfig.preferences.si4732_power_off)
-      SI47XX_PowerDown();
-    else
-      (void)SI47XX_SetVolume(0);
+    if (!UVK6_ENABLE_SI4732) return false;
+    if (gDeviceConfig.preferences.si4732_power_off) SI47XX_PowerDown();
+    else ok = SI47XX_SetVolume(0);
     break;
   case RX_DEVICE_BROADCAST:
-    BK1080_Mute(true);
-    broadcastHoldsBkPath = false;
+    if (UVK6_ENABLE_SI4732) return false;
+    ok = BK1080_Standby();
     break;
   }
+  if (ok) runningDevices &= ~(1u << device);
+  return ok;
 }
 
 void RX_DEVICE_InvalidateBk(void) {
   bkCached=false;
-  BK4819_InvalidateRxMode();
+  BK48X9_InvalidateRxMode();
+}
+bool RX_DEVICE_StopAll(void) {
+  AUDIO_ToggleSpeaker(false);
+  audioOpen = false;
+  bool ok = true;
+  for (uint8_t d=0; d<=RX_DEVICE_BROADCAST; ++d)
+    if (!RX_DEVICE_StopChip((RxDevice)d)) ok = false;
+  return ok;
 }
 void RX_DEVICE_CaptureStop(void) {
-  BK4819_StopScan();
+  BK48X9_StopScan();
   RX_DEVICE_InvalidateBk();
+  runningDevices &= ~(1u << RX_DEVICE_BK);
 }
 
-void RX_DEVICE_CaptureStart(CaptureRange range, RxDevice previous) {
-  leave(previous);
+bool RX_DEVICE_CaptureStart(CaptureRange range) {
+  for (uint8_t d=0; d<=RX_DEVICE_BROADCAST; ++d)
+    if (!RX_DEVICE_CanRunTogether(RX_DEVICE_BK,(RxDevice)d) &&
+        !RX_DEVICE_StopChip((RxDevice)d)) return false;
+  bool restore = audioOpen;
+  RxDevice previousAudio = audioDevice;
+  AUDIO_ToggleSpeaker(false);
+  audioOpen = false;
   RX_DEVICE_CaptureStop();
+  runningDevices |= 1u << RX_DEVICE_BK;
   // A previous SI/BK1080 reception may have left BK asleep. Establish an
   // RX-only baseline before enabling its autonomous frequency detector.
-  BK4819_RX_TurnOn();
-  BK4819_SetRxMode(false);
-  BK4819_ExitSubAu();
-  BK4819_SetAGC(AUTO_GAIN_INDEX);
-  BK4819_SelectFilterEx(range==CAPTURE_RANGE_VHF ? FILTER_VHF : FILTER_UHF);
-  BK4819_EnableFrequencyScanEx(F_SC_T_0_2s);
+  BK48X9_RX_TurnOn();
+  BK48X9_SetRxMode(false);
+  BK48X9_ExitSubAu();
+  BK48X9_SetAGC(AUTO_GAIN_INDEX);
+  BK48X9_SelectFilterEx(range==CAPTURE_RANGE_VHF ? FILTER_VHF : FILTER_UHF);
+  BK48X9_EnableFrequencyScanEx(F_SC_T_0_2s);
   // RX turn-on enables the AF DAC; FC never plays BK audio, and a broadcast
   // chip may be using the speaker meanwhile.
-  BK4819_SetAF(BK4819_AF_MUTE);
-  BK4819_ToggleAFDAC(false);
+  BK48X9_SetAF(BK48X9_AF_MUTE);
+  BK48X9_ToggleAFDAC(false);
+  return !restore || RX_DEVICE_RouteAudio(previousAudio,true);
 }
 
 CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
   uint32_t raw;
-  if (!BK4819_GetFrequencyScanResult(&raw)) return CAPTURE_BUSY;
+  if (!BK48X9_GetFrequencyScanResult(&raw)) return CAPTURE_BUSY;
   if (!hz || raw>RADIO_MAX_HZ/10u) return CAPTURE_INVALID;
   *hz=raw*10u;
   if (*hz<RADIO_MIN_HZ ||
@@ -154,36 +173,38 @@ CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
 
 #if UVK6_ENABLE_SPECTRUM
 static bool spectrumVhf;
-void RX_DEVICE_SpectrumStart(RxDevice previous) {
-  leave(previous);
+bool RX_DEVICE_SpectrumStart(void) {
+  if (!RX_DEVICE_StopAll()) return false;
   RX_DEVICE_InvalidateBk();
+  runningDevices |= 1u << RX_DEVICE_BK;
   uint16_t bandwidth = 0;
-  (void)BK4819_BandwidthFromHz(12000, &bandwidth);
-  BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_RX_ENABLE, true);
-  BK4819_RX_TurnOn();
-  BK4819_SetRxMode(false);
-  BK4819_ExitSubAu();
-  BK4819_SetFilterBandwidth(bandwidth);
-  BK4819_SetAGC(AUTO_GAIN_INDEX);
+  (void)BK48X9_BandwidthFromHz(12000, &bandwidth);
+  BK48X9_ToggleGpioOut(BK48X9_GPIO0_PIN28_RX_ENABLE, true);
+  BK48X9_RX_TurnOn();
+  BK48X9_SetRxMode(false);
+  BK48X9_ExitSubAu();
+  BK48X9_SetFilterBandwidth(bandwidth);
+  BK48X9_SetAGC(AUTO_GAIN_INDEX);
   spectrumVhf = true;
-  BK4819_SelectFilterEx(FILTER_VHF);
-  BK4819_SetAF(BK4819_AF_MUTE);
-  BK4819_ToggleAFDAC(false);
+  BK48X9_SelectFilterEx(FILTER_VHF);
+  BK48X9_SetAF(BK48X9_AF_MUTE);
+  BK48X9_ToggleAFDAC(false);
+  return true;
 }
 void RX_DEVICE_SpectrumTune(uint32_t frequency_hz) {
   uint32_t frequency = frequency_hz / 10u;
   bool vhf = frequency < PREFERENCES_FilterBound();
   if (vhf != spectrumVhf) {
-    BK4819_SelectFilterEx(vhf ? FILTER_VHF : FILTER_UHF);
+    BK48X9_SelectFilterEx(vhf ? FILTER_VHF : FILTER_UHF);
     spectrumVhf = vhf;
   }
-  BK4819_TuneTo(frequency, true);
+  BK48X9_TuneTo(frequency, true);
 }
-uint16_t RX_DEVICE_SpectrumRssi(void) { return BK4819_GetRSSI(); }
+uint16_t RX_DEVICE_SpectrumRssi(void) { return BK48X9_GetRSSI(); }
 void RX_DEVICE_SpectrumStop(void) { RX_DEVICE_InvalidateBk(); }
 #endif
 
-static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
+static bool preparePlan(const RxPlan *plan, bool foreground) {
   if (!plan || plan->frequency_hz < RADIO_MIN_HZ ||
       plan->frequency_hz > RADIO_MAX_HZ ||
       plan->frequency_hz % 10u ||
@@ -192,25 +213,20 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
       (plan->parameters.rx_tone && (plan->device != RX_DEVICE_BK || plan->parameters.mode != RX_NFM)))
     return false;
 
-  // A background BK retune would move the LNA switch off VHF and cut the
-  // broadcast chip's antenna path.
-  if (plan->device == RX_DEVICE_BK && !audible && broadcastHoldsBkPath)
-    return false;
-
   const uint32_t frequency = plan->frequency_hz / 10u; // Drivers use 10 Hz.
   const RxMode mode = plan->parameters.mode;
   uint16_t bandwidth = 0;
 
   switch (plan->device) {
   case RX_DEVICE_BK:
-    if ((mode == RX_AM && BOARD_RadioChip() == BOARD_RADIO_BK4829) ||
+    if ((mode == RX_AM && !BK48X9_GetCapabilities().am) ||
         (mode != RX_NFM && mode != RX_AM))
       return false;
-    if (!BK4819_BandwidthFromHz(plan->parameters.bandwidth_hz, &bandwidth))
+    if (!BK48X9_BandwidthFromHz(plan->parameters.bandwidth_hz, &bandwidth))
       return false;
     break;
   case RX_DEVICE_SI:
-    if (!BOARD_HasSi4732() || mode == RX_NFM || (mode == RX_WFM &&
+    if (!UVK6_ENABLE_SI4732 || mode == RX_NFM || (mode == RX_WFM &&
           (plan->frequency_hz < 64000000u || plan->frequency_hz > 108000000u)) ||
         (mode != RX_WFM && plan->frequency_hz > 30000000u))
       return false;
@@ -220,6 +236,7 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
       return false;
     break;
   case RX_DEVICE_BROADCAST:
+    if (UVK6_ENABLE_SI4732) return false;
     if (mode != RX_WFM || plan->frequency_hz < 64000000u ||
         plan->frequency_hz > 108000000u)
       return false;
@@ -228,63 +245,77 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
     return false;
   }
 
+  // Validate first. Only foreground selection may evict another path.
+  if (!foreground) {
+    for (uint8_t d=0; d<=RX_DEVICE_BROADCAST; ++d)
+      if ((runningDevices & (1u << d)) && d != plan->device &&
+          !RX_DEVICE_CanRunTogether((RxDevice)d, plan->device)) return false;
+  }
+  bool keepAudio = !foreground && plan->device == RX_DEVICE_BK &&
+                   audioOpen && audioDevice != RX_DEVICE_BK;
+  if (!keepAudio) {
+    AUDIO_ToggleSpeaker(false);
+    audioOpen = false;
+  }
+  if (foreground) {
+    for (uint8_t d=0; d<=RX_DEVICE_BROADCAST; ++d)
+      if (d != plan->device && !RX_DEVICE_StopChip((RxDevice)d)) return false;
+  }
+
   // A frequency-only BK step does not need to repeat AGC/squelch/
   // bandwidth setup. SQL timing changes invalidate the shortcut.
-  bool fastBk = bkCached && previous == RX_DEVICE_BK &&
+  bool fastBk = bkCached && (runningDevices & (1u << RX_DEVICE_BK)) &&
                 plan->device == RX_DEVICE_BK &&
                 bkPrevious.parameters.mode == mode &&
                 bkPrevious.parameters.bandwidth_hz == plan->parameters.bandwidth_hz &&
                 bkPrevious.parameters.squelch == plan->parameters.squelch &&
                 bkPrevious.parameters.rx_tone == plan->parameters.rx_tone &&
+                (BOARD_RxCalibrationBand(bkPrevious.frequency_hz) == BOARD_RxCalibrationBand(plan->frequency_hz)) &&
                 bkSqlOpenTime == gDeviceConfig.preferences.sql_open_time &&
                 bkSqlCloseTime == gDeviceConfig.preferences.sql_close_time;
   uint32_t oldBkFrequency = bkPrevious.frequency_hz;
-  bkCached = false;
-  if (previous != plan->device)
-    leave(previous);
+  if (plan->device == RX_DEVICE_BK) bkCached = false;
+  runningDevices |= 1u << plan->device;
 
   switch (plan->device) {
   case RX_DEVICE_BK:
     if (!fastBk) {
-      BK4819_ToggleGpioOut(BK4819_GPIO0_PIN28_RX_ENABLE, true);
-      BK4819_RX_TurnOn();
-      BK4819_SetRxMode(mode == RX_AM);
-      BK4819_SetFilterBandwidth(bandwidth);
-      BK4819_SetAGC(AUTO_GAIN_INDEX);
-      BK4819_SetAFC(8);
-      BK4819_SetAFCSpeed(63);
-      BK4819_SetupSquelch(squelchFor(plan->parameters.squelch, plan->frequency_hz),
+      BK48X9_ToggleGpioOut(BK48X9_GPIO0_PIN28_RX_ENABLE, true);
+      BK48X9_RX_TurnOn();
+      BK48X9_SetRxMode(mode == RX_AM);
+      BK48X9_SetFilterBandwidth(bandwidth);
+      BK48X9_SetAGC(AUTO_GAIN_INDEX);
+      BK48X9_SetAFC(8);
+      BK48X9_SetAFCSpeed(63);
+      BK48X9_SetupSquelch(squelchFor(plan->parameters.squelch, plan->frequency_hz),
                           gDeviceConfig.preferences.sql_open_time,
                           gDeviceConfig.preferences.sql_close_time);
     }
     if (!fastBk || ((oldBkFrequency / 10u < PREFERENCES_FilterBound()) !=
                     (frequency < PREFERENCES_FilterBound())))
-      BK4819_SelectFilterEx(frequency < PREFERENCES_FilterBound()
+      BK48X9_SelectFilterEx(frequency < PREFERENCES_FilterBound()
                               ? FILTER_VHF : FILTER_UHF);
     if (!fastBk || oldBkFrequency != plan->frequency_hz) {
       RadioTone tone = plan->parameters.rx_tone;
       if (!tone) {
-        BK4819_ExitSubAu();
-        BK4819_CssOff();
+        BK48X9_ExitSubAu();
+        BK48X9_CssOff();
       } else {
         DCS_CodeType_t type = TONE_Type(tone);
         if (type == CODE_TYPE_CONTINUOUS_TONE)
-          BK4819_SetCTCSSFrequency(CTCSS_Options[TONE_Code(tone)]);
+          BK48X9_SetCTCSSFrequency(CTCSS_Options[TONE_Code(tone)]);
         else
-          BK4819_SetCDCSSCodeWord(DCS_GetGolayCodeWord(type, TONE_Code(tone)));
-        BK4819_CssResetDetection(type != CODE_TYPE_CONTINUOUS_TONE);
+          BK48X9_SetCDCSSCodeWord(DCS_GetGolayCodeWord(type, TONE_Code(tone)));
+        BK48X9_CssResetDetection(type != CODE_TYPE_CONTINUOUS_TONE);
       }
     }
     if (!fastBk || oldBkFrequency != plan->frequency_hz)
-      BK4819_TuneTo(frequency, true);
+      BK48X9_TuneTo(frequency, true);
     bkPrevious = *plan;
     bkSqlOpenTime = gDeviceConfig.preferences.sql_open_time;
     bkSqlCloseTime = gDeviceConfig.preferences.sql_close_time;
     bkCached = true;
-    if (!audible) {
-      BK4819_SetAF(BK4819_AF_MUTE);
-      BK4819_ToggleAFDAC(false);
-    }
+    BK48X9_MuteAudio();
     return true; // BK serial writes have no acknowledgement.
   case RX_DEVICE_SI: {
     SI47XX_MODE siMode = mode == RX_WFM ? SI47XX_FM :
@@ -296,7 +327,7 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
                   ? SI47XX_SetSsbBandwidth(bandwidth)
                   : SI47XX_SetBandwidth(bandwidth, true);
     if (ready)
-      ready = SI47XX_SetVolume(audible ? 63 : 0);
+      ready = SI47XX_SetVolume(0);
     // Previous plan may be restored by rx-runtime; don't leave an aborted
     // SI plan audible while the other receiver is being configured.
     if (!ready)
@@ -304,71 +335,59 @@ static bool applyPlan(const RxPlan *plan, RxDevice previous, bool audible) {
     return ready;
   }
   case RX_DEVICE_BROADCAST:
-    if (!BK1080_Init(frequency, true)) {
+    if (UVK6_ENABLE_SI4732) return false;
+    if (BOARD_BroadcastUsesBkVhfPath()) {
+      BK48X9_SetAF(BK48X9_AF_MUTE);
+      BK48X9_ToggleAFDAC(false);
+      BK48X9_ToggleGpioOut(BK48X9_GPIO0_PIN28_RX_ENABLE, true);
+      BK48X9_SelectFilterEx(FILTER_VHF);
+    }
+    if (!BK1080_TuneTo(frequency)) {
       (void)BK1080_Mute(true);
       return false;
     }
     // An I2C NACK on unmute is not a successful reception.
-    if (!BK1080_Mute(!audible)) {
+    if (!BK1080_Mute(true)) {
       (void)BK1080_Mute(true);
       return false;
-    }
-    if (BOARD_BroadcastUsesBkVhfPath()) {
-      BK4819_SelectFilterEx(FILTER_VHF);
-      broadcastHoldsBkPath = true;
     }
     return true;
   }
   return false;
 }
 
-bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous) {
-  return applyPlan(plan,previous,true);
+bool RX_DEVICE_Activate(const RxPlan *plan) {
+  return preparePlan(plan, true);
 }
-bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan) {
-  return plan && applyPlan(plan,plan->device,false);
+bool RX_DEVICE_Prepare(const RxPlan *plan) {
+  bool restore = audioOpen && plan && plan->device != audioDevice;
+  RxDevice previousAudio = audioDevice;
+  bool ok = preparePlan(plan, false);
+  // Preparing another chip must neither mix its temporary output into the
+  // speaker nor silently cut an independent background after preparation.
+  if (restore && !audioOpen && !RX_DEVICE_RouteAudio(previousAudio, true)) return false;
+  return ok;
 }
-void RX_DEVICE_StopChip(RxDevice device) {
-  if (device==RX_DEVICE_BK) RX_DEVICE_InvalidateBk();
-  leave(device);
-}
-void RX_DEVICE_SetAudio(RxDevice device, bool open) {
-  bool bk = device == RX_DEVICE_BK;
-  if (open) {
-    if (bk) {
-      BK4819_ToggleAFDAC(true);
-      BK4819_ToggleAFBit(true);
-    }
-    SYS_DelayMs(8);
-    AUDIO_ToggleSpeaker(true);
-  } else {
-    AUDIO_ToggleSpeaker(false);
-    SYS_DelayMs(8);
-    if (bk) {
-      BK4819_ToggleAFDAC(false);
-      BK4819_ToggleAFBit(false);
-    }
-  }
-}
-
 bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open) {
   *rssi = 0;
   *open = false;
   uint8_t snr;
   switch (plan->device) {
   case RX_DEVICE_BK: {
-    *rssi = BK4819_GetRSSI();
+    *rssi = BK48X9_GetRSSI();
     RadioTone tone = plan->parameters.rx_tone;
-    *open = BK4819_IsSquelchOpen() &&
-            (!tone || BK4819_CssIsDetected(TONE_Type(tone) != CODE_TYPE_CONTINUOUS_TONE));
+    bool carrier = BK48X9_IsSquelchOpen(); // Pump events even with SQ0.
+    *open = (!plan->parameters.squelch || carrier) &&
+            (!tone || BK48X9_CssIsDetected(TONE_Type(tone) != CODE_TYPE_CONTINUOUS_TONE));
     return true;
   }
   case RX_DEVICE_SI:
-    if (!BOARD_HasSi4732() || !RSQ_GET()) return false;
+    if (!UVK6_ENABLE_SI4732 || !RSQ_GET()) return false;
     *rssi = rsqStatus.resp.RSSI;
     snr = rsqStatus.resp.SNR;
     break;
   case RX_DEVICE_BROADCAST:
+    if (UVK6_ENABLE_SI4732) return false;
     *rssi = BK1080_GetRSSI();
     snr = BK1080_GetSNR();
     break;
@@ -379,32 +398,38 @@ bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open) {
   return true;
 }
 
-bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open) {
+bool RX_DEVICE_RouteAudio(RxDevice selected, bool open) {
   // Break before make: never mix audio from two chips. Receiver DSP stays on.
   AUDIO_ToggleSpeaker(false);
-  if (!BOARD_HasSi4732() && (devices & (1u << RX_DEVICE_SI))) return false;
+  audioOpen = false;
+  uint8_t devices = runningDevices;
+  if ((!UVK6_ENABLE_SI4732 && (devices & (1u << RX_DEVICE_SI))) ||
+      (UVK6_ENABLE_SI4732 && (devices & (1u << RX_DEVICE_BROADCAST)))) return false;
   bool ok=true;
   if (devices&(1u<<RX_DEVICE_BK)) {
-    BK4819_SetAF(BK4819_AF_MUTE);
-    BK4819_ToggleAFDAC(false);
+    BK48X9_MuteAudio();
   }
-  if (devices&(1u<<RX_DEVICE_SI)) ok=SI47XX_SetVolume(0) && ok;
-  if (devices&(1u<<RX_DEVICE_BROADCAST)) ok=BK1080_Mute(true) && ok;
+  if (UVK6_ENABLE_SI4732 && (devices&(1u<<RX_DEVICE_SI))) ok=SI47XX_SetVolume(0) && ok;
+  if (!UVK6_ENABLE_SI4732 && (devices&(1u<<RX_DEVICE_BROADCAST))) ok=BK1080_Mute(true) && ok;
   if (!ok || !open) return ok;
   if (!(devices&(1u<<selected))) return false;
   switch(selected) {
   case RX_DEVICE_BK:
-    BK4819_SetAF(BK4819_AF_FM);BK4819_ToggleAFDAC(true);break;
-  case RX_DEVICE_SI: ok=SI47XX_SetVolume(63);break;
-  case RX_DEVICE_BROADCAST: ok=BK1080_Mute(false);break;
+    BK48X9_SetAF(BK48X9_AF_FM);BK48X9_ToggleAFDAC(true);break;
+  case RX_DEVICE_SI: if (!UVK6_ENABLE_SI4732) return false; ok=SI47XX_SetVolume(63);break;
+  case RX_DEVICE_BROADCAST: if (UVK6_ENABLE_SI4732) return false; ok=BK1080_Mute(false);break;
   default: return false;
   }
-  if (ok) AUDIO_ToggleSpeaker(true);
+  if (ok) {
+    audioDevice = selected; audioOpen = true;
+    SYS_DelayMs(8);
+    AUDIO_ToggleSpeaker(true);
+  }
   return ok;
 }
 
 bool RX_DEVICE_SeekNative(const RxPlan *plan) {
-  if (!BOARD_HasSi4732() || !plan || plan->device != RX_DEVICE_SI)
+  if (!UVK6_ENABLE_SI4732 || !plan || plan->device != RX_DEVICE_SI)
     return false;
   if (plan->parameters.mode == RX_WFM)
     return plan->parameters.step_hz == 50000 ||
@@ -430,7 +455,7 @@ bool RX_DEVICE_SeekStart(const RxPlan *plan, uint32_t lower_hz,
 }
 
 RxSeekResult RX_DEVICE_SeekPoll(RxDevice device, uint32_t *frequency_hz) {
-  if (!BOARD_HasSi4732() || device != RX_DEVICE_SI)
+  if (!UVK6_ENABLE_SI4732 || device != RX_DEVICE_SI)
     return RX_SEEK_ERROR;
   switch (SI47XX_SeekPoll(frequency_hz)) {
   case SI_SEEK_BUSY: return RX_SEEK_BUSY;
@@ -441,7 +466,7 @@ RxSeekResult RX_DEVICE_SeekPoll(RxDevice device, uint32_t *frequency_hz) {
 }
 
 void RX_DEVICE_SeekCancel(RxDevice device) {
-  if (BOARD_HasSi4732() && device == RX_DEVICE_SI)
+  if (UVK6_ENABLE_SI4732 && device == RX_DEVICE_SI)
     SI47XX_SeekCancel();
 }
 
@@ -450,13 +475,14 @@ bool RX_DEVICE_SeekSignal(RxDevice device, bool *found) {
   switch (device) {
   case RX_DEVICE_BK:
     // The caller applies a temporary squelch >= 4 even if monitoring uses 0.
-    *found = BK4819_IsSquelchOpen();
+    *found = BK48X9_IsSquelchOpen();
     return true;
   case RX_DEVICE_SI:
-    if (!BOARD_HasSi4732() || !RSQ_GET()) return false;
+    if (!UVK6_ENABLE_SI4732 || !RSQ_GET()) return false;
     *found = rsqStatus.resp.RSSI >= 16 && rsqStatus.resp.SNR >= 7;
     return true;
   case RX_DEVICE_BROADCAST: {
+    if (UVK6_ENABLE_SI4732) return false;
     // BK1080's 64-76 and 76-108 MHz channel banks are discontinuous.
     // Frequency stepping handles the split without unsafe native seek wraps.
     uint16_t rssi = BK1080_ReadRegister(BK1080_REG_10);
@@ -477,20 +503,21 @@ bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found) {
   if (plan->device==RX_DEVICE_BK) {
     uint8_t level=plan->parameters.squelch;
     SQL floor=squelchFor(level<4 ? 4 : level, plan->frequency_hz);
-    bool carrier=BK4819_GetRSSI()>=floor.ro && BK4819_GetNoise()<=floor.no &&
-                 BK4819_GetGlitch()<=floor.go;
+    bool carrier=BK48X9_GetRSSI()>=floor.ro && BK48X9_GetNoise()<=floor.no &&
+                 BK48X9_GetGlitch()<=floor.go;
     RadioTone tone=plan->parameters.rx_tone;
-    bool matched=!tone || BK4819_CssIsDetected(TONE_Type(tone)!=CODE_TYPE_CONTINUOUS_TONE);
-    *found=carrier && matched && (!level || BK4819_IsSquelchOpen());
+    bool matched=!tone || BK48X9_CssIsDetected(TONE_Type(tone)!=CODE_TYPE_CONTINUOUS_TONE);
+    *found=carrier && matched && (!level || BK48X9_IsSquelchOpen());
     return true;
   }
   if (plan->device==RX_DEVICE_SI) {
-    if (!BOARD_HasSi4732() || !RSQ_GET()) return false;
+    if (!UVK6_ENABLE_SI4732 || !RSQ_GET()) return false;
     uint8_t snr=plan->parameters.squelch<7 ? 7 : plan->parameters.squelch+1u;
     *found=rsqStatus.resp.RSSI>=16 && rsqStatus.resp.SNR>=snr;
     return true;
   }
   if (plan->device==RX_DEVICE_BROADCAST) {
+    if (UVK6_ENABLE_SI4732) return false;
     uint16_t rssi=BK1080_ReadRegister(BK1080_REG_10);
     uint16_t snr=BK1080_ReadRegister(BK1080_REG_07);
     if (rssi==UINT16_MAX || snr==UINT16_MAX) return false;
@@ -506,7 +533,7 @@ uint8_t RX_DEVICE_SignalLevel(const RxPlan *plan, uint16_t rssi) {
   uint8_t level = 0;
   if (plan->device == RX_DEVICE_BK) {
     if (rssi) {
-      int16_t dBm = Rssi2DBm(rssi) + BK4819_GetAttenuation();
+      int16_t dBm = Rssi2DBm(rssi) + BK48X9_GetAttenuation();
       level = DBm2S(dBm, plan->frequency_hz >= 300000000u);
     }
   } else {

@@ -13,21 +13,24 @@ ReceiverCapabilities RX_DEVICE_Capabilities(void);
 // BK4819 from the stored preferences, PA off, broadcast chip parked.
 void RX_DEVICE_Init(void);
 bool RX_DEVICE_SiActive(void); // SI4732 powered (status line).
-// While the broadcast chip plays, BK cannot be tuned elsewhere (shared LNA
-// switch on the UV-K1), so watch must not pair a broadcast with BK slots.
-bool RX_DEVICE_BroadcastExcludesBk(void);
-bool RX_DEVICE_Apply(const RxPlan *plan, RxDevice previous);
-bool RX_DEVICE_ApplyConcurrent(const RxPlan *plan); // Configure muted, keep other chip alive.
-bool RX_DEVICE_SelectAudio(uint8_t devices, RxDevice selected, bool open);
-// Speaker gate for the tuned chip: break-before-make with a settle delay.
-void RX_DEVICE_SetAudio(RxDevice device, bool open);
+// Different chips still cannot run together if they share an exclusive RF path.
+bool RX_DEVICE_CanRunTogether(RxDevice a, RxDevice b);
+// Selected foreground: stop other paths, then prepare this plan muted.
+bool RX_DEVICE_Activate(const RxPlan *plan);
+// Watch preparation: reject conflicts, keep compatible chips and their audio.
+bool RX_DEVICE_Prepare(const RxPlan *plan);
+// Mute every active output, select exactly one, then enable the speaker.
+bool RX_DEVICE_RouteAudio(RxDevice selected, bool open);
 // One RSSI/squelch sample of the tuned chip. Squelch includes the NFM tone.
 // Returns false when the chip did not answer (then *open is false).
 bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open);
 // Signal strength 0..14 from a sampled RSSI: approximate S units on BK4819,
 // relative strength on the broadcast chips.
 uint8_t RX_DEVICE_SignalLevel(const RxPlan *plan, uint16_t rssi);
-void RX_DEVICE_StopChip(RxDevice device);
+bool RX_DEVICE_StopChip(RxDevice device);
+// Release all receiving paths and mute audio before exclusive RF use (TX).
+// Failure leaves the speaker off and must prevent transmitter preparation.
+bool RX_DEVICE_StopAll(void);
 bool RX_DEVICE_WatchSignal(const RxPlan *plan, bool *found);
 bool RX_DEVICE_ReadRDS(RdsPacket *packet, bool clear_fifo);
 
@@ -39,17 +42,16 @@ RxSeekResult RX_DEVICE_SeekPoll(RxDevice device, uint32_t *frequency_hz);
 void RX_DEVICE_SeekCancel(RxDevice device);
 bool RX_DEVICE_SeekSignal(RxDevice device, bool *found);
 
-// Capture temporarily owns BK with its audio muted; previous is the chip
-// to leave (pass RX_DEVICE_BK to keep a broadcast chip playing). Stop before
-// any RX apply.
-void RX_DEVICE_CaptureStart(CaptureRange range, RxDevice previous);
+// Capture borrows BK muted; only compatible auxiliary paths keep receiving.
+// Stop before any RX activation.
+bool RX_DEVICE_CaptureStart(CaptureRange range);
 CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *frequency_hz);
 void RX_DEVICE_CaptureStop(void);
 void RX_DEVICE_InvalidateBk(void);
 
-// Spectrum borrows BK muted, like capture: previous is the chip to leave.
+// Spectrum exclusively borrows BK muted.
 // Tune one point, wait at least 1 ms, then read its RSSI (raw 0.5 dB units).
-void RX_DEVICE_SpectrumStart(RxDevice previous);
+bool RX_DEVICE_SpectrumStart(void);
 void RX_DEVICE_SpectrumTune(uint32_t frequency_hz);
 uint16_t RX_DEVICE_SpectrumRssi(void);
 void RX_DEVICE_SpectrumStop(void);

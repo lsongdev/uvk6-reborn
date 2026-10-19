@@ -3,9 +3,9 @@
 #include "hal/board.h"
 
 const Py32GpioLine GPIO_LINES[] = {
-  [GPIO_BK4819_SCN] = PY32_GPIO_LINE(F, 9), // idle high
-  [GPIO_BK4819_SCL] = PY32_GPIO_LINE(B, 8), // idle high
-  [GPIO_BK4819_SDA] = PY32_GPIO_LINE(B, 9), // idle high
+  [GPIO_BK48X9_SCN] = PY32_GPIO_LINE(F, 9), // idle high
+  [GPIO_BK48X9_SCL] = PY32_GPIO_LINE(B, 8), // idle high
+  [GPIO_BK48X9_SDA] = PY32_GPIO_LINE(B, 9), // idle high
   [GPIO_ST7565_CS] = PY32_GPIO_LINE(B, 2),  // idle high
   [GPIO_ST7565_A0] = PY32_GPIO_LINE(A, 6), // idle high
   [GPIO_ST7565_RES] = PY32_GPIO_NONE,
