@@ -10,7 +10,6 @@
 #include "hal/storage.h"
 #include "devices/keyboard.h"
 #include "devices/display.h"
-#include "hal/uart.h"
 #include "app/link/uart-link.h"
 #include "devices/battery.h"
 #include "ui/menu.h"
@@ -204,8 +203,8 @@ void SYS_Main() {
 
     appRender();
 
-    while (UART_IsCommandAvailable()) {
-      UART_HandleCommand();
+    while (LINK_IsCommandAvailable()) {
+      LINK_HandleCommand();
       lastUartDataTime = Now();
     }
 

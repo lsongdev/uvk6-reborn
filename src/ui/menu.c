@@ -1,5 +1,4 @@
 #include "ui/menu.h"
-#include "hal/uart.h"
 #include "ui/graphics.h"
 #include "core/text.h"
 #include "core/measurements.h"

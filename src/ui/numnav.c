@@ -1,5 +1,4 @@
 #include "ui/numnav.h"
-#include "hal/uart.h"
 #include <stddef.h>
 #include <string.h>
 

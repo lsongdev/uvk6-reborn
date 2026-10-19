@@ -4,6 +4,7 @@
 #include "hal/systick.h"
 #include "hal/crc.h"
 #include "hal/uart.h"
+#include "drivers/py32f071/usb.h"
 #include "hal/i2c.h"
 #include "boards/uvk1/pins.h"
 #include "drivers/py32f071/adc.h"
@@ -45,6 +46,7 @@ void BOARD_Init(void) {
   PY32_ADC_Init();
   CRC_Init();
   UART_Init();
+  USB_Init();
   I2C_Init();
 }
 
@@ -59,3 +61,7 @@ bool BOARD_BroadcastUsesBkVhfPath(void) { return true; }
 
 
 bool BOARD_HasHorizontalArrows(void) { return true; }
+
+// The K-plug UART and the USB-C port carry the same PC link.
+const SerialPort *const BOARD_SERIAL_PORTS[] = {&UART_PORT, &USB_PORT};
+const uint8_t BOARD_SERIAL_PORT_COUNT = 2;

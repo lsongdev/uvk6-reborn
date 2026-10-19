@@ -176,6 +176,10 @@ done
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/storage-regression.c -o "$test_binary"
 "$test_binary"
+# The PC link over two serial ports (the K1's UART and USB).
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
+  -ffunction-sections -fdata-sections tests/link-regression.c "$dead_strip" -o "$test_binary"
+"$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/bk-rx-mode-regression.c \
   src/drivers/bk48x9/rx.c src/drivers/bk48x9/bk4819.c src/drivers/bk48x9/common.c \
   -ffunction-sections -fdata-sections "$dead_strip" -o "$test_binary"

@@ -4,7 +4,7 @@
 #include "drivers/dp32g030/uart.h"
 
 // UART1 at 38400 baud; DMA channel 0 loops over gUartRxRing.
-uint8_t gUartRxRing[UART_RX_RING_BYTES];
+static uint8_t gUartRxRing[UART_RX_RING_BYTES];
 
 void UART_Init(void) {
   uint32_t Delta;
@@ -61,7 +61,7 @@ void UART_Init(void) {
   UART1->CTRL |= UART_CTRL_UARTEN_BITS_ENABLE;
 }
 
-void UART_Send(const void *pBuffer, uint32_t Size) {
+static void UART_Send(const void *pBuffer, uint32_t Size) {
   const uint8_t *pData = (const uint8_t *)pBuffer;
   uint32_t i;
 
@@ -79,4 +79,6 @@ void UART_Send(const void *pBuffer, uint32_t Size) {
 
 void _putchar(char c) { UART_Send((uint8_t *)&c, 1); }
 
-uint16_t UART_RxHead(void) { return DMA_CH0->ST & 0xFFFU; }
+static uint16_t UART_RxHead(void) { return DMA_CH0->ST & 0xFFFU; }
+
+const SerialPort UART_PORT = {gUartRxRing, UART_RX_RING_BYTES, UART_RxHead, UART_Send};
