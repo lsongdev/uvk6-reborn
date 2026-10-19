@@ -178,7 +178,8 @@ void SYS_Main() {
     RADIO_TxSafetyUpdate();
     DEVICE_Update();
 
-    if (RADIO_IsReceiving() && !RADIO_IsWatching() && Now()-radioTimer >= SQL_DELAY) {
+    if (RADIO_IsReceiving() && !RADIO_IsWatching() &&
+        Now()-radioTimer >= RECEIVER_SamplePeriodMs(gReceiver.plan.device)) {
       RECEIVER_UpdateSquelch();
       radioTimer = Now();
     }
