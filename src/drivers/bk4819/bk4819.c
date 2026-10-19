@@ -321,6 +321,8 @@ void BK4819_SetupSquelch(SQL sq, uint8_t delayOpen, uint8_t delayClose) {
                                           (delayClose << 9) | sq.go);
   BK4819_WriteRegister(BK4819_REG_4F, (sq.nc << 8) | sq.no);
   BK4819_WriteRegister(BK4819_REG_78, (sq.ro << 8) | sq.rc);
+  // New thresholds: forget the previous squelch state and re-arm its events.
+  if (isBk4829()) BK4819_SquelchEventsReset();
 }
 
 void BK4819_Squelch(uint8_t sql, uint8_t openDelay, uint8_t closeDelay) {
@@ -329,6 +331,7 @@ void BK4819_Squelch(uint8_t sql, uint8_t openDelay, uint8_t closeDelay) {
 
 
 bool BK4819_IsSquelchOpen(void) {
+  if (isBk4829()) return BK4819_SquelchEventOpen();
   return (BK4819_ReadRegister(BK4819_REG_0C) >> 1) & 1;
 }
 

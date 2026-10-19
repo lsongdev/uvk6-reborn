@@ -38,6 +38,7 @@ void BK4819_SetCDCSSCodeWord(uint32_t word) { lastDcs=word; }
 void BK4819_ExitSubAu(void) { ++tonesOff; }
 void BK4819_WriteRegister(BK4819_REGISTER_t reg, uint16_t value) { (void)reg; (void)value; }
 void BK4819_CssResetDetection(bool digital) { (void)digital; ++toneResets; }
+void BK4819_CssOff(void) {}
 static bool carrierOpen=true;
 bool BK4819_IsSquelchOpen(void) { return carrierOpen; }
 void BK4819_Idle(void) { ++bkIdle; }

@@ -105,6 +105,10 @@ void BK4819_ToggleGpioOut(BK4819_GPIO_PIN_t Pin, bool bSet);
 
 void BK4819_CssResetDetection(bool digital);
 bool BK4819_CssIsDetected(bool digital);
+void BK4819_CssOff(void); // No tone detection; squelch events stay on.
+// BK4829 squelch from interrupt events (internal to the driver's squelch).
+void BK4819_SquelchEventsReset(void);
+bool BK4819_SquelchEventOpen(void);
 void BK4819_SetCDCSSCodeWord(uint32_t CodeWord);
 void BK4819_SetCTCSSFrequency(uint32_t BaudRate);
 void BK4819_SetFilterBandwidth(BK4819_FilterBandwidth_t Bandwidth);
