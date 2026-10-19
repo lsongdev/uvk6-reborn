@@ -165,7 +165,7 @@ def flash(loader, image, wait=45, retries=5):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', required=True, help='e.g. /dev/cu.usbserial-1420 or /dev/ttyUSB0')
-    parser.add_argument('--firmware', type=Path, default=Path('bin/firmware.bin'), help='raw image, not packed')
+    parser.add_argument('--firmware', type=Path, default=Path('bin/uvk6/firmware.bin'), help='raw image, not packed')
     args = parser.parse_args()
     try:
         image = args.firmware.read_bytes()

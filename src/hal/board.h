@@ -24,4 +24,15 @@
 void BOARD_Init(void);
 void BOARD_ADC_GetBatteryInfo(uint16_t *pVoltage, uint16_t *pCurrent);
 
+// Backlight output; level is the user brightness (0 = off, higher brighter).
+void BOARD_BacklightInit(void);
+void BOARD_BacklightSetLevel(uint8_t level);
+
+// Maintenance over the PC link (tools/resources.py), in the storage medium's
+// own addresses. Writes reach only the board's maintenance ranges and are
+// read back.
+uint32_t BOARD_RawSize(void);
+bool BOARD_RawRead(uint32_t address, void *data, uint16_t size);
+bool BOARD_MaintenanceWrite(uint32_t address, const uint8_t *data, uint16_t size);
+
 #endif

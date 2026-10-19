@@ -189,4 +189,4 @@ FC 仅 VFO、BK 频率检测。core/capture 接收 BUSY／INVALID／SAMPLE，同
 | 页面按键、菜单与卡片 | [home.c](../src/ui/screens/home.c)、[slot-menu.c](../src/ui/screens/slot-menu.c)、[radio-card.c](../src/ui/radio-card.c) |
 | 守听、回话、TX 许可 | [watch.c](../src/core/watch.c)、[tx.c](../src/radio/tx.c)、[tx-model.c](../src/core/tx-model.c) |
 | Seek／FC／RDS | [seek.c](../src/radio/seek.c)、[capture.c](../src/radio/capture.c)、[rds.c](../src/core/rds.c)、[rds-receiver.c](../src/core/rds-receiver.c) |
-| 编码、写保护与偏好 | [config-store.c](../src/core/config-store.c)、[channel-store.c](../src/core/channel-store.c)、[storage.h](../src/hal/storage.h)、[eeprom-layout.h](../src/hal/eeprom-layout.h)、[settings.c](../src/core/settings.c) |
+| 编码、写保护与偏好 | [config-store.c](../src/core/config-store.c)、[channel-store.c](../src/core/channel-store.c)、[storage.h](../src/hal/storage.h)、[eeprom-layout.h](../src/boards/uvk6/storage-layout.h)、[settings.c](../src/core/settings.c) |

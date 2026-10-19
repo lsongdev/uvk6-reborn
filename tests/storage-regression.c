@@ -1,6 +1,6 @@
 // UV-K6 storage areas must land on the EEPROM addresses earlier firmware
 // used, so existing configuration and channels stay readable.
-#include "../src/hal/storage.c"
+#include "../src/boards/uvk6/storage.c"
 #include <assert.h>
 #include <string.h>
 
@@ -8,15 +8,14 @@ static uint32_t capacity = 524288u, lastRead, lastWrite;
 static unsigned writes;
 const char *EEPROM_TYPE_NAMES[7] = {"64 ?", "128", "256", "512", "1024", "M02?", "4Mb?"};
 void EEPROM_Init(void) {}
-void EEPROM_SetWritesEnabled(bool enabled) { (void)enabled; }
 uint32_t EEPROM_DetectSize(void) { return capacity; }
 EEPROMType EEPROM_DetectType(void) { return capacity ? EEPROM_4MBIT : EEPROM_UNKNOWN; }
 int EEPROM_ReadBuffer(uint32_t address, void *data, uint16_t size) {
   lastRead = address; memset(data, 0, size); return 0;
 }
-bool EEPROM_TryWriteBuffer(uint32_t address, const uint8_t *data, uint16_t size) {
+bool EEPROM_WriteBuffer(uint32_t address, const uint8_t *data, uint16_t size) {
   (void)data;
-  assert(EEPROM_WriteAllowed(address, size));
+  (void)size;
   lastWrite = address; ++writes; return true;
 }
 
@@ -45,13 +44,21 @@ int main(void) {
   assert(readAt(STORAGE_CALIBRATION, 0xF0) == 0x1EF0);
   assert(STORAGE_Size(STORAGE_RESOURCES) == RESOURCE_TAIL_BYTES);
   assert(readAt(STORAGE_RESOURCES, RESOURCE_SSB_PATCH_OFFSET) == 0x7DD78);
-  // Writes reach configuration and channel areas only.
+  // Writes wait for the enable, then reach configuration and channel areas only.
+  assert(!STORAGE_Write(STORAGE_CONFIG_A, 0, record, 32) && !writes);
+  STORAGE_SetWritesEnabled(true);
   assert(STORAGE_Write(STORAGE_CONFIG_B, 0, record, 32) && lastWrite == 0x0C00);
   assert(STORAGE_Write(STORAGE_CHANNELS_B, 64, record, 64) && lastWrite == 0xB0C0);
   writes = 0;
   assert(!STORAGE_Write(STORAGE_CALIBRATION, 0, record, 9));
   assert(!STORAGE_Write(STORAGE_RESOURCES, 0, record, 16));
   assert(!STORAGE_Write(STORAGE_CHANNELS_A, 32, record, 64) && !writes);
+  assert(gStorageWrite);
+  // Maintenance: calibration and the resource tail only, read back.
+  assert(BOARD_MaintenanceWrite(0x1ED0, record, 9) && lastWrite == 0x1ED0);
+  assert(BOARD_MaintenanceWrite(0x7DD68, record, 16));
+  assert(!BOARD_MaintenanceWrite(0x0800, record, 16) && !BOARD_MaintenanceWrite(0x1DFF, record, 2));
+  assert(BOARD_RawRead(0x7FFFF, record, 1) && !BOARD_RawRead(0x7FFFF, record, 2));
   // An 8 KiB part keeps the configuration but has no channels or resources.
   memset(windows, 0, sizeof(windows));
   capacity = 8192;

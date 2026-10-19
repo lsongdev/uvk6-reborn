@@ -1,9 +1,23 @@
 # =============================================================================
+# Board
+# =============================================================================
+# uvk6: UV-K6 (DP32G030). Board code lives in src/boards/$(BOARD)/; its
+# board.mk names the MCU, whose drivers live in src/drivers/mcu/$(MCU)/.
+BOARD ?= uvk6
+BOARD_DIR := src/boards/$(BOARD)
+ifeq ($(wildcard $(BOARD_DIR)/board.mk),)
+  $(error Unknown BOARD=$(BOARD): no $(BOARD_DIR)/board.mk)
+endif
+include $(BOARD_DIR)/board.mk
+MCU_DIR := src/drivers/mcu/$(MCU)
+include $(MCU_DIR)/mcu.mk
+
+# =============================================================================
 # Directory Structure
 # =============================================================================
 SRC_DIR       := src
-OBJ_DIR       := obj
-BIN_DIR       := bin
+OBJ_DIR       := obj/$(BOARD)
+BIN_DIR       := bin/$(BOARD)
 
 # =============================================================================
 # Project Configuration
@@ -20,13 +34,15 @@ BUILD_TAG     := $(shell date -u +'%Y%m%d_%H%M')
 SRC := $(SRC_DIR)/main.c \
        $(wildcard $(SRC_DIR)/core/*.c) \
        $(wildcard $(SRC_DIR)/hal/*.c) \
+       $(wildcard $(BOARD_DIR)/*.c) \
+       $(wildcard $(MCU_DIR)/*.c) \
        $(wildcard $(SRC_DIR)/drivers/*/*.c) \
        $(wildcard $(SRC_DIR)/ui/*.c) \
        $(wildcard $(SRC_DIR)/radio/*.c) \
        $(wildcard $(SRC_DIR)/ui/screens/*.c) \
        $(SRC_DIR)/system.c
 
-OBJS := $(OBJ_DIR)/hal/start.o \
+OBJS := $(OBJ_DIR)/drivers/mcu/$(MCU)/start.o \
         $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 # =============================================================================
@@ -51,8 +67,8 @@ PORT     ?=
 # =============================================================================
 # Compiler Flags
 # =============================================================================
-# Common flags for AS and CC
-COMMON_FLAGS := -mcpu=cortex-m0 -mthumb -mabi=aapcs
+# Common flags for AS and CC; mcu.mk sets CPU.
+COMMON_FLAGS := -mcpu=$(CPU) -mthumb -mabi=aapcs
 OPTIMIZATION := -Os -flto=auto -ffunction-sections -fdata-sections
 # OPTIMIZATION := -Os -ffunction-sections -fdata-sections
 
@@ -84,8 +100,7 @@ RELEASE_FLAGS := -g0 -DNDEBUG
 # Defines
 DEFINES  := -DGIT_HASH=\"$(GIT_HASH)\" \
             -DTIME_STAMP=\"$(BUILD_TIME)\" \
-            -DCMSIS_device_header=\"ARMCM0.h\" \
-            -DARMCM0 \
+            $(MCU_DEFINES) \
             -DUVK6_ENABLE_TX=$(ENABLE_TX) \
             -DUVK6_ENABLE_FC=$(ENABLE_FC) \
             -DUVK6_ENABLE_SPECTRUM=$(ENABLE_SPECTRUM)
@@ -93,14 +108,14 @@ DEFINES  := -DGIT_HASH=\"$(GIT_HASH)\" \
 # Include paths
 INC_DIRS := -I./src \
             -I./src/external/CMSIS_5/CMSIS/Core/Include \
-            -I./src/external/CMSIS_5/Device/ARM/ARMCM0/Include
+            $(MCU_INC_DIRS)
 
 # =============================================================================
 # Linker Flags
 # =============================================================================
 LDFLAGS  := $(COMMON_FLAGS) $(OPTIMIZATION) \
             -nostartfiles \
-            -Tfirmware.ld \
+            -T$(BOARD_DIR)/firmware.ld \
             --specs=nano.specs \
             -lc -lnosys -lm \
             -Wl,--gc-sections \
@@ -204,6 +219,7 @@ info:
 	@echo "  Project:     $(PROJECT_NAME)"
 	@echo "  Git Hash:    $(GIT_HASH)"
 	@echo "  Build Time:  $(BUILD_TIME)"
+	@echo "  Board:       $(BOARD)"
 	@echo "  Build Type:  $(BUILD_TYPE)"
 	@echo ""
 	@echo "Toolchain:"
@@ -216,7 +232,7 @@ info:
 # Очистка
 clean:
 	@echo "Cleaning build artifacts..."
-	@rm -rf $(TARGET) $(TARGET).* $(OBJ_DIR) $(BIN_DIR)/*.bin inc/
+	@rm -rf $(OBJ_DIR) $(BIN_DIR) inc/
 	@echo "Clean completed"
 
 # Очистка всего включая зависимости
@@ -243,6 +259,7 @@ help:
 	@echo "  make release      # Build and package release"
 	@echo "  make BUILD_TYPE=debug  # Alternative debug build"
 	@echo "  make flash PORT=/dev/cu.usbserial-1420  # Hold PTT while powering on"
+	@echo "  make BOARD=uvk6   # Board: uvk6 (default)"
 
 # =============================================================================
 # Dependencies

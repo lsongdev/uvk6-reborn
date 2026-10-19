@@ -14,32 +14,11 @@
  *     limitations under the License.
  */
 
+#include "drivers/mcu/dp32g030/gpio-bits.h"
 #include "hal/gpio.h"
-#include "drivers/dp32g030/gpio.h"
-#include "drivers/dp32g030/portcon.h"
-#include "hal/gpio-dp32g030.h"
-
-typedef struct {
-  volatile GPIO_Bank_t *bank;
-  volatile uint32_t *inputEnable; // PORTCON_PORTx_IE.
-  uint8_t bit;
-} Line;
-
-#define LINE(port, bit) {GPIO##port, &PORTCON_PORT##port##_IE, GPIO##port##_PIN_##bit}
-
-static const Line LINES[] = {
-    [GPIO_BK4819_SCN] = LINE(C, BK4819_SCN),
-    [GPIO_BK4819_SCL] = LINE(C, BK4819_SCL),
-    [GPIO_BK4819_SDA] = LINE(C, BK4819_SDA),
-    [GPIO_ST7565_A0] = LINE(B, ST7565_A0),
-    [GPIO_ST7565_RES] = LINE(B, ST7565_RES),
-    [GPIO_BK1080] = LINE(B, BK1080),
-    [GPIO_AUDIO_PATH] = LINE(C, AUDIO_PATH),
-    [GPIO_PTT] = LINE(C, PTT),
-};
 
 void GPIO_Write(GpioLine line, bool high) {
-  const Line *l = &LINES[line];
+  const Dp32GpioLine *l = &GPIO_LINES[line];
   if (high)
     GPIO_SetBit(&l->bank->DATA, l->bit);
   else
@@ -47,12 +26,12 @@ void GPIO_Write(GpioLine line, bool high) {
 }
 
 bool GPIO_Read(GpioLine line) {
-  const Line *l = &LINES[line];
+  const Dp32GpioLine *l = &GPIO_LINES[line];
   return GPIO_CheckBit(&l->bank->DATA, l->bit);
 }
 
 void GPIO_SetInput(GpioLine line, bool input) {
-  const Line *l = &LINES[line];
+  const Dp32GpioLine *l = &GPIO_LINES[line];
   // Input buffer on only while reading, as the DP32G030 pin muxing expects.
   if (input) {
     *l->inputEnable |= 1U << l->bit;

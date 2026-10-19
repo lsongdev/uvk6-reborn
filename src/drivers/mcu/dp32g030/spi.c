@@ -1,8 +1,8 @@
 #include "hal/spi.h"
-#include "drivers/dp32g030/spi.h"
+#include "drivers/mcu/dp32g030/spi.h"
 #include "external/CMSIS_5/Device/ARM/ARMCM0/Include/ARMCM0.h"
-#include "drivers/dp32g030/irq.h"
-#include "drivers/dp32g030/syscon.h"
+#include "drivers/mcu/dp32g030/irq.h"
+#include "drivers/mcu/dp32g030/syscon.h"
 
 typedef struct {
   uint8_t MSTR;

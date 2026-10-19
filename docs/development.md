@@ -28,10 +28,12 @@ make
 
 | 产物 | 用途 |
 | --- | --- |
-| bin/firmware | ELF，符号／段分析 |
-| bin/firmware.bin | 原始应用镜像，仓库刷机脚本使用 |
-| bin/firmware.packed.bin | 经 tools/fw-pack.py 打包，供要求该格式的工具使用 |
-| obj/output.map | 实际链接布局与大小 |
+| bin/<board>/firmware | ELF，符号／段分析 |
+| bin/<board>/firmware.bin | 原始应用镜像，仓库刷机脚本使用 |
+| bin/<board>/firmware.packed.bin | 经 tools/fw-pack.py 打包，供要求该格式的工具使用 |
+| obj/<board>/output.map | 实际链接布局与大小 |
+
+`<board>` 为 `BOARD`，默认 uvk6。
 
 raw 与 packed 不能互换。链接脚本不能为了通过构建扩大 Flash 上限。CI 在 [.github/workflows/c-cpp.yml](../.github/workflows/c-cpp.yml) 固定 Ubuntu 24.04 的 ARM GNU 13.2.rel1 包，运行主机回归、无 FC／无 TX 变体和默认构建，检查 raw≤61,440 B，上传 ELF、两种镜像和 Map。不同工具链产生不同大小，不混作优化增量。
 
@@ -47,12 +49,12 @@ make flash PORT=/dev/ttyUSB0
 
 PORT 必须显式指定；macOS 可用 `ls /dev/cu.*` 查找。命令先构建，再由 tools/flash.py 发送 raw 镜像，不操作 EEPROM。脚本使用 Python 标准库，无额外串口依赖。
 
-打开串口后最多等待 45 秒握手，等待期间每秒一个点，握手成功立即刷写；不是等满 45 秒才开始。38400 baud、256 B 块、每块等待应答，最多尝试 5 次。先检查镜像长度与向量表，限制应用分区。
+打开串口后最多等待 45 秒握手，等待期间每秒一个点，握手成功立即刷写；不是等满 45 秒才开始。38400 baud、256 B 块、每块等待应答，最多尝试 5 次。先检查镜像长度与向量表，限制应用分区；Bootloader 版本不是 3.x（例如 UV-K1 的 7.02.02）时不握手、不写入。
 
 失败或中断时重新关闭电源，按住 PTT 开机，完整重刷。完成表示所有块收到 Bootloader 确认，不表示做过 Flash 回读验证；随后正常重启。首次配置初始化和 EEPROM 备份见用户手册。
 
 ```sh
-python3 tools/flash.py --port /dev/ttyUSB0 --firmware bin/firmware.bin
+python3 tools/flash.py --port /dev/ttyUSB0 --firmware bin/uvk6/firmware.bin
 python3 tests/flash-regression.py
 ```
 
@@ -61,14 +63,16 @@ python3 tests/flash-regression.py
 ## 3. 源码分层与公共 API
 
 ```text
-main.c / hal/start.S  硬件与默认配置初始化
+main.c               默认配置后调用 BOARD_Init、STORAGE_Init，进入主循环
 system.c             主循环、全局按键、显示节奏、UART、优先 TX 安全检查
 radio/               常驻控制器：Slot、来源、调谐事务、RDS、Seek/FC/Watch/PTT
 ui/                  界面：顶层为纯绘图、字体、菜单和输入工具
 ui/screens/          页面栈、主屏、Slot 菜单、频道、设置、草稿输入
 core/                模型、状态机、接收镜像、文本和持久化
-hal/                 整机资源、总线及芯片适配
-drivers/             按芯片组织的寄存器与命令实现
+hal/                 与板无关的接口及其公共实现（背光、音频、收发适配、PC 链路协议）
+drivers/             外部芯片驱动（bk4819、st7565、si473x、bk1080、eeprom-24cxx）
+drivers/mcu/<mcu>/   MCU 寄存器、启动、时钟、定时器、外设驱动、mcu.mk
+boards/<board>/      引脚表、板级初始化、键盘接线、背光输出、存储布局、链接脚本、board.mk
 ```
 
 ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包含 ui，不知道菜单、输入框或 F 前缀。ui 顶层的绘图代码不包含 ui/screens 和 radio，不访问射频全局状态，只绘制传入视图，因此 UI 预览和卡片回归可只编译它们。纯模型 core/tuning、radio-model、watch、seek、capture 不调用 EEPROM、HAL、显示或系统时钟，由调用者传输入／回调。
@@ -90,16 +94,20 @@ ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包�
 | core/radio-state.c、tuning.c | 保存状态、来源解析、跨频段步进、精确方案 |
 | core/device-config.c、config-store.c | dirty／重试、UVR2 固定字节格式、双副本 |
 | core/channel-store.c | 频道双副本（写旧份后镜像）、占用位图、CRC、删除 |
-| hal/storage.c、eeprom-layout.h | 存储区到 UV-K6 EEPROM 地址的映射与写保护 |
+| boards/uvk6/storage.c、storage-layout.h | 存储区到 UV-K6 EEPROM 地址的映射、写保护、维护通道 |
 | hal/rx-device.c | 芯片单位／带宽／信号口径／亚音、音频门、Seek／FC 适配 |
 | hal/tx-device.c | 板级范围、校准读取与插值、物理 PTT／供电、PA 顺序 |
-| drivers/{bk4819,si473x,bk1080,st7565,dp32g030}/ | 芯片命令及外围寄存器 |
+| drivers/{bk4819,si473x,bk1080,st7565,eeprom-24cxx}/ | 外部芯片命令 |
+| drivers/mcu/dp32g030/ | DP32G030 寄存器、启动、时钟、定时器、SPI、UART 收发、ADC、CRC |
+| hal/uart.c | PC 链路帧格式、混淆与命令；原始读／维护写交给板级 |
 
 依赖只向下。HAL 抽象按键、屏幕、LED、音频、背光、EEPROM／总线等资源，也集中跨芯片适配；driver 不读取产品配置或实现菜单。上层不依赖芯片单位、增益索引或寄存器号。
 
-芯片驱动（drivers/ 下除 dp32g030 外）和 hal/ 以外的代码不得包含 MCU 寄存器头：单根信号经 hal/gpio.h 的 `GpioLine`（`GPIO_Write`／`GPIO_Read`／`GPIO_SetInput`），显示总线经 hal/spi.h，复位经 `SYS_Reset`，整机初始化经 `BOARD_Init`。端口、引脚号与寄存器只出现在 hal/ 的板级实现中（hal/gpio.c 的线路表、hal/gpio-dp32g030.h、board.c、keyboard.c、i2c.c 等），换板时只替换这些文件。
+构建按板选择：`make BOARD=uvk6`（默认）读取 boards/uvk6/board.mk 得到 `MCU=dp32g030`，再引入 drivers/mcu/dp32g030/mcu.mk（CPU 与 CMSIS 选项），编译该板和该 MCU 目录下的源文件，产物在 bin/uvk6/、obj/uvk6/。MCU 驱动不认识具体引脚，板级不重复实现外设驱动；同一 MCU 的新机型只需新增 boards/ 目录。
 
-持久数据同理：core 与驱动只经 hal/storage.h 按“区域 + 区内偏移”读写（配置 A／B、频道 A／B、只读校准、只读资源区），不出现绝对地址。区域契约：断电时一次写入最多波及同一区域内的其他字节（闪存擦除单元），绝不影响其他区域；因此一条记录的两份必须放在不同区域，写完一份再写另一份。UV-K6 的 hal/storage.c 把各区映射回原有 EEPROM 地址（频道两份仍交错存放），布局只写在 hal/eeprom-layout.h，并由 storage-regression 校验。UART 原始读和维护写属于板级工具通道，仍按 EEPROM 绝对地址。
+只有 boards/ 与 drivers/mcu/ 可以包含 MCU 寄存器头。其余代码经 hal 接口访问硬件：单根信号经 hal/gpio.h 的 `GpioLine`（`GPIO_Write`／`GPIO_Read`／`GPIO_SetInput`，线路表由板级定义），显示总线经 hal/spi.h，背光输出经 `BOARD_BacklightSetLevel`，复位经 `SYS_Reset`，整机初始化经 `BOARD_Init`。
+
+持久数据同理：core 与驱动只经 hal/storage.h 按“区域 + 区内偏移”读写（配置 A／B、频道 A／B、只读校准、只读资源区），不出现绝对地址。区域契约：断电时一次写入最多波及同一区域内的其他字节（闪存擦除单元），绝不影响其他区域；因此一条记录的两份必须放在不同区域，写完一份再写另一份。UV-K6 的 boards/uvk6/storage.c 把各区映射回原有 EEPROM 地址（频道两份仍交错存放），布局只写在 boards/uvk6/storage-layout.h，并由 storage-regression 校验。UART 原始读和维护写经 `BOARD_RawRead`／`BOARD_MaintenanceWrite`，按该板介质的绝对地址；24Cxx 驱动本身不含布局策略。
 
 selectedSlot 是操作对象，receivingSlot 是接收归属，txSlot 可是回话对象，gReceiver.plan 是实际硬件镜像，runtime.current 是接收事务的运行方案。临时调谐不得把硬件镜像回写用户记忆。MR 的有效参数只读，保存频道是独立显式动作。
 
@@ -235,9 +243,9 @@ LTO 的 Main、homeRender、applyPlan 等符号含内联子调用，不等于原
 
 ```sh
 make -B -j4 all
-python3 tools/map_analyze.py obj/output.map 20
-arm-none-eabi-size -A bin/firmware
-arm-none-eabi-nm --size-sort -S bin/firmware
+python3 tools/map_analyze.py obj/uvk6/output.map 20
+arm-none-eabi-size -A bin/uvk6/firmware
+arm-none-eabi-nm --size-sort -S bin/uvk6/firmware
 ```
 
 未使用的字库文件不等于镜像资源；EEPROM 扩容不增加 MCU Flash／RAM。新功能优先去重复状态、恢复路径和格式转换，不能删 CRC、写保护、回读或 PA 关断来通过预算。

@@ -1,4 +1,4 @@
-#include "drivers/dp32g030/crc.h"
+#include "drivers/mcu/dp32g030/crc.h"
 #include "hal/crc.h"
 
 void CRC_Init(void) {

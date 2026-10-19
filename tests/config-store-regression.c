@@ -1,6 +1,6 @@
 // Configuration format 9: one layout, two copies, newest valid wins.
 #include "../src/core/config-store.c"
-#include "../src/hal/eeprom-layout.h"
+#include "../src/boards/uvk6/storage-layout.h"
 #include <assert.h>
 #include <string.h>
 

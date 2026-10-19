@@ -6,7 +6,7 @@
 #include "core/config-store.h"
 #include "core/channel-store.h"
 #include "core/resource.h"
-#include "hal/eeprom.h"
+#include "drivers/eeprom-24cxx/eeprom.h"
 
 #define CONFIG_STORE_BASE 0x0800u
 #define CONFIG_STORE_END (CONFIG_STORE_BASE + CONFIG_STORE_SLOT_SIZE*CONFIG_STORE_SLOTS)
@@ -37,7 +37,7 @@ static inline bool EEPROM_WriteAllowed(uint32_t address, uint16_t size) {
   return config || channels;
 }
 // The resource tail and the calibration block are written only through
-// EEPROM_WriteMaintenance (the PC tool over UART), never by the configuration
+// BOARD_MaintenanceWrite (the PC tool over UART), never by the configuration
 // or channel code.
 static inline bool EEPROM_ResourceWriteAllowed(uint32_t address, uint16_t size,
                                                uint32_t capacity) {
@@ -48,16 +48,5 @@ static inline bool EEPROM_ResourceWriteAllowed(uint32_t address, uint16_t size,
 // Within 0x1E00-0x1FFF, so a backed-up block can be restored whole.
 static inline bool EEPROM_CalibrationWriteAllowed(uint32_t address, uint16_t size) {
   return size && address >= CAL_BASE && address < CAL_END && size <= CAL_END - address;
-}
-// ACK address patterns can only identify a candidate memory mapping.
-// They do not establish the physical part number, capacity, or page size.
-static inline EEPROMType EEPROM_CandidateFromAckMask(uint8_t mask) {
-  switch (mask) {
-  case 0x01: return EEPROM_BL24C64;
-  case 0x03: return EEPROM_BL24C128;
-  case 0x0f: return EEPROM_M24M02;
-  case 0xff: return EEPROM_4MBIT;
-  default: return EEPROM_UNKNOWN;
-  }
 }
 #endif
