@@ -37,7 +37,7 @@
 | --- | --- |
 | 顶部公共状态栏 | 标题显示主屏幕状态；DW A 表示当前音频属于 A。右侧电池按设置显示图标、百分比或电压；左图的 F 表示正在等待副标快捷键。中间的时间（如右图 20:30）来自 RDS 时钟（CT）：收到一台播发 CT 的 FM 广播约 1–2 分钟后出现，按电台给出的当地时区显示；离开电台后由机内计时继续走，关机清除。机内计时没有晶振校准，长时间不收台会有偏差，回到该电台会重新对时 |
 | 黑条左侧箭头与 A／B | 箭头指定调谐、菜单和输入对象；F→2 切换。箭头和正在出声的 Slot 可以不同 |
-| B 后面的 *（左图） | RX 参数与频段预设不同，**不表示尚未保存**；可用 Reset to defaults 恢复预设 |
+| B 后面的 *（左图） | RX 参数与频段预设不同，**不表示尚未保存**；可用 Reset to presets 恢复预设 |
 | FM Radio／70cm／CH 012 | 频段名称或 MR 频道编号；F→1 切频段，F→3 切 VFO／MR |
 | WFM／NFM | 明确解调模式，F→0 切换当前可用模式；有名称时移到正文右下角 |
 | 大号频率与右侧尾数 | 左图 B 为 438.506＋小字 25，合起来是 **438.50625 MHz**，显示未舍入；低于 1 MHz 使用 kHz |
@@ -108,7 +108,7 @@
 | AM | ≤30 MHz 且有 SI4732 时优先 SI；其余 BK 支持范围用 BK AM 实现。K1 的 BK4829 AM 采用原厂寄存器值，6k／12k 带宽使用原厂 AM 滤波预设，26k 使用宽带预设 |
 | LSB／USB | ≤30 MHz 的 SI4732；须安装全量 CRC 校验通过的 EEPROM 补丁 |
 
-输入允许 150 kHz–1340 MHz，仍须通过模式和能力校验。K1 没有 SI4732，BK4829 只覆盖 18 MHz 以上，因此 LW、MW 和 18 MHz 以下的 SW 提示 RX unavailable。芯片标称范围与整机效果见[硬件事实](hardware-uvk6.md#4-接收芯片与能力边界)。
+输入允许 150 kHz–1340 MHz，仍须通过模式和能力校验。频段和范围按本机芯片提供：切频段和 Bands 列表跳过完全收不到的频段，进入频段时记忆频率若不可接收，移到该频段内最近的可接收频率，搜台也只扫可接收部分。K1 没有 SI4732，BK4829 只覆盖 18 MHz 以上，因此没有 LW、MW，SW 从 18 MHz 开始；直接输入 18 MHz 以下的频率提示 Out of range。芯片标称范围与整机效果见[硬件事实](hardware-uvk6.md#4-接收芯片与能力边界)。
 
 ### 频率输入
 
@@ -135,7 +135,7 @@ Slot 菜单 ▲／▼选择，* 或 MENU 增加／执行，F（键帽副标 #）
 | TX Offset／TX Freq | +／- 时编辑频差，Split 时编辑发射频率；Off 时 --、不可编辑 |
 | TX Tone | 独立发射 CTCSS／DCS，Off 关闭 |
 | Spectrum | 打开频谱（见第 7 章），`ENABLE_SPECTRUM=0` 时没有此项 |
-| Reset to defaults | 恢复当前频段 RX 预设，频率和 TX 设置不变 |
+| Reset to presets | 恢复当前频段 RX 预设，频率和 TX 设置不变 |
 | Save as channel | 选择编号、确认覆盖、输入名称并保存 |
 
 RX Tone 与静噪条件同时满足才开音频，SQ0 也不绕过亚音。CTCSS 如 67.0 Hz，DCS 如 D023N／D023I；没有自动亚音扫描。
@@ -232,11 +232,11 @@ Slot 菜单 → Spectrum。上方是当前 Slot 的卡片，显示光标处的�
 | Lock PTT too | 锁键时是否同时屏蔽 PTT |
 | Battery | Show charge（Icon／Percent／Voltage）、Charge curve（1600／2200／3500 估算曲线）、Cal voltage（输入实测 5.00–8.60 V） |
 | Band presets／Channels | 独立频段预设／频道列表、改名和删除 |
-| About | Firmware、Storage（容量）、Config、FM chip（SI4732／BK1080）、SSB patch（仅 SI4732 构建）、TX status、Save status、Reset prefs |
+| About | Firmware、Storage（容量）、Config、FM chip（SI4732／BK1080）、SSB patch（仅 SI4732 构建）、TX status、Save status、Reset factory |
 
 Brightness 降低时限制 Idle light 不高于它；Light time 的 Off／Always 优先于接收触发。电池曲线不是容量测量。SQL 时序只显示档位，不承诺毫秒数；Auto（默认）采用接收芯片的推荐值：K6 BK4819 为 1／1，K1 BK4829 为 5／3（原厂值）。SI idle 在下次离开 SI 时使用；滤波和 SQL 工程参数离开设置时重新应用，失败回退。设置、文本页面期间接收持续。
 
-Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留原值。Reset prefs 需 MENU 确认，恢复显示和 TX 保护等普通偏好，保留当前键盘锁、电池校准／曲线、RX 工程参数、Mic／Deviation、Slot 和频道，不是整机初始化。
+Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留原值。Reset factory 需 MENU 确认，恢复显示和 TX 保护等普通偏好，保留当前键盘锁、电池校准／曲线、RX 工程参数、Mic／Deviation、Slot 和频道，不是整机初始化。
 
 普通修改在最后变更后约 1500 ms 合并写入，离开设置也尝试提交；失败约每 5 秒重试。About → Save status 显示 Read only／Saved／Pending／Failed／RAM only，MENU 立即保存或重试。Pending 时掉电可能丢失最近修改。
 
@@ -244,7 +244,8 @@ Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留�
 
 | 提示 | 含义与下一步 |
 | --- | --- |
-| RX unavailable／RX -- | 无接收组合，检查频率和模式 |
+| RX unavailable／RX -- | 本机能收该频率，但当前模式不行，换模式 |
+| Out of range | 本机任何模式都收不到该频率 |
 | SSB patch missing | EEPROM 补丁未安装或未通过完整 CRC 校验 |
 | Tune failed／RX error | 调谐失败尝试恢复／恢复失败保持静音 |
 | Invalid value／Out of range／Band boundary | 修改输入或参数；量化后的频段冲突不提交 |

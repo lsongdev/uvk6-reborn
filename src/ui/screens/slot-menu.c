@@ -101,7 +101,7 @@ static void menuRender(void) {
 #if UVK6_ENABLE_SPECTRUM
     "Spectrum",
 #endif
-    "Reset to defaults", "Save as channel"
+    "Reset to presets", "Save as channel"
   };
   _Static_assert(sizeof(names)/sizeof(names[0]) == MENU_ITEM_COUNT,
                  "Every slot menu item needs a label");

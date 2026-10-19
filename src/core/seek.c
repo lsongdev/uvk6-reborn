@@ -1,13 +1,12 @@
 #include "core/seek.h"
 
-bool SEEK_Start(Seek *seek, const RadioBand *band, uint32_t origin_hz,
-                uint32_t step_hz) {
-  if (!seek || !band || !step_hz || origin_hz < band->start_hz ||
-      origin_hz >= band->end_hz || band->end_hz <= band->start_hz)
+bool SEEK_Start(Seek *seek, RadioSpan range, uint32_t origin_hz, uint32_t step_hz) {
+  if (!seek || !step_hz || origin_hz < range.start_hz ||
+      origin_hz >= range.end_hz || range.end_hz <= range.start_hz)
     return false;
   *seek = (Seek){
       .origin_hz = origin_hz, .cursor_hz = origin_hz,
-      .lower_hz = band->start_hz, .end_hz = band->end_hz,
+      .lower_hz = range.start_hz, .end_hz = range.end_hz,
       .step_hz = step_hz, .active = true};
   return true;
 }

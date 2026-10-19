@@ -149,7 +149,7 @@ static const MenuItem aboutItems[] = {
 #endif
     {"TX status",.get_value_text=getTxStatus},
     {"Save status",.get_value_text=getSaveStatus,.action=saveNow},
-    {"Reset prefs",.action=resetPreferences},
+    {"Reset factory",.action=resetPreferences},
 };
 MENU_DEF(aboutMenu,"About",aboutItems);
 static const MenuItem menuItems[] = {
@@ -195,7 +195,7 @@ static bool key(KEY_Code_t key, Key_State_t state) {
 }
 static void render(void) {
   if (resetConfirm) {
-    STATUSLINE_SetText("Reset prefs?");
+    STATUSLINE_SetText("Reset factory?");
     PrintSmall(3,18,"Display, keys, TX limits");
     PrintSmall(3,29,"Keep radio & calibration");
     PrintSmall(3,56,"MENU:OK  EXIT:Back");

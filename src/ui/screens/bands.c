@@ -6,6 +6,8 @@
 #include "ui/screens/statusline.h"
 
 static uint8_t selected, field;
+// Only bands this hardware can receive in are listed; row indexes `shown`.
+static uint8_t shown[RADIO_STATE_BANDS], shownCount, row;
 static bool editing;
 static RadioParameters draft;
 static const char *message;
@@ -16,8 +18,22 @@ static const RadioSlot *selectedSlot(void) {
   return &gDeviceConfig.radio.slots[gDeviceConfig.radio.selected_slot];
 }
 
+// The slot's remembered frequency, moved into the band's receivable part.
+static uint32_t bandFrequency(uint8_t band) {
+  uint32_t hz = selectedSlot()->bands[band].frequency_hz;
+  RadioSpan span;
+  if (!RADIO_MODEL_BandSpan(band, hz, RECEIVER_Capabilities(), &span)) return hz;
+  return hz < span.start_hz ? span.start_hz : hz >= span.end_hz ? span.end_hz - 1u : hz;
+}
+
 static void enter(void) {
-  selected = selectedSlot()->active_band;
+  shownCount = row = 0;
+  for (uint8_t i = 0; i < radioBandCount; ++i) {
+    if (!RADIO_MODEL_BandSpan(i, radioBands[i].initial_hz, RECEIVER_Capabilities(), NULL)) continue;
+    if (i == selectedSlot()->active_band) row = shownCount;
+    shown[shownCount++] = i;
+  }
+  selected = shown[row];
   field = 0;
   editing = false;
   message = NULL;
@@ -29,8 +45,8 @@ static void save(void) {
     return;
   }
   RxPlan plan;
-  RxResult result = RADIO_MODEL_Plan(selectedSlot()->bands[selected].frequency_hz,
-                                    draft, RECEIVER_Capabilities(), &plan);
+  RxResult result = RADIO_MODEL_Plan(bandFrequency(selected), draft,
+                                    RECEIVER_Capabilities(), &plan);
   if (result != RX_OK) {
     message = result == RX_PATCH_MISSING ? "SSB patch missing"
             : result == RX_INVALID_PARAMETERS ? "Invalid value" : "RX unavailable";
@@ -52,9 +68,10 @@ static bool key(KEY_Code_t key, Key_State_t state) {
   if (state != KEY_RELEASED && state != KEY_LONG_PRESSED_CONT)
     return true;
   if (key == KEY_UP || key == KEY_DOWN) {
-    uint8_t count = editing ? FIELD_COUNT : radioBandCount;
-    uint8_t *index = editing ? &field : &selected;
+    uint8_t count = editing ? FIELD_COUNT : shownCount;
+    uint8_t *index = editing ? &field : &row;
     *index = (*index + (key == KEY_DOWN ? 1u : count-1u))%count;
+    selected = shown[row];
     message = NULL;
     return true;
   }
@@ -82,7 +99,7 @@ static bool key(KEY_Code_t key, Key_State_t state) {
     return true;
   message = NULL;
   if (field < FIELD_CURRENT) {
-    if (!RADIO_MODEL_Adjust(selectedSlot()->bands[selected].frequency_hz,
+    if (!RADIO_MODEL_Adjust(bandFrequency(selected),
                             &draft, RECEIVER_Capabilities(),
                             (RadioParameterField)field, key != KEY_F))
       message = field == RADIO_FIELD_BANDWIDTH && draft.mode == RX_WFM ? "Fixed" : "No option";
@@ -104,14 +121,14 @@ static bool key(KEY_Code_t key, Key_State_t state) {
 static void render(void) {
   static const char *const labels[] = {"Mode", "Step", "BW", "SQ", "RX Tone", "Use current", "Defaults", "Save"};
   STATUSLINE_SetText(editing ? radioBands[selected].name : "Bands");
-  uint8_t index = editing ? field : selected;
+  uint8_t index = editing ? field : row;
   uint8_t start = index >= 4 ? index-3 : 0;
-  uint8_t count = editing ? FIELD_COUNT : radioBandCount;
-  for (uint8_t row = 0; row < 4 && start+row < count; ++row) {
-    uint8_t i = start+row, y = 18+row*11;
-    PrintMediumEx(2, y, POS_L, C_FILL, editing ? labels[i] : radioBands[i].name);
+  uint8_t count = editing ? FIELD_COUNT : shownCount;
+  for (uint8_t line = 0; line < 4 && start+line < count; ++line) {
+    uint8_t i = start+line, y = 18+line*11;
+    PrintMediumEx(2, y, POS_L, C_FILL, editing ? labels[i] : radioBands[shown[i]].name);
     if (!editing) {
-      PrintSmallEx(124, y, POS_R, C_FILL, rxModeNames[gDeviceConfig.radio.presets[i].mode]);
+      PrintSmallEx(124, y, POS_R, C_FILL, rxModeNames[gDeviceConfig.radio.presets[shown[i]].mode]);
     } else if (i == RADIO_FIELD_MODE) {
       PrintSmallEx(124, y, POS_R, C_FILL, rxModeNames[draft.mode]);
     } else {
