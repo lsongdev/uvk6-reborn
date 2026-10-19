@@ -13,6 +13,9 @@ import time
 KEY = bytes.fromhex('166c14e62e910d402135d5401303e980')
 BLOCK_SIZE = 256
 FLASH_SIZE = 0xF000  # Application partition; never overwrite the bootloader.
+# UV-K6 (DP32G030) bootloaders report 3.x; the UV-K1 (PY32F071) reports 7.x.
+# A DP32G030 image on a K1, or the reverse, leaves a radio only SWD can revive.
+BOOTLOADER_PREFIX = '3.'
 
 
 def xor(data):
@@ -127,6 +130,9 @@ def flash(loader, image, wait=45, retries=5):
         print(flush=True)
     version = hello[20:36].split(b'\0')[0].decode('ascii', errors='replace')
     print(f'Bootloader: {version}', flush=True)
+    if not version.startswith(BOOTLOADER_PREFIX):
+        raise ValueError(f'Bootloader {version} is not a UV-K6 (expected {BOOTLOADER_PREFIX}x); '
+                         'nothing was written')
     loader.send(bytes.fromhex('30051000') + b'*.01.23' + bytes(9))
     time.sleep(.15)
     end = (len(image) + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1)

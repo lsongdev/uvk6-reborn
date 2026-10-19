@@ -48,7 +48,7 @@ class FlashTests(unittest.TestCase):
             def __init__(self):
                 self.sent = []
                 self.replies = iter([
-                    bytes.fromhex('18052000') + bytes(32),
+                    bytes.fromhex('18052000') + bytes(16) + b'3.00.02'.ljust(16, b'\0'),
                     TimeoutError(),
                     bytes.fromhex('1a0508008a8d9f1d01000000'), # Wrong address.
                     bytes.fromhex('1a0508008a8d9f1d00000000'),
@@ -77,13 +77,28 @@ class FlashTests(unittest.TestCase):
                 self.sent.append(payload)
             def receive(self, deadline):
                 if not self.sent:
-                    return bytes.fromhex('18052000') + bytes(32)
+                    return bytes.fromhex('18052000') + bytes(16) + b'3.00.02'.ljust(16, b'\0')
                 raise TimeoutError()
         loader = Fake()
         with patch.object(flasher.time, 'sleep'), patch('builtins.print'), self.assertRaises(TimeoutError):
             flasher.flash(loader, bytes(300), retries=2)
         self.assertEqual(len(loader.sent), 3) # Handshake and two attempts.
         self.assertEqual(loader.sent[-1][8:10], b'\0\0')
+
+    def test_other_board_bootloader_gets_nothing(self):
+        # The UV-K1 hello read on 2026-10-19 (Bootloader 7.02.02).
+        hello = bytes.fromhex('180520005434504108363233588e800078d50456'
+                              '372e30322e3032000000c42000080000')
+        class Fake:
+            sent = []
+            def send(self, payload):
+                self.sent.append(payload)
+            def receive(self, deadline):
+                return hello
+        loader = Fake()
+        with patch('builtins.print'), self.assertRaises(ValueError):
+            flasher.flash(loader, bytes(300))
+        self.assertEqual(loader.sent, []) # Not even the handshake.
 
 
 if __name__ == '__main__':
