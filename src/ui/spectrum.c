@@ -15,7 +15,7 @@ void UI_SpectrumRender(uint8_t y, uint8_t height, const Spectrum *s) {
   bool covered = false;
   for (uint8_t x = 0; x < SPECTRUM_POINTS && x < LCD_WIDTH; ++x) {
     // A point the sweep cannot measure is a dashed baseline, not silence.
-    if (!RADIO_MODEL_BkCovers(SPECTRUM_Frequency(s, x))) {
+    if (!RADIO_MODEL_InRfRange(SPECTRUM_Frequency(s, x),s->ranges)) {
       if (!(x & 2u)) PutPixel(x, bottom - 1u, C_FILL);
       continue;
     }

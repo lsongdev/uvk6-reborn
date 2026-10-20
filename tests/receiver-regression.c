@@ -1,3 +1,4 @@
+#include "rf-ranges.h"
 // Receiver commit/restore rules with the hardware boundary mocked.
 #include "../src/radio/receiver.c"
 #include <assert.h>
@@ -23,7 +24,7 @@ bool RX_DEVICE_Sample(const RxPlan *plan, uint16_t *rssi, bool *open) {
 void LED_SetGreen(bool on) { (void)on; }
 void BACKLIGHT_SetReception(bool open) { (void)open; }
 ReceiverCapabilities RX_DEVICE_Capabilities(void) {
-  ++probes; return (ReceiverCapabilities){.si = hasSi, .broadcast = !hasSi, .ssb_patch = hasSi, .bk_am=true, .bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL};
+  ++probes; return (ReceiverCapabilities){.si = hasSi, .broadcast = !hasSi, .ssb_patch = hasSi, .bk_am=true, .bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL, .bk_ranges=testBk4819Ranges};
 }
 static unsigned chipInitializations;
 void RX_DEVICE_Init(void) { ++chipInitializations; }

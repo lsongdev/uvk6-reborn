@@ -43,7 +43,7 @@ const uint16_t DCS_Options[104] = {
     0x01D9, 0x01DA, 0x01DC, 0x01E3, 0x01EC,
 };
 
-static uint32_t DCS_CalculateGolay(uint32_t CodeWord) {
+static __attribute__((noinline)) uint32_t DCS_CalculateGolay(uint32_t CodeWord) {
   unsigned int i;
   uint32_t Word = CodeWord;
   for (i = 0; i < 12; i++) {
@@ -60,21 +60,16 @@ uint32_t DCS_GetGolayCodeWord(DCS_CodeType_t CodeType, uint8_t Option) {
     Code ^= 0x7FFFFF;
   return Code;
 }
-
-
-
-
 RadioTone TONE_DecodeCtcss(uint16_t hz10) {
   unsigned best = UINT16_MAX;
-  RadioTone result = 0;
+  unsigned nearest = 0;
   for (unsigned i = 0; i < ARRAY_SIZE(CTCSS_Options); ++i) {
     unsigned standard = CTCSS_Options[i];
     unsigned delta = hz10 > standard ? hz10-standard : standard-hz10;
-    if (delta < best && (delta <= 10u || delta*200u <= standard)) {
-      best = delta; result = i+1u;
-    }
+    if (delta < best) { best = delta; nearest = i; }
   }
-  return result;
+  // Standard acceptance windows do not overlap: check only the nearest.
+  return best <= 10u || best*200u <= CTCSS_Options[nearest] ? nearest+1u : 0;
 }
 
 RadioTone TONE_DecodeDcs(uint32_t word) {
@@ -82,10 +77,9 @@ RadioTone TONE_DecodeDcs(uint32_t word) {
   // Repeated DCS streams have no unique starting bit. Some inverted codes
   // equal a rotation of a different normal code; use the normal catalogue.
   for (unsigned bit = 0; bit < 23; ++bit) {
-    if (((word >> 9) & 7u) == 4u)
+    if (((word >> 9) & 7u) == 4u && word == DCS_CalculateGolay(word & 0xFFFu))
       for (unsigned i = 0; i < ARRAY_SIZE(DCS_Options); ++i)
-        if ((word & 0x1FFu) == DCS_Options[i] &&
-            word == DCS_GetGolayCodeWord(CODE_TYPE_DIGITAL, i)) return 51u+i;
+        if ((word & 0x1FFu) == DCS_Options[i]) return 51u+i;
     word = (word >> 1) | ((word & 1u) << 22);
   }
   return 0;

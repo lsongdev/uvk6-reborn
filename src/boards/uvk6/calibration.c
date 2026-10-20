@@ -4,14 +4,21 @@
 
 bool BOARD_TxCalibration(uint32_t hz, BoardTxCalibration *out) {
   if (!out || hz % 10u) return false;
-  // Preserve the K6's existing calibration interpolation and TX limits.
-  if (hz >= 136000000u && hz < 174000000u)
-    *out = (BoardTxCalibration){CALIBRATION_PA_OFFSET + 2u * CALIBRATION_PA_STRIDE,
-                               136000000u, 150000000u, 173999990u};
-  else if (hz >= 400000000u && hz < 470000000u)
-    *out = (BoardTxCalibration){CALIBRATION_PA_OFFSET + 5u * CALIBRATION_PA_STRIDE,
-                               400000000u, 435000000u, 469999990u};
-  else return false;
+  // Seven factory records, selected by frequency rather than a TX whitelist.
+  // Preserve the existing K6 VHF/UHF anchors. Outside a record's anchors,
+  // the shared interpolator clamps to its first/last value.
+  static const BoardTxCalibration bands[CALIBRATION_PA_BANDS] = {
+    {0xD0u, 50000000u, 65000000u, 76000000u},
+    {0xE0u,108000000u,122000000u,135999900u},
+    {0xF0u,136000000u,150000000u,173999990u},
+    {0x100u,174000000u,260000000u,349999900u},
+    {0x110u,350000000u,370000000u,399999900u},
+    {0x120u,400000000u,435000000u,469999990u},
+    {0x130u,470000000u,550000000u,600000000u},
+  };
+  uint8_t band=CALIBRATION_PA_BANDS-1u;
+  while (band && hz<bands[band].lower_hz) --band;
+  *out=bands[band];
   return true;
 }
 

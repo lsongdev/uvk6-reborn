@@ -1,3 +1,4 @@
+#include "../tests/rf-ranges.h"
 // Render real firmware UI into host-only framebuffer snapshots.
 #include "ui/radio-card.h"
 #include "ui/graphics.h"
@@ -144,7 +145,7 @@ int main(int argc, char **argv) {
   UI_RadioCardRender(8,&v);UI_RadioCardRender(36,&second);snapshot("manual-channel.pbm");
   // Spectrum: the slot card shows the cursor; noise, two carriers, peaks.
   Spectrum s;
-  SPECTRUM_Start(&s,145500000,12500);
+  SPECTRUM_Start(&s,145500000,12500,testBk4819Ranges);
   for (unsigned sweep=0;sweep<4;++sweep)
     for (unsigned i=0;i<SPECTRUM_POINTS;++i) {
       unsigned level=40+((i*7u+sweep*3u)%5u);
@@ -160,15 +161,15 @@ int main(int argc, char **argv) {
   manualBase("Spectrum",false);
   UI_RadioCardRender(8,&v);UI_SpectrumRender(36,28,&s);snapshot("spectrum.pbm");
   // The window crossing 18 MHz: unmeasurable points are a dashed baseline.
-  SPECTRUM_Start(&s,18300000,6250);
+  SPECTRUM_Start(&s,18300000,6250,testBk4819Ranges);
   for (unsigned i=0;i<SPECTRUM_POINTS;++i)
-    SPECTRUM_Record(&s,RADIO_MODEL_BkCovers(SPECTRUM_Frequency(&s,(uint8_t)i)) ?
+    SPECTRUM_Record(&s,RADIO_MODEL_InRfRange(SPECTRUM_Frequency(&s,(uint8_t)i),s.ranges) ?
         (uint8_t)(40+(i*7u)%5u+(i==90?30:0)) : 0);
   s.cursor=90;v.frequency_hz=SPECTRUM_Frequency(&s,s.cursor);v.band_name="Span 800.0 kHz";v.step_hz=6250;
   manualBase("Spectrum",false);
   UI_RadioCardRender(8,&v);UI_SpectrumRender(36,28,&s);snapshot("spectrum-edge.pbm");
   // Nothing measurable at all (medium wave).
-  SPECTRUM_Start(&s,1000000,9000);
+  SPECTRUM_Start(&s,1000000,9000,testBk4819Ranges);
   v.frequency_hz=1000000;v.band_name="Span 1.600 MHz";v.step_hz=9000;v.mode=RX_AM;
   v.activity=UI_RADIO_CARD_IDLE;v.signal_valid=false;
   manualBase("Spectrum",false);

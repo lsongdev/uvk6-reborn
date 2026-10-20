@@ -1,3 +1,4 @@
+#include "rf-ranges.h"
 #include "core/tuning.h"
 #include <assert.h>
 #include <string.h>
@@ -38,7 +39,7 @@ int main(void) {
   assert(TUNING_Resolve(&stored, NULL, &effective));
   assert(effective.current.frequency_hz == 145500000u);
   RxPlan plan;
-  ReceiverCapabilities caps = {true, true, false, true, RX_BK_BANDWIDTH_ALL};
+  ReceiverCapabilities caps = {true, true, false, true, RX_BK_BANDWIDTH_ALL, testBk4819Ranges};
   assert(TUNING_ExactPlan(145500000u,
       (RadioParameters){RX_NFM, 12500, 12000, 4, 0}, caps, &plan) == RX_OK);
   assert(plan.frequency_hz == 145500000u);

@@ -31,16 +31,9 @@ bool RADIO_StopToneScan(bool adopt) {
 bool RADIO_StartToneScan(void) {
   if (toneScanning || capturing || seek.active || spectrumOn || RADIO_TxBusy()) return false;
   if (activeSlot.current.parameters.mode != RX_NFM) { notify("NFM only"); return false; }
-  if (!pauseWatch()) return false;
   // A talkback may have left another slot tuned even with watch stopped.
-  // Resolve and restore the selected slot without committing any user edit.
-  RxPlan origin;
-  if (TUNING_ExactPlan(activeSlot.current.frequency_hz, activeSlot.current.parameters,
-      RECEIVER_Capabilities(), &origin) != RX_OK ||
-      RX_RuntimeTune(&runtime, &origin, applyReceiver, stopReceiver, NULL) != RX_APPLIED) {
-    notify("RX error");
-    return false;
-  }
+  // Reuse watch's restoration without committing any user edit.
+  if (!pauseWatch() || !restoreSelectedReceiver()) return false;
   RECEIVER_Mute();
   receivingSlot = UINT8_MAX;
   resetRds();
@@ -58,8 +51,9 @@ bool RADIO_StartToneScan(void) {
 }
 
 void toneScanUpdate(void) {
-  if (result || Now()-sampledAt < 200u) return;
-  sampledAt = Now();
+  uint32_t now=Now();
+  if (result || now-sampledAt < 200u) return;
+  sampledAt = now;
   RadioTone tone;
   if (RX_DEVICE_ToneScanPoll(&tone) == TONE_SCAN_BUSY) return;
   if (!tone || tone != candidate) hits = 0;

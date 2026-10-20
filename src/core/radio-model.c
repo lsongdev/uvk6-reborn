@@ -1,6 +1,13 @@
 #include "core/radio-model.h"
 #include <stddef.h>
 
+__attribute__((noinline)) bool RADIO_MODEL_InRfRange(uint32_t hz, const RadioSpan *ranges) {
+  if (!ranges) return false;
+  for (uint8_t i=0; i<RADIO_RF_RANGES; ++i)
+    if (hz>=ranges[i].start_hz && hz<ranges[i].end_hz) return true;
+  return false;
+}
+
 #define MHZ_HZ 1000000u
 #define PRESET(mode_, step_, bw_, sq_) {mode_, step_, bw_, sq_, 0}
 const char *const rxModeNames[RX_MODE_COUNT] = {"NFM", "WFM", "AM", "LSB", "USB"};
@@ -38,9 +45,9 @@ static uint8_t coverage(ReceiverCapabilities c, RadioSpan out[4]) {
   RadioSpan all[4];
   uint8_t n = 0;
   if (c.si) all[n++] = (RadioSpan){RADIO_MIN_HZ, 30000001u};
-  all[n++] = (RadioSpan){18000000u, 660000001u};
+  if (c.bk_ranges) all[n++] = c.bk_ranges[0];
   if (c.si || c.broadcast) all[n++] = (RadioSpan){64000000u, 108000001u};
-  all[n++] = (RadioSpan){840000000u, 1300000001u};
+  if (c.bk_ranges) all[n++] = c.bk_ranges[1];
   uint8_t count = 0;
   for (uint8_t i = 0; i < n; ++i) { // Already in start order.
     if (count && all[i].start_hz <= out[count-1].end_hz) {
@@ -111,11 +118,6 @@ static bool bandwidthSupported(RxDevice device, RxMode mode, uint32_t width, uin
   return false;
 }
 
-bool RADIO_MODEL_BkCovers(uint32_t frequency_hz) {
-  return (frequency_hz >= 18000000u && frequency_hz <= 660000000u) ||
-         (frequency_hz >= 840000000u && frequency_hz <= 1300000000u);
-}
-
 RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
                           ReceiverCapabilities capabilities, RxPlan *plan) {
   if (!plan || (unsigned)parameters.mode >= RX_MODE_COUNT || !parameters.step_hz ||
@@ -152,14 +154,14 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
     }
     // Fall through to BK where its existing AM implementation is available.
     // No BK pseudo-SSB fallback is exposed as a supported SSB receiver.
-    if (!capabilities.bk_am || !RADIO_MODEL_BkCovers(frequency_hz))
+    if (!capabilities.bk_am || !RADIO_MODEL_InRfRange(frequency_hz,capabilities.bk_ranges))
       return RX_UNSUPPORTED_MODE;
     device = RX_DEVICE_BK;
     break;
   case RX_NFM:
     // NFM always uses BK, including frequencies overlapping SI's AM or WFM.
     // RX capability alone never grants transmit permission.
-    if (!RADIO_MODEL_BkCovers(frequency_hz))
+    if (!RADIO_MODEL_InRfRange(frequency_hz,capabilities.bk_ranges))
       return RX_UNSUPPORTED_MODE;
     device = RX_DEVICE_BK;
     break;
@@ -172,6 +174,8 @@ RxResult RADIO_MODEL_Plan(uint32_t frequency_hz, RadioParameters parameters,
     return RX_INVALID_PARAMETERS;
   uint32_t actual = ((frequency_hz + resolution/2) / resolution) * resolution;
   if (actual < RADIO_MIN_HZ || actual > RADIO_MAX_HZ)
+    return RX_OUT_OF_RANGE;
+  if (device==RX_DEVICE_BK && !RADIO_MODEL_InRfRange(actual,capabilities.bk_ranges))
     return RX_OUT_OF_RANGE;
   *plan = (RxPlan){device, actual, parameters};
   return RX_OK;

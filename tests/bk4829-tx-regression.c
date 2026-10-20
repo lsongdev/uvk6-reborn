@@ -14,14 +14,16 @@ static bool pressed=true, readOK=true, stopOK=true, stopped;
 static bool releaseDuringDelay, voltageDropDuringDelay;
 static uint32_t lastOffset;
 static uint8_t vhf[9]={95,95,95,105,105,105,145,150,145};
+static uint8_t other[9]={50,50,50,100,100,100,140,140,140};
+static uint8_t uhf350[9]={90,90,90,100,100,100,150,150,150};
 static uint8_t uhf[9]={90,90,90,100,100,100,145,150,145};
 
 bool GPIO_Read(GpioLine line) { assert(line==GPIO_PTT); return !pressed; }
 bool STORAGE_Read(StorageArea area, uint32_t offset, void *data, uint16_t size) {
-  assert(area==STORAGE_CALIBRATION && size==9 && (offset==0xF0 || offset==0x120));
+  assert(area==STORAGE_CALIBRATION && size==9 && (offset>=0xD0 && offset<=0x130 && !(offset % 16u)));
   lastOffset=offset;
   if (!readOK) return false;
-  memcpy(data,offset==0xF0 ? vhf : uhf,size);
+  memcpy(data,offset==0xF0 ? vhf : offset==0x120 ? uhf : offset==0x110 ? uhf350 : other,size);
   return true;
 }
 bool RX_DEVICE_StopAll(void) { stopped=stopOK; return stopOK; }
@@ -72,9 +74,11 @@ int main(void) {
   restoreRx(438750000u);
   assert(TX_DEVICE_Capabilities(145500000u).power_mask==7 && lastOffset==0xF0);
   assert(TX_DEVICE_Capabilities(438750000u).power_mask==7 && lastOffset==0x120);
-  const uint32_t frequencies[]={136000000u,137000000u,155500000u,173999990u,
-                                400000000u,435000000u,469999990u};
-  const uint8_t highBias[]={145,145,150,146,145,150,146};
+  const uint32_t frequencies[]={18000000u,50000000u,95000000u,108000000u,
+    136000000u,137000000u,155500000u,173999990u,174000000u,220000000u,
+    350000000u,375000000u,399999990u,400000000u,435000000u,469999990u,
+    470000000u,580000000u,760000000u,1300000000u};
+  const uint8_t highBias[]={140,140,140,140,145,145,150,146,140,140,150,150,150,145,150,146,140,140,140,140};
   for (unsigned i=0;i<sizeof(frequencies)/sizeof(*frequencies);++i) {
     TxPlan plan={.frequency_hz=frequencies[i],.power=TX_POWER_HIGH};
     resetTrace(); regs[0x74]=0xBEEF; regs[0x7E]=0xA5F7;
@@ -114,7 +118,7 @@ int main(void) {
   readOK=false;assert(!TX_DEVICE_Prepare(&plan));checkOff();readOK=true;
   uhf[0]=255;assert(TX_DEVICE_Capabilities(plan.frequency_hz).power_mask==6);
   plan.power=TX_POWER_LOW;assert(!TX_DEVICE_Prepare(&plan));checkOff();uhf[0]=90;
-  plan.frequency_hz=470000000u;assert(!TX_DEVICE_Prepare(&plan));checkOff();
+  plan.frequency_hz=660000010u;assert(!TX_DEVICE_Prepare(&plan));checkOff();
   plan.frequency_hz=438750001u;assert(!TX_DEVICE_Prepare(&plan));checkOff();
   plan.frequency_hz=438750000u;
   assert(TX_DEVICE_Prepare(&plan));pressed=false;

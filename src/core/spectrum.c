@@ -4,12 +4,14 @@
 static const uint32_t steps[] = {6250, 12500, 25000, 50000, 100000, 250000, 500000};
 #define STEP_COUNT (sizeof(steps) / sizeof(steps[0]))
 
-void SPECTRUM_Start(Spectrum *s, uint32_t center_hz, uint32_t step_hz) {
+void SPECTRUM_Start(Spectrum *s, uint32_t center_hz, uint32_t step_hz,
+                    const RadioSpan *ranges) {
   // The smallest listed step not finer than the slot's own.
   uint8_t i = 0;
   while (i + 1u < STEP_COUNT && steps[i] < step_hz) ++i;
   memset(s, 0, sizeof(*s));
   s->center_hz = center_hz;
+  s->ranges = ranges;
   s->step_hz = steps[i];
   s->cursor = SPECTRUM_CENTER;
 }
@@ -58,7 +60,7 @@ bool SPECTRUM_Zoom(Spectrum *s, bool wider) {
   while (i + 1u < STEP_COUNT && steps[i] < s->step_hz) ++i;
   if (wider ? i + 1u >= STEP_COUNT : i == 0) return false;
   uint32_t center = SPECTRUM_Frequency(s, s->cursor);
-  SPECTRUM_Start(s, center, steps[wider ? i + 1u : i - 1u]);
+  SPECTRUM_Start(s, center, steps[wider ? i + 1u : i - 1u],s->ranges);
   return true;
 }
 

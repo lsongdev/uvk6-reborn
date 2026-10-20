@@ -26,10 +26,15 @@ typedef struct {
 // Bits follow the common nominal BK bandwidth list (6,7,9,10,12,14,17,20,23,26 kHz).
 enum { RX_BK_BANDWIDTH_6K = 1u << 0, RX_BK_BANDWIDTH_12K = 1u << 4,
        RX_BK_BANDWIDTH_26K = 1u << 9, RX_BK_BANDWIDTH_ALL = (1u << 10) - 1u };
+// The two disjoint RF tuning ranges of the fitted transceiver; end exclusive.
+typedef struct { uint32_t start_hz, end_hz; } RadioSpan;
+#define RADIO_RF_RANGES 2u
+bool RADIO_MODEL_InRfRange(uint32_t hz, const RadioSpan *ranges);
 typedef struct {
-  bool si, broadcast, ssb_patch;
-  bool bk_am;
+  bool si:1, broadcast:1, ssb_patch:1;
+  bool bk_am:1;
   uint16_t bk_bandwidth_mask;
+  const RadioSpan *bk_ranges;
 } ReceiverCapabilities;
 typedef struct {
   RxDevice device;
@@ -45,9 +50,6 @@ extern const RadioBand radioBands[];
 extern const uint8_t radioBandCount;
 extern const char *const rxModeNames[RX_MODE_COUNT];
 uint8_t RADIO_MODEL_BandAt(uint32_t frequency_hz);
-bool RADIO_MODEL_BkCovers(uint32_t frequency_hz); // BK4819/BK4829 receive range.
-// A contiguous frequency range, end exclusive.
-typedef struct { uint32_t start_hz, end_hz; } RadioSpan;
 // Whether some mode of this hardware receives the frequency.
 bool RADIO_MODEL_Covers(uint32_t frequency_hz, ReceiverCapabilities capabilities);
 // The receivable part of a band holding the frequency, else the nearest

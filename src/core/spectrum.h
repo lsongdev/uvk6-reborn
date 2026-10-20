@@ -2,6 +2,7 @@
 #define CORE_SPECTRUM_H
 #include <stdbool.h>
 #include <stdint.h>
+#include "core/radio-model.h"
 
 // Set by the Makefile (ENABLE_SPECTRUM); host tests keep the spectrum.
 #ifndef UVK6_ENABLE_SPECTRUM
@@ -15,13 +16,15 @@
 #define SPECTRUM_CENTER (SPECTRUM_POINTS / 2u)
 typedef struct {
   uint32_t center_hz, step_hz;
+  const RadioSpan *ranges;
   uint8_t level[SPECTRUM_POINTS];
   uint8_t peak[SPECTRUM_POINTS]; // Falls 1 dB per sweep towards the level.
   uint8_t next;   // Point being measured.
   uint8_t cursor; // Point the user points at.
 } Spectrum;
 
-void SPECTRUM_Start(Spectrum *s, uint32_t center_hz, uint32_t step_hz);
+void SPECTRUM_Start(Spectrum *s, uint32_t center_hz, uint32_t step_hz,
+                    const RadioSpan *ranges);
 uint32_t SPECTRUM_Frequency(const Spectrum *s, uint8_t point);
 // Stores the measurement of point `next` and moves on; true when the sweep
 // just completed.

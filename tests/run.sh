@@ -67,7 +67,7 @@ for rx_board in uvk6:1 uvk1:0; do
     -Isrc/external/CMSIS_5/CMSIS/Core/Include \
     -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
     tests/rx-device-regression.c "src/boards/$board/calibration.c" \
-    src/core/dcs.c src/core/text.c "$dead_strip" -o "$test_binary"
+    src/core/dcs.c src/core/text.c src/core/radio-model.c "$dead_strip" -o "$test_binary"
   "$test_binary"
 done
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/tuning-regression.c \
@@ -80,7 +80,7 @@ done
   -Wno-missing-field-initializers \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/tx-device-regression.c src/core/dcs.c "$dead_strip" -o "$test_binary"
+  tests/tx-device-regression.c src/core/dcs.c src/core/radio-model.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -Wno-missing-field-initializers \
@@ -89,7 +89,7 @@ done
   tests/bk4829-tx-regression.c src/boards/uvk1/calibration.c src/boards/uvk1/led.c \
   src/devices/led.c src/drivers/bk48x9/common.c src/drivers/bk48x9/bk4829.c \
   src/drivers/bk48x9/tx.c src/drivers/bk48x9/rx.c src/drivers/bk48x9/css.c \
-  src/core/dcs.c src/core/measurements.c "$dead_strip" -o "$test_binary"
+  src/core/dcs.c src/core/measurements.c src/core/radio-model.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 for led_board in uvk1 uvk6; do
   led_k1=0
@@ -106,7 +106,7 @@ done
   tests/tx-disabled-regression.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/tx-regression.c \
-  src/core/tx-model.c src/radio/tx-runtime.c -o "$test_binary"
+  src/core/tx-model.c src/radio/tx-runtime.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/rx-runtime-regression.c \
   src/radio/rx-runtime.c -o "$test_binary"

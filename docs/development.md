@@ -98,7 +98,7 @@ ui/screens 经 radio/radio.h 发意图和读取 RadioSlotStatus；radio 不包�
 | store/channel-store.c | 频道双副本（写旧份后镜像）、占用位图、CRC、删除 |
 | boards/uvk6/storage.c、storage-layout.h | 存储区到 UV-K6 EEPROM 地址的映射、写保护、维护通道 |
 | devices/rx-device.c | 芯片单位／带宽／信号口径／亚音、音频门、Seek／FC 适配 |
-| devices/tx-device.c | 板级范围、校准读取与插值、物理 PTT／供电、PA 顺序 |
+| devices/tx-device.c | 芯片调谐范围、校准读取与插值、物理 PTT／供电、PA 顺序 |
 | drivers/bk48x9/ | BK4819／BK4829 共用代码（common、rx、tx、css、bus、capture）＋按 `RADIO_CHIP` 只链接一个芯片后端 bk4819.c／bk4829.c |
 | drivers/{si473x,bk1080,st7565,eeprom-24cxx}/ | 外部芯片命令 |
 | drivers/dp32g030/ | DP32G030 寄存器、启动、时钟、定时器、SPI、UART 收发、ADC、CRC |
@@ -168,7 +168,7 @@ python3 tools/resources.py --port /dev/cu.usbserial-1410 cal-restore backups/uvk
 ```
 
 - cal-read：备份并列出 band 0–6 的 Low／Medium／High 各三个锚点。
-- cal-write BAND ROW：写一行 9 字节；值不得为 00／FF（固件视为无校准）。TX 只用 band 2（136–174 MHz）和 band 5（400–470 MHz）。
+- cal-write BAND ROW：写一行 9 字节；值不得为 00／FF（固件视为无校准）。TX 按频率使用 band 0–6 的全部记录，锚点和端点钳位规则见[发射范围](tx-frequency-range.md)。
 - cal-seed：只给全 00／FF 的 band 2／5 写参考值，已有数据不动。参考值来自三份公开 UV-K5(8) dump，High 取逐锚点最小值，**不是本机测量值**。
 - cal-restore FILE：从 512 B 备份恢复整个校准区，只写有差异的 16 B 行，最后整块回读比对。全 00／FF 或 band 2／5 PA 行为空的文件直接拒绝，不访问设备。
 

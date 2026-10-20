@@ -2,6 +2,10 @@
 #include "drivers/bk48x9/internal.h"
 #include "core/misc.h"
 
+const RadioSpan BK48X9_FREQUENCY_RANGES[RADIO_RF_RANGES] = {
+  {18000000u,660000001u}, {840000000u,1300000001u}
+};
+
 // Statically selected chip backend; register values preserved by trace regressions.
 const BK48X9Chip BK48X9_CHIP={
   .capabilities={4819,true,(1u<<10)-1u,1,1}, // The long-standing K6 delays.

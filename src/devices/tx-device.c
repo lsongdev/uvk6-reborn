@@ -44,18 +44,14 @@ static uint8_t calibrationMask(const uint8_t values[9]) {
 __attribute__((noinline)) TxCapabilities TX_DEVICE_Capabilities(uint32_t hz) {
   uint8_t values[9]; BoardTxCalibration record;
   return (TxCapabilities){.available=true,
+    .ranges=BK48X9_FREQUENCY_RANGES,
     .power_mask=readCalibration(hz,values,&record) ? calibrationMask(values) : 0};
-}
-TxPolicy TX_DEVICE_Policy(void) {
-  return (TxPolicy){.authorized=true, .count=2,
-    .ranges={{136000000u,174000000u},{400000000u,470000000u}}};
 }
 #else
 TxCapabilities TX_DEVICE_Capabilities(uint32_t hz) {
   (void)hz;
   return (TxCapabilities){0};
 }
-TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
 #endif
 
 bool TX_DEVICE_PttPressed(void) {
@@ -91,6 +87,7 @@ static uint8_t interpolate(uint8_t a, uint8_t b, uint32_t hz,
 bool TX_DEVICE_Prepare(const TxPlan *plan) {
   TX_DEVICE_Disable();
   if (!plan || !TONE_Valid(plan->tone) || (unsigned)plan->power > TX_POWER_HIGH ||
+      !RADIO_MODEL_InRfRange(plan->frequency_hz,BK48X9_FREQUENCY_RANGES) ||
       !TX_DEVICE_PttPressed() || !TX_DEVICE_VoltageValid()) return false;
   uint8_t values[9]; BoardTxCalibration record;
   if (!readCalibration(plan->frequency_hz,values,&record) ||

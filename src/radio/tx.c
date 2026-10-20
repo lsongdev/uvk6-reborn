@@ -87,7 +87,7 @@ void RADIO_TxSafetyUpdate(void) {
       notify("TX busy/locked");
     } else if (busy) {
       transmitter.wait_release = true;
-      notify("Channel busy");
+      notify("TX: RX Busy");
     } else startTransmit();
   }
 }
@@ -119,11 +119,10 @@ static void startTransmit(void) {
   }
   const TxConfig *tx = txConfig();
   TxCapabilities capability = TX_DEVICE_Capabilities(TX_MODEL_Frequency(tx, runtime.current.frequency_hz));
-  TxPolicy policy = TX_DEVICE_Policy();
   TxPlan planned;
   TxResult result = TX_MODEL_Plan(&runtime.current, tx,
-                                 &capability, &policy, &planned);
-  // The board policy and target-frequency calibration authorize TX independently of RX.
+                                 &capability, &planned);
+  // Target chip coverage and calibration are checked independently of RX mode.
   if (result == TX_OK && !TX_DEVICE_VoltageValid()) {
     notify("TX: bad battery");
     return;
