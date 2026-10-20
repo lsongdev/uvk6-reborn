@@ -967,7 +967,7 @@ int main(void) {
   unsigned meterBefore = receiverMeasurements;
   for (unsigned i=0; i<20; ++i) update();
   assert(receiverMeasurements == meterBefore+1);
-  clockNow += UVK6_FM_RSQ_POLL_MS-1u;
+  clockNow += 500u-1u;
   update(); assert(receiverMeasurements == meterBefore+1);
   clockNow++; update(); assert(receiverMeasurements == meterBefore+2);
   SCREEN_Render();assert(!strcmp(statusText,"DW A"));

@@ -56,9 +56,9 @@ static void testPoll(void) {
   t = pollFor(t, t + 3000); assert(sampled() == 3);
   gReceiver.plan.parameters.squelch = 0; sampleRssi = 77;
   t = pollFor(t, t + 3000); assert(sampled() == 3 && gReceiver.rssi == 77 && gReceiver.open);
-  // SI4732 meter: UVK6_FM_RSQ_POLL_MS.
+  // SI4732 meter: 500 ms.
   gReceiver.plan = (RxPlan){RX_DEVICE_SI, 95900000u, {RX_WFM, 100000, 0, 0, 0}};
-  t = pollFor(t, t + 2000); assert(sampled() == 2000u / UVK6_FM_RSQ_POLL_MS);
+  t = pollFor(t, t + 2000); assert(sampled() == 4);
   // A failed route at SQ0 is retried at the squelch cadence, not every loop.
   gReceiver.open = false; routeOK = false; opens = 0;
   (void)pollFor(t, t + 1000);

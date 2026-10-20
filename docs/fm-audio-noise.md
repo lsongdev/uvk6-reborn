@@ -59,37 +59,17 @@ alter transmit/RF calibrations, AGC or undocumented FM tuning properties.
    signal meter value intact. This prevents one failed read being interpreted
    as "squelch closed"; a separate policy for sustained hardware faults may
    be implemented after real-device evidence.
-4. Build-time diagnostic controls permit independent isolation of RSQ and RDS
-   periodic accesses. They default to normal (RDS enabled, slower RSQ), and
-   do not change EEPROM configuration or persistent user settings.
-5. Host tests cover a transient sample failure and bounded watch-meter reads.
+4. Host tests cover a transient sample failure and bounded watch-meter reads.
 
-## A/B test matrix
+## Further isolation
 
-Use the **same strong FM station, volume, antenna position, supply, speaker
-and listening position**. Start with one slot and SQ0, then repeat with
-SI4732 broadcast background + BK event watch. Do not compare raw audio
-loudness across different settings or against an actively transmitting radio.
-
-| Build | Command | What it isolates |
-| --- | --- | --- |
-| Default | `make -B all BOARD=uvk6` | 500 ms SI RSQ meter + RDS |
-| No periodic SI FM RSQ | `make -B all BOARD=uvk6 FM_RSQ_POLL_MS=0` | RSQ meter access in SQ0 and watch background |
-| No RDS polling | `make -B all BOARD=uvk6 ENABLE_RDS_POLL=0` | RDS FIFO I2C transactions (initial RDS setup may still execute) |
-| Both off | `make -B all BOARD=uvk6 FM_RSQ_POLL_MS=0 ENABLE_RDS_POLL=0` | Residual keyboard, LCD, backlight, ADC and RF/hardware effects |
-
-Makefile tracks both new flags in `build-flags`, so changing a value
-invalidates old objects. For actual flashing, use the project's normal
-backup/flashing workflow in `docs/development.md`; **do not flash a BK1080
-build to the SI4732-modified radio**.
-
-Record: firmware commit, active slot(s), chosen WFM/SQ level, station, RDS
-available or not, approximate tap interval (e.g. 50/100/500 ms), whether
-speaker versus headphones differ, and whether an RX LED toggles with each
-sound. Useful additional experiments after the above: freeze LCD refresh,
-use a fixed (non-PWM) backlight level via temporary board-only diagnostic
-code, suspend matrix scanning while maintaining physical PTT safety, or
-measure VDD/audio with an oscilloscope. These are **not** changes made here.
+The PR's build-time switches that stopped SI4732 RSQ or RDS polling were
+removed once the K6 default build was quiet (below). If a periodic sound
+returns, compare on the same strong station, volume, antenna, supply and
+speaker, and note its interval and whether the RX LED toggles with it.
+Further experiments: freeze LCD refresh, use a fixed (non-PWM) backlight,
+suspend matrix scanning while keeping PTT safe, or measure VDD/audio with an
+oscilloscope.
 
 ## UV-K1 hardware evidence (2026-10-20)
 
@@ -101,15 +81,16 @@ to the receiver chip is therefore an audible source on that radio.
 ## UV-K6 hardware evidence (2026-10-20)
 
 With `aa4a112` (default build: 500 ms SI RSQ meter, RDS on) the user listened
-on several FM stations and heard no ticking any more, so the diagnostic
-matrix above was not needed. One audible gap remains and is accepted: about
+on several FM stations and heard no ticking any more, so the RSQ/RDS
+A/B builds were not needed. One audible gap remains and is accepted: about
 1 s after tuning, when the save icon appears, audio drops briefly and the
-LED blinks once while the setting is written to EEPROM.
+LED blinks once, coinciding with the settings save (cause not yet
+confirmed in code).
 
 ## Verification limits
 
 Host mocks prove logic and bounded polling, not physical RF/AF behavior.
 Only listening and/or analog measurements can establish which noise source
 dominates on this particular unit. Do not treat quieter output under a
-diagnostic flag as proof of a defective SI4732 chip; it may be digital
+diagnostic build as proof of a defective SI4732 chip; it may be digital
 supply or ground coupling, board routing, or firmware-induced gating.
