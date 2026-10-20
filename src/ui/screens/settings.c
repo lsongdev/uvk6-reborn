@@ -47,10 +47,10 @@ static bool calibrate(const MenuItem *item, KEY_Code_t key, Key_State_t state) {
 
 static const MenuItem displayItems[] = {
     VALUE("Contrast",SETTING_CONTRAST),
-    VALUE("Light time",SETTING_BACKLIGHT),
+    VALUE("Backlight time",SETTING_BACKLIGHT),
     VALUE("Brightness",SETTING_BRIGHTNESS_H),
-    VALUE("Idle light",SETTING_BRIGHTNESS_L),
-    VALUE("Light on RX",SETTING_BACKLIGHTONSQUELCH),
+    VALUE("Idle brightness",SETTING_BRIGHTNESS_L),
+    VALUE("Backlight on RX",SETTING_BACKLIGHTONSQUELCH),
 };
 MENU_DEF(displayMenu,"Display",displayItems);
 
@@ -82,6 +82,7 @@ static const MenuItem transmitItems[] = {
     VALUE("Time limit",SETTING_TX_TIMEOUT),
     VALUE("Block if busy",SETTING_TX_BUSY_LOCK),
     VALUE("Mic gain",SETTING_MIC),
+    VALUE("Lock PTT",SETTING_PTT_LOCK),
 };
 MENU_DEF(transmitMenu,"Transmit",transmitItems);
 static const MenuItem batteryItems[] = {
@@ -149,13 +150,13 @@ static const MenuItem aboutItems[] = {
 #endif
     {"TX status",.get_value_text=getTxStatus},
     {"Save status",.get_value_text=getSaveStatus,.action=saveNow},
-    {"Reset to defaults",.action=resetPreferences},
+    {"Reset settings",.action=resetPreferences},
 };
 MENU_DEF(aboutMenu,"About",aboutItems);
 static const MenuItem menuItems[] = {
     {"Display",.submenu=&displayMenu}, {"Receive",.submenu=&receiveMenu},
-    {"Transmit",.submenu=&transmitMenu}, VALUE("Lock PTT too",SETTING_PTT_LOCK),
-    {"Battery",.submenu=&batteryMenu}, {"Band presets",.action=openBands},
+    {"Transmit",.submenu=&transmitMenu},
+    {"Battery",.submenu=&batteryMenu}, {"Bands",.action=openBands},
     {"Channels",.action=openChannels}, {"About",.submenu=&aboutMenu},
 };
 MENU_DEF(settingsMenu,"Settings",menuItems);
@@ -195,7 +196,7 @@ static bool key(KEY_Code_t key, Key_State_t state) {
 }
 static void render(void) {
   if (resetConfirm) {
-    STATUSLINE_SetText("Reset to defaults?");
+    STATUSLINE_SetText("Reset settings?");
     PrintSmall(3,18,"Display, keys, TX limits");
     PrintSmall(3,29,"Keep radio & calibration");
     PrintSmall(3,56,"MENU:OK  EXIT:Back");

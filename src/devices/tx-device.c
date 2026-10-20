@@ -24,6 +24,7 @@
 static bool prepared;
 static uint8_t paBias;
 static uint32_t txFrequency;
+static RadioTone txTone;
 
 static __attribute__((noinline)) bool readCalibration(uint32_t hz, uint8_t values[9],
                                                       BoardTxCalibration *record) {
@@ -101,6 +102,7 @@ bool TX_DEVICE_Prepare(const TxPlan *plan) {
   // TX owns the antenna. A muted BK1080 may still be receiving; park all
   // receivers successfully before touching the shared RF path or voice DSP.
   if (!RX_DEVICE_StopAll()) return false;
+  txTone = plan->tone;
   txFrequency = plan->frequency_hz / 10u;
   prepared = true; // All subsequent exit paths must stop DSP and invalidate RX.
   AUDIO_ToggleSpeaker(false);
@@ -130,7 +132,14 @@ bool TX_DEVICE_Enable(void) {
   return true; // Register commands sent; this is not an RF measurement.
 }
 
+bool TX_DEVICE_BeginTail(void) {
+  if (!prepared || !txTone || !TX_DEVICE_VoltageValid()) return false;
+  BK48X9_StartTxTail(TONE_Type(txTone) != CODE_TYPE_CONTINUOUS_TONE);
+  return true;
+}
+
 #else
+bool TX_DEVICE_BeginTail(void) { return false; }
 bool TX_DEVICE_Prepare(const TxPlan *plan) {
   (void)plan;
   TX_DEVICE_Disable();

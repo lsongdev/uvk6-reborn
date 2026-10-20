@@ -255,7 +255,7 @@ void RADIO_Init(void) {
 
 bool RADIO_IsReceiving(void) {
   return initialized && receivingSlot != UINT8_MAX && !WATCH_IsProbing(&watcher) &&
-         runtime.active && !seek.active && !capturing && !spectrumOn &&
+         runtime.active && !seek.active && !capturing && !toneScanning && !spectrumOn &&
          transmitter.mode == RADIO_RX;
 }
 
@@ -283,6 +283,7 @@ void RADIO_Update(void) {
     }
   if (transmitter.mode != RADIO_RX)
     return;
+  if (toneScanning) { toneScanUpdate(); return; }
   if (capturing) { captureUpdate(); return; }
   if (spectrumOn) { spectrumUpdate(); return; }
   seekUpdate();
@@ -497,7 +498,7 @@ void RADIO_SlotStatus(uint8_t id, RadioSlotStatus *status) {
   TEXT_Add(&t, name);
   status->radio_text = textValid && label->rt_until ? label->text : NULL;
   status->activity =
-      id == txSlot && transmitter.mode == RADIO_TX ? RADIO_ACTIVITY_TRANSMITTING :
+      id == txSlot && (transmitter.mode == RADIO_TX || transmitter.mode == RADIO_TX_TAIL) ? RADIO_ACTIVITY_TRANSMITTING :
       id == txSlot && transmitter.mode == RADIO_FAULT ? RADIO_ACTIVITY_FAULT :
       selected && seek.active ? RADIO_ACTIVITY_SEEKING :
       status->receiving && gReceiver.open ? RADIO_ACTIVITY_RECEIVING :
@@ -587,6 +588,7 @@ void RADIO_ChannelsChanged(void) {
 // Reapply only the active receive plan. Global settings never rewrite slots
 // or presets, and the receive runtime remains responsible for recovery.
 bool RADIO_ApplyRxSettings(void) {
+  if (toneScanning) RADIO_StopToneScan(false);
   if (capturing) cancelCapture(NULL);
   if (!initialized) return true;
   RxPlan plan;
@@ -601,7 +603,8 @@ bool RADIO_ApplyRxSettings(void) {
 // Leaving the main screen ends what its keys drive; reception and watch go on.
 void RADIO_CancelInteractive(void) {
   confirming = false;
+  if (toneScanning) RADIO_StopToneScan(false);
   if (capturing) cancelCapture(NULL);
-  RADIO_PttRelease();
+  RADIO_AbortTx();
   if (seek.active) finishSeek(false, 0, NULL);
 }

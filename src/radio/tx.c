@@ -40,30 +40,44 @@ static bool txRestore(void *unused, const RxPlan *plan) {
   resetRds();
   return true;
 }
+static bool txTail(void *unused) {
+  (void)unused; return TX_DEVICE_BeginTail();
+}
 static const TxOperations txOperations = {
   .mute_rx = txMute, .prepare = txPrepare, .enable = txEnable,
-  .disable = txDisable, .restore_rx = txRestore
+  .disable = txDisable, .restore_rx = txRestore, .begin_tail = txTail
 };
 
+void RADIO_AbortTx(void) {
+  pttPending = false;
+  TX_RuntimeAbort(&transmitter, &txOperations);
+}
 void RADIO_PttRelease(void) {
   pttPending = false;
-  TX_RuntimeRelease(&transmitter, &txOperations);
+  if ((transmitter.mode == RADIO_TX || transmitter.mode == RADIO_TX_TAIL) &&
+      !TX_DEVICE_VoltageValid()) RADIO_AbortTx();
+  else TX_RuntimeRelease(&transmitter, Now(), &txOperations);
 }
 
 void RADIO_TxSafetyUpdate(void) {
-  // Check the physical button, not just the queued keyboard release event.
-  if ((pttPending || transmitter.mode == RADIO_TX) && !TX_DEVICE_PttPressed()) {
-    RADIO_PttRelease();
-    gRedrawScreen = true;
-    return;
-  }
-  if (transmitter.mode == RADIO_TX && !TX_DEVICE_VoltageValid()) {
-    RADIO_PttRelease();
-    transmitter.wait_release = true;
+  bool onAir = transmitter.mode == RADIO_TX || transmitter.mode == RADIO_TX_TAIL;
+  if (onAir && !TX_DEVICE_VoltageValid()) {
+    RADIO_AbortTx();
     notify("TX: bad battery");
     return;
   }
-
+  TxRuntimeEvent event = TX_RuntimeUpdate(&transmitter, Now(), &txOperations);
+  if (event != TX_EVENT_NONE) {
+    gRedrawScreen = true;
+    if (transmitter.mode == RADIO_FAULT) notify("RX error");
+    else if (event == TX_EVENT_TIMEOUT) notify("TX timeout");
+  }
+  // Physical release starts a tail once; subsequent polls only tick its deadline.
+  if ((pttPending || transmitter.mode == RADIO_TX || transmitter.wait_release) &&
+      !TX_DEVICE_PttPressed()) {
+    RADIO_PttRelease();
+    gRedrawScreen = true;
+  }
   if (pttPending && (int32_t)(Now()-pttCheckAt) >= 0) {
     pttPending = false;
     bool busy = false;
@@ -74,13 +88,8 @@ void RADIO_TxSafetyUpdate(void) {
     } else if (busy) {
       transmitter.wait_release = true;
       notify("Channel busy");
-    } else {
-      startTransmit();
-    }
+    } else startTransmit();
   }
-  // TOT is a system-level safety deadline, not a screen refresh feature.
-  if (TX_RuntimeUpdate(&transmitter, Now(), &txOperations))
-    notify(transmitter.mode == RADIO_FAULT ? "RX error" : "TX timeout");
 }
 
 // Selected slot TX settings: validated, stored and saved; VFO only.
@@ -139,7 +148,12 @@ static void startTransmit(void) {
 }
 
 void RADIO_PttPress(void) {
-  if (pttPending || transmitter.wait_release || transmitter.mode != RADIO_RX)
+  // A re-press during the tail never starts a new transmission implicitly.
+  if (transmitter.mode == RADIO_TX_TAIL) {
+    transmitter.wait_release = true;
+    return;
+  }
+  if (toneScanning || pttPending || transmitter.wait_release || transmitter.mode != RADIO_RX)
     return;
   // Talkback: during a watched talk or its reply window PTT answers that
   // slot with its own TX settings; otherwise it transmits on the selection.

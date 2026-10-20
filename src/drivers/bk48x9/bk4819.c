@@ -105,6 +105,13 @@ void BK48X9_SetCTCSSFrequency(uint32_t freqControlWord) {
                                            << BK48X9_REG_07_SHIFT_FREQUENCY));
 }
 
+void BK48X9_StartTxTail(bool digital) {
+  BK48X9_EnterTxMute();
+  // REG52 bit15 enables tail generation: DCS 134.4 Hz / CTCSS 180 degrees.
+  BK48X9_WriteRegister(BK48X9_REG_52, digital ? 0x828F : 0xC28F);
+  if (digital) BK48X9_WriteRegister(BK48X9_REG_51, 0x804A);
+}
+
 void BK48X9_EnterTxMute(void) { BK48X9_WriteRegister(BK48X9_REG_50,0xBB20); }
 
 void BK48X9_ExitTxMute(void) { BK48X9_WriteRegister(BK48X9_REG_50,0x3B20); }

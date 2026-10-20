@@ -20,6 +20,7 @@ int main(void) {
   TxPlan p={.frequency_hz=145500000u,.power=TX_POWER_LOW};
   assert(!TX_DEVICE_Prepare(&p));
   assert(!TX_DEVICE_Enable());
+  assert(!TX_DEVICE_BeginTail());
   TX_DEVICE_Disable();
   assert(paStarts==0 && paStops>=3);
   return 0;

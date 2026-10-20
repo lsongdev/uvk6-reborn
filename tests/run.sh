@@ -42,7 +42,7 @@ esac
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include -DUVK6_ENABLE_FC=0 -fsyntax-only \
   src/radio/radio.c src/radio/capture.c src/radio/watch.c src/radio/seek.c src/radio/tx.c \
   src/radio/spectrum.c src/ui/screens/home.c src/ui/screens/slot-menu.c src/ui/screens/save-channel.c \
-  src/ui/screens/spectrum.c src/ui/spectrum.c
+  src/ui/screens/spectrum.c src/ui/screens/tone-scan.c src/radio/tone-scan.c src/ui/spectrum.c
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include -DUVK6_ENABLE_SPECTRUM=0 -fsyntax-only \
@@ -194,6 +194,22 @@ for chip in bk4819 bk4829; do
     src/core/measurements.c "$dead_strip" -o "$test_binary"
   "$test_binary"
 done
+for chip in bk4819:0 bk4829:1; do
+  "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+    -DTEST_BK4829="${chip#*:}" tests/tx-tail-driver-regression.c \
+    src/drivers/bk48x9/common.c "src/drivers/bk48x9/${chip%:*}.c" \
+    src/drivers/bk48x9/tx.c src/drivers/bk48x9/rx.c src/drivers/bk48x9/css.c \
+    src/core/measurements.c src/core/dcs.c src/core/text.c "$dead_strip" -o "$test_binary"
+  "$test_binary"
+done
+for chip in bk4819 bk4829; do
+  "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+    tests/tone-scan-regression.c src/drivers/bk48x9/tone-scan.c \
+    src/drivers/bk48x9/common.c "src/drivers/bk48x9/$chip.c" \
+    src/drivers/bk48x9/rx.c src/drivers/bk48x9/css.c \
+    src/core/measurements.c src/core/dcs.c src/core/text.c "$dead_strip" -o "$test_binary"
+  "$test_binary"
+done
 # Register-write traces captured from the pre-split runtime-selected driver.
 # BK4829 since then: user squelch delays reach REG_4E, and AM is configured.
 for chip in bk4819:0:173:0x672c4eae bk4829:1:202:0x2740c8e2; do
@@ -221,5 +237,22 @@ done
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/battery-regression.c \
   src/devices/battery.c -o "$test_binary"
+"$test_binary"
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  tests/uvk6-crystal-regression.c src/boards/uvk6/calibration.c \
+  src/drivers/bk48x9/common.c src/drivers/bk48x9/bk4819.c src/drivers/bk48x9/tx.c \
+  src/drivers/bk48x9/rx.c src/drivers/bk48x9/css.c src/core/measurements.c \
+  "$dead_strip" -o "$test_binary"
+"$test_binary"
+# Check actual board PWM registers, not a duplicate duty mapping in a mock.
+for backlight_k1 in 0 1; do
+  "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
+    -DTEST_UVK1="$backlight_k1" -DPY32F071xB \
+    -Isrc/drivers/py32f071/vendor -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+    tests/backlight-board-regression.c -o "$test_binary"
+  "$test_binary"
+done
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
+  tests/display-contrast-regression.c src/drivers/st7565/st7565.c -o "$test_binary"
 "$test_binary"
 echo 'Radio, multi-VFO UI, storage, receiver plans, FC capture, RDS, and RX/TX regressions passed.'

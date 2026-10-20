@@ -63,6 +63,7 @@ uint32_t PREFERENCES_FilterBound(void) { return PREFERENCES_FILTER_BOUND_240; }
 void BK48X9_SetFrequency(uint32_t hz10) { assert(!paOn);tuned=hz10; }
 void BK48X9_SetCTCSSFrequency(uint32_t value) { assert(!paOn && value); }
 void BK48X9_SetCDCSSCodeWord(uint32_t value) { assert(!paOn && value); }
+void BK48X9_StartTxTail(bool digital) { (void)digital; }
 void BK48X9_PrepareTransmit(void) { assert(!paOn);dspOn=true; }
 void BK48X9_SetupPowerAmplifier(uint8_t value, uint32_t hz10) {
   assert(!paOn && dspOn && hz10==tuned);bias=value;

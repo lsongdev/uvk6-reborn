@@ -15,6 +15,7 @@ typedef struct {
   uint32_t offset_hz; // Used by + and -; kept while another shift is chosen.
   uint32_t split_hz;  // Absolute TX Hz used by Split; zero means not set.
   RadioTone tone;
+  bool tail; // Send an end-of-transmission CSS signal; default off.
 } TxConfig;
 
 // Board implementation availability and factory calibration for the target Hz.
@@ -36,6 +37,7 @@ typedef struct {
   uint32_t frequency_hz; // Resolved independently from the RX frequency.
   TxPower power;
   RadioTone tone;
+  bool tail; // Send an end-of-transmission CSS signal; default off.
 } TxPlan;
 
 typedef enum {

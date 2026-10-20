@@ -54,6 +54,7 @@ static void captureAttempt(void) {
 }
 
 void RADIO_StartCapture(void) {
+  if (toneScanning) return;
   if (activeSlot.source!=RADIO_SOURCE_VFO) { notify("VFO only"); return; }
   // FC borrows BK: BK slots leave the watch until FC ends, broadcasts go on.
   if (watcher.phase!=WATCH_OFF) suspendWatchBk(true);

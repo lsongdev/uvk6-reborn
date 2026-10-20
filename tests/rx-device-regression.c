@@ -52,6 +52,11 @@ void BK48X9_ExitSubAu(void) { ++tonesOff; }
 void BK48X9_WriteRegister(BK48X9_REGISTER_t reg, uint16_t value) { (void)reg; (void)value; }
 void BK48X9_CssResetDetection(bool digital) { (void)digital; ++toneResets; }
 void BK48X9_CssOff(void) {}
+static unsigned toneAcquisitions;
+static BK48X9_CssScanResult_t scanType=BK48X9_CSS_RESULT_NOT_FOUND;
+static uint32_t scanValue;
+void BK48X9_StartToneScan(void) { ++toneAcquisitions; }
+BK48X9_CssScanResult_t BK48X9_ReadToneScan(uint32_t *value) { *value=scanValue;return scanType; }
 static bool carrierOpen=true;
 bool BK48X9_IsSquelchOpen(void) { return carrierOpen; }
 void BK48X9_Idle(void) { ++bkIdle; bkDac=false; }
@@ -175,6 +180,30 @@ void BK48X9_SetRxCalibration(int16_t trim, uint8_t volume, uint8_t dac) {
 }
 void TX_DEVICE_Disable(void) {}
 
+static void testToneScan(void) {
+  RxPlan origin={RX_DEVICE_BK,438500000u,{RX_NFM,12500,12000,0,1}};
+  assert(RX_DEVICE_ToneScanStart(&origin) && !speakerOn);
+  assert(origin.parameters.rx_tone==1 && bkPrevious.parameters.rx_tone==0);
+  assert(bkPrevious.parameters.squelch==1 && !bkCached && toneAcquisitions==1);
+  scanType=BK48X9_CSS_RESULT_CTCSS;scanValue=885;carrierOpen=true;
+  RadioTone got=0;
+  assert(RX_DEVICE_ToneScanPoll(&got)==TONE_SCAN_SAMPLE && got==9 && toneAcquisitions==2);
+  scanValue=1344;
+  assert(RX_DEVICE_ToneScanPoll(&got)==TONE_SCAN_INVALID && !got && toneAcquisitions==2);
+  scanType=BK48X9_CSS_RESULT_NOT_FOUND;
+  assert(RX_DEVICE_ToneScanPoll(&got)==TONE_SCAN_BUSY && !got && toneAcquisitions==2);
+  carrierOpen=false;
+  assert(RX_DEVICE_ToneScanPoll(&got)==TONE_SCAN_INVALID && !got && toneAcquisitions==3);
+  carrierOpen=true;scanValue=0x763813;scanType=BK48X9_CSS_RESULT_CDCSS;
+  assert(RX_DEVICE_ToneScanPoll(&got)==TONE_SCAN_SAMPLE && got==51 && toneAcquisitions==4);
+  scanValue^=1u;assert(RX_DEVICE_ToneScanPoll(&got)==TONE_SCAN_INVALID && !got);
+  origin.parameters.mode=RX_AM;
+  assert(!RX_DEVICE_ToneScanStart(&origin));
+  origin.parameters.mode=RX_NFM;origin.device=RX_DEVICE_SI;
+  assert(!RX_DEVICE_ToneScanStart(&origin));
+  assert(RX_DEVICE_StopAll());
+}
+
 static void testCalibratedSquelch(void) {
 #if UVK6_ENABLE_SI4732
   assert(squelchFor(4, 145500000u).ro == 108); // K6 keeps the formula.
@@ -208,6 +237,13 @@ static void testDetectionAndInit(void) {
   gDeviceConfig.preferences.mic = 9; gDeviceConfig.preferences.deviation = 130;
   RX_DEVICE_Init();
   assert(initMic == 9 && initDeviation == 130 && !broadcastParks); // No BK1080 built in.
+  memcpy(calibration + CALIBRATION_RX_MISC_OFFSET, "\x03\0\x46\0\x50\0\x2c\x0e", 8);
+  RX_DEVICE_Init();
+  assert(rxTrim == 3 && rxVolume == 58 && rxDac == 8); // Only K6 crystal trim is restored.
+  calibrationReadable = false;
+  RX_DEVICE_Init();
+  assert(rxTrim == 0 && rxVolume == 58 && rxDac == 8);
+  calibrationReadable = true;
 }
 
 static void testUvk1(void) {
@@ -353,6 +389,8 @@ static void testBroadcastPath(void) {
 }
 
 int main(void) {
+  testToneScan();
+  toneAcquisitions=0;bkModes=bkTunes=bkIdle=modeInvalidations=0;
 #if !UVK6_ENABLE_SI4732
   testUvk1();
   testCalibratedSquelch();

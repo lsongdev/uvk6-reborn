@@ -37,7 +37,11 @@ void BACKLIGHT_ApplySettings(void) {
   assert(gDeviceConfig.preferences.backlight < ARRAY_SIZE(BL_TIME_VALUES));
   assert(gDeviceConfig.preferences.brightness_low <= gDeviceConfig.preferences.brightness);
 }
-void DISPLAY_Init(bool full, uint8_t contrast) { (void)full; assert(contrast<=15); ++contrasts; }
+void DISPLAY_Init(bool full, uint8_t contrast) {
+  assert(!full && contrast<=15);
+  assert(contrast==gDeviceConfig.preferences.contrast);
+  ++contrasts;
+}
 int main(void) {
   assert(RESOURCE_SsbPatchPresent());
   patchCorrupted=true; assert(!RESOURCE_SsbPatchPresent()); patchCorrupted=false;
@@ -66,6 +70,17 @@ int main(void) {
   SETTINGS_IncDecValue(SETTING_BRIGHTNESS_L,false); assert(gDeviceConfig.preferences.brightness_low==3);
   // Squelch delays: register levels, then Auto (the chip's recommendation).
   char text[16];
+  static const char *const contrastText[] = {
+    "-8", "-7", "-6", "-5", "-4", "-3", "-2", "-1",
+    "0", "1", "2", "3", "4", "5", "6", "7"
+  };
+  for (unsigned level=0;level<16;++level) {
+    unsigned previous=contrasts, savesRequested=requests;
+    assert(SETTINGS_SetValue(SETTING_CONTRAST,level));
+    assert(contrasts==previous+1 && requests==savesRequested+1);
+    SETTINGS_GetValueText(SETTING_CONTRAST,text,sizeof(text));
+    assert(!strcmp(text,contrastText[level]));
+  }
   SETTINGS_SetValue(SETTING_SQLOPENTIME,7); SETTINGS_IncDecValue(SETTING_SQLOPENTIME,true);
   assert(gDeviceConfig.preferences.sql_open_time==PREFERENCES_SQL_OPEN_AUTO);
   SETTINGS_GetValueText(SETTING_SQLOPENTIME,text,sizeof(text)); assert(!strcmp(text,"Auto"));

@@ -107,7 +107,7 @@ uint16_t BK48X9_ReadRegister(BK48X9_REGISTER_t Register);
 void BK48X9_WriteRegister(BK48X9_REGISTER_t Register, uint16_t Data);
 
 void BK48X9_SetAGC(uint8_t gainIndex);
-// Factory reference trim (-1000..1000), AF gain (0..63), DAC gain (0..15).
+// Shared RX/TX reference trim (-1000..1000), AF gain (0..63), DAC gain (0..15).
 // Invalid fields use the reference firmware defaults; call after chip reset.
 void BK48X9_SetRxCalibration(int16_t trim, uint8_t volume, uint8_t dac);
 int8_t BK48X9_GetAgcIndex();
@@ -117,6 +117,10 @@ void BK48X9_ToggleGpioOut(BK48X9_GPIO_PIN_t Pin, bool bSet);
 
 void BK48X9_CssResetDetection(bool digital);
 bool BK48X9_CssIsDetected(bool digital);
+// Fixed-frequency CSS measurement; caller keeps PA off and restores RX.
+void BK48X9_StartToneScan(void);
+// CTCSS value is Hz*10; DCS value is the captured word. NOT_FOUND is pending.
+BK48X9_CssScanResult_t BK48X9_ReadToneScan(uint32_t *value);
 void BK48X9_CssOff(void); // No tone detection; squelch events stay on.
 // BK4829 squelch from interrupt events (internal to the driver's squelch).
 void BK48X9_SetCDCSSCodeWord(uint32_t CodeWord);
@@ -132,6 +136,8 @@ void BK48X9_RX_TurnOn(void);
 void BK48X9_SelectFilterEx(Filter filter);
 void BK48X9_SelectFilter(uint32_t Frequency, uint32_t vhfUhfBound);
 void BK48X9_DisableDTMF(void);
+// Keep RF on: mute voice, then signal CTCSS phase reversal or DCS turn-off.
+void BK48X9_StartTxTail(bool digital);
 void BK48X9_EnterTxMute(void);
 void BK48X9_ExitTxMute(void);
 void BK48X9_Idle(void);

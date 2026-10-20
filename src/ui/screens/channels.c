@@ -8,7 +8,7 @@
 #include "ui/screens/statusline.h"
 #include <string.h>
 
-#define ROWS 4
+#define ROWS 5
 static uint16_t cursor, top; // Channel numbers; zero when the list is empty.
 static bool confirmDelete;
 static const char *message;
@@ -84,6 +84,7 @@ static bool key(KEY_Code_t key, Key_State_t state) {
 }
 
 static void render(void) {
+  STATUSLINE_SetText(message ? message : "Channels");
   char line[20];
   if (confirmDelete) {
     Text t = TEXT_Begin(line, sizeof(line));
@@ -111,7 +112,6 @@ static void render(void) {
     }
     if (n == cursor) FillRect(0, y - 7, 128, 10, C_INVERT);
   }
-  PrintSmall(2, 61, message ? message : "MENU:Name  *:Delete");
 }
 
 const Screen channelsScreen = { .title = "Channels", .enter = enter, .render = render, .key = key };

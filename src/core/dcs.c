@@ -64,6 +64,33 @@ uint32_t DCS_GetGolayCodeWord(DCS_CodeType_t CodeType, uint8_t Option) {
 
 
 
+RadioTone TONE_DecodeCtcss(uint16_t hz10) {
+  unsigned best = UINT16_MAX;
+  RadioTone result = 0;
+  for (unsigned i = 0; i < ARRAY_SIZE(CTCSS_Options); ++i) {
+    unsigned standard = CTCSS_Options[i];
+    unsigned delta = hz10 > standard ? hz10-standard : standard-hz10;
+    if (delta < best && (delta <= 10u || delta*200u <= standard)) {
+      best = delta; result = i+1u;
+    }
+  }
+  return result;
+}
+
+RadioTone TONE_DecodeDcs(uint32_t word) {
+  word &= 0x7FFFFFu;
+  // Repeated DCS streams have no unique starting bit. Some inverted codes
+  // equal a rotation of a different normal code; use the normal catalogue.
+  for (unsigned bit = 0; bit < 23; ++bit) {
+    if (((word >> 9) & 7u) == 4u)
+      for (unsigned i = 0; i < ARRAY_SIZE(DCS_Options); ++i)
+        if ((word & 0x1FFu) == DCS_Options[i] &&
+            word == DCS_GetGolayCodeWord(CODE_TYPE_DIGITAL, i)) return 51u+i;
+    word = (word >> 1) | ((word & 1u) << 22);
+  }
+  return 0;
+}
+
 void TONE_Format(RadioTone tone, char text[24]) {
   Text t = TEXT_Begin(text,24);
   if (!TONE_Valid(tone)) TEXT_Add(&t,"Invalid");

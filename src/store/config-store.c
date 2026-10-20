@@ -96,7 +96,7 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
     for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
       p = encodeBand(p, &slot->bands[i]);
     const TxConfig *tx = &slot->tx;
-    *p++ = (uint8_t)(tx->enabled | tx->power << 1 | tx->shift << 3);
+    *p++ = (uint8_t)(tx->enabled | tx->power << 1 | tx->shift << 3 | tx->tail << 5);
     put32(p, tx->offset_hz); put32(p+4, tx->split_hz); put16(p+8, tx->tone); p += 10;
   }
   for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
@@ -143,7 +143,8 @@ bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
       p = decodeBand(p, &slot->bands[i]);
     TxConfig *tx = &slot->tx;
     tx->enabled = *p & 1u; tx->power = (TxPower)(*p >> 1 & 3u); tx->shift = (TxShift)(*p >> 3 & 3u);
-    if (*p++ >> 5) return false;
+    tx->tail = (*p >> 5) & 1u;
+    if (*p++ >> 6) return false;
     tx->offset_hz = get32(p); tx->split_hz = get32(p+4); tx->tone = get16(p+8); p += 10;
   }
   for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {

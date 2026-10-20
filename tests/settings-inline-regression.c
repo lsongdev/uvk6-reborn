@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
   if (UVK6_ENABLE_SI4732) { press(KEY_4);capture(); }
   press(KEY_EXIT);
   choose(KEY_3); capture(); // Transmit
-  press(KEY_EXIT); choose(KEY_5); capture(); // Battery
+  press(KEY_EXIT); choose(KEY_4); capture(); // Battery
   choose(KEY_3);
   assert(active_menu==&batteryMenu && number.active && menu_stack_top==1 && !appRuns);
   assert(!strcmp(number.text,"8.24"));
@@ -88,9 +88,9 @@ int main(int argc, char **argv) {
   assert(!strcmp(notice,"Save failed")); saveWorks=true;
   press(KEY_MENU);press(KEY_4);press(KEY_MENU);assert(number.active && number.invalid && saves==1);
   assert(key(KEY_EXIT,KEY_LONG_PRESSED));assert(!number.active && saves==1);
-  press(KEY_EXIT); choose(KEY_7); // Channels opens the channel list.
+  press(KEY_EXIT); choose(KEY_6); // Channels opens the channel list.
   assert(lastScreen==&channelsScreen && active_menu==&settingsMenu);
-  choose(KEY_8); capture(); // About is last and also holds the former System items.
+  choose(KEY_7); capture(); // About is last and also holds the former System items.
   // SSB patch status only in SI4732 builds; the FM chip names the fitted part.
   const KEY_Code_t resetKey=(KEY_Code_t)(7u+UVK6_ENABLE_SI4732);
   assert(active_menu==&aboutMenu && menu_stack_top==1 && active_menu->num_items==resetKey);

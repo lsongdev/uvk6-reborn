@@ -5,6 +5,7 @@
 //   radio.c   slots, VFO/MR resolution, the tune transaction, RDS, status
 //   seek.c    Seek (temporary tuning, one final commit)
 //   capture.c FC frequency capture
+//   tone-scan.c independent fixed-frequency CSS identification
 //   watch.c   multi-slot watch and primary restore
 //   tx.c      PTT, TX safety, talkback
 // Nothing here knows about screens.
@@ -71,6 +72,10 @@ extern bool capturing;
 void captureUpdate(void);
 void cancelCapture(const char *status);
 
+// tone-scan.c
+extern bool toneScanning;
+void toneScanUpdate(void);
+
 // spectrum.c
 #if UVK6_ENABLE_SPECTRUM
 extern bool spectrumOn;
@@ -90,6 +95,7 @@ void delayWatch(void);
 
 // tx.c
 extern TxRuntime transmitter;
+void RADIO_AbortTx(void);
 extern uint8_t txSlot; // Slot PTT transmits on: selected, or a talkback reply.
 
 #endif

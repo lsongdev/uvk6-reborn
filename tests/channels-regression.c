@@ -35,8 +35,8 @@ int main(void) {
   for (unsigned i=0;i<6;++i) save(numbers[i],"CH");
   enter();assert(cursor==3 && top==3);
   for (unsigned i=0;i<4;++i) press(KEY_DOWN);
-  assert(cursor==150 && top==7);
-  press(KEY_DOWN);assert(cursor==200 && top==8);
+  assert(cursor==150 && top==3);
+  press(KEY_DOWN);assert(cursor==200 && top==7);
   press(KEY_DOWN);assert(cursor==200); // No wrap.
   for (unsigned i=0;i<5;++i) press(KEY_UP);
   assert(cursor==3 && top==3);

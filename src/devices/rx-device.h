@@ -49,6 +49,10 @@ CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *frequency_hz);
 void RX_DEVICE_CaptureStop(void);
 void RX_DEVICE_InvalidateBk(void);
 
+// Fixed-frequency, muted RX Tone Scan. Stop BK before restoring the origin.
+bool RX_DEVICE_ToneScanStart(const RxPlan *plan);
+ToneScanSample RX_DEVICE_ToneScanPoll(RadioTone *tone);
+
 // Spectrum exclusively borrows BK muted.
 // Tune one point, wait at least 1 ms, then read its RSSI (raw 0.5 dB units).
 bool RX_DEVICE_SpectrumStart(void);

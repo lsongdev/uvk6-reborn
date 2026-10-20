@@ -73,8 +73,8 @@ int main(void) {
   original.radio.selected_slot=3;
   assert(RADIO_STATE_Set(&original.radio,2,145750000,(RadioParameters){RX_NFM,25000,14000,5,50}));
   assert(RADIO_STATE_Set(&original.radio,3,100000000,(RadioParameters){RX_WFM,100000,0,0,0}));
-  original.radio.slots[1].tx=(TxConfig){true,TX_POWER_HIGH,TX_SHIFT_MINUS,5000000,0,155};
-  original.radio.slots[2].tx=(TxConfig){false,TX_POWER_MEDIUM,TX_SHIFT_SPLIT,600000,146500000,258};
+  original.radio.slots[1].tx=(TxConfig){true,TX_POWER_HIGH,TX_SHIFT_MINUS,5000000,0,155,true};
+  original.radio.slots[2].tx=(TxConfig){false,TX_POWER_MEDIUM,TX_SHIFT_SPLIT,600000,146500000,258,false};
   original.radio.slots[0].source=RADIO_SOURCE_CHANNEL;original.radio.slots[0].channel_number=200;
   original.radio.presets[6].squelch=7;
   original.preferences.mic=9;original.preferences.tx_timeout_seconds=300;
@@ -88,10 +88,10 @@ int main(void) {
   assert(loaded.radio.slots[3].current.parameters.mode==RX_WFM);
   const TxConfig *tx=&loaded.radio.slots[1].tx;
   assert(tx->enabled && tx->power==TX_POWER_HIGH && tx->shift==TX_SHIFT_MINUS &&
-         tx->offset_hz==5000000 && tx->tone==155);
+         tx->offset_hz==5000000 && tx->tone==155 && tx->tail);
   tx=&loaded.radio.slots[2].tx;
   assert(!tx->enabled && tx->shift==TX_SHIFT_SPLIT && tx->offset_hz==600000 &&
-         tx->split_hz==146500000 && tx->tone==258);
+         tx->split_hz==146500000 && tx->tone==258 && !tx->tail);
   assert(loaded.radio.slots[0].source==RADIO_SOURCE_CHANNEL && loaded.radio.slots[0].channel_number==200);
   assert(loaded.radio.presets[6].squelch==7);
   assert(loaded.preferences.mic==9 && loaded.preferences.tx_timeout_seconds==300);
@@ -111,7 +111,7 @@ int main(void) {
   record[HEADER_VERSION]=8;put32(record+HEADER_CRC,crc32(record,RECORD_BYTES));
   assert(!CONFIG_Decode(record,&loaded,NULL)); // Older formats are not read.
   assert(CONFIG_Encode(&original,1,record));
-  record[PAYLOAD_START+2+3+BAND_BYTES*(RADIO_STATE_BANDS+1u)]|=0x20; // Unknown TX flag bit.
+  record[PAYLOAD_START+2+3+BAND_BYTES*(RADIO_STATE_BANDS+1u)]|=0x40; // Unknown TX flag bit.
   put32(record+HEADER_CRC,crc32(record,RECORD_BYTES));
   assert(!CONFIG_Decode(record,&loaded,NULL));
 
