@@ -8,10 +8,6 @@
 // signal meter are slower: each bus burst to a receiver chip can be faintly
 // audible (BK1080 on the UV-K1, SI4732 RSQ on modified radios).
 #define SQL_DELAY 50
-// SI4732 meter period; 0 stops its RSQ reads for a hardware-noise A/B.
-#ifndef UVK6_FM_RSQ_POLL_MS
-#define UVK6_FM_RSQ_POLL_MS 500u
-#endif
 
 // What the receiver hardware is doing now. Any owner (user tune, Seek,
 // Watch, TX restore) changes it only through RECEIVER_Apply/Select, so the
@@ -40,7 +36,7 @@ void RECEIVER_UpdateSquelch(void);
 // 0 never. The BK1080 is read once a second whatever its squelch.
 static inline uint32_t RECEIVER_MeterPeriodMs(const RxPlan *plan) {
   return plan->device == RX_DEVICE_BROADCAST ? 1000u
-       : plan->device == RX_DEVICE_SI ? UVK6_FM_RSQ_POLL_MS : 200u;
+       : plan->device == RX_DEVICE_SI ? 500u : 200u;
 }
 // Main-loop receiver upkeep. SQ0 without a receive tone has nothing to
 // decide: it stays open and samples only for the meter. Otherwise squelch

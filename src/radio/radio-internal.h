@@ -32,9 +32,6 @@
 // rt_until: a new RadioText is shown until then (0: not shown).
 typedef struct { uint32_t frequency_hz, rt_until; char ps[9], text[65]; } SlotLabel;
 #define RADIO_RT_SHOW_MS 10000u
-#ifndef UVK6_ENABLE_RDS_POLL
-#define UVK6_ENABLE_RDS_POLL 1
-#endif
 
 // radio.c: selection and committed receive state
 extern bool initialized;
