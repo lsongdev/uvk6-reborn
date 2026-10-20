@@ -196,8 +196,8 @@ void BK48X9_SetRxCalibration(int16_t trim, uint8_t volume, uint8_t dac) {
   if (trim < -1000 || trim > 1000) trim = 0;
   if (volume > 63) volume = 58;
   if (dac > 15) dac = 8;
-  // Both K1 references load REG_3B from factory offset 0x188 and restore
-  // calibrated AF gain at runtime. REG_3C is deliberately left untouched.
+  // Factory offset 0x188 trims the shared RX/TX crystal reference on both
+  // chips. The board supplies AF gains; REG_3C is left untouched.
   BK48X9_WriteRegister(BK48X9_REG_3B, (uint16_t)(22656 + trim));
   BK48X9_WriteRegister(BK48X9_REG_48, 0xB000u | ((uint16_t)volume << 4) | dac);
 }

@@ -50,6 +50,6 @@ TxResult TX_MODEL_Plan(const RxPlan *rx, const TxConfig *config,
   }
   if (!allowed) return TX_OUT_OF_BAND;
   if (!(capabilities->power_mask & (1u << config->power))) return TX_UNCALIBRATED;
-  *out = (TxPlan){.frequency_hz = frequency, .power = config->power, .tone = config->tone};
+  *out = (TxPlan){.frequency_hz = frequency, .power = config->power, .tone = config->tone, .tail = config->tail && config->tone != 0};
   return TX_OK;
 }

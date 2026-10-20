@@ -7,11 +7,13 @@
 #include "../src/radio/watch.c"
 #include "../src/radio/tx.c"
 #include "../src/radio/spectrum.c"
+#include "../src/radio/tone-scan.c"
 #include "../src/ui/screens/screen.c"
 #include "../src/ui/screens/home.c"
 #include "../src/ui/screens/slot-menu.c"
 #include "../src/ui/screens/save-channel.c"
 #include "../src/ui/screens/spectrum.c"
+#include "../src/ui/screens/tone-scan.c"
 #include <assert.h>
 
 Receiver gReceiver;
@@ -49,7 +51,8 @@ static unsigned appRuns;
 static bool failApply;
 static bool txFakeVerified, txFakePrepareOK, txFakeEnableOK;
 static bool txFakePttPressed=true, txFakeVoltageValid=true;
-static unsigned txFakePrepares, txFakeEnables, txFakeDisables;
+static unsigned txFakePrepares, txFakeEnables, txFakeDisables, txFakeTails;
+bool TX_DEVICE_BeginTail(void) { ++txFakeTails; return true; }
 // Host capabilities and hardware calls are isolated from the production HAL.
 TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) {
   (void)frequency_hz;
@@ -82,6 +85,18 @@ static RxSeekResult nativeReply;
 static unsigned nativeStarts, nativeCancels;
 static uint32_t nativeFrequency;
 static unsigned captureStarts, captureStops;
+static RadioTone scannedTone;
+static bool scanStartOK = true, scanBusy;
+static unsigned scanStartsTone, scanPolls;
+bool RX_DEVICE_ToneScanStart(const RxPlan *plan) {
+  assert(plan->device==RX_DEVICE_BK && plan->parameters.mode==RX_NFM);
+  assert(plan->frequency_hz==activeSlot.current.frequency_hz);
+  ++scanStartsTone;return scanStartOK;
+}
+ToneScanSample RX_DEVICE_ToneScanPoll(RadioTone *tone) {
+  ++scanPolls;*tone=scannedTone;
+  return scanBusy ? TONE_SCAN_BUSY : scannedTone ? TONE_SCAN_SAMPLE : TONE_SCAN_INVALID;
+}
 static CaptureSample captureReply;
 static uint32_t captureHz;
 static CaptureRange captureRange;
@@ -234,6 +249,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   // Unwind the previous scenario's screens first: leaving home releases PTT
   // and cancels FC/Seek, which must not count against this scenario.
   SCREEN_Reset(&homeScreen);
+  toneScanning=false;scanStartOK=true;scanBusy=false;scannedTone=scanStartsTone=scanPolls=0;
   capturing=false;
   captureStarts=captureStops=0; captureReply=CAPTURE_BUSY;
   spectrumOn=false; spectrumStarts=spectrumStops=spectrumTunes=0; spectrumRssi=100;
@@ -264,7 +280,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   gDeviceConfig.preferences.keylock = false;
   txFakeVerified = false;
   txFakePrepareOK = txFakeEnableOK = true;
-  txFakePrepares = txFakeEnables = txFakeDisables = 0;
+  txFakePrepares = txFakeEnables = txFakeDisables = txFakeTails = 0;
   gReceiver.open = false;
   assert(RADIO_STATE_Set(&gDeviceConfig.radio, 0, frequency, values));
   gReceiver = (Receiver){.plan = {.device = RX_DEVICE_BK, .frequency_hz = frequency}};
@@ -783,6 +799,9 @@ int main(void) {
   press(KEY_DOWN);assert(menuIndex==MENU_TX_TONE);
   press(KEY_MENU);assert(gDeviceConfig.radio.slots[0].tx.tone==1);
   press(KEY_F);assert(gDeviceConfig.radio.slots[0].tx.tone==0);
+  press(KEY_DOWN);assert(menuIndex==MENU_TX_TAIL && !activeSlot.tx.tail);
+  press(KEY_MENU);assert(activeSlot.tx.tail && gDeviceConfig.radio.slots[0].tx.tail);
+  press(KEY_F);assert(!activeSlot.tx.tail && !gDeviceConfig.radio.slots[0].tx.tail);
   press(KEY_DOWN);assert(menuIndex==MENU_SPECTRUM);
   unsigned savesBeforePlaceholder=saveRequests;
   appliesBefore=applied;
@@ -1416,5 +1435,106 @@ int main(void) {
   press(KEY_DOWN);assert(gDeviceConfig.radio.slots[0].channel_number==7); // Right = next channel.
   press(KEY_UP);assert(gDeviceConfig.radio.slots[0].channel_number==3);
   horizontalArrows=false;
+  // Real menu -> stored slot -> planner -> physical release -> tail -> RX.
+  for (unsigned scenario=0;scenario<5;++scenario) {
+    setup(438500000,fm);txFakeVerified=true;
+    TxConfig tx=activeSlot.tx;tx.enabled=true;tx.tone=1;tx.tail=true;
+    assert(RADIO_SetTx(&tx) && !gDeviceConfig.radio.slots[1].tx.tail);
+    if (scenario==2) gDeviceConfig.preferences.tx_timeout_seconds=15;
+    assert(SCREEN_Key(KEY_PTT,KEY_PRESSED) && transmitter.mode==RADIO_TX);
+    if (scenario==2) transmitter.started_at=clockNow-14950u;
+    unsigned off=txFakeDisables;
+    txFakePttPressed=false;RADIO_TxSafetyUpdate();
+    assert(transmitter.mode==RADIO_TX_TAIL && txFakeTails==1 && txFakeDisables==off);
+    uint32_t began=transmitter.tail_started_at;
+    press(KEY_PTT); // Duplicate queued release after the physical release.
+    assert(transmitter.mode==RADIO_TX_TAIL && transmitter.tail_started_at==began && txFakeTails==1);
+    if (scenario==1) { txFakeVoltageValid=false;RADIO_TxSafetyUpdate(); }
+    else if (scenario==2) { clockNow+=50;RADIO_TxSafetyUpdate(); }
+    else if (scenario==3) { RADIO_CancelInteractive(); }
+    else {
+      if (scenario==4) {
+        txFakePttPressed=true;RADIO_PttPress();
+        assert(transmitter.wait_release && txFakePrepares==1);
+      }
+      clockNow=began+199;RADIO_TxSafetyUpdate();
+      assert(transmitter.mode==RADIO_TX_TAIL && txFakeDisables==off && txFakeTails==1);
+      SCREEN_Render();assert(drawn[0].activity==UI_RADIO_CARD_TRANSMITTING);
+      clockNow=began+200;RADIO_TxSafetyUpdate();
+    }
+    assert(transmitter.mode==RADIO_RX && txFakeDisables>off && receivingSlot==0);
+    if (scenario==4) {
+      assert(transmitter.wait_release);RADIO_PttPress();assert(txFakePrepares==1);
+      txFakePttPressed=false;RADIO_TxSafetyUpdate();assert(!transmitter.wait_release);
+    }
+  }
+  // Independent current-frequency RX Tone Scan. FC is never entered.
+  setup(438500000,fm);
+  activeSlot.tx.tone=gDeviceConfig.radio.slots[0].tx.tone=12;
+  activeSlot.tx.enabled=gDeviceConfig.radio.slots[0].tx.enabled=true;
+  RadioSlot scanOrigin=gDeviceConfig.radio.slots[0], scanOther=gDeviceConfig.radio.slots[1];
+  unsigned scanSaves=saveRequests;
+  openMenu(MENU_RX_TONE_SCAN);press(KEY_MENU);
+  assert(SCREEN_Top()==&toneScanScreen && toneScanning && scanStartsTone==1 && !captureStarts);
+  SCREEN_Render();assert(!strcmp(statusText,"RX Tone Scan"));
+  clockNow+=199;update();assert(!scanPolls);
+  assert(SCREEN_Key(KEY_PTT,KEY_PRESSED));press(KEY_PTT);
+  RADIO_PttPress();assert(!txFakePrepares);
+  RADIO_StartCapture();RADIO_StartSeek();RADIO_StartSpectrum();
+  assert(!capturing && !seek.active && !spectrumOn && !captureStarts);
+  scannedTone=9;
+  clockNow+=1;update();clockNow+=200;update();
+  assert(toneScanning && *RADIO_ToneScanResult()==0);
+  scannedTone=0;clockNow+=200;update(); // Missing carrier/result breaks confirmation.
+  scannedTone=9;clockNow+=200;update();clockNow+=200;update();
+  assert(!*RADIO_ToneScanResult());
+  scanBusy=true;clockNow+=200;update();assert(!*RADIO_ToneScanResult());
+  scanBusy=false;clockNow+=200;update();assert(*RADIO_ToneScanResult()==9);
+  assert(!memcmp(&scanOrigin,&gDeviceConfig.radio.slots[0],sizeof(scanOrigin)) && saveRequests==scanSaves);
+  unsigned pollsBefore=scanPolls;clockNow+=1000;update();assert(scanPolls==pollsBefore);
+  press(KEY_MENU);
+  assert(!toneScanning && SCREEN_Top()==&slotMenuScreen && saveRequests==scanSaves+1);
+  assert(activeSlot.current.frequency_hz==438500000 && activeSlot.current.parameters.rx_tone==9);
+  assert(!memcmp(&scanOrigin.tx,&gDeviceConfig.radio.slots[0].tx,sizeof(scanOrigin.tx)));
+  assert(!memcmp(&scanOther,&gDeviceConfig.radio.slots[1],sizeof(scanOther)));
+  assert(runtime.current.parameters.rx_tone==9 && RADIO_IsReceiving());
+  // A previous reply on another slot cannot redirect identification.
+  setup(438500000,fm);
+  runtime.current.frequency_hz=gReceiver.plan.frequency_hz=438600000;receivingSlot=1;
+  openMenu(MENU_RX_TONE_SCAN);press(KEY_MENU);
+  assert(toneScanning && runtime.current.frequency_hz==438500000);
+  press(KEY_EXIT);assert(receivingSlot==0 && gReceiver.plan.frequency_hz==438500000);
+  // Cancel before/after a result and covering the page never save.
+  for (unsigned phase=0;phase<3;++phase) {
+    setup(438500000,fm);scanOrigin=gDeviceConfig.radio.slots[0];scanSaves=saveRequests;
+    openMenu(MENU_RX_TONE_SCAN);press(KEY_MENU);scannedTone=51;
+    if (phase) for (unsigned sample=0;sample<3;++sample) { clockNow+=200;update(); }
+    if (phase==2) SCREEN_Push(&otherScreen); else press(KEY_EXIT);
+    assert(!toneScanning && RADIO_IsReceiving() && runtime.current.frequency_hz==438500000);
+    assert(saveRequests==scanSaves && !memcmp(&scanOrigin,&gDeviceConfig.radio.slots[0],sizeof(scanOrigin)));
+  }
+  setup(438500000,fm);scanOrigin=gDeviceConfig.radio.slots[0];scanSaves=saveRequests;
+  openMenu(MENU_RX_TONE_SCAN);press(KEY_MENU);scannedTone=9;
+  for (unsigned sample=0;sample<3;++sample) { clockNow+=200;update(); }
+  failApply=true;press(KEY_MENU);
+  assert(!toneScanning && !runtime.active && saveRequests==scanSaves);
+  assert(!memcmp(&scanOrigin,&gDeviceConfig.radio.slots[0],sizeof(scanOrigin)));
+  // MR may inspect but not apply; failure and unsupported modes stay read-only.
+  setup(438500000,fm);
+  activeSlot.source=gDeviceConfig.radio.slots[0].source=RADIO_SOURCE_CHANNEL;
+  openMenu(MENU_RX_TONE_SCAN);press(KEY_MENU);scannedTone=9;
+  for (unsigned sample=0;sample<3;++sample) { clockNow+=200;update(); }
+  scanSaves=saveRequests;press(KEY_MENU);
+  assert(toneScanning && *RADIO_ToneScanResult()==9 && !strcmp(message,"VFO only") && saveRequests==scanSaves);
+  press(KEY_EXIT);assert(!toneScanning && RADIO_IsReceiving());
+  setup(125000000,(RadioParameters){RX_AM,8330,6000,4});
+  openMenu(MENU_RX_TONE_SCAN);press(KEY_MENU);
+  assert(!toneScanning && !scanStartsTone && !strcmp(message,"NFM only"));press(KEY_EXIT);
+  setup(438500000,fm);scanStartOK=false;
+  openMenu(MENU_RX_TONE_SCAN);press(KEY_MENU);
+  assert(!toneScanning && RADIO_IsReceiving() && !strcmp(message,"RX error"));press(KEY_EXIT);
+  setup(438500000,fm);scanStartOK=false;failApply=true;scanSaves=saveRequests;
+  openMenu(MENU_RX_TONE_SCAN);press(KEY_MENU);
+  assert(!toneScanning && !runtime.active && !strcmp(message,"RX error") && saveRequests==scanSaves);
   return 0;
 }

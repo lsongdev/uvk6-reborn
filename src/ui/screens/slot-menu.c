@@ -1,5 +1,6 @@
 // Per-slot menu: RX parameters, TX settings, Save as channel and reset.
 #include "ui/screens/slot-menu.h"
+#include "ui/screens/tone-scan.h"
 #include "ui/screens/save-channel.h"
 #include "ui/screens/spectrum.h"
 #include "radio/radio.h"
@@ -41,6 +42,7 @@ static void txInputKey(KEY_Code_t key, Key_State_t state) {
 static void menuChangeValue(bool up) {
   TxConfig tx = RADIO_Selected()->tx;
   switch (menuIndex) {
+  case MENU_RX_TONE_SCAN: SCREEN_Push(&toneScanScreen); return;
   case MENU_TX_ENABLE: tx.enabled = !tx.enabled; setTx(tx); return;
   case MENU_TX_POWER: (void)RADIO_CycleTxPower(up); return;
   case MENU_TX_SHIFT:
@@ -48,6 +50,7 @@ static void menuChangeValue(bool up) {
     setTx(tx); return;
   case MENU_TX_OFFSET: beginTxInput(); return;
   case MENU_TX_TONE: tx.tone = TONE_Next(tx.tone, up); setTx(tx); return;
+  case MENU_TX_TAIL: tx.tail = !tx.tail; setTx(tx); return;
 #if UVK6_ENABLE_SPECTRUM
   case MENU_SPECTRUM: SCREEN_Pop(); SCREEN_Push(&spectrumScreen); return;
 #endif
@@ -74,7 +77,9 @@ static const char *menuValue(uint8_t item, char out[24]) {
     return out;
   }
   case MENU_RX_TONE:
+  case MENU_RX_TONE_SCAN:
     if (rx->mode != RX_NFM) return "NFM only";
+    if (item == MENU_RX_TONE_SCAN) return "";
     TONE_Format(rx->rx_tone, out); return out;
   case MENU_TX_ENABLE: return tx->enabled ? "On" : "Off";
   case MENU_TX_POWER: return txPowerNames[tx->power <= TX_POWER_HIGH ? tx->power : 0];
@@ -88,6 +93,7 @@ static const char *menuValue(uint8_t item, char out[24]) {
     if (tx->shift == TX_SHIFT_SPLIT && !tx->split_hz) return "Same";
     hz = tx->shift == TX_SHIFT_SPLIT ? tx->split_hz : tx->offset_hz; break;
   case MENU_TX_TONE: TONE_Format(tx->tone, out); return out;
+  case MENU_TX_TAIL: return tx->tail ? "On" : "Off";
   default: return "";
   }
   UI_FrequencyText(hz, out);
@@ -96,8 +102,8 @@ static const char *menuValue(uint8_t item, char out[24]) {
 
 static void menuRender(void) {
   static const char *const names[] = {
-    "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone",
-    "TX Enable", "TX Power", "TX Shift", "TX Offset", "TX Tone",
+    "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone", "RX Tone Scan",
+    "TX Enable", "TX Power", "TX Shift", "TX Offset", "TX Tone", "TX tail",
 #if UVK6_ENABLE_SPECTRUM
     "Spectrum",
 #endif

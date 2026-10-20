@@ -20,16 +20,19 @@ int main(void) {
   UserChannel ch={.name="Repeater 438.725",.frequency_hz=438725000,
     .rx={.mode=RX_NFM,.step_hz=12500,.bandwidth_hz=12000,.squelch=4,.rx_tone=12},
     .tx={.enabled=true,.power=TX_POWER_MEDIUM,.shift=TX_SHIFT_MINUS,
-         .offset_hz=5000000,.split_hz=0,.tone=12}};
+         .offset_hz=5000000,.split_hz=0,.tone=12,.tail=true}};
   UserChannel loaded;
   assert(strlen(ch.name)==USER_CHANNEL_NAME_MAX);
   assert(CHANNEL_STORE_Save(12,&ch) && CHANNEL_STORE_Load(12,&loaded));
   assert(!strcmp(loaded.name,ch.name) && loaded.frequency_hz==438725000);
   assert(loaded.rx.rx_tone==12 && loaded.tx.enabled && loaded.tx.power==TX_POWER_MEDIUM);
-  assert(loaded.tx.shift==TX_SHIFT_MINUS && loaded.tx.offset_hz==5000000 && loaded.tx.tone==12);
+  assert(loaded.tx.shift==TX_SHIFT_MINUS && loaded.tx.offset_hz==5000000 && loaded.tx.tone==12 && loaded.tx.tail);
   ch.tx.shift=TX_SHIFT_SPLIT;ch.tx.split_hz=145500000;
   assert(CHANNEL_STORE_Save(12,&ch) && CHANNEL_STORE_Init() && CHANNEL_STORE_Load(12,&loaded));
   assert(loaded.tx.shift==TX_SHIFT_SPLIT && loaded.tx.split_hz==145500000);
+  // Toggling only tail is a material update, and zero-bit records stay Off.
+  ch.tx.tail=false;
+  assert(CHANNEL_STORE_Save(12,&ch) && CHANNEL_STORE_Load(12,&loaded) && !loaded.tx.tail);
   // Invalid channels are refused.
   UserChannel bad=ch;bad.tx.offset_hz=TX_OFFSET_MAX_HZ+10;
   assert(!CHANNEL_STORE_Save(13,&bad));

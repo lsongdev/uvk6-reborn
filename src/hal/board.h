@@ -33,8 +33,8 @@ typedef struct {
 bool BOARD_TxCalibration(uint32_t frequency_hz, BoardTxCalibration *record);
 
 typedef struct { int16_t trim; uint8_t volume,dac; } BoardRxCalibration;
-// Whether this board supplies a factory RX profile; unreadable fields use
-// that board's defaults. No calibration storage is ever written here.
+// Factory RX/TX reference trim and RX gains; unreadable fields use that
+// board's defaults. No calibration storage is ever written here.
 bool BOARD_RxCalibration(BoardRxCalibration *out);
 typedef struct {
   uint8_t rssi_open,rssi_close,noise_open,noise_close,glitch_open,glitch_close;
@@ -58,7 +58,7 @@ bool BOARD_BroadcastUsesBkVhfPath(void);
 // these lines with other parts.
 extern const uint8_t BOARD_KEYPAD_IDLE_LEVELS;
 
-// Backlight output; level is the user brightness (0 = off, higher brighter).
+// Backlight output; level is 0..15 (0 = off, 15 = maximum).
 void BOARD_BacklightInit(void);
 void BOARD_BacklightSetLevel(uint8_t level);
 

@@ -548,3 +548,34 @@ uint8_t RX_DEVICE_SignalLevel(const RxPlan *plan, uint16_t rssi) {
   }
   return level > SEGMENTS ? SEGMENTS : level;
 }
+
+bool RX_DEVICE_ToneScanStart(const RxPlan *plan) {
+  if (!plan || plan->device != RX_DEVICE_BK || plan->parameters.mode != RX_NFM)
+    return false;
+  RxPlan scan = *plan;
+  scan.parameters.rx_tone = 0;
+  if (!scan.parameters.squelch) scan.parameters.squelch = 1;
+  if (!RX_DEVICE_StopAll() || !RX_DEVICE_Activate(&scan)) return false;
+  RX_DEVICE_InvalidateBk();
+  BK48X9_StartToneScan();
+  return true;
+}
+ToneScanSample RX_DEVICE_ToneScanPoll(RadioTone *tone) {
+  uint32_t value;
+  *tone = 0;
+  if (BK48X9_IsSquelchOpen()) {
+    BK48X9_CssScanResult_t type = BK48X9_ReadToneScan(&value);
+    // DCS acquisition may need several frames. Pending must not restart it.
+    if (type == BK48X9_CSS_RESULT_NOT_FOUND) return TONE_SCAN_BUSY;
+    if (type == BK48X9_CSS_RESULT_CTCSS) {
+      *tone = TONE_DecodeCtcss(value);
+      // An unlisted low-frequency reading (e.g. DCS 134.4 Hz) must not
+      // repeatedly reset a still-acquiring digital decoder.
+      if (!*tone) return TONE_SCAN_INVALID;
+    } else *tone = TONE_DecodeDcs(value);
+  }
+  // New acquisition after a completed reading or lost carrier. A latched
+  // result cannot supply repeated hits, while slow acquisitions can finish.
+  BK48X9_StartToneScan();
+  return *tone ? TONE_SCAN_SAMPLE : TONE_SCAN_INVALID;
+}

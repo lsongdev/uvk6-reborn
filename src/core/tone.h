@@ -17,5 +17,10 @@ static inline uint8_t TONE_Code(RadioTone tone) {
 static inline RadioTone TONE_Next(RadioTone tone, bool up) {
   return (tone + (up ? 1u : RADIO_TONE_COUNT-1u)) % RADIO_TONE_COUNT;
 }
+typedef enum { TONE_SCAN_BUSY, TONE_SCAN_INVALID, TONE_SCAN_SAMPLE } ToneScanSample;
+// Unknown scan readings return Off (0), never an invented nearest code.
+RadioTone TONE_DecodeCtcss(uint16_t frequency_hz10);
+// DCS cyclic/inverted aliases are reported as an equivalent normal code.
+RadioTone TONE_DecodeDcs(uint32_t word);
 void TONE_Format(RadioTone tone, char text[24]);
 #endif

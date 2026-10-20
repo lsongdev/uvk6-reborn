@@ -9,7 +9,7 @@ static uint32_t tunedAt;
 static bool settling; // spectrum.next is tuned and settling.
 
 void RADIO_StartSpectrum(void) {
-  if (spectrumOn || capturing || seek.active || RADIO_TxBusy()) return;
+  if (toneScanning || spectrumOn || capturing || seek.active || RADIO_TxBusy()) return;
   if (!pauseWatch()) return;
   RECEIVER_Mute();
   receivingSlot = UINT8_MAX;

@@ -7,9 +7,10 @@
 // Reset to presets. Item order matches RadioParameterField for the RX items.
 enum {
   MENU_RX_MODE, MENU_RX_STEP, MENU_RX_BANDWIDTH, MENU_RX_SQUELCH, MENU_RX_TONE,
+  MENU_RX_TONE_SCAN,
   MENU_TX_ENABLE, MENU_TX_POWER, MENU_TX_SHIFT,
   MENU_TX_OFFSET, // TX Offset for +/-, TX Freq for Split.
-  MENU_TX_TONE,
+  MENU_TX_TONE, MENU_TX_TAIL,
 #if UVK6_ENABLE_SPECTRUM
   MENU_SPECTRUM,
 #endif

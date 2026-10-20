@@ -43,6 +43,10 @@ void RADIO_Reverse(void);                 // Swap RX and TX frequencies (VFO).
 void RADIO_StartSeek(void);
 void RADIO_CancelSeek(void);
 bool RADIO_Seeking(void);
+// Independent fixed-frequency RX Tone Scan. NULL: inactive; *result==0: searching.
+bool RADIO_StartToneScan(void);
+const RadioTone *RADIO_ToneScanResult(void);
+bool RADIO_StopToneScan(bool adopt); // Adopt RX only; MR is read-only.
 void RADIO_StartCapture(void);
 void RADIO_CaptureAdopt(void);            // Tune to the reading on screen.
 void RADIO_CaptureCancel(void);
@@ -51,7 +55,7 @@ bool RADIO_Capturing(void);
 void RADIO_PttPress(void);
 void RADIO_PttRelease(void);              // Always honoured, even under keylock.
 bool RADIO_TxBusy(void);
-void RADIO_CancelInteractive(void);       // The main screen was left: stop FC, Seek, PTT.
+void RADIO_CancelInteractive(void);       // The main screen was left: stop FC, tone scan, Seek, PTT.
 // Spectrum sweeps around the selected slot with BK muted; the selected
 // slot's status shows the cursor. Stop restores reception, or tunes the
 // slot to the cursor (VFO only).

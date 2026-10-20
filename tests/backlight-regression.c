@@ -3,8 +3,7 @@
 #include <assert.h>
 static uint32_t output;
 void BOARD_BacklightInit(void) {}
-// The UV-K6 duty mapping, so the expected values stay comparable.
-void BOARD_BacklightSetLevel(uint8_t level) { output = (1u << (level + 2)) - 1; }
+void BOARD_BacklightSetLevel(uint8_t level) { output = level; }
 DeviceConfig gDeviceConfig = {.preferences=CONFIG_DEFAULT_PREFERENCES};
 uint8_t BL_TIME_VALUES[7]={0,5,10,20,60,120,255};
 int main(void) {
@@ -22,8 +21,8 @@ int main(void) {
   assert(state && countdown==255);
   gDeviceConfig.preferences.backlight=0;
   gDeviceConfig.preferences.brightness_low=3;
-  BACKLIGHT_ApplySettings();assert(!state && output==31);
-  BACKLIGHT_On();assert(!state && output==31);
+  BACKLIGHT_ApplySettings();assert(!state && output==3);
+  BACKLIGHT_On();assert(!state && output==3);
   gDeviceConfig.preferences.backlight=1;
   gDeviceConfig.preferences.backlight_on_squelch=BL_SQL_ON;
   BACKLIGHT_ApplySettings();BACKLIGHT_SetReception(true);

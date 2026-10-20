@@ -23,4 +23,8 @@ void BOARD_BacklightInit(void) {
       PWMPLUS_CFG_CNT_REP_BITS_ENABLE | PWMPLUS_CFG_COUNTER_EN_BITS_ENABLE | 0;
 }
 
-void BOARD_BacklightSetLevel(uint8_t level) { PWM_PLUS0_CH0_COMP = (1 << (level + 2)) - 1; }
+void BOARD_BacklightSetLevel(uint8_t level) {
+  if (level > 15) level = 15;
+  // A quadratic curve spreads all 16 settings over the 10-bit PWM range.
+  PWM_PLUS0_CH0_COMP = (uint32_t)level * level * 1023u / 225u;
+}

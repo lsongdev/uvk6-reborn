@@ -79,7 +79,7 @@
 | F→*（Scan） | 当前频段向前搜台 Seek |
 | 其余目标键 | Not supported |
 
-锁键同时锁住两个侧键。默认 PTT 不受锁键影响；Lock PTT too 为 On 时一并锁住。PTT 松开优先处理，不会被锁键吞掉。输入、搜台、捕获和发射期间，各自界面独占按键，普通调谐快捷键不执行。
+锁键同时锁住两个侧键。默认 PTT 不受锁键影响；Lock PTT 为 On 时一并锁住。PTT 松开优先处理，不会被锁键吞掉。输入、搜台、捕获和发射期间，各自界面独占按键，普通调谐快捷键不执行。
 
 ## 3. 频段、模式与频率输入
 
@@ -129,22 +129,28 @@ Slot 菜单 ▲／▼选择，* 或 MENU 增加／执行，F（键帽副标 #）
 | RX Mode、RX Step、RX Bandwidth | 模式、步进、带宽，只提供可用组合；WFM 为 Fixed |
 | RX Squelch | 0–10 |
 | RX Tone | Off、50 个 CTCSS、104 个 DCS 正／反码；仅 NFM 可编辑 |
+| RX Tone Scan | 在当前 Slot 的 NFM 频率上识别未知亚音，独立于 FC |
 | TX Enable | 当前 Slot 发射意图，默认 Off |
 | TX Power | Low／Medium／High，按对应校准档执行 |
 | TX Shift | Off 同频、+／- 中继频差、Split 独立发射频率 |
 | TX Offset／TX Freq | +／- 时编辑频差，Split 时编辑发射频率；Off 时 --、不可编辑 |
 | TX Tone | 独立发射 CTCSS／DCS，Off 关闭 |
+| TX tail | 当前 Slot 的发射结束信令，Off／On，默认 Off；随频道保存 |
 | Spectrum | 打开频谱（见第 7 章），`ENABLE_SPECTRUM=0` 时没有此项 |
 | Save as channel | 选择编号、确认覆盖、输入名称并保存 |
 | Reset to presets | 恢复当前频段 RX 预设，频率和 TX 设置不变 |
 
-RX Tone 与静噪条件同时满足才开音频，SQ0 也不绕过亚音。CTCSS 如 67.0 Hz，DCS 如 D023N／D023I；没有自动亚音扫描。
+RX Tone 与静噪条件同时满足才开音频，SQ0 也不绕过亚音。CTCSS 如 67.0 Hz，DCS 如 D023N／D023I。
+
+RX Tone Scan 固定当前 Slot 的频率，扫描期间静音、暂停多槽守听并屏蔽发射。让对方持续发射，三次独立采集一致后显示结果；MENU 只应用 RX Tone，频率与 TX 设置保持原值，EXIT 取消并恢复原接收。MR 可以查看，不能直接应用。Searching 不等于“没有亚音”。DCS 显示等效的标准正码并提示 Equivalent DCS code：例如 D023I 的循环码字等效于 D047N，显示不保证还原对方菜单里的原始标签。FC 操作和结果不受此功能影响。
 
 TX Offset／TX Freq 在当前行以 MHz 编辑，首个数字替换草稿。0 清除值；Split 未设置时跟随 RX。频差上限 100 MHz，Split 要求 BK 支持范围和 10 Hz 栅格；PTT 另按实际 TX Hz 校验板级范围。修改 TX 不重调 RX、不自动开启 TX Enable。
 
+TX tail 开启且 TX Tone 非 Off 时，正常松开 PTT 后静音麦克风并继续发射约 200 ms：CTCSS 使用 180° 相移，DCS 正／反码使用 134.4 Hz 结束音，随后关闭 PA、恢复接收。它帮助兼容的对方电台提前静音，不是本机接收尾音消除；TX Tone=Off 时不增加延迟。尾音期间仍显示 TX；此时重新按 PTT 不会自动续发，需松开后重新按下。超时、低压、故障或离开主界面取消发射时直接关 PA，不延迟发送尾音。
+
 ### 频段预设编辑器
 
-Settings → Band presets 中 ▲／▼选择九个频段，MENU 编辑 Mode、Step、BW、SQ、RX Tone。Use current 复制选中 Slot 的当前 VFO 参数（仅当前频段），Defaults 恢复内置草稿，均须再 Save。EXIT 丢弃草稿。
+Settings → Bands 中 ▲／▼选择九个频段，MENU 编辑 Mode、Step、BW、SQ、RX Tone。Use current 复制选中 Slot 的当前 VFO 参数（仅当前频段），Reset to defaults 恢复内置草稿，均须再 Save。EXIT 丢弃草稿。
 
 保存先校验并写入，失败保留旧预设和可重试草稿。成功显示 Saved，**下次进入该频段时应用**，不立即改当前接收。频段名称、范围和快捷顺序暂不可编辑。
 
@@ -226,17 +232,16 @@ Slot 菜单 → Spectrum。上方是当前 Slot 的卡片，显示光标处的�
 
 | 菜单 | 项目与说明 |
 | --- | --- |
-| Display | Contrast（-8～+7）、Light time（Off、5/10/20/60/120 秒、Always）、Brightness／Idle light（0–15）、Light on RX（Off／Timed／Receiving） |
+| Display | Contrast（-8～+7）、Backlight time（Off、5/10/20/60/120 秒、Always）、Brightness／Idle brightness（0–15）、Backlight on RX（Off／Timed／Receiving） |
 | Receive | Slot count（1–4）、SQL open delay（Level 0–7／Auto）、SQL close delay（Level 0–3／Auto）、SI4732 idle（Mute／Power off，仅 SI4732 构建）、Filter split（240／280 MHz） |
-| Transmit | Time limit（30/60/120/180/300/600 秒）、Block if busy、Mic gain（0–31，默认 16） |
-| Lock PTT too | 锁键时是否同时屏蔽 PTT |
+| Transmit | Time limit（30/60/120/180/300/600 秒）、Block if busy、Mic gain（0–31，默认 16）、Lock PTT（锁键时是否同时屏蔽 PTT） |
 | Battery | Show charge（Icon／Percent／Voltage）、Charge curve（1600／2200／3500 估算曲线）、Cal voltage（输入实测 5.00–8.60 V） |
-| Band presets／Channels | 独立频段预设／频道列表、改名和删除 |
-| About | Firmware、Storage（容量）、Config、FM chip（SI4732／BK1080）、SSB patch（仅 SI4732 构建）、TX status、Save status、Reset to defaults |
+| Bands／Channels | 独立频段预设／频道列表、改名和删除 |
+| About | Firmware、Storage（容量）、Config、FM chip（SI4732／BK1080）、SSB patch（仅 SI4732 构建）、TX status、Save status、Reset settings |
 
-Brightness 降低时限制 Idle light 不高于它；Light time 的 Off／Always 优先于接收触发。电池曲线不是容量测量。SQL 时序只显示档位，不承诺毫秒数；Auto（默认）采用接收芯片的推荐值：K6 BK4819 为 1／1，K1 BK4829 为 5／3（原厂值）。SI idle 在下次离开 SI 时使用；滤波和 SQL 工程参数离开设置时重新应用，失败回退。设置、文本页面期间接收持续。
+Brightness 降低时限制 Idle brightness 不高于它；Backlight time 的 Off／Always 优先于接收触发。电池曲线不是容量测量。SQL 时序只显示档位，不承诺毫秒数；Auto（默认）采用接收芯片的推荐值：K6 BK4819 为 1／1，K1 BK4829 为 5／3（原厂值）。SI idle 在下次离开 SI 时使用；滤波和 SQL 工程参数离开设置时重新应用，失败回退。设置、文本页面期间接收持续。
 
-Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留原值。Reset to defaults 需 MENU 确认，恢复显示和 TX 保护等普通偏好，保留当前键盘锁、电池校准／曲线、RX 工程参数、Mic／Deviation、Slot 和频道，不是整机初始化。
+Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留原值。Reset settings 需 MENU 确认，恢复显示和 TX 保护等普通偏好，保留当前键盘锁、电池校准／曲线、RX 工程参数、Mic／Deviation、Slot 和频道，不是整机初始化。
 
 普通修改在最后变更后约 1500 ms 合并写入，离开设置也尝试提交；失败约每 5 秒重试。About → Save status 显示 Read only／Saved／Pending／Failed／RAM only，MENU 立即保存或重试。Pending 时掉电可能丢失最近修改。
 

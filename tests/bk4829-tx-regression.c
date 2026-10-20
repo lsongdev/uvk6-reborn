@@ -30,10 +30,11 @@ void AUDIO_ToggleSpeaker(bool on) { assert(!on); }
 void BK48X9_BusInit(void) {}
 uint16_t BK48X9_ReadRegister(BK48X9_REGISTER_t reg) { return reg==0x0C ? 0 : regs[reg]; }
 void BK48X9_WriteRegister(BK48X9_REGISTER_t reg, uint16_t value) {
-  // Once PA is on, only independent LED changes or PA gate off are allowed.
+  // While PA is on, only LEDs, CSS tail/mic controls, or PA gate off may change.
   bool on = regs[0x33] & 0x20;
-  if (on) assert(reg==0x33 && (!(value & 0x20) ||
-                 ((value ^ regs[0x33]) & ~3u)==0));
+  if (on) assert((reg==0x33 && (!(value & 0x20) ||
+                 ((value ^ regs[0x33]) & ~3u)==0)) ||
+                 reg==0x50 || reg==0x51 || reg==0x52);
   if (reg==0x33 && (value & 0x20) && !on) {
     assert(stopped && pressed && TX_DEVICE_VoltageValid());
     assert(!(value & 0x40) && regs[0x30]==0xC1FE && regs[0x37]==0x9D1F);
@@ -99,6 +100,15 @@ int main(void) {
   uint32_t code=DCS_GetGolayCodeWord(TONE_Type(plan.tone),TONE_Code(plan.tone));
   assert(regs[0x08]==(0x8000u | ((code>>12)&0xFFFu)));
   TX_DEVICE_Disable();
+  for (unsigned type=0;type<3;++type) {
+    plan.tone=type==0 ? 1 : type==1 ? 51 : 155;
+    assert(TX_DEVICE_Prepare(&plan) && TX_DEVICE_Enable());
+    pressed=false;
+    assert(TX_DEVICE_BeginTail() && (regs[0x33] & 0x20));
+    assert(regs[0x52]==(type ? 0x828F : 0xC28F) && regs[0x50]==0xBB18);
+    TX_DEVICE_Disable();checkOff();
+    assert(!TX_DEVICE_BeginTail());pressed=true;
+  }
   unsigned before=starts;
   stopOK=false; assert(!TX_DEVICE_Prepare(&plan));checkOff();stopOK=true;
   readOK=false;assert(!TX_DEVICE_Prepare(&plan));checkOff();readOK=true;

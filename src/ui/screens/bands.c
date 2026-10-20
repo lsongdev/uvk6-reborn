@@ -119,13 +119,13 @@ static bool key(KEY_Code_t key, Key_State_t state) {
 }
 
 static void render(void) {
-  static const char *const labels[] = {"Mode", "Step", "BW", "SQ", "RX Tone", "Use current", "Defaults", "Save"};
-  STATUSLINE_SetText(editing ? radioBands[selected].name : "Bands");
+  static const char *const labels[] = {"Mode", "Step", "BW", "SQ", "RX Tone", "Use current", "Reset to defaults", "Save"};
+  STATUSLINE_SetText(message ? message : editing ? radioBands[selected].name : "Bands");
   uint8_t index = editing ? field : row;
-  uint8_t start = index >= 4 ? index-3 : 0;
+  uint8_t start = index >= 5 ? index-4 : 0;
   uint8_t count = editing ? FIELD_COUNT : shownCount;
-  for (uint8_t line = 0; line < 4 && start+line < count; ++line) {
-    uint8_t i = start+line, y = 18+line*11;
+  for (uint8_t line = 0; line < 5 && start+line < count; ++line) {
+    uint8_t i = start+line, y = 17+line*11;
     PrintMediumEx(2, y, POS_L, C_FILL, editing ? labels[i] : radioBands[shown[i]].name);
     if (!editing) {
       PrintSmallEx(124, y, POS_R, C_FILL, rxModeNames[gDeviceConfig.radio.presets[shown[i]].mode]);
@@ -145,8 +145,6 @@ static void render(void) {
     if (i == index)
       FillRect(0, y-8, 128, 11, C_INVERT);
   }
-  if (message)
-    PrintSmall(2, 61, message);
 }
 
 const Screen bandsScreen = { .title = "Bands", .enter = enter, .render = render, .key = key };

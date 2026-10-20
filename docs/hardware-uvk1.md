@@ -109,7 +109,7 @@ K1 的 band 2／5 High 档（`91 96 91`）与本项目 `tools/resources.py` 中�
 
 ## 5. 当前项目适配状态
 
-`make BOARD=uvk1` 已可构建 PY32F071 首启只读版本（应用起点 `0x08002800`、118 KiB Flash、16 KiB RAM）。`src/boards/uvk1/` 提供引脚默认状态、GPIO、PF8 背光开关、PF5/PF6 软件 I²C、电池 ADC 和 SPI Flash 存储；SWD 保留。共享 ST7565、键盘和上层 UI 通过 HAL 访问硬件。
+`make BOARD=uvk1` 已可构建 PY32F071 首启只读版本（应用起点 `0x08002800`、118 KiB Flash、16 KiB RAM）。`src/boards/uvk1/` 提供引脚默认状态、GPIO、PF8 背光 PWM（TIM7 + DMA7，4 kHz，0–15 档）、PF5/PF6 软件 I²C、电池 ADC 和 SPI Flash 存储；SWD 保留。共享 ST7565、键盘和上层 UI 通过 HAL 访问硬件。
 
 - TX 已接通 BK4829 NFM 路径，默认随共享构建使用 `ENABLE_TX=1`；每槽 TX Enable 默认 Off。功率读取本机原厂 PA 记录；`ENABLE_TX=0` 仍生成仅接收镜像。代码、回归和实机测量边界见 [K1 发射核对](uvk1-tx-audit.md)。
 - `drivers/py25q16/` 实现 JEDEC ID、状态、读取、写使能、4 KiB 扇区擦除（`0x20`）与按 256 B 页拆分的页编程（`0x02`）。哪些地址可写由板级决定，驱动不限制。

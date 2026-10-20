@@ -49,6 +49,8 @@ static bool decode(const uint8_t b[RECORD], uint16_t number, UserChannel *out) {
   ch.tx.enabled = tx & 1u;
   ch.tx.power = (TxPower)(tx >> 1 & 3u);
   ch.tx.shift = (TxShift)(tx >> 3 & 3u);
+  ch.tx.tail = (tx >> 5) & 1u;
+  if (tx >> 6) return false;
   ch.tx.offset_hz = get32(p + 15);
   ch.tx.split_hz = get32(p + 19);
   ch.tx.tone = get16(p + 23);
@@ -69,7 +71,7 @@ static void encode(uint8_t b[RECORD], uint16_t number, uint8_t sequence, const U
   p[10] = (uint8_t)ch->rx.mode;
   p[11] = ch->rx.squelch;
   put16(p + 12, ch->rx.rx_tone);
-  p[14] = (uint8_t)(ch->tx.enabled | ch->tx.power << 1 | ch->tx.shift << 3);
+  p[14] = (uint8_t)(ch->tx.enabled | ch->tx.power << 1 | ch->tx.shift << 3 | ch->tx.tail << 5);
   put32(p + 15, ch->tx.offset_hz);
   put32(p + 19, ch->tx.split_hz);
   put16(p + 23, ch->tx.tone);
@@ -95,7 +97,7 @@ static bool same(const UserChannel *a, const UserChannel *b) {
       a->rx.rx_tone == b->rx.rx_tone && a->tx.enabled == b->tx.enabled &&
       a->tx.power == b->tx.power && a->tx.shift == b->tx.shift &&
       a->tx.offset_hz == b->tx.offset_hz && a->tx.split_hz == b->tx.split_hz &&
-      a->tx.tone == b->tx.tone;
+      a->tx.tone == b->tx.tone && a->tx.tail == b->tx.tail;
 }
 
 bool CHANNEL_STORE_Init(void) {
