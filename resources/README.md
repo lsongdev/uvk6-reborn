@@ -3,7 +3,7 @@
 Data installed into the radio's EEPROM by `tools/resources.py`, never
 compiled into the firmware. Each resource sits in the reserved tail at the
 top of the EEPROM behind a 16-byte header (magic, length, CRC-32); see
-`src/core/resource.h`.
+[`src/store/resource.h`](../src/store/resource.h).
 
 | File | Resource | Bytes | CRC-32 |
 | --- | --- | --- | --- |
@@ -17,3 +17,7 @@ at commit `123eccc`. It is the `amrx_6_0_1_ssbrx_patch_init_0xA902` patch
 published by Vadim Afonkin; as the file's own header says, the patch is not
 part of that library's licence and should not be used commercially. Keep the
 file byte-identical so its source stays verifiable.
+
+The firmware project uses [AGPL v3](../LICENSE); this external patch is
+separate and does not inherit that license. Installation and read-back
+verification are documented in [Development](../docs/development.md#eeprom-资源与校准工具).

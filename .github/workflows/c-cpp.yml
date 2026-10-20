@@ -11,7 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  test:
+    name: Host regressions
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -22,12 +23,45 @@ jobs:
           python-version: '3.12'
       - name: Run host regression tests
         run: sh tests/run.sh
+      - name: Check UI preview generation
+        run: python3 tools/ui-preview.py --frames manual-slot-rx manual-settings --output /tmp/menu-preview.png
+
+  build:
+    name: Build ${{ matrix.variant }}
+    needs: test
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - board: uvk1
+            si4732: 0
+            variant: uvk1-bk1080
+          - board: uvk6
+            si4732: 0
+            variant: uvk6-bk1080
+          - board: uvk6
+            si4732: 1
+            variant: uvk6-si4732
+    env:
+      BOARD: ${{ matrix.board }}
+      ENABLE_SI4732: ${{ matrix.si4732 }}
+      VARIANT: ${{ matrix.variant }}
+      ENABLE_TX: 1
+      ENABLE_FC: 1
+      ENABLE_SPECTRUM: 1
+      BUILD_TYPE: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Install ARM GNU toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc-arm-none-eabi=15:13.2.rel1-2 \
-            libnewlib-arm-none-eabi=4.4.0.20231231-2
+        uses: carlosperate/arm-none-eabi-gcc-action@0edbb000a5a98e2292b051b463bff6f512547118 # v1
+        with:
+          release: '15.3.Rel1'
       - name: Install packer dependency
         run: python -m pip install crcmod
       - name: Build optional-feature variants
@@ -39,19 +73,54 @@ jobs:
         run: |
           arm-none-eabi-gcc --version | head -1
           make -B -j4 all
-          python3 tools/map_analyze.py obj/uvk6/output.map 15
-      - name: Verify artifacts
+          python3 tools/map_analyze.py "obj/$BOARD/output.map" 15
+      - name: Verify and prepare artifacts
         run: |
-          test -s bin/uvk6/firmware
-          test -s bin/uvk6/firmware.bin
-          test -s bin/uvk6/firmware.packed.bin
-          python3 -c 'from pathlib import Path; n=Path("bin/uvk6/firmware.bin").stat().st_size; assert 8 <= n <= 0xF000, f"Invalid firmware size: {n}"; print(f"Raw firmware: {n}/61440 bytes ({61440-n} free)"); print("::warning::Less than 2 KiB free in firmware Flash" if 61440-n < 2048 else "Flash headroom OK")'
-      - name: Upload raw and packed firmware
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+          import sys
+
+          sys.path.insert(0, 'tools')
+          from flash import validate_image
+
+          board, variant = os.environ['BOARD'], os.environ['VARIANT']
+          binary = Path('bin') / board
+          raw = (binary / 'firmware.bin').read_bytes()
+          validate_image(raw, board)
+          budget = 0xF000 if board == 'uvk6' else 118 * 1024
+          if budget - len(raw) < 2048:
+              print(f'::warning::{variant}: less than 2 KiB free in application Flash')
+          output = Path('dist') / variant
+          output.mkdir(parents=True)
+          files = {
+              f'{variant}.bin': binary / 'firmware.bin',
+              f'{variant}.elf': binary / 'firmware',
+              f'{variant}.map': Path('obj') / board / 'output.map',
+          }
+          if board == 'uvk6':
+              files[f'{variant}.packed.bin'] = binary / 'firmware.packed.bin'
+          for name, source in files.items():
+              assert source.stat().st_size > 0, f'Empty artifact: {source}'
+              shutil.copyfile(source, output / name)
+          metadata = {
+              'board': board, 'variant': variant, 'commit': os.environ['GITHUB_SHA'],
+              'toolchain': subprocess.check_output(['arm-none-eabi-gcc', '--version'], text=True).splitlines()[0],
+              'flags': {'ENABLE_TX': 1, 'ENABLE_FC': 1, 'ENABLE_SPECTRUM': 1,
+                        'ENABLE_SI4732': int(os.environ['ENABLE_SI4732']), 'BUILD_TYPE': 'release'},
+              'raw_bytes': len(raw), 'flash_budget': budget,
+              'sha256': {name: hashlib.sha256((output / name).read_bytes()).hexdigest() for name in files},
+          }
+          (output / 'build-info.json').write_text(json.dumps(metadata, indent=2) + '\n')
+          print(f'{variant}: {len(raw)}/{budget} bytes ({budget-len(raw)} free)')
+          PY
+      - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: uvk6-reborn-firmware
-          path: |
-            bin/uvk6/firmware
-            bin/uvk6/firmware.bin
-            bin/uvk6/firmware.packed.bin
-            obj/uvk6/output.map
+          name: uvk6-reborn-${{ matrix.variant }}
+          path: dist/${{ matrix.variant }}/
+          if-no-files-found: error

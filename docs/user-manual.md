@@ -1,29 +1,60 @@
 # 用户手册
 
-更新于 2026-10-14，按当前代码核对。本文描述当前操作；功能取舍见[设计文档](design.md)，编译和工具见[开发文档](development.md)，设备基线与存储保护见[硬件事实](hardware-uvk6.md)。代码已实现不等于实机性能已验收。
+更新于 2026-10-20，按当前代码核对。本文描述当前操作；功能取舍见[设计文档](design.md)，编译和工具见[开发文档](development.md)，设备基线与存储保护见 [UV-K6](hardware-uvk6.md) 和 [UV-K1](hardware-uvk1.md) 硬件事实。代码已实现不等于实机性能已验收。
 
-## 1. 功能与首次使用
+## 1. 刷入固件与首次使用
 
-主屏幕支持 A/B/C/D 四个独立 Slot，可启用 1–4 个，每页显示两个。每个 Slot 可以直接调频（VFO）或读取已保存频道（MR）；切换来源不会丢掉原来的 VFO 频率和频段记忆。两个及以上 Slot 自动守听，没有额外的 Dual watch 或 RX Watch 开关。只听一路时将 Slot count 设为 1。
+### 下载与选择镜像
 
-接收模式为 NFM、WFM、AM、LSB、USB。芯片由频率、模式和硬件能力共同决定，不需手动选择，没有 Auto 解调模式。默认固件包含 BK4819 NFM 发射和 FC 频率捕获，各 Slot 的 TX Enable 初始均为 Off。中文显示、NOAA、VOX 和呼叫频道快捷键尚未实现。
+先备份本机存储和原厂校准；K6 为 512 KiB EEPROM，K1 为 2 MiB SPI Flash。读取命令与断点续传见[开发文档](development.md#只读备份与诊断)。不要用另一台机器的校准覆盖本机。
 
-### 刷入与初始化
+在 GitHub [Actions → Firmware build](https://github.com/lsongdev/uvk6-reborn/actions/workflows/c-cpp.yml) 打开一个成功的运行，从 Artifacts 下载匹配硬件的压缩包并解压：
 
-1. 编程线连接电脑和设备，关闭电源，按住 PTT 开机进入 Bootloader。
-2. 使用[刷机命令](development.md#2-刷机与恢复)写入固件。刷机不会自动初始化 EEPROM。
-3. 有有效 UVR2 格式 9 配置时恢复已保存状态；没有有效配置时显示 No UVR2 config，写入保持锁定。
-4. 初始化前备份原 EEPROM。按 0 进入 Initialize UVR2?，再按 1 确认；EXIT 取消。初始化只写配置双槽，成功后重启。
+| 硬件 | Artifact | 使用本项目脚本刷入的文件 |
+| --- | --- | --- |
+| UV-K1 MiniKong（BK4829＋BK1080） | `uvk6-reborn-uvk1-bk1080` | `uvk1-bk1080.bin` |
+| UV-K6（BK4819＋BK1080） | `uvk6-reborn-uvk6-bk1080` | `uvk6-bk1080.bin` |
+| UV-K6（BK4819＋SI4732 改装） | `uvk6-reborn-uvk6-si4732` | `uvk6-si4732.bin` |
 
-旧固件和旧版 UVR2 配置不读取、不迁移。初始化不会清空已保存的当前格式频道；未知配置区可能含旧固件数据，确认初始化会覆盖该区域。开机检测到 EXIT 也会进入初始化页面。Cannot initialize 或 Write/verify failed 表示初始化未成功，不能绕过进入正常接收。
+K1／K6 镜像不可混用；SI4732 版本要求实际安装改装板。K6 包内还有 `.packed.bin`，本项目刷机脚本只接受表中的 raw `.bin`；K1 不生成 packed。`.elf`／`.map` 用于调试，`build-info.json` 记录版本、开关、工具链与 SHA-256，不刷入设备。Actions 构建是开发快照，下载通常需要登录 GitHub；功能验证状态以硬件文档为准。
 
-### 快速开始
+### 刷机步骤
+
+1. 安装 Python 3，下载或克隆本仓库取得 `tools/flash.py`；仅运行刷机脚本不需要 ARM 编译器或额外 Python 包。
+2. 接上 K 头 UART 编程线，记下电脑串口路径（macOS 可用 `ls /dev/cu.*`，Linux 通常为 `/dev/ttyUSB0`）。**K1 USB-C 应用 CDC 不能用于 Bootloader 刷机。**
+3. 关闭对讲机，按住 PTT 开机进入 Bootloader，运行对应命令；替换实际端口和已解压固件的路径。
+
+```sh
+# UV-K6 原装广播芯片
+python3 tools/flash.py --board uvk6 --port /dev/cu.usbserial-1420 --firmware uvk6-bk1080.bin
+
+# UV-K6 SI4732 改装
+python3 tools/flash.py --board uvk6 --port /dev/cu.usbserial-1420 --firmware uvk6-si4732.bin
+
+# UV-K1 MiniKong
+python3 tools/flash.py --board uvk1 --port /dev/cu.usbserial-1420 --firmware uvk1-bk1080.bin
+```
+
+4. 工具最多等待 45 s 握手，匹配板型后逐块写入；完成后关机，松开 PTT 正常开机。K6 要求 3.x Bootloader，K1 要求 7.x；不匹配会拒绝。全部块 ACK 表示 Bootloader 已应答，不等于 Flash 回读校验。
+5. 中断时重新按住 PTT 开机，完整重刷。脚本仅写 MCU 应用，不改外部存储与校准；更多限制和恢复方法见[开发文档](development.md#2-刷机与恢复)。
+
+### 首次初始化
+
+有有效 UVR2 格式 9 时恢复已有配置；没有时显示 No UVR2 config，写入保持锁定。确认已经备份后，按 0 进入 Initialize UVR2?，再按 1 确认，EXIT 取消；初始化只写配置双槽，成功后重启。开机检测到 EXIT 也会进入初始化页。
+
+旧固件和旧版 UVR2 配置不读取、不迁移。初始化不会清空当前格式频道；确认初始化会覆盖配置区的旧内容。Cannot initialize／Write/verify failed 表示未成功。K1 若 SPI Flash 受芯片块保护，则回退 RAM 配置，关机丢失，不能当成已保存。
+
+### 开始收听
+
+主屏幕最多有 A–D 四个 Slot，可启用 1–4 个，每页两个；直接调频为 VFO，存储频道为 MR。两个以上槽按兼容路径自动守听；只听一路把 Slot count 设为 1。
 
 - 输入 `438*500`，按 MENU，调到 438.500 MHz；* 是小数点。
 - 侧键 1 或 F→1 切频段，侧键 2 或 F→0 切模式。
 - K6 上键加频、下键减频；K1 左键减频、右键加频，按住连续调节。
 - 短按 MENU 打开当前 Slot 参数，长按 MENU 打开全局设置。
-- 修改成功后通常延迟约 1.5 秒保存，连续修改顺延。关机前留出保存时间；About → Save status 可查看或立即保存。
+- 最后一次修改约 1.5 s 后自动保存；关机前留出时间，About → Save status 可查看或立即保存。
+
+默认包含 NFM TX、FC、频谱与独立亚音识别，每槽 TX Enable 初始 Off。SSB、RDS 等依赖 SI4732；中文、NOAA、VOX 和呼叫频道快捷键尚未实现。
 
 ## 2. 主屏幕与按键
 
@@ -81,7 +112,82 @@
 
 锁键同时锁住两个侧键。默认 PTT 不受锁键影响；Lock PTT 为 On 时一并锁住。PTT 松开优先处理，不会被锁键吞掉。输入、搜台、捕获和发射期间，各自界面独占按键，普通调谐快捷键不执行。
 
-## 3. 频段、模式与频率输入
+## 3. Slot 参数与频段预设
+
+![Slot 菜单：左为 RX 参数，右为滚动到 TX tail 的发射参数](images/manual-slot-menu.png)
+
+左图选中 RX Mode，右图选中 TX tail；中间项目通过方向键滚动。截图使用实际 Slot 菜单绘制代码和示例数据，不是实机照片。
+
+Slot 菜单 ▲／▼选择，* 或 MENU 增加／执行，F（键帽副标 #）减少，EXIT 返回。RX Mode 同样按方向循环。参数成功修改后立即生效，退出不撤销；MR 参数只读，需切回 VFO 修改。
+
+| 顺序／项目 | 含义 |
+| --- | --- |
+| RX Mode、RX Step、RX Bandwidth | 模式、步进、带宽，只提供可用组合；WFM 为 Fixed |
+| RX Squelch | 0–10 |
+| RX Tone | Off、50 个 CTCSS、104 个 DCS 正／反码；仅 NFM 可编辑 |
+| RX Tone Scan | 在当前 Slot 的 NFM 频率上识别未知亚音，独立于 FC |
+| TX Enable | 当前 Slot 发射意图，默认 Off |
+| TX Power | Low／Medium／High，按对应校准档执行 |
+| TX Shift | Off 同频、+／- 中继频差、Split 独立发射频率 |
+| TX Offset／TX Freq | +／- 时编辑频差，Split 时编辑发射频率；Off 时 --、不可编辑 |
+| TX Tone | 独立发射 CTCSS／DCS，Off 关闭 |
+| TX tail | 当前 Slot 的发射结束信令，Off／On，默认 Off；随频道保存 |
+| Spectrum | 打开频谱（见第 8 章），`ENABLE_SPECTRUM=0` 时没有此项 |
+| Save as channel | 选择编号、确认覆盖、输入名称并保存 |
+| Reset to presets | 恢复当前频段 RX 预设，频率和 TX 设置不变 |
+
+RX Tone 与静噪条件同时满足才开音频，SQ0 也不绕过亚音。CTCSS 如 67.0 Hz，DCS 如 D023N／D023I。
+
+RX Tone Scan 固定当前 Slot 的频率，扫描期间静音、暂停多槽守听并屏蔽发射。让对方持续发射，三次独立采集一致后显示结果；MENU 只应用 RX Tone，频率与 TX 设置保持原值，EXIT 取消并恢复原接收。MR 可以查看，不能直接应用。Searching 不等于“没有亚音”。DCS 显示等效的标准正码并提示 Equivalent DCS code：例如 D023I 的循环码字等效于 D047N，显示不保证还原对方菜单里的原始标签。FC 操作和结果不受此功能影响。
+
+TX Offset／TX Freq 在当前行以 MHz 编辑，首个数字替换草稿。0 清除值；Split 未设置时跟随 RX。频差上限 100 MHz，Split 要求 BK 支持范围和 10 Hz 栅格；PTT 另按实际 TX Hz 校验板级范围。修改 TX 不重调 RX、不自动开启 TX Enable。
+
+TX tail 开启且 TX Tone 非 Off 时，正常松开 PTT 后静音麦克风并继续发射约 200 ms：CTCSS 使用 180° 相移，DCS 正／反码使用 134.4 Hz 结束音，随后关闭 PA、恢复接收。它帮助兼容的对方电台提前静音，不是本机接收尾音消除；TX Tone=Off 时不增加延迟。尾音期间仍显示 TX；此时重新按 PTT 不会自动续发，需松开后重新按下。超时、低压、故障或离开主界面取消发射时直接关 PA，不延迟发送尾音。
+
+### 频段预设编辑器
+
+Settings → Bands 中 ▲／▼选择本机可接收的频段（最多九个），MENU 编辑 Mode、Step、BW、SQ、RX Tone。Use current 复制选中 Slot 的当前 VFO 参数（仅当前频段），Reset to defaults 恢复内置草稿，均须再 Save。EXIT 丢弃草稿。
+
+保存先校验并写入，失败保留旧预设和可重试草稿。成功显示 Saved，**下次进入该频段时应用**，不立即改当前接收。频段名称、范围和快捷顺序暂不可编辑。
+
+## 4. 全局设置与保存
+
+![全局菜单：左为 Settings 根菜单，右为 Display 设置](images/manual-settings.png)
+
+左图的 > 表示还有下层菜单；右图显示项目名、右侧当前值与反白选中行。根菜单向下还有 Channels 和 About。
+
+![接收与发射设置：左为 Receive，右为 Transmit](images/manual-rx-tx-settings.png)
+
+以上由实际菜单与偏好格式化代码生成，示例采用 K6 SI4732 构建；K1／BK1080 构建不显示 SI4732 idle。
+
+长按 MENU；▲／▼导航，MENU 进入／执行，* 增加，F（#）减少，EXIT 返回。普通偏好即时改变，不因 EXIT 撤销；校准和恢复偏好保存成功后提交。
+
+| 菜单 | 项目与说明 |
+| --- | --- |
+| Display | Contrast（-8～+7）、Backlight time（Off、5/10/20/60/120 秒、Always）、Brightness／Idle brightness（0–15）、Backlight on RX（Off／Timed／Receiving） |
+| Receive | Slot count（1–4）、SQL open delay（Level 0–7／Auto）、SQL close delay（Level 0–3／Auto）、SI4732 idle（Mute／Power off，仅 SI4732 构建）、Filter split（240／280 MHz） |
+| Transmit | Time limit（30/60/120/180/300/600 秒）、Block if busy、Mic gain（0–31，默认 16）、Lock PTT（锁键时是否同时屏蔽 PTT） |
+| Battery | Show charge（Icon／Percent／Voltage）、Charge curve（1600／2200／3500 估算曲线）、Cal voltage（输入实测 5.00–8.60 V） |
+| Bands／Channels | 独立频段预设／频道列表、改名和删除 |
+| About | Firmware、Storage（容量）、Config、FM chip（SI4732／BK1080）、SSB patch（仅 SI4732 构建）、TX status、Save status、Reset settings |
+
+Brightness 降低时限制 Idle brightness 不高于它；Backlight time 的 Off／Always 优先于接收触发。电池曲线不是容量测量。SQL 时序只显示档位，不承诺毫秒数；Auto（默认）采用接收芯片的推荐值：K6 BK4819 为 1／1，K1 BK4829 为 5／3（原厂值）。SI idle 在下次离开 SI 时使用；滤波和 SQL 工程参数离开设置时重新应用，失败回退。设置、文本页面期间接收持续。
+
+Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留原值。Reset settings 需 MENU 确认，恢复显示和 TX 保护等普通偏好，保留当前键盘锁、电池校准／曲线、RX 工程参数、Mic／Deviation、Slot 和频道，不是整机初始化。
+
+普通修改在最后变更后约 1500 ms 合并写入，离开设置也尝试提交；失败约每 5 秒重试。About → Save status 显示 Read only／Saved／Pending／Failed／RAM only，MENU 立即保存或重试。Pending 时掉电可能丢失最近修改。
+
+## 5. 接收范围、频段与频率输入
+
+### 收发范围一览
+
+| 构建 | NFM 接收／NFM TX 检查范围 | AM 接收 | 广播 WFM | LSB／USB |
+| --- | --- | --- | --- | --- |
+| K6＋SI4732 | 18–660／840–1300 MHz | SI：0.150–30 MHz；其余为 BK 范围 | 64–108 MHz | 0.150–30 MHz，须 SSB 补丁 |
+| K6＋BK1080 | 18–660／840–1300 MHz | BK：18–660／840–1300 MHz | 64–108 MHz | 不支持 |
+| K1＋BK1080 | 18–660／760–1300 MHz | BK：18–660／760–1300 MHz | 64–108 MHz | 不支持 |
+
+表内端点均包含，是当前软件允许规划的范围，不保证整机在全部频率有合格灵敏度、功率或杂散。K1 BK4829 手册标称 18–580／760–1160 MHz，580–660 和 1160–1300 MHz 为未实测扩展。**只有 NFM 可申请 TX，且须 TX Enable、有效本机校准、供电和 PTT 保护全部满足**；WFM、AM、SSB 仅接收。TX Offset／Split 按计算出的 TX 频率校验，详见[发射说明](#9-发射)。
 
 快捷频段按 LW→MW→SW→FM Radio→Airband→2m→70cm 循环。VHF、UHF 是匹配兜底，不加入快捷循环。重叠时更窄的频段优先。
 
@@ -108,7 +214,7 @@
 | AM | ≤30 MHz 且有 SI4732 时优先 SI；其余 BK 支持范围用 BK AM 实现。K1 的 BK4829 AM 采用原厂寄存器值，6k／12k 带宽使用原厂 AM 滤波预设，26k 使用宽带预设 |
 | LSB／USB | ≤30 MHz 的 SI4732；须安装全量 CRC 校验通过的 EEPROM 补丁 |
 
-输入允许 150 kHz–1340 MHz，仍须通过模式和能力校验。频段和范围按本机芯片提供：切频段和 Bands 列表跳过完全收不到的频段，进入频段时记忆频率若不可接收，移到该频段内最近的可接收频率，搜台也只扫可接收部分。K1 没有 SI4732，BK4829 只覆盖 18 MHz 以上，因此没有 LW、MW，SW 从 18 MHz 开始；直接输入 18 MHz 以下的频率提示 Out of range。芯片标称范围与整机效果见[硬件事实](hardware-uvk6.md#4-接收芯片与能力边界)。
+输入允许 150 kHz–1340 MHz，仍须通过模式和能力校验。频段和范围按本机芯片提供：切频段和 Bands 列表跳过完全收不到的频段，进入频段时记忆频率若不可接收，移到该频段内最近的可接收频率，搜台也只扫可接收部分。K1 没有 SI4732，BK4829 只覆盖 18 MHz 以上，因此没有 LW、MW，SW 从 18 MHz 开始；直接输入 18 MHz 以下的频率提示 Out of range。芯片标称范围与整机效果分别见 [K6](hardware-uvk6.md#4-接收芯片与能力边界)、[K1](hardware-uvk1.md#2-mcu-与存储参考固件源码)。
 
 ### 频率输入
 
@@ -120,41 +226,7 @@
 
 `0*401` 是 401 kHz，`95*925` 是 95.925 MHz，`438*500` 是 438.500 MHz。非法值保留草稿并显示 Invalid value。不能精确表示目标时，Apply 页展示实际频率，MENU 应用、EXIT 取消。无接收路径或调谐失败时提示原因，不保存失败目标。
 
-## 4. Slot 参数与频段预设
-
-Slot 菜单 ▲／▼选择，* 或 MENU 增加／执行，F（键帽副标 #）减少，EXIT 返回。RX Mode 同样按方向循环。参数成功修改后立即生效，退出不撤销；MR 参数只读，需切回 VFO 修改。
-
-| 顺序／项目 | 含义 |
-| --- | --- |
-| RX Mode、RX Step、RX Bandwidth | 模式、步进、带宽，只提供可用组合；WFM 为 Fixed |
-| RX Squelch | 0–10 |
-| RX Tone | Off、50 个 CTCSS、104 个 DCS 正／反码；仅 NFM 可编辑 |
-| RX Tone Scan | 在当前 Slot 的 NFM 频率上识别未知亚音，独立于 FC |
-| TX Enable | 当前 Slot 发射意图，默认 Off |
-| TX Power | Low／Medium／High，按对应校准档执行 |
-| TX Shift | Off 同频、+／- 中继频差、Split 独立发射频率 |
-| TX Offset／TX Freq | +／- 时编辑频差，Split 时编辑发射频率；Off 时 --、不可编辑 |
-| TX Tone | 独立发射 CTCSS／DCS，Off 关闭 |
-| TX tail | 当前 Slot 的发射结束信令，Off／On，默认 Off；随频道保存 |
-| Spectrum | 打开频谱（见第 7 章），`ENABLE_SPECTRUM=0` 时没有此项 |
-| Save as channel | 选择编号、确认覆盖、输入名称并保存 |
-| Reset to presets | 恢复当前频段 RX 预设，频率和 TX 设置不变 |
-
-RX Tone 与静噪条件同时满足才开音频，SQ0 也不绕过亚音。CTCSS 如 67.0 Hz，DCS 如 D023N／D023I。
-
-RX Tone Scan 固定当前 Slot 的频率，扫描期间静音、暂停多槽守听并屏蔽发射。让对方持续发射，三次独立采集一致后显示结果；MENU 只应用 RX Tone，频率与 TX 设置保持原值，EXIT 取消并恢复原接收。MR 可以查看，不能直接应用。Searching 不等于“没有亚音”。DCS 显示等效的标准正码并提示 Equivalent DCS code：例如 D023I 的循环码字等效于 D047N，显示不保证还原对方菜单里的原始标签。FC 操作和结果不受此功能影响。
-
-TX Offset／TX Freq 在当前行以 MHz 编辑，首个数字替换草稿。0 清除值；Split 未设置时跟随 RX。频差上限 100 MHz，Split 要求 BK 支持范围和 10 Hz 栅格；PTT 另按实际 TX Hz 校验板级范围。修改 TX 不重调 RX、不自动开启 TX Enable。
-
-TX tail 开启且 TX Tone 非 Off 时，正常松开 PTT 后静音麦克风并继续发射约 200 ms：CTCSS 使用 180° 相移，DCS 正／反码使用 134.4 Hz 结束音，随后关闭 PA、恢复接收。它帮助兼容的对方电台提前静音，不是本机接收尾音消除；TX Tone=Off 时不增加延迟。尾音期间仍显示 TX；此时重新按 PTT 不会自动续发，需松开后重新按下。超时、低压、故障或离开主界面取消发射时直接关 PA，不延迟发送尾音。
-
-### 频段预设编辑器
-
-Settings → Bands 中 ▲／▼选择九个频段，MENU 编辑 Mode、Step、BW、SQ、RX Tone。Use current 复制选中 Slot 的当前 VFO 参数（仅当前频段），Reset to defaults 恢复内置草稿，均须再 Save。EXIT 丢弃草稿。
-
-保存先校验并写入，失败保留旧预设和可重试草稿。成功显示 Saved，**下次进入该频段时应用**，不立即改当前接收。频段名称、范围和快捷顺序暂不可编辑。
-
-## 5. 频道保存、MR 与名称编辑
+## 6. 频道保存、MR 与名称编辑
 
 频道固定编号 1–200，各自保存 RX、完整 TX 设置和最多 16 个 ASCII 字符名称。编号不因删除其他频道而移动，当前不显示中文。
 
@@ -168,13 +240,13 @@ Settings → Channels 浏览已保存频道，跳过空号、不循环；MENU �
 
 先按 2–9 选字符组，再按屏幕对应数字选具体字符。1 输入空格，F 切换大小写，* 选符号组，0 切换数字／符号输入；数字模式按数字直接插入。▲／▼右／左移动光标，EXIT 删除或取消字符组，长按 EXIT 清空，光标在起点且没有选择字符组时 EXIT 退出；MENU 接受名称。
 
-## 6. 多路守听与回话
+## 7. 多路守听与回话
 
 Slot count 为 2–4 时自动守听全部已启用 Slot；减少数量保留隐藏参数，隐藏当前项时回到 A。F→2 只切操作对象，后台接收不翻页、不移动箭头。
 
 ![主屏幕活动：左为 B 守听命中，右为 B 发射](images/manual-activity.png)
 
-左图箭头仍在 A，但 B 的 RX 与阶梯信号亮起，顶部 DW B 表示正在播放 B；A 广播暂时静音，左侧改为 STEP。右图已选中 B 并按 PTT 发射，B 显示 TX／MID，即 Medium 功率档；松键后恢复接收。此时 DW - 表示没有正在播放的接收音频，TX 以卡片标识为准。发射条件见[发射说明](#8-发射)，功率档不代表实测瓦数。
+左图箭头仍在 A，但 B 的 RX 与阶梯信号亮起，顶部 DW B 表示正在播放 B；A 广播暂时静音，左侧改为 STEP。右图已选中 B 并按 PTT 发射，B 显示 TX／MID，即 Medium 功率档；松键后恢复接收。此时 DW - 表示没有正在播放的接收音频，TX 以卡片标识为准。发射条件见[发射说明](#9-发射)，功率档不代表实测瓦数。
 
 - **常驻源**：SI4732 的 WFM／AM／LSB／USB 或 BK1080 广播，只播放一路；选中的优先，否则第一个。选中 BK SQ0 时独占连续收听，其他槽暂停；未选中的 BK SQ0 不参与守候。
 - **事件源**：SQ 大于 0 的 BK 方案，平时轮流检查；确认信号后占用扬声器，广播暂时静音。
@@ -183,15 +255,15 @@ Slot count 为 2–4 时自动守听全部已启用 Slot；减少数量保留隐
 
 事件源共用 BK，检查一次约 200 ms，频道越多发现越慢，短呼叫可能漏掉。SI 常驻源不被 BK 轮询重新调谐；SSB patch 也不会因 BK 音频接管而重新加载。选中 BK SQ0 时不会切去其他频率检查，保证连续收听。K1 的 FM 和对讲机共享前端：选 FM 时暂停全部 BK 槽；选 BK 时暂停 FM，其余 BK 事件槽仍可守候。这是预期行为，状态栏不显示提示；切换选中 Slot 即可收听被暂停的一方。切槽会实际停用旧路径并激活新路径。多个广播或短波 Slot 不能让同一颗 SI 同时接收多个台，只保留选中的常驻源，否则保留第一路。重复方案去重；不足两个独立来源时不守听，只播放选中的 Slot，也不显示提示。例如 A、B 都是 FM 广播：只播放选中的那个台，切到另一个 Slot 才换台；A 为 7.074 MHz USB、B 为 438.500 MHz NFM 时，SI 持续接收 A，BK 守听 B，收到 B 后切换音频，结束后恢复 A。
 
-翻菜单、输入草稿、确认页和频道保存不暂停守听。实际调谐、切 Slot／来源、改 RX、Seek、PTT 会暂停并恢复相应方案，约 2 秒后继续。FC 单独借用 BK，广播可继续播放，但 FC 期间暂停 RDS 轮询。
+翻菜单、输入草稿、确认页和频道保存不暂停守听。实际调谐、切 Slot／来源、改 RX、Seek、PTT 会暂停并恢复相应方案，约 2 秒后继续。FC 单独借用 BK；K6 独立 SI 音频可继续，K1 必须暂停 FM；FC 期间暂停 RDS 轮询。
 
 **PTT 回话**：事件正在出声或讲完后的 2 秒内，PTT 使用该事件 Slot 的 TX 设置回复；其条件不允许发射时拒绝，不改发其他 Slot。其他时候发射到选中项。回话不移动箭头，松键后停在该频道接收，随后恢复守听。
 
-## 7. 广播文字、搜台与频率捕获
+## 8. 广播文字、搜台与频率捕获
 
 ### RDS
 
-仅 SI4732 WFM 读取 RDS，电台须实际发送。支持 PI、8 字符 PS、2A／2B RadioText。PS 用作正文名称；RadioText 改变后占黑条 10 秒，随后恢复频段和频率，重复同一段不续时。15 秒无有效同步数据后过期。SI 被 BK 音频压掉时仍解析 RDS；缓存按 Slot 和频率隔离，不写 EEPROM。扩展字符显示 ?，没有 RT+、时钟或 AF 换台。
+仅 SI4732 WFM 读取 RDS，电台须实际发送。支持 PI、8 字符 PS、2A／2B RadioText。PS 用作正文名称；RadioText 改变后占黑条 10 秒，随后恢复频段和频率，重复同一段不续时。15 秒无有效同步数据后过期。SI 被 BK 音频压掉时仍解析 RDS；缓存按 Slot 和频率隔离，不写 EEPROM。扩展字符显示 ?，支持 4A 电台时钟（CT），用于状态栏时间；没有 RT+ 或 AF 自动换台。
 
 ### 向前 Seek
 
@@ -218,32 +290,13 @@ Slot 菜单 → Spectrum。上方是当前 Slot 的卡片，显示光标处的�
 
 扫描使用当前板的 BK4819／BK4829，范围与本板 NFM 调谐范围一致，范围外的点留空；固定 12 kHz 滤波、自动增益。期间静音、暂停守听和 RDS，退出后恢复原接收，约 2 秒后继续守听。每点约 2 ms，一轮约 0.3 秒；稳定时间与读数准确度须实测。
 
-## 8. 发射
+## 9. 发射
 
-默认构建开放 K6 BK4819／K1 BK4829 NFM TX，TX Enable 为 On 后才可申请；每槽默认 Off。不另设 TX 白名单；K6 调谐范围为 **18–660／840–1300 MHz**，K1 为 **18–660／760–1300 MHz**，均包含端点，实际 TX Hz 由 Shift／Offset／Split 计算。扩展频率仍使用本机原厂 PA 表，缺有效数据时提示 TX uncalibrated；芯片标称与扩展范围的区别见[发射范围](tx-frequency-range.md)。WFM、AM、LSB、USB 不自动转为 NFM 发射。K1 使用本机 SPI Flash 中的原厂 PA 校准。K1 发射期间暂停全部接收路径，松键后恢复对讲接收和后续守听。
+默认构建开放 K6 BK4819／K1 BK4829 NFM TX，TX Enable 为 On 后才可申请；每槽默认 Off。不另设 TX 白名单；K6 调谐范围为 **18–660／840–1300 MHz**，K1 为 **18–660／760–1300 MHz**，均包含端点，实际 TX Hz 由 Shift／Offset／Split 计算。扩展频率仍使用本机原厂 PA 表，缺有效数据时提示 TX uncalibrated；芯片标称与扩展范围的区别见[范围与校准规则](design.md#板级范围与-pa-数据)。WFM、AM、LSB、USB 不自动转为 NFM 发射。K1 使用本机 SPI Flash 中的原厂 PA 校准。K1 发射期间暂停全部接收路径，松键后恢复对讲接收和后续守听。
 
 还检查功率校准、供电（当前 6.00–9.00 V）、锁键、忙信道和 TOT；默认 TOT 120 秒、Block if busy On。缺某档校准则拒绝该档。松键、TOT 或供电异常先关 PA，再恢复 RX；TOT 后按住不自动重发，需松键。Low／Medium／High 是校准档，不代表已测瓦数。
 
 本机 RF 输出、频偏、杂散及最大关断延迟尚需仪表验收。首次测试使用假负载，只在许可频率发射。开发时可构建仅接收固件，见[编译选项](development.md#1-环境与构建)。
-
-## 9. 全局设置与保存
-
-长按 MENU；▲／▼导航，MENU 进入／执行，* 增加，F（#）减少，EXIT 返回。普通偏好即时改变，不因 EXIT 撤销；校准和恢复偏好保存成功后提交。
-
-| 菜单 | 项目与说明 |
-| --- | --- |
-| Display | Contrast（-8～+7）、Backlight time（Off、5/10/20/60/120 秒、Always）、Brightness／Idle brightness（0–15）、Backlight on RX（Off／Timed／Receiving） |
-| Receive | Slot count（1–4）、SQL open delay（Level 0–7／Auto）、SQL close delay（Level 0–3／Auto）、SI4732 idle（Mute／Power off，仅 SI4732 构建）、Filter split（240／280 MHz） |
-| Transmit | Time limit（30/60/120/180/300/600 秒）、Block if busy、Mic gain（0–31，默认 16）、Lock PTT（锁键时是否同时屏蔽 PTT） |
-| Battery | Show charge（Icon／Percent／Voltage）、Charge curve（1600／2200／3500 估算曲线）、Cal voltage（输入实测 5.00–8.60 V） |
-| Bands／Channels | 独立频段预设／频道列表、改名和删除 |
-| About | Firmware、Storage（容量）、Config、FM chip（SI4732／BK1080）、SSB patch（仅 SI4732 构建）、TX status、Save status、Reset settings |
-
-Brightness 降低时限制 Idle brightness 不高于它；Backlight time 的 Off／Always 优先于接收触发。电池曲线不是容量测量。SQL 时序只显示档位，不承诺毫秒数；Auto（默认）采用接收芯片的推荐值：K6 BK4819 为 1／1，K1 BK4829 为 5／3（原厂值）。SI idle 在下次离开 SI 时使用；滤波和 SQL 工程参数离开设置时重新应用，失败回退。设置、文本页面期间接收持续。
-
-Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留原值。Reset settings 需 MENU 确认，恢复显示和 TX 保护等普通偏好，保留当前键盘锁、电池校准／曲线、RX 工程参数、Mic／Deviation、Slot 和频道，不是整机初始化。
-
-普通修改在最后变更后约 1500 ms 合并写入，离开设置也尝试提交；失败约每 5 秒重试。About → Save status 显示 Read only／Saved／Pending／Failed／RAM only，MENU 立即保存或重试。Pending 时掉电可能丢失最近修改。
 
 ## 10. 提示与排查
 
@@ -266,3 +319,10 @@ Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留�
 | TX error／TX timeout | 准备失败／到达时限，先松开 PTT |
 
 广播选择 WFM，438.5 MHz 对讲选择 NFM。调谐成功不证明音频或天线链路正常，仍需检查音量、静噪和硬件。实机验收项目集中在[开发文档](development.md#7-实机验收与未完成事项)。
+
+### 已知限制
+
+- K1 没有 SI4732，因此没有 LW／MW、18 MHz 以下接收、SSB 或 RDS；AM 已实现，尚待本机听音验证。
+- RX Tone Scan 和 TX tail 已有双板代码与主机验证，识别速度、弱信号表现、尾音互通仍待实机确认。本机接收尾音静音尚未实现。
+- K1 BK1080 广播仍可能听到极轻的周期声；降低读取频率后已减轻。K6 在 `aa4a112` 默认构建的多个广播台听音中未再听到周期敲击声；调频后保存图标出现时仍有一次短暂断音和 LED 闪动，原因未定位。
+- 不同板的完整测量状态见硬件文档；收听正常、刷机 ACK 和仪器 RF 验收是不同结论。

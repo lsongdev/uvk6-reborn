@@ -34,6 +34,7 @@ static void manualBase(const char *title, bool shortcut) {
   PrintSmall(0,4,title);
   if (shortcut) PrintSmallEx(108,4,POS_R,C_FILL,"F");
 }
+void UI_PreviewMenus(void (*snapshot)(const char *));
 int main(int argc, char **argv) {
   if (argc != 2) return 1;
   outputDirectory = argv[1];
@@ -174,5 +175,6 @@ int main(int argc, char **argv) {
   v.activity=UI_RADIO_CARD_IDLE;v.signal_valid=false;
   manualBase("Spectrum",false);
   UI_RadioCardRender(8,&v);UI_SpectrumRender(36,28,&s);snapshot("spectrum-out.pbm");
+  UI_PreviewMenus(snapshot);
   return 0;
 }

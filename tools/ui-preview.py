@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the firmware's real drawing code and export a single/dual VFO PNG."""
+"""Compile the firmware's real drawing code and export radio and menu previews."""
 import argparse
 import os
 from pathlib import Path
@@ -50,19 +50,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'docs/images/vfo-states.png')
     parser.add_argument('--scale', type=int, choices=range(1, 13), default=4)
-    parser.add_argument('--frames', nargs=2, choices=['error-short', 'error-long', 'multi-ab', 'multi-cd', 'watch-probe', 'watch-rx', 'ab-a', 'ab-b', 'single', 'dual', 'plain', 'max', 'maxtext', 'lw', 'rds', 'frequency', 'name', 'tuned', 'channel', 'spectrum', 'spectrum-edge', 'spectrum-out', 'tx', 'seek', 'manual-frequency', 'manual-name', 'manual-watch', 'manual-tx', 'manual-input', 'manual-channel'],
+    parser.add_argument('--frames', nargs=2, choices=['error-short', 'error-long', 'multi-ab', 'multi-cd', 'watch-probe', 'watch-rx', 'ab-a', 'ab-b', 'single', 'dual', 'plain', 'max', 'maxtext', 'lw', 'rds', 'frequency', 'name', 'tuned', 'channel', 'spectrum', 'spectrum-edge', 'spectrum-out', 'tx', 'seek', 'manual-frequency', 'manual-name', 'manual-watch', 'manual-tx', 'manual-input', 'manual-channel', 'manual-slot-rx', 'manual-slot-tx', 'manual-settings', 'manual-display', 'manual-receive', 'manual-transmit'],
                         default=['frequency', 'name'], help='left and right preview scenarios')
     args = parser.parse_args()
     try:
         with tempfile.TemporaryDirectory(prefix='uvk6-ui-preview-') as temp:
             directory = Path(temp)
             binary = directory / 'preview'
-            sources = ['tools/ui-preview.c', 'src/ui/graphics.c', 'src/ui/radio-card.c',
+            sources = ['tools/ui-preview.c', 'tools/ui-menu-preview.c',
+                       'src/ui/screens/settings.c', 'src/ui/screens/slot-menu.c',
+                       'src/ui/screens/preferences.c', 'src/store/preferences.c',
+                       'src/ui/menu.c', 'src/ui/numnav.c', 'src/ui/number-input.c',
+                       'src/core/measurements.c', 'src/core/dcs.c', 'src/core/tx-model.c',
+                       'src/core/radio-state.c', 'src/ui/graphics.c', 'src/ui/radio-card.c',
                        'src/ui/frequency.c', 'src/ui/spectrum.c', 'src/core/spectrum.c',
                        'src/core/rds.c',
                        'src/ui/signal.c', 'src/core/radio-model.c', 'src/core/text.c']
             command = shlex.split(os.environ.get('CC', 'cc')) + [
-                '-Isrc', '-std=c2x', '-ffunction-sections', '-fdata-sections',
+                '-Isrc', '-std=c2x', '-DUVK6_ENABLE_SI4732=1',
+                '-DUVK6_ENABLE_SPECTRUM=1', '-ffunction-sections', '-fdata-sections',
                 '-Wno-incompatible-pointer-types',
                 '-Isrc/external/CMSIS_5/CMSIS/Core/Include',
                 '-Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include',
