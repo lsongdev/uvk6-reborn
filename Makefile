@@ -101,10 +101,6 @@ ENABLE_TX ?= 1
 # Exclusive auxiliary receiver selection: 1 = SI4732, 0 = BK1080.
 # No runtime chip-type detection; each board.mk sets its fitted chip.
 ENABLE_SI4732 ?= 0
-# F→4 frequency capture (FC). ENABLE_FC=0 drops it and frees about 1.3 KiB.
-ENABLE_FC ?= 1
-# Slot menu → Spectrum: BK4819 sweep around the slot. ENABLE_SPECTRUM=0 drops it.
-ENABLE_SPECTRUM ?= 1
 
 # Debug/Release specific flags
 DEBUG_FLAGS   := -g3 -DDEBUG -Og
@@ -115,9 +111,7 @@ DEFINES  := -DGIT_HASH=\"$(GIT_HASH)\" \
             -DTIME_STAMP=\"$(BUILD_TIME)\" \
             $(MCU_DEFINES) \
             -DUVK6_ENABLE_TX=$(ENABLE_TX) \
-            -DUVK6_ENABLE_SI4732=$(ENABLE_SI4732) \
-            -DUVK6_ENABLE_FC=$(ENABLE_FC) \
-            -DUVK6_ENABLE_SPECTRUM=$(ENABLE_SPECTRUM)
+            -DUVK6_ENABLE_SI4732=$(ENABLE_SI4732)
 
 # Include paths
 INC_DIRS := -I./src \
@@ -208,7 +202,6 @@ $(TARGET): $(OBJS) | $(BIN_DIR)
 # Feature switches select code at compile time. Objects built with other
 # switches are dropped: make 3.81 timestamps are too coarse to rely on.
 BUILD_FLAGS := ENABLE_TX=$(ENABLE_TX) ENABLE_SI4732=$(ENABLE_SI4732) \
-               ENABLE_FC=$(ENABLE_FC) ENABLE_SPECTRUM=$(ENABLE_SPECTRUM) \
                BUILD_TYPE=$(BUILD_TYPE)
 FLAGS_FILE := $(OBJ_DIR)/build-flags
 ifneq ($(BUILD_FLAGS),$(shell cat $(FLAGS_FILE) 2>/dev/null))

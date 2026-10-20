@@ -132,7 +132,7 @@ Slot 菜单 ▲／▼选择，* 或 MENU 增加／执行，F（键帽副标 #）
 | TX Offset／TX Freq | +／- 时编辑频差，Split 时编辑发射频率；Off 时 --、不可编辑 |
 | TX Tone | 独立发射 CTCSS／DCS，Off 关闭 |
 | TX tail | 当前 Slot 的发射结束信令，Off／On，默认 Off；随频道保存 |
-| Spectrum | 打开频谱（见第 8 章），`ENABLE_SPECTRUM=0` 时没有此项 |
+| Spectrum | 打开频谱（见第 8 章），所有构建均包含 |
 | Save as channel | 选择编号、确认覆盖、输入名称并保存 |
 | Reset to presets | 恢复当前频段 RX 预设，频率和 TX 设置不变 |
 

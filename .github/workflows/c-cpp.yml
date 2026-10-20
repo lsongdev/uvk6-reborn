@@ -48,8 +48,6 @@ jobs:
       ENABLE_SI4732: ${{ matrix.si4732 }}
       VARIANT: ${{ matrix.variant }}
       ENABLE_TX: 1
-      ENABLE_FC: 1
-      ENABLE_SPECTRUM: 1
       BUILD_TYPE: release
     steps:
       - uses: actions/checkout@v4
@@ -64,11 +62,8 @@ jobs:
           release: '15.3.Rel1'
       - name: Install packer dependency
         run: python -m pip install crcmod
-      - name: Build optional-feature variants
-        run: |
-          make -B -j4 all ENABLE_FC=0
-          make -B -j4 all ENABLE_TX=0
-          make -B -j4 all ENABLE_SPECTRUM=0
+      - name: Build receive-only firmware
+        run: make -B -j4 all ENABLE_TX=0
       - name: Build firmware
         run: |
           arm-none-eabi-gcc --version | head -1
@@ -110,7 +105,7 @@ jobs:
           metadata = {
               'board': board, 'variant': variant, 'commit': os.environ['GITHUB_SHA'],
               'toolchain': subprocess.check_output(['arm-none-eabi-gcc', '--version'], text=True).splitlines()[0],
-              'flags': {'ENABLE_TX': 1, 'ENABLE_FC': 1, 'ENABLE_SPECTRUM': 1,
+              'flags': {'ENABLE_TX': 1,
                         'ENABLE_SI4732': int(os.environ['ENABLE_SI4732']), 'BUILD_TYPE': 'release'},
               'raw_bytes': len(raw), 'flash_budget': budget,
               'sha256': {name: hashlib.sha256((output / name).read_bytes()).hexdigest() for name in files},

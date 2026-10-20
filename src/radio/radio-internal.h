@@ -58,17 +58,9 @@ extern Seek seek;
 void seekUpdate(void);
 void finishSeek(bool found, uint32_t frequency_hz, const char *status);
 
-// capture.c. Set by the Makefile (ENABLE_FC); host tests keep FC.
-#ifndef UVK6_ENABLE_FC
-#define UVK6_ENABLE_FC 1
-#endif
+// capture.c
 extern CaptureRuntime capture;
-#if UVK6_ENABLE_FC
 extern bool capturing;
-#else
-// A constant lets every FC branch in the other modules fold away.
-#define capturing false
-#endif
 void captureUpdate(void);
 void cancelCapture(const char *status);
 
@@ -77,11 +69,7 @@ extern bool toneScanning;
 void toneScanUpdate(void);
 
 // spectrum.c
-#if UVK6_ENABLE_SPECTRUM
 extern bool spectrumOn;
-#else
-#define spectrumOn false
-#endif
 void spectrumUpdate(void);
 
 // watch.c

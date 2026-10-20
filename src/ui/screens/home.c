@@ -162,9 +162,7 @@ static void shortcutKey(KEY_Code_t key) {
   case KEY_2: RADIO_SwitchSlot(); break;
   case KEY_3: RADIO_SwitchSource(); break;
   case KEY_4: RADIO_StartCapture(); break;
-#if UVK6_ENABLE_SPECTRUM
   case KEY_5: SCREEN_Push(&spectrumScreen); break;
-#endif
   case KEY_6: cycleTxPower(); break;
   case KEY_8: RADIO_Reverse(); break;
   case KEY_STAR: RADIO_StartSeek(); break;

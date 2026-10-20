@@ -36,17 +36,13 @@ esac
   tests/radio-app-regression.c src/devices/keyboard.c src/core/tuning.c src/ui/number-input.c src/core/dcs.c src/core/text.c src/core/radio-model.c src/core/radio-state.c src/radio/rx-runtime.c src/core/watch.c src/core/tx-model.c src/radio/tx-runtime.c src/core/seek.c src/core/capture.c src/core/spectrum.c \
   src/core/rds.c src/core/rds-receiver.c src/ui/frequency.c "$dead_strip" -o "$test_binary"
 "$test_binary"
-# ENABLE_FC=0 must keep compiling: FC branches fold to a constant phase.
+# Always-included RF features and their screens must compile together.
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
-  -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include -DUVK6_ENABLE_FC=0 -fsyntax-only \
+  -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include -fsyntax-only \
   src/radio/radio.c src/radio/capture.c src/radio/watch.c src/radio/seek.c src/radio/tx.c \
   src/radio/spectrum.c src/ui/screens/home.c src/ui/screens/slot-menu.c src/ui/screens/save-channel.c \
   src/ui/screens/spectrum.c src/ui/screens/tone-scan.c src/radio/tone-scan.c src/ui/spectrum.c
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
-  -Isrc/external/CMSIS_5/CMSIS/Core/Include \
-  -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include -DUVK6_ENABLE_SPECTRUM=0 -fsyntax-only \
-  src/radio/radio.c src/radio/spectrum.c src/radio/watch.c src/ui/screens/slot-menu.c
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \

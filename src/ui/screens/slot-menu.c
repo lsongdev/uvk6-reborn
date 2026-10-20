@@ -51,9 +51,7 @@ static void menuChangeValue(bool up) {
   case MENU_TX_OFFSET: beginTxInput(); return;
   case MENU_TX_TONE: tx.tone = TONE_Next(tx.tone, up); setTx(tx); return;
   case MENU_TX_TAIL: tx.tail = !tx.tail; setTx(tx); return;
-#if UVK6_ENABLE_SPECTRUM
   case MENU_SPECTRUM: SCREEN_Pop(); SCREEN_Push(&spectrumScreen); return;
-#endif
   case MENU_RESET: RADIO_ResetToPreset(); return;
   case MENU_SAVE_CHANNEL: SAVE_CHANNEL_Open(); return;
   default: RADIO_AdjustRx((RadioParameterField)menuIndex, up); return;
@@ -104,9 +102,7 @@ static void menuRender(void) {
   static const char *const names[] = {
     "RX Mode", "RX Step", "RX Bandwidth", "RX Squelch", "RX Tone", "RX Tone Scan",
     "TX Enable", "TX Power", "TX Shift", "TX Offset", "TX Tone", "TX tail",
-#if UVK6_ENABLE_SPECTRUM
     "Spectrum",
-#endif
     "Save as channel", "Reset to presets"
   };
   _Static_assert(sizeof(names)/sizeof(names[0]) == MENU_ITEM_COUNT,

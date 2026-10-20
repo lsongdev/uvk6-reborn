@@ -2,7 +2,6 @@
 // Reception is restored on stop unless the slot is tuned to the cursor.
 #include "radio/radio-internal.h"
 
-#if UVK6_ENABLE_SPECTRUM
 Spectrum spectrum;
 bool spectrumOn;
 static uint32_t tunedAt;
@@ -75,11 +74,3 @@ void spectrumUpdate(void) {
     if (SPECTRUM_Record(&spectrum, 0) || !(spectrum.next & 15u)) gRedrawScreen = true;
   }
 }
-#else
-void RADIO_StartSpectrum(void) { notify("Not supported"); }
-void RADIO_StopSpectrum(bool tune) { (void)tune; }
-const Spectrum *RADIO_Spectrum(void) { return NULL; }
-void RADIO_SpectrumMove(bool up) { (void)up; }
-void RADIO_SpectrumZoom(bool wider) { (void)wider; }
-void spectrumUpdate(void) {}
-#endif

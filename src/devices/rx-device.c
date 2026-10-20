@@ -172,7 +172,6 @@ CaptureSample RX_DEVICE_CapturePoll(CaptureRange range, uint32_t *hz) {
   return CAPTURE_SAMPLE;
 }
 
-#if UVK6_ENABLE_SPECTRUM
 static bool spectrumVhf;
 bool RX_DEVICE_SpectrumStart(void) {
   if (!RX_DEVICE_StopAll()) return false;
@@ -203,7 +202,6 @@ void RX_DEVICE_SpectrumTune(uint32_t frequency_hz) {
 }
 uint16_t RX_DEVICE_SpectrumRssi(void) { return BK48X9_GetScanRssi(); }
 void RX_DEVICE_SpectrumStop(void) { RX_DEVICE_InvalidateBk(); }
-#endif
 
 // "Auto" squelch delays use the chip's own recommendation.
 static uint8_t sqlDelay(uint8_t preference, uint8_t automatic, uint8_t recommended) {

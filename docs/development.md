@@ -17,17 +17,15 @@ make BOARD=uvk1
 
 | 选项／目标 | 行为 |
 | --- | --- |
-| make／make all | 默认 release；ENABLE_TX=1、ENABLE_FC=1；K6 ENABLE_SI4732=1 |
+| make／make all | 默认 release；ENABLE_TX=1；K6 ENABLE_SI4732=1；FC 与频谱始终包含 |
 | make -B -j4 all | 强制重编，测预算或改变编译选项时使用 |
 | make -B -j4 all ENABLE_TX=0 | 仅接收，TX HAL 只保留关 PA 路径 |
-| make -B -j4 all ENABLE_FC=0 | 去掉 FC，F→4 提示 Not supported；独立 RX Tone Scan 保留 |
-| make ENABLE_SPECTRUM=0 | 去掉频谱菜单和实现 |
 | make ENABLE_SI4732=0 | K6 改用 BK1080 广播（原装板）；不编入 SI4732、RDS 与 SSB 路径。K1 的 board.mk 固定为 0 |
 | make debug | 调试构建；不作为 release 容量基线 |
 | make release | 清理、构建，并生成带时间戳镜像；K6 为 packed，K1 为 raw |
 | make info／make help | 构建信息／目标说明 |
 
-Makefile 跟踪 ENABLE_TX／ENABLE_SI4732／ENABLE_FC／ENABLE_SPECTRUM／BUILD_TYPE，切换时删除该板旧对象；改工具链、CFLAGS、RADIO_CHIP 等其他参数仍须 `-B` 强制重编。可用独立 OBJ_DIR／BIN_DIR 做对照构建。两块板目录独立，可分别构建，不能共用镜像。
+Makefile 跟踪 ENABLE_TX／ENABLE_SI4732／BUILD_TYPE，切换时删除该板旧对象；改工具链、CFLAGS、RADIO_CHIP 等其他参数仍须 `-B` 强制重编。可用独立 OBJ_DIR／BIN_DIR 做对照构建。两块板目录独立，可分别构建，不能共用镜像。
 
 | 产物 | 用途 |
 | --- | --- |
@@ -38,7 +36,7 @@ Makefile 跟踪 ENABLE_TX／ENABLE_SI4732／ENABLE_FC／ENABLE_SPECTRUM／BUILD_
 
 `<board>` 为 `BOARD`，默认 uvk6。
 
-raw 与 packed 不能互换。链接脚本不能为了通过构建扩大 Flash 上限。CI 在 [.github/workflows/c-cpp.yml](../.github/workflows/c-cpp.yml) 使用 Ubuntu 24.04，通过固定提交的 arm-none-eabi-gcc-action 安装 ARM GNU 15.3.Rel1（与本机预算基线一致），单独运行主机回归和菜单预览，再构建三种矩阵：K1＋BK1080、K6＋BK1080、K6＋SI4732。每种均检查无 FC／无 TX／无 Spectrum 变体，再构建默认全功能 release；K6 raw≤61,440 B、K1 raw≤120,832 B，并校验对应向量表。每个 Artifact 独立包含带板型／芯片名的 raw、ELF、Map 和 build-info.json（提交、工具链、开关、SHA-256）；K6 另含 packed，K1 不打包。涉及 HAL／驱动仍须双板构建与分别实机确认。不同工具链产生不同大小，不混作优化增量。原 GCC 13.2.rel1 在当前 K6 SI4732 默认构建占 61,460 B，超出上限 20 B，因此 CI 升级工具链，不扩大链接预算。工具链发行来源见 [Arm GNU Toolchain](https://gitlab.arm.com/tooling/gnu-toolchains-for-arm/-/tree/releases/15.3.rel1)。
+raw 与 packed 不能互换。链接脚本不能为了通过构建扩大 Flash 上限。CI 在 [.github/workflows/c-cpp.yml](../.github/workflows/c-cpp.yml) 使用 Ubuntu 24.04，通过固定提交的 arm-none-eabi-gcc-action 安装 ARM GNU 15.3.Rel1（与本机预算基线一致），单独运行主机回归和菜单预览，再构建三种矩阵：K1＋BK1080、K6＋BK1080、K6＋SI4732。每种均检查仅接收（ENABLE_TX=0）变体，再构建默认 release；所有镜像始终包含 FC 与频谱；K6 raw≤61,440 B、K1 raw≤120,832 B，并校验对应向量表。每个 Artifact 独立包含带板型／芯片名的 raw、ELF、Map 和 build-info.json（提交、工具链、开关、SHA-256）；K6 另含 packed，K1 不打包。涉及 HAL／驱动仍须双板构建与分别实机确认。不同工具链产生不同大小，不混作优化增量。原 GCC 13.2.rel1 在源码 `8b34704` 的 K6 SI4732 默认构建占 61,460 B，超出上限 20 B，因此 CI 升级工具链，不扩大链接预算。工具链发行来源见 [Arm GNU Toolchain](https://gitlab.arm.com/tooling/gnu-toolchains-for-arm/-/tree/releases/15.3.rel1)。
 
 ## 2. 刷机与恢复
 
@@ -253,14 +251,14 @@ python3 tools/ui-preview.py --frames manual-receive manual-transmit --output doc
 
 ## 5. Flash、RAM 与优化记录
 
-2026-10-20 对源码 **8b34704** 的双板默认 release 强制构建（`make -B -j4 BOARD=uvk6`／`uvk1`，ARM GNU 15.3.rel1，TX／FC／Spectrum 开启，K6 SI4732、K1 BK1080）：
+2026-10-20 在 **fff1259** 基础上移除 FC／频谱编译开关后，双板默认 release 强制构建（`make -B -j4 BOARD=uvk6`／`uvk1`，ARM GNU 15.3.rel1，TX 开启，FC／Spectrum 始终包含，K6 SI4732、K1 BK1080）：
 
 | 指标 | UV-K6 | UV-K1 |
 | --- | ---: | ---: |
-| Flash | **61,332 / 61,440 B** | **61,264 / 120,832 B** |
-| Flash 余量 | **108 B** | **59,568 B** |
+| Flash | **61,328 / 61,440 B** | **61,264 / 120,832 B** |
+| Flash 余量 | **112 B** | **59,568 B** |
 | 代码输入 | 54,528 B | 54,222 B |
-| 只读输入 | 6,180 B | 6,389 B |
+| 只读输入 | 6,178 B | 6,389 B |
 | data（RAM 初值，亦占 Flash） | 368 B | 388 B |
 | bss | 6,152 B | 10,904 B |
 | 静态 RAM（data＋bss） | **6,520 B** | **11,292 B** |
@@ -341,7 +339,7 @@ FM 周期声排查发现两处确定代码问题：守听音源逐主循环读�
 
 RX Tone Scan 的芯片配置为 REG51=`0300`；REG68 bit15 清零时取低 13 位 ×4843÷10000 得 CTCSS Hz×10；REG69／6A 低 12 位拼接 DCS，并重读 REG69 排除撕裂。扫描策略、三次独立采集、MR 只读及 DCS 等效码规则见[设计文档](design.md#独立-rx-tone-scan)。实现参考 [DualTachyon BK4819](https://github.com/DualTachyon/uv-k5-firmware/blob/main/driver/bk4819.c)、[F4HWN BK4829 5fedc09](https://github.com/armel/uv-k1-k5v3-firmware-custom/blob/5fedc09e9ddec350823adb9bb2d81df05b52ab8d/App/driver/bk4829.c) 和 [Egzumer DCS](https://github.com/egzumer/uv-k5-firmware-custom/blob/main/dcs.c)。
 
-主机模型覆盖 50 个 CTCSS 及误差边界、104 个 DCS 正／反码 × 23 种循环起始位（4784 种波形）、单比特损坏、慢采集和非标准 CTCSS 不打断 DCS、失载波重置、PTT 排他、回话后恢复选中槽、VFO 单次提交、MR 拒写与恢复失败。优化后的 CTCSS 匹配还与旧算法逐值核对全部 65536 个输入；`ENABLE_FC=0` 仍保留独立识别。
+主机模型覆盖 50 个 CTCSS 及误差边界、104 个 DCS 正／反码 × 23 种循环起始位（4784 种波形）、单比特损坏、慢采集和非标准 CTCSS 不打断 DCS、失载波重置、PTT 排他、回话后恢复选中槽、VFO 单次提交、MR 拒写与恢复失败。优化后的 CTCSS 匹配还与旧算法逐值核对全部 65536 个输入；亚音识别独立于 FC，二者均始终编入。
 
 TX tail 回归覆盖约 200 ms 非阻塞期限、计时回绕、连续松键、重按门禁、TOT／低压／取消硬停止、PA 顺序、普通 TX 清尾音模式、配置／频道 bit5 和仅接收构建。DCS 尾音 REG51 的芯片差异为 BK4819=`804A`、BK4829=`8040`；状态机和菜单共享。主机模型不能证明检测速度、灵敏度、尾音互通或波形。
 
