@@ -127,7 +127,7 @@ EXIT(D)
 | BK4819 | 18–660 MHz、840–1300 MHz | 半双工 FM 收发；面向窄带对讲语音，支持 6.25 / 12.5 / 20 / 25 kHz 信道间隔、CTCSS / DCS、DTMF 和 FSK 等 |
 | SI4732-A10 | LW 153–279 kHz；MW 520–1710 kHz；SW 2.3–26.1 MHz；FM 64–108 MHz | 广播接收；AM 与广播 FM，支持 FM 立体声、RDS / RBDS 和可选 AM 通道滤波器；不提供发射 |
 
-来源：[Beken BK4819 数据手册](https://offer-product.oss-cn-beijing.aliyuncs.com/product/offer/attachment/2216999951400/file/subPdf_729460_326293_20231219-105353923.pdf)、[Skyworks SI4732-A10 数据手册](https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/data-shorts/Si4732-A10-short.pdf)。BK 的信道间隔不等同于接收滤波器带宽；SI 的广播频段列表也不表示从长波到 108 MHz 连续覆盖。
+来源：[Beken BK4819 数据手册](datasheets/BK4819.pdf)、[Skyworks SI4732-A10 数据手册](https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/data-shorts/Si4732-A10-short.pdf)。BK 的信道间隔不等同于接收滤波器带宽；SI 的广播频段列表也不表示从长波到 108 MHz 连续覆盖。
 
 ### 频率交集与模式区别
 
@@ -139,7 +139,7 @@ EXIT(D)
 
 路由规则：**频率与用户明确选择的模式共同决定接收芯片**。例如 100 MHz + NFM 走 BK4819，100 MHz + WFM 走 SI4732；20 MHz + NFM 走 BK4819，20 MHz + AM / 补丁支持的 LSB/USB 走 SI4732。仅凭频率重叠不能替换用户选择的模式。
 
-**TX 单独决策**：选择 NFM/BK4819 只表明存在硬件发射候选，绝不自动授予发射资格。WFM/SI4732、广播 BK1080 和 AM/SSB 接收不提供自动 TX 兜底。当前已接入本机 BK4819 NFM 发射 HAL，软件范围限制为 136–174／400–470 MHz，使用本机原厂功率校准记录；PTT 仍须按 TX Enable、模式、范围、校准与供电状态校验。本轮没有实机射频验收。
+**TX 单独决策**：选择 NFM/BK4819 只表明存在硬件发射候选，绝不自动授予发射资格。WFM/SI4732、广播 BK1080 和 AM/SSB 接收不提供自动 TX 兜底。当前已接入本机 BK4819 NFM 发射 HAL，不另设 TX 白名单，按 18–660／840–1300 MHz 调谐范围检查，使用本机全部七段原厂 PA 记录（见[发射范围与校准边界](tx-frequency-range.md)）；PTT 仍须按 TX Enable、模式、范围、校准与供电状态校验。本轮没有实机射频验收。
 
 本文中的 NFM 指对讲机窄带 FM，WFM 指广播宽带 FM。BK 的上述公开手册没有将广播 WFM、AM 或 SSB 列为标准接收能力；固件实现的 AM 或其他扩展模式，应单独记录实现依据和实机验证。SI 的 SSB 补丁能力也须与公开数据手册列出的基础功能分开记录，加载补丁不能据此推断支持 VHF / UHF 对讲频段。
 

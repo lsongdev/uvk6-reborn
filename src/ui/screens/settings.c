@@ -110,9 +110,9 @@ static void getTxStatus(const MenuItem *item, char *out, uint8_t size) {
   (void)item;
   const RadioSlot *slot = &gDeviceConfig.radio.slots[gDeviceConfig.radio.selected_slot];
   TxCapabilities capability = TX_DEVICE_Capabilities(TX_MODEL_Frequency(&slot->tx, slot->current.frequency_hz));
-  TxPolicy policy = TX_DEVICE_Policy();
   const char *status = !capability.available ? "HW locked" :
-      !capability.power_mask ? "Uncalibrated" : !policy.authorized ? "Not allowed" : "Ready";
+      !RADIO_MODEL_InRfRange(TX_MODEL_Frequency(&slot->tx,slot->current.frequency_hz),capability.ranges) ? "Out of band" :
+      !capability.power_mask ? "Uncalibrated" : "Ready";
   TEXT_Copy(out,size,status);
 }
 static bool resetPreferences(const MenuItem *item, KEY_Code_t key, Key_State_t state) {

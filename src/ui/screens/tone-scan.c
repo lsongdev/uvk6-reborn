@@ -17,8 +17,9 @@ static void toneScanRender(void) {
   const char *notice = RADIO_Notice();
   PrintSmall(2,45,notice ? notice : tone && *tone >= 51 ? "Equivalent DCS code" :
              tone && !*tone ? "Keep signal on" : "");
-  PrintSmall(2,58,RADIO_Selected()->source == RADIO_SOURCE_CHANNEL ? "Read only  EXIT:Back" :
-             tone && *tone ? "MENU:Use RX  EXIT:Back" : "EXIT:Back");
+  const char *hint = RADIO_Selected()->source == RADIO_SOURCE_CHANNEL ? "Read only" :
+                     tone && *tone ? "MENU:Use RX" : NULL;
+  if (hint) PrintSmall(2,58,hint);
 }
 static bool toneScanKey(KEY_Code_t key, Key_State_t state) {
   if (state == KEY_RELEASED) {

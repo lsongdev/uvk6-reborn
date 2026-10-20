@@ -1,3 +1,4 @@
+#include "rf-ranges.h"
 // Exercise draft cancellation, isolated persistence and capability filtering.
 #include "../src/ui/screens/bands.c"
 #include <assert.h>
@@ -6,7 +7,7 @@ DeviceConfig gDeviceConfig;
 bool gDeviceConfigReady = true;
 static bool saveWorks = true;
 static unsigned saves, exits;
-static ReceiverCapabilities capabilities = {true, false, true, true, RX_BK_BANDWIDTH_ALL};
+static ReceiverCapabilities capabilities = {true, false, true, true, RX_BK_BANDWIDTH_ALL, testBk4819Ranges};
 bool DEVICE_SaveNow(void) { ++saves; return saveWorks; }
 ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
 bool SCREEN_Pop(void) { ++exits; return true; }
@@ -62,7 +63,7 @@ int main(void) {
   press(KEY_STAR);
   assert(draft.bandwidth_hz == 0 && message);
   field = FIELD_SAVE;
-  capabilities = (ReceiverCapabilities){.bk_am=true, .bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL};
+  capabilities = (ReceiverCapabilities){.bk_am=true, .bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL, .bk_ranges=testBk4819Ranges};
   unsigned before = saves;
   press(KEY_MENU);
   assert(editing && saves == before); // Unavailable receiver cannot be saved.

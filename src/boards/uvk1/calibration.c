@@ -3,16 +3,21 @@
 
 bool BOARD_TxCalibration(uint32_t hz, BoardTxCalibration *out) {
   if (!out || hz % 10u) return false;
-  // K1 factory bands from reference frequencies.c/radio.c (5fedc09).
-  // Below 137 MHz clamp to band 2's first anchor; band 1 is an RX band
-  // with placeholder PA data, not the VHF transmitter's calibration.
-  if (hz >= 136000000u && hz < 174000000u)
-    *out = (BoardTxCalibration){CALIBRATION_PA_OFFSET + 2u * CALIBRATION_PA_STRIDE,
-                               137000000u, 155500000u, 174000000u};
-  else if (hz >= 400000000u && hz < 470000000u)
-    *out = (BoardTxCalibration){CALIBRATION_PA_OFFSET + 5u * CALIBRATION_PA_STRIDE,
-                               400000000u, 435000000u, 470000000u};
-  else return false;
+  // Original (non-WIDE_RX) factory bands in reference 5fedc09. Expanding
+  // tuning must not stretch these calibration anchors to the new limits.
+  static const BoardTxCalibration bands[CALIBRATION_PA_BANDS] = {
+    {0xD0u, 50000000u, 63000000u, 76000000u},
+    {0xE0u,108000000u,122500000u,137000000u},
+    {0xF0u,137000000u,155500000u,174000000u},
+    {0x100u,174000000u,262000000u,350000000u},
+    {0x110u,350000000u,375000000u,400000000u},
+    {0x120u,400000000u,435000000u,470000000u},
+    {0x130u,470000000u,535000000u,600000000u},
+  };
+  uint8_t band=CALIBRATION_PA_BANDS-1u;
+  // Keep the previously used VHF record at 136--137 MHz.
+  while (band && hz<(band==2 ? 136000000u : bands[band].lower_hz)) --band;
+  *out=bands[band];
   return true;
 }
 

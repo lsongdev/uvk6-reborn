@@ -4,7 +4,6 @@
 
 // Half-duplex NFM TX, using the board's own factory power calibration.
 TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz);
-TxPolicy TX_DEVICE_Policy(void);
 bool TX_DEVICE_Prepare(const TxPlan *plan);
 bool TX_DEVICE_Enable(void);
 // Normal PTT release only; deliberately runs with PTT no longer pressed.

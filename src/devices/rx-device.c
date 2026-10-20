@@ -34,6 +34,7 @@ ReceiverCapabilities RX_DEVICE_Capabilities(void) {
     BK48X9Capabilities bk=BK48X9_GetCapabilities();
     capabilities.bk_am=bk.am;
     capabilities.bk_bandwidth_mask=bk.bandwidth_mask;
+    capabilities.bk_ranges=BK48X9_FREQUENCY_RANGES;
     capabilities.si=UVK6_ENABLE_SI4732;
     capabilities.broadcast=!UVK6_ENABLE_SI4732;
     capabilities.ssb_patch=UVK6_ENABLE_SI4732 && RESOURCE_SsbPatchPresent();
@@ -224,6 +225,7 @@ static bool preparePlan(const RxPlan *plan, bool foreground) {
 
   switch (plan->device) {
   case RX_DEVICE_BK:
+    if (!RADIO_MODEL_InRfRange(plan->frequency_hz,BK48X9_FREQUENCY_RANGES)) return false;
     if ((mode == RX_AM && !BK48X9_GetCapabilities().am) ||
         (mode != RX_NFM && mode != RX_AM))
       return false;

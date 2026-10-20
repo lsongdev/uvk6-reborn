@@ -26,6 +26,8 @@ void BOARD_ADC_GetBatteryInfo(uint16_t *pVoltage, uint16_t *pCurrent);
 
 // Factory PA record and its three frequency anchors, in Hz. The record
 // offset is relative to STORAGE_CALIBRATION, never a physical flash address.
+// Frequency chooses among all seven factory records; values outside a
+// record's anchors clamp at its endpoints. This does not set TX permission.
 typedef struct {
   uint16_t offset;
   uint32_t lower_hz, middle_hz, upper_hz;

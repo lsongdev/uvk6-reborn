@@ -1,3 +1,4 @@
+#include "rf-ranges.h"
 #include "store/device-config.h"
 // Exercise the real radio controller and its screens; only hardware and
 // drawing are mocked. Unity build keeps private state reachable.
@@ -44,7 +45,7 @@ void PrintMedium(uint8_t x, uint8_t y, const char *pattern) {
 void PrintMediumEx(uint8_t x, uint8_t y, TextPos pos, Color c, const char *pattern) {
   (void)x; (void)y; (void)pos; (void)c; (void)pattern;
 }
-static ReceiverCapabilities capabilities = {true, false, true, true, RX_BK_BANDWIDTH_ALL};
+static ReceiverCapabilities capabilities = {true, false, true, true, RX_BK_BANDWIDTH_ALL, testBk4819Ranges};
 static unsigned applied, applyAttempts;
 static unsigned routed;
 static unsigned appRuns;
@@ -56,11 +57,9 @@ bool TX_DEVICE_BeginTail(void) { ++txFakeTails; return true; }
 // Host capabilities and hardware calls are isolated from the production HAL.
 TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) {
   (void)frequency_hz;
-  return (TxCapabilities){txFakeVerified, txFakeVerified ? 1u : 0u};
+  return (TxCapabilities){txFakeVerified, txFakeVerified ? 1u : 0u, testBk4819Ranges};
 }
-TxPolicy TX_DEVICE_Policy(void) {
-  return (TxPolicy){txFakeVerified, 1, {{430000000u, 440000000u}}};
-}
+
 bool TX_DEVICE_PttPressed(void) { return txFakePttPressed; }
 bool TX_DEVICE_VoltageValid(void) { return txFakeVoltageValid; }
 void TX_DEVICE_Disable(void) { ++txFakeDisables; }
@@ -291,7 +290,7 @@ static void setup(uint32_t frequency, RadioParameters values) {
   nativeFrequency = 100100000;
   nativeReply = RX_SEEK_FOUND;
   nativeStarts = nativeCancels = 0;
-  capabilities = (ReceiverCapabilities){true, false, true, true, RX_BK_BANDWIDTH_ALL};
+  capabilities = (ReceiverCapabilities){true, false, true, true, RX_BK_BANDWIDTH_ALL, testBk4819Ranges};
   receiverReady = false; receiverInitializations = 0;
   RADIO_Init();
   assert(receiverReady && receiverInitializations == 1);
@@ -558,7 +557,7 @@ int main(void) {
   assert(gReceiver.plan.device == RX_DEVICE_BK);
 
   setup(438500000, fm);
-  capabilities = (ReceiverCapabilities){false, false, false, true, RX_BK_BANDWIDTH_ALL};
+  capabilities = (ReceiverCapabilities){false, false, false, true, RX_BK_BANDWIDTH_ALL, testBk4819Ranges};
   // Bands follow the hardware: LW and MW are skipped, SW starts where BK
   // coverage begins.
   press(KEY_SIDE1);
@@ -711,7 +710,7 @@ int main(void) {
   assert(pttPending && !txFakePrepares);
   clockNow += 180;
   RADIO_TxSafetyUpdate();
-  assert(!strcmp(message, "Channel busy"));
+  assert(!strcmp(message, "TX: RX Busy"));
   assert(txFakePrepares == 0 && transmitter.mode == RADIO_RX);
   RADIO_PttRelease();
 
@@ -792,7 +791,7 @@ int main(void) {
   press(KEY_4);press(KEY_3);press(KEY_8);press(KEY_STAR);press(KEY_6);press(KEY_MENU);
   assert(gDeviceConfig.radio.slots[0].tx.split_hz==438600000 && activeSlot.tx.offset_hz==600000);
   assert(activeSlot.current.frequency_hz==438500000);
-  press(KEY_MENU);press(KEY_7);press(KEY_0);press(KEY_0);press(KEY_MENU);
+  press(KEY_MENU);press(KEY_1);press(KEY_7);press(KEY_MENU);
   assert(txInput.active && txInput.invalid && gDeviceConfig.radio.slots[0].tx.split_hz==438600000);
   assert(SCREEN_Key(KEY_EXIT,KEY_LONG_PRESSED));
   assert(inMenu);
@@ -1156,7 +1155,7 @@ int main(void) {
       assert(!txFakePrepares && transmitter.mode==RADIO_RX);
       if (scenario!=3) {
         assert(transmitter.wait_release);
-        assert(!strcmp(message,scenario==0 ? "Channel busy" : "TX busy/locked"));
+        assert(!strcmp(message,scenario==0 ? "TX: RX Busy" : "TX busy/locked"));
       }
     }
     RADIO_PttRelease();
@@ -1302,7 +1301,7 @@ int main(void) {
   for (unsigned chip=0;chip<2;++chip) {
     setup(95900000,(RadioParameters){RX_WFM,100000,0,0});
     if (chip) {
-      capabilities=(ReceiverCapabilities){false,true,false, true, RX_BK_BANDWIDTH_ALL};
+      capabilities=(ReceiverCapabilities){false,true,false, true, RX_BK_BANDWIDTH_ALL, testBk4819Ranges};
       request(95900000,activeSlot.current.parameters);
     }
     fcOrigin=gDeviceConfig.radio.slots[0];fcSaves=saveRequests;
@@ -1314,7 +1313,7 @@ int main(void) {
     press(KEY_F);press(KEY_4);captureReply=CAPTURE_SAMPLE;captureHz=145500000;
     clockNow+=20;update();clockNow+=20;update();
     assert(!capturing && gReceiver.plan.device==RX_DEVICE_BK && runtime.current.frequency_hz==145500000);
-    capabilities=(ReceiverCapabilities){true,false,true, true, RX_BK_BANDWIDTH_ALL};captureReply=CAPTURE_BUSY;
+    capabilities=(ReceiverCapabilities){true,false,true, true, RX_BK_BANDWIDTH_ALL, testBk4819Ranges};captureReply=CAPTURE_BUSY;
   }
   // An unsupported candidate is ignored; a failed tune restores the origin
   // and never commits the candidate.

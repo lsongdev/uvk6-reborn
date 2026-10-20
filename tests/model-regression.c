@@ -1,13 +1,14 @@
+#include "rf-ranges.h"
 #include "../src/core/radio-model.h"
 #include <assert.h>
 #include <string.h>
 
 int main(void) {
-  ReceiverCapabilities si = {true, false, true, true, RX_BK_BANDWIDTH_ALL};
-  ReceiverCapabilities bk1080 = {false, true, false, true, RX_BK_BANDWIDTH_ALL};
-  ReceiverCapabilities none = {false, false, false, true, RX_BK_BANDWIDTH_ALL};
+  ReceiverCapabilities si = {true, false, true, true, RX_BK_BANDWIDTH_ALL, testBk4819Ranges};
+  ReceiverCapabilities bk1080 = {false, true, false, true, RX_BK_BANDWIDTH_ALL, testBk4819Ranges};
+  ReceiverCapabilities none = {false, false, false, true, RX_BK_BANDWIDTH_ALL, testBk4819Ranges};
   ReceiverCapabilities k1 = {.broadcast=true, .bk_bandwidth_mask=
-      RX_BK_BANDWIDTH_6K | RX_BK_BANDWIDTH_12K | RX_BK_BANDWIDTH_26K};
+      RX_BK_BANDWIDTH_6K | RX_BK_BANDWIDTH_12K | RX_BK_BANDWIDTH_26K, .bk_ranges=testBk4829Ranges};
   RxPlan plan;
   RadioParameters k1fm = {RX_NFM,12500,12000,0,0};
   assert(RADIO_MODEL_Plan(145500000,k1fm,k1,&plan) == RX_OK);
@@ -97,14 +98,20 @@ int main(void) {
   assert(RADIO_MODEL_Covers(95900000, k1) && RADIO_MODEL_Covers(95900000, none)); // BK NFM.
   assert(!RADIO_MODEL_Covers(700000000, si) && RADIO_MODEL_Covers(1300000000, si));
   assert(!RADIO_MODEL_Covers(1300000001, si));
+  // K1 adds its documented high-band entry without shrinking old extensions.
+  assert(!RADIO_MODEL_Covers(760000000u,si) && RADIO_MODEL_Covers(760000000u,k1));
+  assert(RADIO_MODEL_Covers(660000000u,k1) && RADIO_MODEL_Covers(1300000000u,k1));
+  assert(!RADIO_MODEL_Covers(700000000u,k1));
+  assert(RADIO_MODEL_Plan(760000000u,nfm,k1,&plan)==RX_OK);
+  assert(RADIO_MODEL_Plan(760000000u,nfm,si,&plan)==RX_UNSUPPORTED_MODE);
   RadioSpan span;
   assert(!RADIO_MODEL_BandSpan(0, 225000, k1, &span));
   assert(RADIO_MODEL_BandSpan(2, 7100000, k1, &span) && span.start_hz == 18000000 && span.end_hz == 30000001);
   assert(RADIO_MODEL_BandSpan(2, 7100000, si, &span) && span.start_hz == 1800000 && span.end_hz == 30000001);
   // UHF holds two BK spans; the one nearest the frequency wins.
   assert(RADIO_MODEL_BandSpan(8, 445000000, k1, &span) && span.start_hz == 300000000 && span.end_hz == 660000001);
-  assert(RADIO_MODEL_BandSpan(8, 800000000, k1, &span) && span.start_hz == 840000000 && span.end_hz == 1300000001);
-  assert(RADIO_MODEL_BandSpan(8, 700000000, k1, &span) && span.end_hz == 660000001);
+  assert(RADIO_MODEL_BandSpan(8, 800000000, k1, &span) && span.start_hz == 760000000 && span.end_hz == 1300000001);
+  assert(RADIO_MODEL_BandSpan(8, 680000000, k1, &span) && span.end_hz == 660000001);
   assert(RADIO_MODEL_Step(107950000, 100000, true) == 108050000);
   assert(RADIO_MODEL_Step(RADIO_MAX_HZ, UINT32_MAX, true) == RADIO_MAX_HZ);
   assert(RADIO_MODEL_Step(RADIO_MIN_HZ, UINT32_MAX, false) == RADIO_MIN_HZ);

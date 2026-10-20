@@ -152,6 +152,11 @@ static void audioEvent(char c) { if (audioCount < sizeof(audioOrder)) audioOrder
 void SYS_DelayMs(uint32_t ms) { assert(ms == 8); audioEvent('t'); }
 uint16_t BK1080_GetRSSI(void) { return 30; }
 uint8_t BK1080_GetSNR(void) { return 10; }
+#if UVK6_ENABLE_SI4732
+const RadioSpan BK48X9_FREQUENCY_RANGES[RADIO_RF_RANGES] = {{18000000u,660000001u},{840000000u,1300000001u}};
+#else
+const RadioSpan BK48X9_FREQUENCY_RANGES[RADIO_RF_RANGES] = {{18000000u,660000001u},{760000000u,1300000001u}};
+#endif
 static RxPlan plan(uint32_t hz, RxMode mode, RxDevice device) {
   return (RxPlan){device, hz, {mode, mode == RX_WFM ? 100000 : 12500,
     mode == RX_WFM ? 0 : mode == RX_NFM ? 12000 : 6000, 0}};

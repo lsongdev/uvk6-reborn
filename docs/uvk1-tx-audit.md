@@ -2,6 +2,8 @@
 
 2026-10-19。实现范围：BK4829 NFM 语音、三档原厂 PA 校准、发射亚音和松键后的接收恢复。主机寄存器模型通过不等于射频输出已实测。
 
+2026-10-20 更新：已移除下文首版实现的双频 TX 白名单，改用全部七段 PA 数据；当前范围及扩展边界以[发射范围](tx-frequency-range.md)为准。下文保留 2026-10-19 首版实现与实机记录。
+
 ## 参考与本机依据
 
 - [F4HWN 5fedc09e](https://github.com/armel/uv-k1-k5v3-firmware-custom/tree/5fedc09e9ddec350823adb9bb2d81df05b52ab8d/App)：`driver/bk4829.c`、`radio.c`、`frequencies.c`、`settings.c`。

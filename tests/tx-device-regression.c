@@ -6,6 +6,7 @@
 #include "../src/boards/uvk6/calibration.c"
 #include <assert.h>
 #include <string.h>
+const RadioSpan BK48X9_FREQUENCY_RANGES[RADIO_RF_RANGES] = {{18000000u,660000001u},{840000000u,1300000001u}};
 DeviceConfig gDeviceConfig = {.preferences=CONFIG_DEFAULT_PREFERENCES};
 uint16_t gBatteryVoltage=760;
 static uint8_t calibration[9]={30,40,50,60,80,100,100,140,180};
@@ -17,8 +18,8 @@ static uint8_t bias;
 static bool stopOK=true;
 bool RX_DEVICE_StopAll(void) { assert(!paOn); return stopOK; }
 bool STORAGE_Read(StorageArea area, uint32_t offset, void *data, uint16_t size) {
-  // Bands 2 and 5 of the PA table: 0x1EF0 and 0x1F20 on the UV-K5 layout.
-  assert(area==STORAGE_CALIBRATION && size==9 && (offset==0xF0 || offset==0x120));
+  // All seven factory PA records in the UV-K5 layout.
+  assert(area==STORAGE_CALIBRATION && size==9 && (offset>=0xD0 && offset<=0x130 && !(offset % 16u)));
   calibrationAddress=0x1E00+offset;
   if (!readOK) return false;
   memcpy(data,calibration,size);return true;
@@ -76,11 +77,10 @@ void SYS_DelayMs(uint32_t ms) { assert(!paOn && ms==10);if(releaseDuringDelay) p
 int main(void) {
   assert(TX_DEVICE_Capabilities(145500000).power_mask==7 && calibrationAddress==0x1EF0);
   assert(TX_DEVICE_Capabilities(438500000).power_mask==7 && calibrationAddress==0x1F20);
-  assert(!TX_DEVICE_Capabilities(174000000).power_mask);
-  assert(!TX_DEVICE_Capabilities(399999990).power_mask);
-  assert(!TX_DEVICE_Capabilities(470000000).power_mask);
+  assert(TX_DEVICE_Capabilities(174000000).power_mask==7 && calibrationAddress==0x1F00);
+  assert(TX_DEVICE_Capabilities(399999990).power_mask==7 && calibrationAddress==0x1F10);
+  assert(TX_DEVICE_Capabilities(470000000).power_mask==7 && calibrationAddress==0x1F30);
   assert(!TX_DEVICE_Capabilities(438500001).power_mask);
-  TxPolicy policy=TX_DEVICE_Policy();assert(policy.count==2 && policy.authorized);
   readOK=false;assert(!TX_DEVICE_Capabilities(145500000).power_mask);readOK=true;
   calibration[4]=255;assert(TX_DEVICE_Capabilities(145500000).power_mask==5);calibration[4]=80;
   calibration[0]=0;assert(TX_DEVICE_Capabilities(145500000).power_mask==6);calibration[0]=30;
@@ -102,9 +102,24 @@ int main(void) {
   gBatteryVoltage=760;pressed=false;assert(!TX_DEVICE_Prepare(&plan));pressed=true;
   readOK=false;assert(!TX_DEVICE_Prepare(&plan));readOK=true;
   stopOK=false;assert(!TX_DEVICE_Prepare(&plan) && !prepared && !paOn);stopOK=true;
-  plan.frequency_hz=95000000;assert(!TX_DEVICE_Prepare(&plan) && !paOn);
+  plan.frequency_hz=700000000;assert(!TX_DEVICE_Prepare(&plan) && !paOn);
   plan.frequency_hz=136000000;plan.power=TX_POWER_LOW;
   assert(TX_DEVICE_Prepare(&plan) && paBias==30);TX_DEVICE_Disable();
   assert(interpolate(60,30,150000000,136000000,164000000)==45);
+  const uint32_t expanded[]={18000000u,95000000u,108000000u,174000000u,350000000u,
+    399999990u,470000000u,600000000u,660000000u,840000000u,1300000000u};
+  const uint16_t offsets[]={0xD0,0xD0,0xE0,0x100,0x110,0x110,0x130,0x130,0x130,0x130,0x130};
+  for (unsigned i=0;i<sizeof(expanded)/sizeof(*expanded);++i) {
+    plan.frequency_hz=expanded[i];
+    assert(TX_DEVICE_Prepare(&plan) && calibrationAddress==0x1E00u+offsets[i]);
+    if (i==0) assert(paBias==30); // Below the first anchor: clamp, no extrapolation.
+    if (i>=7) assert(paBias==50); // Above the final anchor: clamp.
+    assert(TX_DEVICE_Enable() && paOn);
+    TX_DEVICE_Disable();assert(!paOn);
+  }
+  memset(calibration,0,sizeof(calibration));
+  assert(!TX_DEVICE_Capabilities(350000000u).power_mask);
+  plan.frequency_hz=350000000u;
+  assert(!TX_DEVICE_Prepare(&plan) && !paOn);
   return 0;
 }

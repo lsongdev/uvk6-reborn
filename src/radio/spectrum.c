@@ -20,7 +20,7 @@ void RADIO_StartSpectrum(void) {
     return;
   }
   SPECTRUM_Start(&spectrum, activeSlot.current.frequency_hz,
-                 activeSlot.current.parameters.step_hz);
+                 activeSlot.current.parameters.step_hz,RECEIVER_Capabilities().bk_ranges);
   spectrumOn = true;
   settling = false;
   message = NULL;
@@ -66,7 +66,7 @@ void spectrumUpdate(void) {
   }
   for (uint8_t skipped = 0; skipped < SPECTRUM_POINTS; ++skipped) {
     uint32_t hz = SPECTRUM_Frequency(&spectrum, spectrum.next);
-    if (RADIO_MODEL_BkCovers(hz)) {
+    if (RADIO_MODEL_InRfRange(hz,spectrum.ranges)) {
       RX_DEVICE_SpectrumTune(hz);
       tunedAt = now;
       settling = true;

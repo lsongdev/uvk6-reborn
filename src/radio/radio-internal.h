@@ -89,6 +89,7 @@ extern WatchRuntime watcher;
 extern const char *watchStatus;
 void watchUpdate(void);
 bool pauseWatch(void);
+bool restoreSelectedReceiver(void);
 bool pauseWatchTo(const WatchTarget *target);
 void suspendWatchBk(bool suspend);
 void delayWatch(void);

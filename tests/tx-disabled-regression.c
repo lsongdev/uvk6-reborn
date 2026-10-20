@@ -16,7 +16,7 @@ void LED_SetRed(bool on) { assert(!on); }
 int main(void) {
   assert(!TX_DEVICE_Capabilities(145500000u).available);
   assert(TX_DEVICE_Capabilities(145500000u).power_mask==0);
-  assert(!TX_DEVICE_Policy().authorized);
+  assert(!TX_DEVICE_Capabilities(145500000u).ranges);
   TxPlan p={.frequency_hz=145500000u,.power=TX_POWER_LOW};
   assert(!TX_DEVICE_Prepare(&p));
   assert(!TX_DEVICE_Enable());

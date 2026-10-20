@@ -1,3 +1,4 @@
+#include "rf-ranges.h"
 // Real Settings, preferences, input and framebuffer; only hardware/storage mocked.
 #include "../src/ui/screens/preferences.c"
 #include "../src/ui/screens/settings.c"
@@ -13,7 +14,7 @@ static unsigned saves, appRuns, requests, reapplications;
 static bool saveWorks=true, applyWorks=true;
 static uint16_t calibrationResult=2100;
 static uint32_t calibratedVoltage;
-static ReceiverCapabilities capabilities = {.bk_am=true, .bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL};
+static ReceiverCapabilities capabilities = {.bk_am=true, .bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL, .bk_ranges=testBk4819Ranges};
 static char title[40];
 static uint8_t panels[10][8][128];
 static unsigned panelCount;
@@ -33,7 +34,6 @@ static unsigned slotChanges;
 void RADIO_SlotsChanged(void) { ++slotChanges; }
 ReceiverCapabilities RECEIVER_Capabilities(void) { return capabilities; }
 TxCapabilities TX_DEVICE_Capabilities(uint32_t frequency_hz) { (void)frequency_hz; return (TxCapabilities){0}; }
-TxPolicy TX_DEVICE_Policy(void) { return (TxPolicy){0}; }
 uint32_t STORAGE_Capacity(void) { return 524288; }
 const Screen bandsScreen = {0}, channelsScreen = {0};
 static const Screen *lastScreen;
@@ -55,7 +55,7 @@ static void capture(void) {
 static void choose(KEY_Code_t index) { press(index); press(KEY_MENU); }
 int main(int argc, char **argv) {
   RADIO_STATE_Default(&gDeviceConfig.radio);
-  capabilities=(ReceiverCapabilities){.si=true,.ssb_patch=true,.bk_am=true,.bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL};
+  capabilities=(ReceiverCapabilities){.si=true,.ssb_patch=true,.bk_am=true,.bk_bandwidth_mask=RX_BK_BANDWIDTH_ALL, .bk_ranges=testBk4819Ranges};
   enter(); capture();
   choose(KEY_1); capture(); // Display directly contains contrast and all light settings.
   assert(active_menu==&displayMenu && menu_stack_top==1 && active_menu->num_items==5);

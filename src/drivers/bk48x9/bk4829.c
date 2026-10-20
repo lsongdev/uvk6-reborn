@@ -3,6 +3,13 @@
 #include "core/misc.h"
 #include "hal/systick.h"
 
+// DS-BK4829-E01 V1.0 guarantees 18--580 / 760--1160 MHz. Preserve
+// the existing extended 660/1300 MHz tuning limits; add the documented
+// 760--840 MHz span without imposing a narrower TX-only whitelist.
+const RadioSpan BK48X9_FREQUENCY_RANGES[RADIO_RF_RANGES] = {
+  {18000000u,660000001u}, {760000000u,1300000001u}
+};
+
 // Statically selected chip backend; register values preserved by trace regressions.
 const BK48X9Chip BK48X9_CHIP={
   // Recommended squelch timing: open 5, close 3, as the stock firmware and

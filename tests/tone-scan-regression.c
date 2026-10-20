@@ -17,7 +17,21 @@ void BK48X9_WriteRegister(BK48X9_REGISTER_t reg, uint16_t value) {
   regs[reg]=value;
 }
 static uint32_t rotate(uint32_t w) { return (w >> 1) | ((w & 1u) << 22); }
+// Original matcher retained as an independent exhaustive equivalence oracle.
+static RadioTone originalCtcss(uint16_t hz10) {
+  unsigned best=UINT16_MAX;RadioTone result=0;
+  for (unsigned i=0;i<50;++i) {
+    unsigned standard=CTCSS_Options[i];
+    unsigned delta=hz10>standard ? hz10-standard : standard-hz10;
+    if (delta<best && (delta<=10u || delta*200u<=standard)) {
+      best=delta;result=i+1u;
+    }
+  }
+  return result;
+}
 int main(void) {
+  for (unsigned hz10=0;hz10<=UINT16_MAX;++hz10)
+    assert(TONE_DecodeCtcss(hz10)==originalCtcss(hz10));
   for (unsigned i=0;i<50;++i) {
     assert(TONE_DecodeCtcss(CTCSS_Options[i])==i+1);
     assert(TONE_DecodeCtcss(CTCSS_Options[i]+1u)==i+1);

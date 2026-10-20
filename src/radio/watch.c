@@ -13,7 +13,7 @@ void __attribute__((noinline)) delayWatch(void) {
 
 bool RADIO_IsWatching(void) { return watcher.phase!=WATCH_OFF; }
 
-static bool restorePrimary(void) {
+bool restoreSelectedReceiver(void) {
   RxPlan plan;
   if (TUNING_ExactPlan(activeSlot.current.frequency_hz,activeSlot.current.parameters,
       RECEIVER_Capabilities(),&plan)!=RX_OK) {
@@ -34,7 +34,7 @@ bool pauseWatchTo(const WatchTarget *target) {
   bool wasWatching=watcher.phase!=WATCH_OFF;
   if (wasWatching) {
     // Watch may have left any chip tuned elsewhere: stop them all and let
-    // restorePrimary configure the selected slot from scratch.
+    // restoreSelectedReceiver configure the selected slot from scratch.
     RECEIVER_Mute();
     for (uint8_t device=0; device<8; ++device)
       if (watcher.devices&(1u<<device)) RX_DEVICE_StopChip((RxDevice)device);
@@ -45,7 +45,7 @@ bool pauseWatchTo(const WatchTarget *target) {
   // single slot) there is nothing to delay.
   if (wasWatching || watchDelay) delayWatch();
   if (!wasWatching) return true;
-  if (!target) return restorePrimary();
+  if (!target) return restoreSelectedReceiver();
   if (RX_RuntimeTune(&runtime,&target->plan,applyReceiver,stopReceiver,NULL)!=RX_APPLIED) {
     RX_RuntimeStop(&runtime,stopReceiver,NULL); notify("RX error"); return false;
   }
@@ -143,5 +143,5 @@ void watchUpdate(void) {
     }
   }
   // If all candidates fail, listen to the primary during bounded retry delay.
-  if (watcher.phase==WATCH_RETRY && !wasRetrying) (void)restorePrimary();
+  if (watcher.phase==WATCH_RETRY && !wasRetrying) (void)restoreSelectedReceiver();
 }

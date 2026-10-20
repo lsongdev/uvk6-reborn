@@ -3,6 +3,7 @@
 
 #include "drivers/bk48x9/registers.h"
 #include "core/measurements.h"
+#include "core/radio-model.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -97,6 +98,7 @@ typedef struct {
   uint8_t squelch_open_delay, squelch_close_delay;
 } BK48X9Capabilities;
 BK48X9Capabilities BK48X9_GetCapabilities(void);
+extern const RadioSpan BK48X9_FREQUENCY_RANGES[RADIO_RF_RANGES];
 // Mute this receiver, retaining the chip-specific RX DSP/DAC requirements.
 void BK48X9_MuteAudio(void);
 

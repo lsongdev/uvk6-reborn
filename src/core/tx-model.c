@@ -18,10 +18,10 @@ uint32_t TX_MODEL_Frequency(const TxConfig *c, uint32_t rx) {
 
 TxResult TX_MODEL_Plan(const RxPlan *rx, const TxConfig *config,
                        const TxCapabilities *capabilities,
-                       const TxPolicy *policy, TxPlan *out) {
+                       TxPlan *out) {
   // Failure must never leave a previously authorized plan in the output.
   if (out) *out = (TxPlan){0};
-  if (!rx || !config || !capabilities || !policy || !out)
+  if (!rx || !config || !capabilities || !out)
     return TX_HW_FAULT;
   if (!TX_MODEL_ConfigValid(config))
     return TX_HW_FAULT;
@@ -33,22 +33,11 @@ TxResult TX_MODEL_Plan(const RxPlan *rx, const TxConfig *config,
   if (!TONE_Valid(rx->parameters.rx_tone) || !rx->parameters.step_hz || rx->parameters.squelch > 10 ||
       rx->frequency_hz % 10u)
     return TX_HW_FAULT;
-  // TX must never expand outside the RF chip's already-planned RX range,
-  // regardless of what a misconfigured board policy requests.
-  if (!((rx->frequency_hz >= 18000000u && rx->frequency_hz <= 660000000u) ||
-        (rx->frequency_hz >= 840000000u && rx->frequency_hz <= 1300000000u)))
-    return TX_OUT_OF_BAND;
-  if (!frequency || !TX_MODEL_FrequencyValid(frequency)) return TX_OUT_OF_BAND;
-  if (!capabilities->available || !policy->authorized)
+  if (!capabilities->available)
     return TX_UNVERIFIED_HARDWARE;
-  if (!policy->count || policy->count > TX_RANGE_CAPACITY) return TX_OUT_OF_BAND;
-  bool allowed = false;
-  for (uint8_t i=0; i<policy->count; ++i) {
-    const TxFrequencyRange *range = &policy->ranges[i];
-    if (range->lower_hz >= range->upper_hz) return TX_OUT_OF_BAND;
-    allowed |= frequency >= range->lower_hz && frequency < range->upper_hz;
-  }
-  if (!allowed) return TX_OUT_OF_BAND;
+  if (!frequency || !TX_MODEL_FrequencyValid(frequency) ||
+      !RADIO_MODEL_InRfRange(rx->frequency_hz,capabilities->ranges) ||
+      !RADIO_MODEL_InRfRange(frequency,capabilities->ranges)) return TX_OUT_OF_BAND;
   if (!(capabilities->power_mask & (1u << config->power))) return TX_UNCALIBRATED;
   *out = (TxPlan){.frequency_hz = frequency, .power = config->power, .tone = config->tone, .tail = config->tail && config->tone != 0};
   return TX_OK;

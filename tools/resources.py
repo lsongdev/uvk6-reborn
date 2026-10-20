@@ -405,7 +405,7 @@ def main():
                                                help='skip the reset that reloads the patch check')
     cal_read = commands.add_parser('cal-read', help='back up calibration, show the PA rows')
     cal_write = commands.add_parser('cal-write', help='write one PA row')
-    cal_write.add_argument('band', type=int, help='0-6; TX uses 2 (136-174 MHz) and 5 (400-470 MHz)')
+    cal_write.add_argument('band', type=int, help='0-6; TX selects all seven factory bands by frequency')
     cal_write.add_argument('row', help="9 hex bytes, Low/Medium/High x3, e.g. '5f5f5f 696969 7a8b7f'")
     cal_seed = commands.add_parser('cal-seed', help='reference values into erased band 2/5 rows')
     cal_restore = commands.add_parser('cal-restore', help='the whole block from a 512-byte backup')

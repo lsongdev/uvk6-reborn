@@ -101,7 +101,7 @@ int main(void) {
   original.preferences.deviation=130;
   original.radio.slots[1].tx.offset_hz=TX_OFFSET_MAX_HZ+10;assert(!CONFIG_Encode(&original,1,record));
   original.radio.slots[1].tx.offset_hz=5000000;
-  original.radio.slots[2].tx.split_hz=700000000;assert(!CONFIG_Encode(&original,1,record));
+  original.radio.slots[2].tx.split_hz=17000000;assert(!CONFIG_Encode(&original,1,record));
   original.radio.slots[2].tx.split_hz=146500000;
   original.radio.slots[0].channel_number=USER_CHANNEL_COUNT+1;assert(!CONFIG_Encode(&original,1,record));
   original.radio.slots[0].channel_number=200;

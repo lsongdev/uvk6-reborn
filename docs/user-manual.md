@@ -103,7 +103,7 @@
 
 | 模式 | 软件接收路径 |
 | --- | --- |
-| NFM | BK4819（K6）／BK4829（K1）：18–660 MHz、840–1300 MHz |
+| NFM | BK4819（K6）：18–660／840–1300 MHz；BK4829（K1）：18–660／760–1300 MHz |
 | WFM | 64–108 MHz；SI4732 构建用 SI4732，否则用 BK1080（K1 固定 BK1080） |
 | AM | ≤30 MHz 且有 SI4732 时优先 SI；其余 BK 支持范围用 BK AM 实现。K1 的 BK4829 AM 采用原厂寄存器值，6k／12k 带宽使用原厂 AM 滤波预设，26k 使用宽带预设 |
 | LSB／USB | ≤30 MHz 的 SI4732；须安装全量 CRC 校验通过的 EEPROM 补丁 |
@@ -216,11 +216,11 @@ Slot 菜单 → Spectrum。上方是当前 Slot 的卡片，显示光标处的�
 | MENU | 把 Slot 调到光标频率（按键盘输入的规则，跨频段采用该频段预设）并回到主屏幕；MR 提示 VFO only |
 | EXIT | 不改动 Slot，回到主屏幕 |
 
-扫描只用 BK4819，范围 18–660 MHz 与 840–1300 MHz，范围外的点留空；固定 12 kHz 滤波、自动增益。期间静音、暂停守听和 RDS，退出后恢复原接收，约 2 秒后继续守听。每点约 2 ms，一轮约 0.3 秒；稳定时间与读数准确度须实测。
+扫描使用当前板的 BK4819／BK4829，范围与本板 NFM 调谐范围一致，范围外的点留空；固定 12 kHz 滤波、自动增益。期间静音、暂停守听和 RDS，退出后恢复原接收，约 2 秒后继续守听。每点约 2 ms，一轮约 0.3 秒；稳定时间与读数准确度须实测。
 
 ## 8. 发射
 
-默认构建开放 K6 BK4819／K1 BK4829 NFM TX，TX Enable 为 On 后才可申请；每槽默认 Off。软件范围为 **136 ≤ f < 174 MHz、400 ≤ f < 470 MHz**，实际 TX Hz 由 Shift／Offset／Split 计算。WFM、AM、LSB、USB 不自动转为 NFM 发射。K1 使用本机 SPI Flash 中的原厂 PA 校准。K1 发射期间暂停全部接收路径，松键后恢复对讲接收和后续守听。
+默认构建开放 K6 BK4819／K1 BK4829 NFM TX，TX Enable 为 On 后才可申请；每槽默认 Off。不另设 TX 白名单；K6 调谐范围为 **18–660／840–1300 MHz**，K1 为 **18–660／760–1300 MHz**，均包含端点，实际 TX Hz 由 Shift／Offset／Split 计算。扩展频率仍使用本机原厂 PA 表，缺有效数据时提示 TX uncalibrated；芯片标称与扩展范围的区别见[发射范围](tx-frequency-range.md)。WFM、AM、LSB、USB 不自动转为 NFM 发射。K1 使用本机 SPI Flash 中的原厂 PA 校准。K1 发射期间暂停全部接收路径，松键后恢复对讲接收和后续守听。
 
 还检查功率校准、供电（当前 6.00–9.00 V）、锁键、忙信道和 TOT；默认 TOT 120 秒、Block if busy On。缺某档校准则拒绝该档。松键、TOT 或供电异常先关 PA，再恢复 RX；TOT 后按住不自动重发，需松键。Low／Medium／High 是校准档，不代表已测瓦数。
 
@@ -262,7 +262,7 @@ Cal voltage 在当前行编辑，保存成功才采用新系数；失败保留�
 | TX disabled／TX: NFM only | 检查对应 Slot 的 TX Enable 和模式 |
 | TX HW locked／TX uncalibrated／TX out of band | 无板级 TX／缺校准／实际 TX Hz 越界 |
 | TX: bad battery | 电压未知或越界 |
-| Channel busy／TX busy/locked | 忙信道或发射状态、锁定条件不允许 |
+| TX: RX Busy／TX busy/locked | 接收侧检测到忙信道，或发射状态、锁定条件不允许 |
 | TX error／TX timeout | 准备失败／到达时限，先松开 PTT |
 
 广播选择 WFM，438.5 MHz 对讲选择 NFM。调谐成功不证明音频或天线链路正常，仍需检查音量、静噪和硬件。实机验收项目集中在[开发文档](development.md#7-实机验收与未完成事项)。
