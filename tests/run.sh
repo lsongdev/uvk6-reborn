@@ -245,10 +245,12 @@ done
   "$dead_strip" -o "$test_binary"
 "$test_binary"
 # Check actual board PWM registers, not a duplicate duty mapping in a mock.
+# CMSIS targets 32-bit MCU pointers. Treat its headers as system headers on
+# 64-bit hosts while keeping -Werror for the test and actual board driver.
 for backlight_k1 in 0 1; do
   "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror \
     -DTEST_UVK1="$backlight_k1" -DPY32F071xB \
-    -Isrc/drivers/py32f071/vendor -Isrc/external/CMSIS_5/CMSIS/Core/Include \
+    -Isrc/drivers/py32f071/vendor -isystem src/external/CMSIS_5/CMSIS/Core/Include \
     tests/backlight-board-regression.c -o "$test_binary"
   "$test_binary"
 done
