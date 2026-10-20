@@ -96,8 +96,15 @@ measure VDD/audio with an oscilloscope. These are **not** changes made here.
 On the UV-K1 (BK1080 broadcast over a bit-banged I2C on PF5/PF6) the user
 heard a faint regular ticking with BK1080 read every 50 ms. Reading it once
 a second instead left a barely audible tick about once a second. Bus traffic
-to the receiver chip is therefore an audible source on that radio; the K6
-SI4732 path has not been A/B tested yet.
+to the receiver chip is therefore an audible source on that radio.
+
+## UV-K6 hardware evidence (2026-10-20)
+
+With `aa4a112` (default build: 500 ms SI RSQ meter, RDS on) the user listened
+on several FM stations and heard no ticking any more, so the diagnostic
+matrix above was not needed. One audible gap remains and is accepted: about
+1 s after tuning, when the save icon appears, audio drops briefly and the
+LED blinks once while the setting is written to EEPROM.
 
 ## Verification limits
 
