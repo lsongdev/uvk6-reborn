@@ -4,11 +4,6 @@
 #include <stdint.h>
 #include "core/radio-model.h"
 
-// Set by the Makefile (ENABLE_SPECTRUM); host tests keep the spectrum.
-#ifndef UVK6_ENABLE_SPECTRUM
-#define UVK6_ENABLE_SPECTRUM 1
-#endif
-
 // A sweep of SPECTRUM_POINTS frequencies, step_hz apart, centred on
 // center_hz. Levels are RSSI in dB above the chip's zero (raw RSSI / 2);
 // 0 means not measured (outside the chip's range, or not yet swept).

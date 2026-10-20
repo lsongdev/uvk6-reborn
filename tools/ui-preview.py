@@ -68,7 +68,7 @@ def main():
                        'src/ui/signal.c', 'src/core/radio-model.c', 'src/core/text.c']
             command = shlex.split(os.environ.get('CC', 'cc')) + [
                 '-Isrc', '-std=c2x', '-DUVK6_ENABLE_SI4732=1',
-                '-DUVK6_ENABLE_SPECTRUM=1', '-ffunction-sections', '-fdata-sections',
+                '-ffunction-sections', '-fdata-sections',
                 '-Wno-incompatible-pointer-types',
                 '-Isrc/external/CMSIS_5/CMSIS/Core/Include',
                 '-Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include',

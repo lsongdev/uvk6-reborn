@@ -2,7 +2,6 @@
 #include "radio/radio-internal.h"
 
 CaptureRuntime capture;
-#if UVK6_ENABLE_FC
 bool capturing;
 static uint32_t capturePollAt;
 static bool captureInterruptedAudio;
@@ -100,12 +99,3 @@ void RADIO_CaptureNextScope(void) {
   captureAttempt();
 }
 bool RADIO_Capturing(void) { return capturing; }
-#else
-void RADIO_StartCapture(void) { notify("Not supported"); }
-void RADIO_CaptureAdopt(void) {}
-void RADIO_CaptureCancel(void) {}
-void RADIO_CaptureNextScope(void) {}
-bool RADIO_Capturing(void) { return false; }
-void captureUpdate(void) {}
-void cancelCapture(const char *status) { (void)status; }
-#endif
