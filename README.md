@@ -10,7 +10,7 @@ Tune by band, frequency, and mode. Keep your channels, monitor multiple slots, a
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Targets](https://img.shields.io/badge/Targets-UV--K6_%C2%B7_UV--K1-367d65)](#supported-hardware)
 
-[User Manual](docs/user-manual.md) · [Build & Development](docs/development.md) · [Design](docs/design.md) · [Firmware Builds](https://github.com/lsongdev/uvk6-reborn/actions/workflows/c-cpp.yml)
+[Web Flasher & Device Tools](https://lsong.org/uvk6-reborn/) · [User Manual](docs/user-manual.md) · [Build & Development](docs/development.md) · [Design](docs/design.md) · [Firmware Builds](https://github.com/lsongdev/uvk6-reborn/actions/workflows/c-cpp.yml)
 
 <img src="docs/images/manual-main.png" alt="Frequency view, broadcast station name and saved channel view" width="780">
 
@@ -41,6 +41,11 @@ Development is active. Basic listening and operation have been confirmed on the 
 The default K6 build targets the SI4732 modification. Use `ENABLE_SI4732=0` for BK1080 hardware. K1 always uses BK1080. Other EEPROM sizes and board variants are not validated targets. **K1 and K6 images are not interchangeable.**
 
 ## Get Started
+
+Use the [browser workbench](https://lsong.org/uvk6-reborn/) to flash firmware,
+connect the running radio, read diagnostics and download storage backups.
+It requires desktop Chrome or Edge; flashing both boards uses a K-type UART
+programming cable. The buildless Preact + htm source is in [website/](website/).
 
 1. Read the [flashing and backup instructions](docs/user-manual.md#1-刷入固件与首次使用), and preserve your radio's factory calibration.
 2. Download the matching artifact from a successful [Firmware build](https://github.com/lsongdev/uvk6-reborn/actions/workflows/c-cpp.yml) run: `uvk1-bk1080`, `uvk6-bk1080`, or `uvk6-si4732`.

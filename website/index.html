@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="UVK6 Reborn 开源对讲机固件。直接通过浏览器为 UV-K6 / UV-K1 刷机、连接设备、读取诊断和备份存储。">
+    <meta name="theme-color" content="#f6f7f9">
+    <title>UVK6 Reborn · 让电台焕新</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="https://lsong.org/stylesheets/index.css">
+    <link rel="stylesheet" href="https://lsong.org/css/stylesheet.css">
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div id="app"><main class="loading"><h1>UVK6 Reborn</h1><p id="loading-status" role="status">正在加载设备工具…</p><noscript>请启用 JavaScript，以使用浏览器串口刷机和设备连接。</noscript></main></div>
+    <script type="module">
+      import('./app.js').catch(() => {
+        document.getElementById('app').textContent = '页面模块加载失败，请检查网络能否访问 lsong.org 和 unpkg.com，然后刷新页面。';
+      });
+    </script>
+  </body>
+</html>
