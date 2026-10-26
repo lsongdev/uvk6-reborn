@@ -50,10 +50,10 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('./firmware/manifest.json', { cache: 'no-cache', signal: controller.signal })
+    fetch('./firmware/manifest.json', { cache: 'no-cache', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]) })
       .then(response => { if (!response.ok) throw new Error('本站固件尚未发布，可先选择本地 .bin。'); return response.json(); })
       .then(value => { if (!value.variants || !value.commit) throw new Error('固件索引无效，请使用本地文件。'); setManifest(value); })
-      .catch(error => { if (error.name !== 'AbortError') setManifestError(error.message); });
+      .catch(error => { if (error.name !== 'AbortError') setManifestError(error.name === 'TimeoutError' ? '固件索引加载超时，请刷新页面或选择本地 .bin。' : error.message); });
     return () => controller.abort();
   }, []);
 
@@ -89,7 +89,8 @@ function App() {
     catch (error) {
       const cancelled = error.name === 'NotFoundError' || error.name === 'AbortError';
       const suffix = label === '刷写固件' ? ' 若刷写已开始，请重新进入 Bootloader 后完整重刷。' : '';
-      const message = cancelled ? (label === '备份存储' ? '备份已取消，没有生成不完整文件。' : '已取消连接设备。') : `${error.message}${suffix}`;
+      const timedOut = label === '下载固件' && error.name === 'TimeoutError';
+      const message = cancelled ? (label === '备份存储' ? '备份已取消，没有生成不完整文件。' : '已取消连接设备。') : timedOut ? '固件下载超时，请重试或选择本地 .bin 文件。' : `${error.message}${suffix}`;
       setNotice({ error: !cancelled, message }); log(message);
       // A failed exchange must not leave a seemingly usable session in the UI.
       if (['连接设备', '刷新诊断', '读取 RF', '备份存储', '重启设备'].includes(label)) await disconnect().catch(() => {});
@@ -121,7 +122,7 @@ function App() {
       setImage(null); setAcknowledged(false);
       const entry = manifest?.variants?.[variant];
       if (!entry || entry.board !== selected.board || entry.variant !== variant || entry.file !== `${variant}.bin`) throw new Error('本站尚未提供该机型固件，请选择本地文件。');
-      const response = await fetch(`./firmware/${entry.file}`, { cache: 'no-cache' });
+      const response = await fetch(`./firmware/${entry.file}`, { cache: 'no-cache', signal: AbortSignal.timeout(30000) });
       if (!response.ok) throw new Error('固件下载失败，请重试或选择本地文件。');
       const bytes = new Uint8Array(await response.arrayBuffer());
       const digest = await sha256(bytes);
