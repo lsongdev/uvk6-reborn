@@ -23,6 +23,13 @@ jobs:
           python-version: '3.12'
       - name: Run host regression tests
         run: sh tests/run.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test browser device protocols and Pages packaging
+        run: |
+          npm --prefix website test
+          python3 website/tests/prepare_test.py
       - name: Check UI preview generation
         run: python3 tools/ui-preview.py --frames manual-slot-rx manual-settings --output /tmp/menu-preview.png
 
@@ -119,3 +126,36 @@ jobs:
           name: uvk6-reborn-${{ matrix.variant }}
           path: dist/${{ matrix.variant }}/
           if-no-files-found: error
+
+  pages:
+    name: Publish website and firmware
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: uvk6-reborn-*
+          path: /tmp/firmware-artifacts
+      - name: Prepare static website with verified firmware
+        run: python3 website/prepare.py --artifacts /tmp/firmware-artifacts --output /tmp/website --commit "$GITHUB_SHA"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: /tmp/website
+      - uses: actions/deploy-pages@v4
+        id: deployment
