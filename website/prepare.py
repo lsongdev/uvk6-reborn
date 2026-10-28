@@ -45,8 +45,17 @@ def prepare(artifacts, output, commit):
     if set(found) != set(VARIANTS):
         raise ValueError('All three firmware variants are required')
     output.mkdir(parents=True)
-    for filename in ('index.html', 'app.js', 'serial.js', 'protocol.js', 'style.css', 'favicon.svg'):
-        shutil.copyfile(source / filename, output / filename)
+    files = ('index.html', 'app.js', 'serial.js', 'protocol.js', 'style.css', 'favicon.svg')
+    asset_urls = {f'./{filename}' for filename in files}
+    asset_urls.update(f'./{path.relative_to(source).as_posix()}' for path in (source / 'assets').rglob('*') if path.is_file())
+    for filename in files:
+        content = (source / filename).read_text()
+        # Version the complete local module graph with the same deployment SHA.
+        # This also keeps modulepreload and import() pointed at one module URL.
+        for url in sorted(asset_urls):
+            content = re.sub(r'([\'\"])' + re.escape(url) + r'\1',
+                             lambda match: f'{match[1]}{url}?v={commit}{match[1]}', content)
+        (output / filename).write_text(content)
     shutil.copytree(source / 'assets', output / 'assets')
     (output / '.nojekyll').touch()
     firmware = output / 'firmware'
