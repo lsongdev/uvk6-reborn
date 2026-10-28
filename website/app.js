@@ -122,7 +122,7 @@ function App() {
       setImage(null); setAcknowledged(false);
       const entry = manifest?.variants?.[variant];
       if (!entry || entry.board !== selected.board || entry.variant !== variant || entry.file !== `${variant}.bin`) throw new Error('本站尚未提供该机型固件，请选择本地文件。');
-      const response = await fetch(`./firmware/${entry.file}`, { cache: 'no-cache', signal: AbortSignal.timeout(30000) });
+      const response = await fetch(`./firmware/${entry.file}?v=${manifest.commit}`, { cache: 'no-cache', signal: AbortSignal.timeout(30000) });
       if (!response.ok) throw new Error('固件下载失败，请重试或选择本地文件。');
       const bytes = new Uint8Array(await response.arrayBuffer());
       const digest = await sha256(bytes);

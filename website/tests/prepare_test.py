@@ -44,6 +44,14 @@ class PackagingTests(unittest.TestCase):
         self.assertTrue((self.output / 'index.html').is_file())
         self.assertFalse((self.output / 'tests').exists())
         self.assertFalse((self.output / 'prepare.py').exists())
+        index = (self.output / 'index.html').read_text()
+        self.assertIn(f'./style.css?v={COMMIT}', index)
+        self.assertEqual(index.count(f'./app.js?v={COMMIT}'), 2)
+        app = (self.output / 'app.js').read_text()
+        self.assertIn(f'./serial.js?v={COMMIT}', app)
+        self.assertIn(f'./protocol.js?v={COMMIT}', app)
+        self.assertIn(f'./assets/main-screen.png?v={COMMIT}', app)
+        self.assertIn(f'./serial.js?v={COMMIT}', (self.output / 'protocol.js').read_text())
 
     def test_mixed_commits_and_modified_firmware_cannot_publish(self):
         metadata = self.artifacts / 'uvk1-bk1080/build-info.json'

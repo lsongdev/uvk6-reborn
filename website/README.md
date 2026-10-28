@@ -50,6 +50,9 @@ three firmware builds pass on `main`. `prepare.py` verifies the artifacts'
 board, variant, commit, vector table, size and SHA-256, then copies the static
 files and matching binaries to the Pages artifact. The deployed site and firmware
 always come from the same commit. There is no frontend build step.
+Published local scripts, module imports, styles and images use `?v=<commit>`
+URLs so browser caches cannot mix files from different deployments. Firmware
+downloads use the manifest's commit as their version and still verify SHA-256.
 
 Repository Settings → Pages → Source must be **GitHub Actions**. The account's
 custom Pages domain may determine the final project URL. All asset and firmware
