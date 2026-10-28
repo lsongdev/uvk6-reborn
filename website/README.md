@@ -4,8 +4,8 @@ Browser flashing and device tools, built with Preact + htm + native ESM.
 No frontend build, package installation, or application server is needed.
 `app.js` imports `https://lsong.org/scripts/react/index.js`; the page uses
 `https://lsong.org/css/stylesheet.css` and `https://lsong.org/stylesheets/index.css`.
-The shared module currently loads htm/Preact from unpkg.com, so these origins
-must be reachable. Radio data and backups stay in the browser.
+The shared module serves pinned htm/Preact runtime copies from lsong.org;
+the page does not need unpkg.com. Radio data and backups stay in the browser.
 
 ## Preview
 
