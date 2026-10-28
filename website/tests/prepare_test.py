@@ -47,6 +47,11 @@ class PackagingTests(unittest.TestCase):
         index = (self.output / 'index.html').read_text()
         self.assertIn(f'./style.css?v={COMMIT}', index)
         self.assertEqual(index.count(f'./app.js?v={COMMIT}'), 2)
+        import_map = json.loads(index.split('<script type="importmap">', 1)[1].split('</script>', 1)[0])
+        for name in ('preact.js', 'preact-hooks.js', 'htm.js'):
+            url = f'https://lsong.org/scripts/react/{name}'
+            self.assertEqual(import_map['imports'][url], f'{url}?v={COMMIT}')
+        self.assertLess(index.index('<script type="importmap">'), index.index('rel="modulepreload"'))
         app = (self.output / 'app.js').read_text()
         self.assertIn(f'./serial.js?v={COMMIT}', app)
         self.assertIn(f'./protocol.js?v={COMMIT}', app)
