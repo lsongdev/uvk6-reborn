@@ -24,18 +24,20 @@ def png_chunk(kind, data):
     return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
 
 
-def write_preview(path, left, right, scale):
+def write_preview(path, frames, scale):
     gap = 4 * scale
-    width, height = 256 * scale + gap, 64 * scale
+    screen_width = 128 * scale
+    width, height = len(frames) * screen_width + (len(frames) - 1) * gap, 64 * scale
     rows = []
     for y in range(height):
         row = bytearray(b'\0')
         for x in range(width):
-            if 128 * scale <= x < 128 * scale + gap:
+            screen, local_x = divmod(x, screen_width + gap)
+            if local_x >= screen_width:
                 value = 255
             else:
-                source = left if x < 128 * scale else right
-                sx = x // scale if source is left else (x - 128 * scale - gap) // scale
+                source = frames[screen]
+                sx = local_x // scale
                 ink = source[(y // scale) * 16 + sx // 8] & (128 >> (sx % 8))
                 value = 30 if ink else 232
             row.extend((value, value, value))
@@ -50,9 +52,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'docs/images/vfo-states.png')
     parser.add_argument('--scale', type=int, choices=range(1, 13), default=4)
-    parser.add_argument('--frames', nargs=2, choices=['error-short', 'error-long', 'multi-ab', 'multi-cd', 'watch-probe', 'watch-rx', 'ab-a', 'ab-b', 'single', 'dual', 'plain', 'max', 'maxtext', 'lw', 'rds', 'frequency', 'name', 'tuned', 'channel', 'spectrum', 'spectrum-edge', 'spectrum-out', 'tx', 'seek', 'manual-frequency', 'manual-name', 'manual-watch', 'manual-tx', 'manual-input', 'manual-channel', 'manual-slot-rx', 'manual-slot-tx', 'manual-settings', 'manual-display', 'manual-receive', 'manual-transmit'],
-                        default=['frequency', 'name'], help='left and right preview scenarios')
+    parser.add_argument('--frames', nargs='+', choices=['error-short', 'error-long', 'multi-ab', 'multi-cd', 'watch-probe', 'watch-rx', 'ab-a', 'ab-b', 'single', 'dual', 'plain', 'max', 'maxtext', 'lw', 'rds', 'frequency', 'name', 'tuned', 'channel', 'spectrum', 'spectrum-edge', 'spectrum-out', 'tx', 'seek', 'manual-frequency', 'manual-name', 'manual-watch', 'manual-tx', 'manual-input', 'manual-channel', 'manual-slot-rx', 'manual-slot-tx', 'manual-settings', 'manual-display', 'manual-receive', 'manual-transmit'],
+                        default=['frequency', 'name'], help='one scenario for a single screen, or two for a side-by-side preview')
     args = parser.parse_args()
+    if len(args.frames) not in (1, 2):
+        parser.error('--frames requires one or two scenarios')
     try:
         with tempfile.TemporaryDirectory(prefix='uvk6-ui-preview-') as temp:
             directory = Path(temp)
@@ -76,9 +80,8 @@ def main():
                 '-o', str(binary)]
             subprocess.run(command, cwd=ROOT, check=True)
             subprocess.run([str(binary), str(directory)], check=True)
-            write_preview(args.output, read_frame(directory / f'{args.frames[0]}.pbm'),
-                          read_frame(directory / f'{args.frames[1]}.pbm'), args.scale)
-        print(f'Preview: {args.output.resolve()} (left: {args.frames[0]}; right: {args.frames[1]})')
+            write_preview(args.output, [read_frame(directory / f'{frame}.pbm') for frame in args.frames], args.scale)
+        print(f'Preview: {args.output.resolve()} (frames: {", ".join(args.frames)})')
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         print(f'Preview failed: {error}', file=sys.stderr)
         return 1

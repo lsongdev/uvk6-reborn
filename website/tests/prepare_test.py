@@ -40,7 +40,7 @@ class PackagingTests(unittest.TestCase):
         for entry in manifest['variants'].values():
             data = (self.output / 'firmware' / entry['file']).read_bytes()
             self.assertEqual(entry['sha256'], hashlib.sha256(data).hexdigest())
-        self.assertTrue((self.output / 'assets/manual-main.png').is_file())
+        self.assertTrue((self.output / 'assets/main-screen.png').is_file())
         self.assertTrue((self.output / 'index.html').is_file())
         self.assertFalse((self.output / 'tests').exists())
         self.assertFalse((self.output / 'prepare.py').exists())

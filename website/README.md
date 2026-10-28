@@ -21,6 +21,12 @@ use a local raw `.bin`; the firmware manifest is generated only for deployment.
 
 ## Device operations
 
+Regenerate the website's single-screen firmware preview from the real drawing code:
+
+```sh
+python3 tools/ui-preview.py --frames manual-frequency --output website/assets/main-screen.png
+```
+
 - Flash K6 SI4732, K6 BK1080, or K1 BK1080 raw images using a K-type UART cable,
   38400 baud, 256-byte pages, five attempts per page, and matched acknowledgments.
   Hold PTT while powering on after selecting the port. K1 USB CDC is application-only.
