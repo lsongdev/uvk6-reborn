@@ -49,7 +49,7 @@ def prepare(artifacts, output, commit):
     asset_urls = {f'./{filename}' for filename in files}
     asset_urls.update(f'./{path.relative_to(source).as_posix()}' for path in (source / 'assets').rglob('*') if path.is_file())
     for filename in files:
-        content = (source / filename).read_text()
+        content = (source / filename).read_text().replace('?v=site', f'?v={commit}')
         # Version the complete local module graph with the same deployment SHA.
         # This also keeps modulepreload and import() pointed at one module URL.
         for url in sorted(asset_urls):

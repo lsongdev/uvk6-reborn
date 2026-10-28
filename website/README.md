@@ -53,6 +53,9 @@ always come from the same commit. There is no frontend build step.
 Published local scripts, module imports, styles and images use `?v=<commit>`
 URLs so browser caches cannot mix files from different deployments. Firmware
 downloads use the manifest's commit as their version and still verify SHA-256.
+An import map applies the same deployment version to the shared Preact/htm
+runtime URLs, including transitive imports, to bypass cached missing-file responses
+and keep hooks and rendering on the same Preact module instance.
 
 Repository Settings → Pages → Source must be **GitHub Actions**. The account's
 custom Pages domain may determine the final project URL. All asset and firmware
