@@ -11,13 +11,105 @@
     <link rel="stylesheet" href="https://lsong.org/css/stylesheet.css">
     <link rel="stylesheet" href="./style.css">
     <link rel="modulepreload" href="./app.js">
+    <style>
+      /* Keep startup and recovery usable even when shared styles cannot load. */
+      body { margin: 0; }
+      #startup, #startup * { box-sizing: border-box; }
+      #startup[hidden], #startup [hidden] { display: none !important; }
+      #startup { display: grid; align-content: center; min-height: 100svh; width: 100%; max-width: none; margin: 0; padding: 40px 20px; background: #f8f9f7; color: #26332b; font: 15px/1.8 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+      #startup .startup-content { width: 100%; max-width: 540px; margin: auto; }
+      #startup .startup-brand { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 30px; color: #526650; font-size: 15px; text-decoration: none; }
+      #startup .startup-brand svg { width: 32px; height: 32px; flex-shrink: 0; }
+      #startup .startup-card { padding: 36px; border: 1px solid #dfe5dd; border-radius: 12px; background: #fff; box-shadow: 0 12px 36px -24px #26332b44; }
+      #startup .startup-indicator { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 24px; border: 1px solid #dfe8d9; border-radius: 12px; background: #f2f6ee; color: #526d46; }
+      #startup .startup-indicator svg { width: 24px; height: 24px; }
+      #startup h1 { margin: 0 0 12px; color: #26332b; font: 600 clamp(24px, 5vw, 30px)/1.4 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; letter-spacing: -.035em; }
+      #startup h1:focus { outline: none; }
+      #startup p { margin: 0; color: #6b776b; font-size: 14px; }
+      #startup .startup-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 26px; }
+      #startup .startup-button { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 9px 18px; border: 1px solid #dfe5dd; border-radius: 6px; background: #fff; color: #315d48; font: inherit; font-size: 13px; font-weight: 500; line-height: 1.6; text-decoration: none; cursor: pointer; }
+      #startup button.startup-button { border-color: #315d48; background: #315d48; color: #fff; font-family: inherit; font-size: 13px; }
+      #startup button.startup-button:hover { background: #244b39; }
+      #startup a:hover { text-decoration: underline; text-underline-offset: 4px; }
+      #startup :is(a, button, summary):focus-visible { outline: 2px solid #315d48; outline-offset: 4px; }
+      #startup details { margin-top: 26px; padding-top: 20px; border-top: 1px solid #edf0eb; color: #6b776b; font-size: 12px; }
+      #startup summary { cursor: pointer; }
+      #startup details p { margin-top: 10px; font-size: 12px; }
+      #startup details a, #startup .startup-links a { color: #426741; text-underline-offset: 3px; }
+      #startup .startup-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 20px; font-size: 12px; }
+      #startup .startup-note { margin-top: 20px; font-size: 12px; color: #7b8679; }
+      #startup .startup-spinner { animation: startup-spin 1.5s linear infinite; }
+      #startup .startup-error-icon { display: none; }
+      #startup[data-state="error"] .startup-spinner { display: none; }
+      #startup[data-state="error"] .startup-error-icon { display: block; }
+      @keyframes startup-spin { to { transform: rotate(360deg); } }
+      @media (max-width: 480px) { #startup { padding: 28px 16px; } #startup .startup-card { padding: 28px 22px; } }
+      @media (prefers-reduced-motion: reduce) { #startup .startup-spinner { animation: none; } }
+    </style>
   </head>
   <body>
-    <div id="app"><main class="loading"><h1>UVK6 Reborn</h1><p id="loading-status" role="status">正在加载设备工具…</p><noscript>请启用 JavaScript，以使用浏览器串口刷机和设备连接。</noscript></main></div>
-    <script type="module">
-      import('./app.js').catch(() => {
-        document.getElementById('app').textContent = '页面模块加载失败，请检查网络能否访问 lsong.org 和 unpkg.com，然后刷新页面。';
-      });
+    <main id="startup" data-state="loading" aria-labelledby="startup-title">
+      <div class="startup-content">
+        <a class="startup-brand" href="./">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#1c2027"/><path d="M9 20h4l3-10 7 20 3-10h5" fill="none" stroke="#b9e98b" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>
+          <span>UVK6 Reborn</span>
+        </a>
+        <section class="startup-card">
+          <div class="startup-indicator" aria-hidden="true">
+            <svg class="startup-spinner" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".2" stroke-width="2"/><path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" stroke-linecap="round" stroke-width="2"/></svg>
+            <svg class="startup-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 8a11 11 0 0 1 14 0M8 11a6 6 0 0 1 8 0M11 14a2 2 0 0 1 2 0M4 3l16 18"/><circle cx="12" cy="18" r=".5"/></svg>
+          </div>
+          <div id="startup-status" role="status" aria-live="polite" aria-atomic="true">
+            <h1 id="startup-title" tabindex="-1">正在准备电台工具</h1>
+            <p id="startup-description">正在加载刷机与设备连接工具，请稍候。</p>
+          </div>
+          <div id="startup-actions" class="startup-actions" hidden>
+            <button id="startup-retry" class="startup-button" type="button">重新加载</button>
+            <a class="startup-button" href="https://github.com/lsongdev/uvk6-reborn/blob/main/docs/user-manual.md">查看使用手册 ↗</a>
+          </div>
+          <details id="startup-help" hidden>
+            <summary>重试后仍然无法打开？</summary>
+            <p>页面需要从 <a href="https://lsong.org/">lsong.org</a> 和 <a href="https://unpkg.com/">unpkg.com</a> 加载资源。你可以尝试切换网络，或稍后重试。</p>
+            <p>如果问题持续出现，请<a href="https://github.com/lsongdev/uvk6-reborn/issues">反馈问题</a>，并附上浏览器名称与遇到的情况。</p>
+          </details>
+          <noscript><p>请启用 JavaScript 后重新加载页面，以使用刷机与设备连接工具。</p></noscript>
+        </section>
+        <nav class="startup-links" aria-label="备用入口">
+          <a href="https://github.com/lsongdev/uvk6-reborn/actions/workflows/c-cpp.yml">查看固件构建 ↗</a>
+          <a href="https://github.com/lsongdev/uvk6-reborn">GitHub 源码 ↗</a>
+        </nav>
+        <p class="startup-note">开源固件 · 为 UV-K6 与 UV-K1 打造</p>
+      </div>
+    </main>
+    <div id="app"></div>
+    <script>
+      (() => {
+        const startup = document.getElementById('startup');
+        const title = document.getElementById('startup-title');
+        const description = document.getElementById('startup-description');
+        const actions = document.getElementById('startup-actions');
+        const help = document.getElementById('startup-help');
+        document.getElementById('startup-retry').addEventListener('click', () => location.reload());
+        const slowLoading = setTimeout(() => {
+          title.textContent = '加载时间有点长';
+          description.textContent = '仍在等待页面资源。你可以继续等待，或重新加载再试一次。';
+          actions.hidden = false;
+          help.hidden = false;
+        }, 15000);
+        import('./app.js').then(() => {
+          clearTimeout(slowLoading);
+          startup.remove();
+        }).catch(() => {
+          clearTimeout(slowLoading);
+          document.getElementById('app').replaceChildren();
+          startup.dataset.state = 'error';
+          title.textContent = '电台工具暂时未能加载';
+          description.textContent = '部分页面资源没有成功载入。请检查网络连接后重试，也可以先查看使用手册或固件构建。';
+          actions.hidden = false;
+          help.hidden = false;
+          title.focus();
+        });
+      })();
     </script>
   </body>
 </html>
