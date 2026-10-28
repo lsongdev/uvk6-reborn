@@ -99,7 +99,8 @@
         import('./app.js').then(() => {
           clearTimeout(slowLoading);
           startup.remove();
-        }).catch(() => {
+        }).catch(error => {
+          console.error('UVK6 Reborn could not load:', error);
           clearTimeout(slowLoading);
           document.getElementById('app').replaceChildren();
           startup.dataset.state = 'error';
