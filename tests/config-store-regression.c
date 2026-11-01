@@ -96,6 +96,16 @@ int main(void) {
   assert(loaded.radio.presets[6].squelch==7);
   assert(loaded.preferences.mic==9 && loaded.preferences.tx_timeout_seconds==300);
 
+  // K1 factory calibration is outside the old 1900--2154 UI/storage bounds.
+  original.preferences.battery_calibration=2193;
+  assert(CONFIG_Encode(&original,7,record) && CONFIG_Decode(record,&loaded,NULL));
+  assert(loaded.preferences.battery_calibration==2193);
+  original.preferences.battery_calibration=0;
+  assert(!CONFIG_Encode(&original,7,record));
+  original.preferences.battery_calibration=4096;
+  assert(!CONFIG_Encode(&original,7,record));
+  original.preferences.battery_calibration=2193;
+
   // Invalid values never encode; corrupt or foreign records never decode.
   original.preferences.deviation=205;assert(!CONFIG_Encode(&original,1,record));
   original.preferences.deviation=130;

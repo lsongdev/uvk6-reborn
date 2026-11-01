@@ -1,5 +1,6 @@
 #include "store/config-store.h"
 #include "core/crc32.h"
+#include "core/fields.h"
 #include <string.h>
 
 // Record: "UVR2", format, band count, slot capacity, pad, sequence, CRC32,
@@ -37,21 +38,51 @@ static uint32_t crc32(const uint8_t *bytes, uint16_t size) {
   crc = CRC32_Update(crc, zero, sizeof(zero));
   return ~CRC32_Update(crc, bytes + HEADER_CRC + 4, size - HEADER_CRC - 4u);
 }
-static uint8_t *encodeBand(uint8_t *p, const BandState *band) {
-  put32(p, band->frequency_hz);
-  put32(p+4, band->parameters.step_hz);
-  put32(p+8, band->parameters.bandwidth_hz);
-  p[12] = band->parameters.mode;
-  p[13] = band->parameters.squelch;
-  put16(p+14, band->parameters.rx_tone);
-  return p + BAND_BYTES;
-}
-static const uint8_t *decodeBand(const uint8_t *p, BandState *band) {
-  band->frequency_hz = get32(p);
-  band->parameters = (RadioParameters){
-      .mode = (RxMode)p[12], .step_hz = get32(p+4),
-      .bandwidth_hz = get32(p+8), .squelch = p[13], .rx_tone = get16(p+14)};
-  return p + BAND_BYTES;
+static const Field bandFields[] = {
+  FIELD(BandState, frequency_hz, 4), FIELD(BandState, parameters.step_hz, 4),
+  FIELD(BandState, parameters.bandwidth_hz, 4), FIELD(BandState, parameters.mode, 1),
+  FIELD(BandState, parameters.squelch, 1), FIELD(BandState, parameters.rx_tone, 2),
+};
+static const Field slotFields[] = {
+  FIELD(RadioSlot, active_band, 1), FIELD(RadioSlot, source, 1), FIELD(RadioSlot, channel_number, 1),
+};
+static const Field txFields[] = { // After the flags byte.
+  FIELD(TxConfig, offset_hz, 4), FIELD(TxConfig, split_hz, 4), FIELD(TxConfig, tone, 2),
+};
+static const Field presetFields[] = {
+  FIELD(RadioParameters, step_hz, 4), FIELD(RadioParameters, bandwidth_hz, 2),
+  FIELD(RadioParameters, mode, 1), FIELD(RadioParameters, squelch, 1),
+  FIELD(RadioParameters, rx_tone, 2),
+};
+#define PREF(member, width) FIELD(ConfigPreferences, member, width)
+static const Field preferenceFields[] = {
+  PREF(battery_calibration, 2), PREF(backlight, 1), PREF(contrast, 1), PREF(brightness, 1),
+  PREF(battery_type, 1), PREF(battery_style, 1), PREF(backlight_on_squelch, 1),
+  PREF(keylock, 1), PREF(ptt_lock, 1), PREF(beep, 1), PREF(si4732_power_off, 1),
+  PREF(mic, 1), PREF(deviation, 1), PREF(bound_240_280, 1), PREF(brightness_low, 1),
+  PREF(sql_open_time, 1), PREF(sql_close_time, 1), PREF(tx_timeout_seconds, 2),
+  PREF(tx_busy_lockout, 1),
+};
+// The payload after the header, either way: its end, or NULL on a reserved
+// TX flag bit. Encoding only reads the config, decoding only the bytes.
+static uint8_t *payload(uint8_t *p, DeviceConfig *config, bool decode) {
+  RadioUserState *radio = &config->radio;
+  p = FIELDS_Code(p, radio, (const Field[]){FIELD(RadioUserState, slot_count, 1),
+                                            FIELD(RadioUserState, selected_slot, 1)}, 2, decode);
+  for (uint8_t id=0; id<RADIO_SLOT_CAPACITY; ++id) {
+    RadioSlot *slot = &radio->slots[id];
+    p = FIELDS_CODE(p, slot, slotFields, decode);
+    p = FIELDS_CODE(p, &slot->current, bandFields, decode);
+    for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
+      p = FIELDS_CODE(p, &slot->bands[i], bandFields, decode);
+    TxConfig *tx = &slot->tx;
+    if (!decode) *p = TX_MODEL_Flags(tx);
+    else if (!TX_MODEL_SetFlags(tx, *p)) return NULL;
+    p = FIELDS_CODE(p + 1, tx, txFields, decode);
+  }
+  for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
+    p = FIELDS_CODE(p, &radio->presets[i], presetFields, decode);
+  return FIELDS_CODE(p, &config->preferences, preferenceFields, decode);
 }
 void CONFIG_Default(DeviceConfig *config) {
   if (!config)
@@ -65,7 +96,8 @@ static bool valid(const DeviceConfig *config) {
   return RADIO_STATE_Valid(&config->radio) &&
          p->tx_timeout_seconds >= 15 && p->tx_timeout_seconds <= 600 &&
          p->tx_busy_lockout <= 1 &&
-         p->battery_calibration >= 1900 && p->battery_calibration <= 2154 &&
+         p->battery_calibration >= CALIBRATION_BATTERY_MIN &&
+         p->battery_calibration <= CALIBRATION_BATTERY_MAX &&
          p->backlight <= 6 && p->contrast <= 15 && p->brightness <= 15 &&
          p->battery_type <= 2 && p->battery_style <= 2 &&
          p->backlight_on_squelch <= 2 && p->keylock <= 1 &&
@@ -84,40 +116,8 @@ bool CONFIG_Encode(const DeviceConfig *config, uint32_t sequence,
   bytes[HEADER_BANDS] = RADIO_STATE_BANDS;
   bytes[HEADER_SLOTS] = RADIO_SLOT_CAPACITY;
   put32(bytes + HEADER_SEQUENCE, sequence);
-  uint8_t *p = bytes + PAYLOAD_START;
-  *p++ = config->radio.slot_count;
-  *p++ = config->radio.selected_slot;
-  for (uint8_t id=0; id<RADIO_SLOT_CAPACITY; ++id) {
-    const RadioSlot *slot = &config->radio.slots[id];
-    *p++ = slot->active_band;
-    *p++ = (uint8_t)slot->source;
-    *p++ = slot->channel_number;
-    p = encodeBand(p, &slot->current);
-    for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
-      p = encodeBand(p, &slot->bands[i]);
-    const TxConfig *tx = &slot->tx;
-    *p++ = (uint8_t)(tx->enabled | tx->power << 1 | tx->shift << 3 | tx->tail << 5);
-    put32(p, tx->offset_hz); put32(p+4, tx->split_hz); put16(p+8, tx->tone); p += 10;
-  }
-  for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
-    const RadioParameters *preset = &config->radio.presets[i];
-    put32(p, preset->step_hz); put16(p+4, preset->bandwidth_hz);
-    p[6] = preset->mode; p[7] = preset->squelch;
-    put16(p+8, preset->rx_tone); p += PRESET_BYTES;
-  }
-  const ConfigPreferences *pref = &config->preferences;
-  put16(p, pref->battery_calibration); p += 2;
-  const uint8_t values[] = {
-    pref->backlight, pref->contrast, pref->brightness, pref->battery_type,
-    pref->battery_style, pref->backlight_on_squelch, pref->keylock,
-    pref->ptt_lock, pref->beep, pref->si4732_power_off, pref->mic,
-    pref->deviation, pref->bound_240_280, pref->brightness_low,
-    pref->sql_open_time, pref->sql_close_time
-  };
-  memcpy(p, values, sizeof(values)); p += sizeof(values);
-  put16(p, pref->tx_timeout_seconds); p += 2;
-  *p++ = pref->tx_busy_lockout;
-  if (p != bytes + PAYLOAD_START + PAYLOAD_BYTES) return false;
+  if (payload(bytes + PAYLOAD_START, (DeviceConfig *)config, false) !=
+      bytes + PAYLOAD_START + PAYLOAD_BYTES) return false;
   put32(bytes + HEADER_CRC, crc32(bytes, RECORD_BYTES));
   return true;
 }
@@ -130,39 +130,8 @@ bool CONFIG_Decode(const uint8_t bytes[RECORD_BYTES], DeviceConfig *config,
     return false;
   DeviceConfig candidate;
   CONFIG_Default(&candidate);
-  const uint8_t *p = bytes + PAYLOAD_START;
-  candidate.radio.slot_count = *p++;
-  candidate.radio.selected_slot = *p++;
-  for (uint8_t id=0; id<RADIO_SLOT_CAPACITY; ++id) {
-    RadioSlot *slot = &candidate.radio.slots[id];
-    slot->active_band = *p++;
-    slot->source = (RadioSource)*p++;
-    slot->channel_number = *p++;
-    p = decodeBand(p, &slot->current);
-    for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i)
-      p = decodeBand(p, &slot->bands[i]);
-    TxConfig *tx = &slot->tx;
-    tx->enabled = *p & 1u; tx->power = (TxPower)(*p >> 1 & 3u); tx->shift = (TxShift)(*p >> 3 & 3u);
-    tx->tail = (*p >> 5) & 1u;
-    if (*p++ >> 6) return false;
-    tx->offset_hz = get32(p); tx->split_hz = get32(p+4); tx->tone = get16(p+8); p += 10;
-  }
-  for (uint8_t i=0; i<RADIO_STATE_BANDS; ++i) {
-    candidate.radio.presets[i] = (RadioParameters){
-      .step_hz=get32(p), .bandwidth_hz=get16(p+4),
-      .mode=(RxMode)p[6], .squelch=p[7], .rx_tone=get16(p+8)};
-    p += PRESET_BYTES;
-  }
-  ConfigPreferences *pref = &candidate.preferences;
-  pref->battery_calibration = get16(p); p += 2;
-  uint8_t *values[] = {&pref->backlight, &pref->contrast, &pref->brightness,
-    &pref->battery_type, &pref->battery_style, &pref->backlight_on_squelch,
-    &pref->keylock, &pref->ptt_lock, &pref->beep, &pref->si4732_power_off,
-    &pref->mic, &pref->deviation, &pref->bound_240_280,
-    &pref->brightness_low, &pref->sql_open_time, &pref->sql_close_time};
-  for (unsigned i = 0; i < sizeof(values)/sizeof(values[0]); ++i) *values[i] = *p++;
-  pref->tx_timeout_seconds = get16(p); p += 2;
-  pref->tx_busy_lockout = *p++;
+  if (payload((uint8_t *)bytes + PAYLOAD_START, &candidate, true) !=
+      bytes + PAYLOAD_START + PAYLOAD_BYTES) return false;
   if (!valid(&candidate)) return false;
   *config = candidate;
   if (sequence) *sequence = get32(bytes + HEADER_SEQUENCE);

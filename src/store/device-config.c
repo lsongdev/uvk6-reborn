@@ -25,12 +25,17 @@ static bool writeStorage(void *context, unsigned slot, const void *data, uint16_
 static ConfigStore storage(void) {
   return (ConfigStore){.read = readStorage, .write = writeStorage};
 }
+static void defaults(void) {
+  CONFIG_Default(&gDeviceConfig);
+  gDeviceConfig.preferences.battery_calibration = CALIBRATION_BatteryReference();
+}
 bool DEVICE_Load(void) {
   gDeviceConfigReady = false;
   dirty = saveFailed = false;
-  CONFIG_Default(&gDeviceConfig);
+  defaults();
   if (!STORAGE_Ready())
     return false;
+  uint16_t reference = gDeviceConfig.preferences.battery_calibration;
   ConfigStore io = storage();
   if (!CONFIG_Load(&io, &gDeviceConfig, &committedSequence))
     return false;
@@ -38,6 +43,14 @@ bool DEVICE_Load(void) {
   (void)CHANNEL_STORE_Init();
   saveAt = 0;
   dirty = saveFailed = false;
+  // Older firmware persisted 2000 during initialization, discarding the
+  // factory reference. Repair that legacy default; keep other user values.
+  if (gDeviceConfig.preferences.battery_calibration == CALIBRATION_BATTERY_FALLBACK) {
+    if (reference != CALIBRATION_BATTERY_FALLBACK) {
+      gDeviceConfig.preferences.battery_calibration = reference;
+      DEVICE_RequestSave();
+    }
+  }
   // Older format-8 preferences allowed an idle level above active brightness.
   // Normalize that relationship without rejecting an otherwise valid config.
   if (gDeviceConfig.preferences.brightness_low > gDeviceConfig.preferences.brightness) {
@@ -49,7 +62,7 @@ bool DEVICE_Load(void) {
 bool DEVICE_Initialize(void) {
   if (!STORAGE_Ready())
     return false;
-  CONFIG_Default(&gDeviceConfig);
+  defaults();
   ConfigStore io = storage();
   if (!CONFIG_Save(&io, &gDeviceConfig, &committedSequence)) {
     dirty = saveFailed = true;
@@ -71,7 +84,7 @@ void DEVICE_RequestSave(void) {
 bool DEVICE_UseVolatile(void) {
   if (!STORAGE_Ready() || STORAGE_Size(STORAGE_CONFIG_A) || STORAGE_Size(STORAGE_CONFIG_B))
     return false;
-  CONFIG_Default(&gDeviceConfig);
+  defaults();
   gDeviceConfigReady = volatileConfig = true;
   saveAt = 0;
   dirty = saveFailed = false;

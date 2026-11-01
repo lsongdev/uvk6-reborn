@@ -7,6 +7,8 @@
 #include "hal/storage.h"
 #include "hal/crc.h"
 #include "hal/system.h"
+#include "radio/radio.h"
+#include "store/channel-store.h"
 #include "app/link/uart-protocol.h"
 #include <stdbool.h>
 #include <string.h>
@@ -15,7 +17,7 @@
 // command set, over every transport the board lists in BOARD_SERIAL_PORTS.
 // Each port keeps its own read position and obfuscation state; a reply goes
 // back on the port its request arrived on.
-static const char Version[] = "s0v4";
+static const char Version[] = "reborn";
 
 static bool bIsInLockScreen = false;
 
@@ -110,11 +112,6 @@ typedef struct {
     uint16_t Current;
   } Data;
 } REPLY_0529_t;
-
-typedef struct {
-  Header_t Header;
-  uint32_t Timestamp;
-} CMD_052F_t;
 
 typedef struct {
   Header_t Header;
@@ -309,12 +306,56 @@ static void CMD_0570(const uint8_t *pBuffer) {
   SendReply(&Reply, sizeof(Reply));
 }
 
-static void CMD_052F(const uint8_t *pBuffer) {
-  const CMD_052F_t *pCmd = (const CMD_052F_t *)pBuffer;
+// Channels in the normalized record format (docs/channel-format.md).
+typedef struct {
+  Header_t Header;
+  uint16_t Number;
+  uint8_t Op; // Write: 0 delete, 1 save. Read: unused.
+  uint8_t Padding;
+  uint32_t Timestamp;
+  uint8_t Record[CHANNEL_RECORD_BYTES];
+} CMD_CHANNEL_t;
 
-  Timestamp = pCmd->Timestamp;
+typedef struct {
+  Header_t Header;
+  uint16_t Number;
+  uint8_t Status;
+  uint8_t Padding;
+  uint8_t Record[CHANNEL_RECORD_BYTES];
+} REPLY_CHANNEL_t;
 
-  SendVersion();
+static void __attribute__((noinline)) channelReply(uint16_t id, uint16_t number, uint8_t status, const UserChannel *channel) {
+  REPLY_CHANNEL_t reply = {{id, 0}, number, status, 0, {0}};
+  uint16_t size = 8;
+  if (channel) { CHANNEL_STORE_Encode(channel, reply.Record); size += CHANNEL_RECORD_BYTES; }
+  reply.Header.Size = size - 4;
+  SendReply(&reply, size);
+}
+
+// Read: 0 empty, 1 the channel follows, 2 no such channel or no storage.
+static void CMD_0580(const uint8_t *buffer) {
+  const CMD_CHANNEL_t *cmd = (const CMD_CHANNEL_t *)buffer;
+  if (cmd->Timestamp != Timestamp) return;
+  UserChannel channel;
+  bool exists = CHANNEL_STORE_Available() && cmd->Number >= 1 && cmd->Number <= USER_CHANNEL_COUNT;
+  bool loaded = exists && CHANNEL_STORE_Load(cmd->Number, &channel);
+  channelReply(0x0581, cmd->Number, loaded ? 1 : exists ? 0 : 2, loaded ? &channel : NULL);
+}
+
+// Write: 0 done, 1 invalid channel, 2 no such channel or no storage,
+// 3 storage failed, 4 busy transmitting.
+static void CMD_0582(const uint8_t *buffer) {
+  const CMD_CHANNEL_t *cmd = (const CMD_CHANNEL_t *)buffer;
+  if (cmd->Timestamp != Timestamp) return;
+  uint16_t number = cmd->Number;
+  UserChannel channel;
+  uint8_t status = !CHANNEL_STORE_Available() || number < 1 || number > USER_CHANNEL_COUNT ? 2
+      : RADIO_TxBusy() ? 4
+      : cmd->Op && !CHANNEL_STORE_Decode(cmd->Record, &channel) ? 1
+      : cmd->Op ? (CHANNEL_STORE_Save(number, &channel) ? 0 : 3)
+      : (!CHANNEL_STORE_IsOccupied(number) || CHANNEL_STORE_Delete(number) ? 0 : 3);
+  if (status == 0 || status == 3) RADIO_ChannelsChanged(number);
+  channelReply(0x0583, number, status, NULL);
 }
 
 static bool commandOn(uint8_t index) {
@@ -437,17 +478,13 @@ void LINK_HandleCommand(void) {
   switch (UART_Command.Header.ID) {
     // VERSION
   case 0x0514:
+  case 0x052F: // The same, with the backlight off on stock firmware.
     CMD_0514(UART_Command.Buffer);
     break;
 
     // EEPROM READ
   case 0x051B:
     CMD_051B(UART_Command.Buffer);
-    break;
-
-    // VERSION, BL OFF
-  case 0x052F:
-    CMD_052F(UART_Command.Buffer);
     break;
 
     // RESOURCE WRITE
@@ -465,6 +502,14 @@ void LINK_HandleCommand(void) {
 
   case 0x0570:
     CMD_0570(UART_Command.Buffer);
+    break;
+
+  case 0x0580:
+    CMD_0580(UART_Command.Buffer);
+    break;
+
+  case 0x0582:
+    CMD_0582(UART_Command.Buffer);
     break;
 
     // RESET

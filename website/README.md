@@ -33,15 +33,16 @@ python3 tools/ui-preview.py --frames manual-frequency --output website/assets/ma
 - Reject packed images, wrong vectors, partition overflow and mismatched bootloaders
   (K6 3.x, K1 7.x) before sending a handshake or writing a page. The K6 chip
   variant cannot be detected by the bootloader; the user must select it correctly.
-- Power-cycle after flashing, then connect the running `s0v4` application.
+- Power-cycle after flashing, then connect the running `reborn` application.
   Read storage information, diagnostics and the RF register whitelist, or reboot.
 - Back up calibration (K6 `0x1E00..0x1FFF`; K1 the 4 KiB sector at `0x010000`)
   or the full detected physical storage (512 KiB / 2 MiB). Reads use 128-byte chunks,
   matched addresses and sizes, pacing, and a bounded retry budget. Only completed
   backups are offered for download, with optional SHA-256 metadata.
 - A cancelled/failed backup closes the session. Reconnect before another operation.
-  No storage write or arbitrary register write commands are exposed. The firmware
-  currently has no remote tuning or channel-editing interface.
+  No storage write or arbitrary register write commands are exposed. Channels can be
+  read and written by the firmware's `0x0580`/`0x0582` commands
+  ([format](../docs/channel-format.md)); the website does not use them yet.
 
 ## GitHub Pages
 

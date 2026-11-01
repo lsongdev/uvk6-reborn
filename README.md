@@ -79,6 +79,7 @@ Replace the port with your device's port. Hold PTT while powering on to enter th
 | [User Manual](docs/user-manual.md) | Flashing, screen tour, keys, illustrated menus, channels, RX and TX ranges |
 | [Design](docs/design.md) | Tuning, slot monitoring, audio ownership, TX lifecycle, storage formats and roadmap |
 | [Development](docs/development.md) | Build matrix, tools, architecture, memory budgets and validation |
+| [Channel Format](docs/channel-format.md) | Normalized channel record and the serial read/write commands |
 | [UV-K6 Hardware](docs/hardware-uvk6.md) | Primary unit, controls, EEPROM layout, calibration and listening records |
 | [UV-K1 Hardware](docs/hardware-uvk1.md) | Board differences, USB, SPI storage, calibration and hardware records |
 | [Datasheets](docs/datasheets/README.md) · [Resources](resources/README.md) | Chip references, original sources and external SSB patch provenance |

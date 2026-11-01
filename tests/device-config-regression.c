@@ -66,5 +66,46 @@ int main(void) {
   clockNow+=2000; DEVICE_Update();
   assert(DEVICE_SaveNow() && writes==savedWrites && DEVICE_GetSaveStatus()==DEVICE_VOLATILE);
   fakeReady=false; assert(!DEVICE_UseVolatile()); // Missing storage stays unavailable.
+
+  // K1's actual factory ADC points: first initialization, failed/no-config
+  // load, and RAM mode all use the reference instead of the K6-era 2000.
+  volatileConfig=false; // Simulate reboot after the read-only bring-up test.
+  fakeReady=true;
+  fakeSize[STORAGE_CONFIG_A]=fakeSize[STORAGE_CONFIG_B]=1024;
+  memset(fakeArea,255,sizeof(fakeArea));
+  static const uint16_t points[6]={1442,2010,2163,2193,2314,2600};
+  for (unsigned i=0;i<6;++i) {
+    fakeArea[STORAGE_CALIBRATION][0x140u+i*2u]=points[i];
+    fakeArea[STORAGE_CALIBRATION][0x141u+i*2u]=points[i]>>8;
+  }
+  savedWrites=writes;
+  assert(!DEVICE_Load() && writes==savedWrites);
+  assert(gDeviceConfig.preferences.battery_calibration==2193);
+  assert(DEVICE_Initialize());
+  assert(gDeviceConfig.preferences.battery_calibration==2193);
+  assert(DEVICE_Load() && gDeviceConfig.preferences.battery_calibration==2193);
+  assert(DEVICE_GetSaveStatus()==DEVICE_SAVED);
+
+  // Repair old default-only configs without resetting radio/settings. No
+  // writes during load; the existing deferred save path commits the repair.
+  gDeviceConfig.preferences.battery_calibration=2000;
+  gDeviceConfig.preferences.contrast=12;
+  assert(DEVICE_SaveNow()); savedWrites=writes;
+  assert(DEVICE_Load() && writes==savedWrites);
+  assert(gDeviceConfig.preferences.battery_calibration==2193);
+  assert(gDeviceConfig.preferences.contrast==12 && DEVICE_GetSaveStatus()==DEVICE_PENDING);
+  clockNow+=1500; DEVICE_Update(); assert(writes>savedWrites);
+  assert(DEVICE_Load() && gDeviceConfig.preferences.battery_calibration==2193);
+  assert(DEVICE_GetSaveStatus()==DEVICE_SAVED);
+
+  // Explicit non-default calibration survives load and later saves.
+  draft=gDeviceConfig.preferences; draft.battery_calibration=2240;
+  assert(DEVICE_SavePreferences(&draft));
+  savedWrites=writes;
+  assert(DEVICE_Load() && gDeviceConfig.preferences.battery_calibration==2240);
+  assert(writes==savedWrites && DEVICE_GetSaveStatus()==DEVICE_SAVED);
+  fakeSize[STORAGE_CONFIG_A]=fakeSize[STORAGE_CONFIG_B]=0;
+  assert(!DEVICE_Load() && DEVICE_UseVolatile());
+  assert(gDeviceConfig.preferences.battery_calibration==2193);
   return 0;
 }

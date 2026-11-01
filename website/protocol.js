@@ -171,7 +171,7 @@ export class Radio {
     if (reply.length < 20) throw new Error('无效的固件版本应答。');
     this.version = text(reply.slice(4, 20));
     // Only Reborn's current read/diagnostic protocol is supported here.
-    if (this.version !== 's0v4') throw new Error(`固件协议 ${this.version} 不受支持，请先刷入 UVK6 Reborn。`);
+    if (this.version !== 'reborn') throw new Error(`固件协议 ${this.version} 不受支持，请先刷入 UVK6 Reborn。`);
     const info = await this.request(command(0x0572, 8, this.stamp), 0x0573);
     if (info.length !== 32) throw new Error('无效的存储信息应答。');
     this.capacity = u32(info, 4);

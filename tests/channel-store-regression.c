@@ -33,6 +33,16 @@ int main(void) {
   // Toggling only tail is a material update, and zero-bit records stay Off.
   ch.tx.tail=false;
   assert(CHANNEL_STORE_Save(12,&ch) && CHANNEL_STORE_Load(12,&loaded) && !loaded.tx.tail);
+  // A record of the earlier format (tag 0xC5) reads as empty.
+  {
+    uint8_t b[RECORD];
+    encode(b, 30, 1, &ch);
+    b[0] = 0xC5;
+    put32(b + CRC_AT, crc32(b));
+    memcpy(fakeArea[STORAGE_CHANNELS_A] + offset(30), b, RECORD);
+    memcpy(fakeArea[STORAGE_CHANNELS_B] + offset(30), b, RECORD);
+    assert(CHANNEL_STORE_Init() && !CHANNEL_STORE_IsOccupied(30) && !CHANNEL_STORE_Load(30, &loaded));
+  }
   // Invalid channels are refused.
   UserChannel bad=ch;bad.tx.offset_hz=TX_OFFSET_MAX_HZ+10;
   assert(!CHANNEL_STORE_Save(13,&bad));

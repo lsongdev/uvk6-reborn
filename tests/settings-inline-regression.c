@@ -18,7 +18,9 @@ static ReceiverCapabilities capabilities = {.bk_am=true, .bk_bandwidth_mask=RX_B
 static char title[40];
 static uint8_t panels[10][8][128];
 static unsigned panelCount;
-uint32_t BATTERY_GetPreciseVoltage(uint16_t cal) { assert(cal>=1900 && cal<=2154); return 82400; }
+uint32_t BATTERY_GetPreciseVoltage(uint16_t cal) {
+  assert(cal>=CALIBRATION_BATTERY_MIN && cal<=CALIBRATION_BATTERY_MAX); return 82400;
+}
 uint16_t BATTERY_GetCal(uint32_t voltage) { calibratedVoltage=voltage; return calibrationResult; }
 void BACKLIGHT_ApplySettings(void) {}
 void DISPLAY_Init(bool full, uint8_t contrast) { (void)full; (void)contrast; }
@@ -78,16 +80,25 @@ int main(int argc, char **argv) {
   press(KEY_MENU);assert(!number.active && saves==1 && calibratedVoltage==78600);
   assert(active_menu==&batteryMenu && menu_stack_top==1 && !appRuns);
   assert(gDeviceConfig.preferences.battery_calibration==2100);
-  calibrationResult=2200;
+  // K1 factory reference must be accepted by both the menu and persistence.
+  calibrationResult=2193;
   press(KEY_MENU);press(KEY_MENU);
-  assert(saves==1 && gDeviceConfig.preferences.battery_calibration==2100);
+  assert(saves==2 && gDeviceConfig.preferences.battery_calibration==2193);
+  // Exact user report: accepting 8.29 V requires a coefficient above 2154.
+  calibrationResult=2236;
+  press(KEY_MENU);press(KEY_8);press(KEY_STAR);press(KEY_2);press(KEY_9);press(KEY_MENU);
+  assert(saves==3 && calibratedVoltage==82900 &&
+         gDeviceConfig.preferences.battery_calibration==2236);
+  calibrationResult=4096;
+  press(KEY_MENU);press(KEY_MENU);
+  assert(saves==3 && gDeviceConfig.preferences.battery_calibration==2236);
   assert(!strcmp(notice,"Invalid value"));
   calibrationResult=2000; saveWorks=false;
   press(KEY_MENU);press(KEY_MENU);
-  assert(saves==1 && gDeviceConfig.preferences.battery_calibration==2100);
+  assert(saves==3 && gDeviceConfig.preferences.battery_calibration==2236);
   assert(!strcmp(notice,"Save failed")); saveWorks=true;
-  press(KEY_MENU);press(KEY_4);press(KEY_MENU);assert(number.active && number.invalid && saves==1);
-  assert(key(KEY_EXIT,KEY_LONG_PRESSED));assert(!number.active && saves==1);
+  press(KEY_MENU);press(KEY_4);press(KEY_MENU);assert(number.active && number.invalid && saves==3);
+  assert(key(KEY_EXIT,KEY_LONG_PRESSED));assert(!number.active && saves==3);
   press(KEY_EXIT); choose(KEY_6); // Channels opens the channel list.
   assert(lastScreen==&channelsScreen && active_menu==&settingsMenu);
   choose(KEY_7); capture(); // About is last and also holds the former System items.
@@ -99,9 +110,9 @@ int main(int argc, char **argv) {
   assert(!strcmp(info,UVK6_ENABLE_SI4732 ? "SI4732" : "BK1080"));
   assert(menuItems[ARRAY_SIZE(menuItems)-1].submenu==&aboutMenu);
   choose(resetKey); capture(); // Reset confirmation
-  press(KEY_EXIT); assert(!resetConfirm && saves==1);
-  choose(resetKey);press(KEY_MENU);assert(saves==2 && !resetConfirm);
-  assert(gDeviceConfig.preferences.battery_calibration==2100);
+  press(KEY_EXIT); assert(!resetConfirm && saves==3);
+  choose(resetKey);press(KEY_MENU);assert(saves==4 && !resetConfirm);
+  assert(gDeviceConfig.preferences.battery_calibration==2236);
   // A failed reapplication restores the prior engineering preferences.
   gDeviceConfig.preferences.sql_open_time=3;
   applyWorks=false;leave();

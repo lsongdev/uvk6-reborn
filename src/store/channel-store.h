@@ -14,6 +14,12 @@
 #define CHANNEL_STORE_COPY_COUNT 2u
 #define CHANNEL_STORE_AREA_BYTES (USER_CHANNEL_COUNT * CHANNEL_STORE_RECORD_BYTES)
 
+// The channel's fields in the normalized format (docs/channel-format.md),
+// shared by storage and the PC link. Decode refuses an invalid channel.
+#define CHANNEL_RECORD_BYTES 41u
+void CHANNEL_STORE_Encode(const UserChannel *channel, uint8_t record[CHANNEL_RECORD_BYTES]);
+bool CHANNEL_STORE_Decode(const uint8_t record[CHANNEL_RECORD_BYTES], UserChannel *channel);
+
 // Channel numbers are stable, one-based EEPROM record identifiers.
 bool CHANNEL_STORE_Init(void);
 bool CHANNEL_STORE_Available(void);

@@ -44,6 +44,10 @@ static inline bool TX_MODEL_FrequencyValid(uint32_t hz) {
 }
 
 bool TX_MODEL_ConfigValid(const TxConfig *config);
+// Stored flags byte: bit 0 enabled, 1-2 power, 3-4 shift, 5 tail. SetFlags
+// refuses the reserved bits 6-7.
+uint8_t TX_MODEL_Flags(const TxConfig *config);
+bool TX_MODEL_SetFlags(TxConfig *config, uint8_t flags);
 // TX Hz for an RX Hz under the shift; zero when it cannot apply.
 uint32_t TX_MODEL_Frequency(const TxConfig *config, uint32_t rx_hz);
 TxResult TX_MODEL_Plan(const RxPlan *rx, const TxConfig *config,

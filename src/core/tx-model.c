@@ -7,6 +7,16 @@ bool TX_MODEL_ConfigValid(const TxConfig *c) {
          TONE_Valid(c->tone) && !(c->offset_hz % 10u) && c->offset_hz <= TX_OFFSET_MAX_HZ &&
          TX_MODEL_FrequencyValid(c->split_hz);
 }
+uint8_t TX_MODEL_Flags(const TxConfig *c) {
+  return (uint8_t)(c->enabled | c->power << 1 | c->shift << 3 | c->tail << 5);
+}
+bool TX_MODEL_SetFlags(TxConfig *c, uint8_t flags) {
+  c->enabled = flags & 1u;
+  c->power = (TxPower)(flags >> 1 & 3u);
+  c->shift = (TxShift)(flags >> 3 & 3u);
+  c->tail = flags >> 5 & 1u;
+  return !(flags >> 6);
+}
 uint32_t TX_MODEL_Frequency(const TxConfig *c, uint32_t rx) {
   switch (c->shift) {
   case TX_SHIFT_PLUS: return rx + c->offset_hz;

@@ -24,7 +24,7 @@ static const Preference preferences[SETTING_COUNT] = {
     PREF(SETTING_BRIGHTNESS_L, brightness_low, 0, 15),
     PREF(SETTING_CONTRAST, contrast, 0, 15),
     PREF(SETTING_BACKLIGHTONSQUELCH, backlight_on_squelch, 0, 2),
-    PREF(SETTING_BATTERYCALIBRATION, battery_calibration, 1900, 2154),
+    PREF(SETTING_BATTERYCALIBRATION, battery_calibration, CALIBRATION_BATTERY_MIN, CALIBRATION_BATTERY_MAX),
     PREF(SETTING_BATTERYTYPE, battery_type, 0, 2),
     PREF(SETTING_BATTERYSTYLE, battery_style, 0, 2),
     PREF(SETTING_KEYLOCK, keylock, 0, 1),

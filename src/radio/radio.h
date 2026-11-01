@@ -104,7 +104,9 @@ void RADIO_ChannelSaved(uint16_t number, const UserChannel *channel);
 
 // Settings hooks.
 void RADIO_SlotsChanged(void);    // Slot count changed.
-void RADIO_ChannelsChanged(void); // A channel was renamed or deleted.
+// A channel was renamed, edited or deleted; a nonzero `retune` names one
+// whose radio settings changed, so a selected slot showing it is reapplied.
+void RADIO_ChannelsChanged(uint16_t retune);
 bool RADIO_ApplyRxSettings(void); // Reapply the receive plan after RX preferences.
 
 #endif

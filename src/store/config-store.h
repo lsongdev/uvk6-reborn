@@ -4,6 +4,7 @@
 #include "core/radio-state.h"
 #include "core/tx-model.h"
 #include "store/preferences.h"
+#include "store/calibration.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -25,7 +26,7 @@ typedef struct {
 
 // Shared by boot-time initialization and reset; never serialize this struct.
 #define CONFIG_DEFAULT_PREFERENCES { \
-    .battery_calibration = 2000, .backlight = 3, .contrast = 8, \
+    .battery_calibration = CALIBRATION_BATTERY_FALLBACK, .backlight = 3, .contrast = 8, \
     .brightness = 8, .battery_type = 0, .battery_style = 1, \
     .backlight_on_squelch = 1, .mic = 16, .deviation = 130, \
     .brightness_low = 0, .sql_open_time = PREFERENCES_SQL_OPEN_AUTO, \

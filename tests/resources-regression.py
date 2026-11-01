@@ -36,7 +36,7 @@ class FakeFirmware:
         kind = int.from_bytes(payload[:2], 'little')
         if kind == 0x0514:
             self.stamp = struct.unpack_from('<I', payload, 4)[0]
-            self.reply = struct.pack('<HH', 0x0515, 36) + b's0v4'.ljust(16, b'\0') + bytes(20)
+            self.reply = struct.pack('<HH', 0x0515, 36) + b'reborn'.ljust(16, b'\0') + bytes(20)
         elif kind == 0x051B:
             at, n, stamp = struct.unpack_from('<IB3xI', payload, 4)
             assert stamp == self.stamp and 0 < n <= 128 and at + n <= CAPACITY
@@ -217,7 +217,7 @@ class ResourceTests(unittest.TestCase):
         self.assertEqual(len(self.patch), 8840)
         self.assertEqual(zlib.crc32(self.patch), 0xf9c0f474)
         self.assertEqual(self.address, 0x7DD78)
-        self.assertEqual(self.radio.version, 's0v4')
+        self.assertEqual(self.radio.version, 'reborn')
         with self.assertRaises(ValueError):
             resources.parse_patch('const uint8_t ssb_patch_content[] = {0x15, 0x00};')
 

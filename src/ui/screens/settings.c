@@ -29,7 +29,9 @@ static void changeValue(const MenuItem *item, bool up) {
 }
 static void doCalibrate(uint32_t value) {
   uint16_t calibration = BATTERY_GetCal(value*100u);
-  if (calibration < 1900 || calibration > 2154) { notice="Invalid value"; return; }
+  if (calibration < CALIBRATION_BATTERY_MIN || calibration > CALIBRATION_BATTERY_MAX) {
+    notice="Invalid value"; return;
+  }
   ConfigPreferences next = gDeviceConfig.preferences;
   next.battery_calibration = calibration;
   notice = DEVICE_SavePreferences(&next) ? "Calibrated" : "Save failed";

@@ -144,7 +144,7 @@ muMatrix 源文件注明由 muwerk 的 mufont 生成；转换格式不意味着�
 
 ### EEPROM 资源与校准工具
 
-本小节写入命令仅适用于 K6。tools/resources.py 通过正常运行固件（非 Bootloader）的 UART 维护 EEPROM；K1 不支持校准／资源维护写，读取必须使用本板物理地址，见下一小节。固件命令 0x0570 只接受 SSB 资源尾区和校准区 `0x1E00–0x1FFF`，写后回读再应答；配置和频道仍不可由串口写入。
+本小节写入命令仅适用于 K6。tools/resources.py 通过正常运行固件（非 Bootloader）的 UART 维护 EEPROM；K1 不支持校准／资源维护写，读取必须使用本板物理地址，见下一小节。固件命令 0x0570 只接受 SSB 资源尾区和校准区 `0x1E00–0x1FFF`，写后回读再应答；配置仍不可由串口写入。频道经专用命令 `0x0580`／`0x0582` 按规范记录读写，见[频道格式](channel-format.md)。
 
 补丁不在固件中，安装到 EEPROM 尾部，无需构建 CRC 宏。当前资源为 `resources/si4735/patch_init.h`，8840 B，CRC32 为 `0xf9c0f474`；数据位于 `0x7DD78–0x7FFFF`，前方 16 B 为 `SSBP` 资源头（长度、CRC）。工具先清除资源头、写入数据，最后写头并全量回读，成功后重启刷新能力检测。`RESOURCE_SsbPatchPresent` 校验资源头和全部数据，驱动只读加载到 SI；不能只检查前缀，也不自动迁移其他固件的补丁布局。
 

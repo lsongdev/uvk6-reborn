@@ -48,7 +48,7 @@ static void renamed(void) {
   memcpy(channel.name, nameDraft, sizeof(channel.name));
   channel.name[USER_CHANNEL_NAME_MAX] = '\0';
   message = CHANNEL_STORE_Save(cursor, &channel) ? "Saved" : "Save failed";
-  RADIO_ChannelsChanged();
+  RADIO_ChannelsChanged(0);
 }
 
 static bool key(KEY_Code_t key, Key_State_t state) {
@@ -59,7 +59,7 @@ static bool key(KEY_Code_t key, Key_State_t state) {
       uint16_t gone = cursor;
       uint16_t next = step(gone, true) ? step(gone, true) : step(gone, false);
       if (CHANNEL_STORE_Delete(gone)) {
-        RADIO_ChannelsChanged();
+        RADIO_ChannelsChanged(0);
         if (top == gone) top = next;
         cursor = next;
         if (top > cursor) top = cursor;

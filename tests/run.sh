@@ -107,14 +107,14 @@ done
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/rx-runtime-regression.c \
   src/radio/rx-runtime.c -o "$test_binary"
 "$test_binary"
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/config-store-regression.c src/core/crc32.c \
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/config-store-regression.c src/core/crc32.c src/core/fields.c \
   src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
   -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/band-editor-regression.c src/store/config-store.c src/core/crc32.c src/core/radio-model.c src/core/radio-state.c src/core/tx-model.c "$dead_strip" -o "$test_binary"
+  tests/band-editor-regression.c src/store/config-store.c src/core/fields.c src/core/crc32.c src/core/radio-model.c src/core/radio-state.c src/core/tx-model.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -ffunction-sections -fdata-sections \
   -Wno-incompatible-pointer-types \
@@ -155,7 +155,7 @@ for settings_si in 0 1; do
   "$test_binary"
 done
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/device-config-regression.c src/store/resource.c \
-  src/store/config-store.c src/core/crc32.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
+  src/store/config-store.c src/store/calibration.c src/core/fields.c src/core/crc32.c src/core/radio-state.c src/core/tx-model.c src/core/radio-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include \
@@ -164,17 +164,19 @@ done
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -Isrc/external/CMSIS_5/CMSIS/Core/Include -Isrc/external/CMSIS_5/Device/ARM/ARMCM0/Include \
-  tests/channels-regression.c src/store/channel-store.c src/core/crc32.c src/store/resource.c src/core/radio-model.c src/core/tx-model.c \
+  tests/channels-regression.c src/store/channel-store.c src/core/fields.c src/core/dcs.c src/core/crc32.c src/store/resource.c src/core/radio-model.c src/core/tx-model.c \
   src/ui/graphics.c src/ui/frequency.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
-"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/channel-store-regression.c src/core/crc32.c src/store/resource.c \
+"${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/channel-store-regression.c src/core/crc32.c src/core/fields.c src/core/dcs.c src/core/text.c src/store/resource.c \
   src/core/radio-model.c src/core/tx-model.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/storage-regression.c -o "$test_binary"
 "$test_binary"
 # The PC link over two serial ports (the K1's UART and USB).
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -Wno-missing-field-initializers \
-  -ffunction-sections -fdata-sections tests/link-regression.c "$dead_strip" -o "$test_binary"
+  -ffunction-sections -fdata-sections tests/link-regression.c src/store/channel-store.c src/core/fields.c \
+  src/core/crc32.c src/core/dcs.c src/core/text.c src/core/radio-model.c src/core/tx-model.c \
+  "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/bk-rx-mode-regression.c \
   src/drivers/bk48x9/rx.c src/drivers/bk48x9/bk4819.c src/drivers/bk48x9/common.c \
@@ -228,11 +230,11 @@ done
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   tests/uvk1-storage-regression.c src/drivers/py25q16/py25q16.c src/store/config-store.c \
-  src/store/channel-store.c src/core/crc32.c src/core/radio-state.c src/core/tx-model.c \
+  src/store/channel-store.c src/core/fields.c src/core/crc32.c src/core/radio-state.c src/core/tx-model.c \
   src/core/radio-model.c src/core/dcs.c src/core/text.c "$dead_strip" -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror tests/battery-regression.c \
-  src/devices/battery.c -o "$test_binary"
+  src/devices/battery.c src/store/calibration.c -o "$test_binary"
 "$test_binary"
 "${CC:-cc}" -Isrc -std=c2x -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   tests/uvk6-crystal-regression.c src/boards/uvk6/calibration.c \

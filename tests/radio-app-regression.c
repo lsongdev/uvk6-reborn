@@ -371,7 +371,7 @@ int main(void) {
   fakeChannelUsed[12] = true;
   press(KEY_F);press(KEY_3);assert(activeSlot.source==RADIO_SOURCE_CHANNEL);
   SCREEN_Push(&otherScreen);
-  fakeChannelUsed[12] = false;RADIO_ChannelsChanged();
+  fakeChannelUsed[12] = false;RADIO_ChannelsChanged(0);
   assert(gDeviceConfig.radio.slots[0].source==RADIO_SOURCE_VFO && !gDeviceConfig.radio.slots[0].channel_number);
   SCREEN_Pop();
   assert(activeSlot.source==RADIO_SOURCE_VFO && runtime.current.frequency_hz==145500000);

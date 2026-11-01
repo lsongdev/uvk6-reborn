@@ -569,20 +569,22 @@ void RADIO_SlotsChanged(void) {
 
 // Drop cached channels; slots whose channel is gone go back to VFO, and the
 // selected one is retuned.
-void RADIO_ChannelsChanged(void) {
-  bool selectedLost = false;
+void RADIO_ChannelsChanged(uint16_t retune) {
+  const RadioSlot *selected = &gDeviceConfig.radio.slots[selectedSlot];
+  bool reload = retune && selected->source == RADIO_SOURCE_CHANNEL &&
+      selected->channel_number == retune;
   for (uint8_t id = 0; id < RADIO_SLOT_CAPACITY; ++id) {
     RadioSlot *slot = &gDeviceConfig.radio.slots[id];
     channelCacheValid[id] = false;
     if (slot->source == RADIO_SOURCE_CHANNEL && !CHANNEL_STORE_IsOccupied(slot->channel_number)) {
       slot->source = RADIO_SOURCE_VFO;
       slot->channel_number = 0;
-      selectedLost |= id == selectedSlot;
+      reload |= id == selectedSlot;
       DEVICE_RequestSave();
     }
   }
   (void)pauseWatch(); // Watch plans may name a changed channel.
-  if (selectedLost) loadSelected();
+  if (reload) loadSelected();
 }
 
 // Reapply only the active receive plan. Global settings never rewrite slots

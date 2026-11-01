@@ -20,9 +20,14 @@ bool UART_CommandValid(const uint8_t *data, uint16_t size) {
     return size == 4;
   case 0x0570: // Maintenance write: 16-byte request header, then 1..128 bytes.
     return size > 16 && data[8] <= 128 && size == 16u + data[8];
+  case 0x0580: // Channel read: number, op, timestamp.
+    return size == 12;
+  case 0x0582: // Channel write: as a read, then one normalized record.
+    return size == 12 + 41;
   default:
     // In particular 0x051d (raw EEPROM write) is not exposed; 0x0570 only
-    // reaches the resource tail and calibration (BOARD_MaintenanceWrite).
+    // reaches the resource tail and calibration (BOARD_MaintenanceWrite),
+    // and 0x0582 only channel records through the channel store.
     return false;
   }
 }

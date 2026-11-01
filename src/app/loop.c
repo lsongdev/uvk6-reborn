@@ -147,9 +147,10 @@ void SYS_Main() {
   if (!ready) {
     // Unknown storage contents are not our config: never write a marker or
     // restart automatically. Only explicit initialization may unlock writes.
-    // Diagnostics may use the board-mapped factory calibration even though
-    // no writable configuration exists yet. Saved user calibration is untouched.
-    (void)BATTERY_UseFactoryCalibration();
+    // Holding EXIT skips DEVICE_Load; diagnostics still need the factory ADC
+    // reference. Normal load/initialize paths own this value otherwise.
+    if (n.key == KEY_EXIT)
+      gDeviceConfig.preferences.battery_calibration = CALIBRATION_BatteryReference();
     BATTERY_UpdateBatteryInfo();
     initDisplay();
     gDeviceConfig.preferences.backlight = 5;

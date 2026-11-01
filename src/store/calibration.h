@@ -1,6 +1,8 @@
 #ifndef CORE_CALIBRATION_H
 #define CORE_CALIBRATION_H
 
+#include <stdint.h>
+
 // Factory calibration block, DualTachyon's UV-K5 layout, as offsets in
 // STORAGE_CALIBRATION. The PA table is seven 16-byte band records, the
 // first 9 bytes Low/Medium/High x three anchors.
@@ -9,6 +11,13 @@
 #define CALIBRATION_BATTERY_OFFSET 0x140u
 #define CALIBRATION_BATTERY_POINTS 6u
 #define CALIBRATION_BATTERY_REFERENCE 3u
+#define CALIBRATION_BATTERY_MIN 1u
+#define CALIBRATION_BATTERY_MAX 4095u
+#define CALIBRATION_BATTERY_FALLBACK 2000u
+
+// Validated factory ADC reference, or the legacy fallback if unavailable.
+// Uses the board's read-only calibration area; never writes factory data.
+uint16_t CALIBRATION_BatteryReference(void);
 
 // Squelch thresholds: six 16-byte rows per range, byte n for level n.
 #define CALIBRATION_SQUELCH_UHF_OFFSET 0x00u // 174 MHz and above.

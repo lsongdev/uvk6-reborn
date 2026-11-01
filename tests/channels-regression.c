@@ -14,7 +14,7 @@ bool SCREEN_Pop(void) { ++exits; return true; }
 void TEXT_INPUT_Open(char *text, uint8_t max, void (*onAccept)(void), bool replaceTop) {
   assert(!replaceTop); gTextinputText=text; gTextInputSize=max; gTextInputCallback=onAccept; ++runs;
 }
-void RADIO_ChannelsChanged(void) { ++changes; }
+void RADIO_ChannelsChanged(uint16_t retune) { (void)retune; ++changes; }
 void STATUSLINE_SetText(const char *text) { TEXT_Copy(title,sizeof(title),text); }
 static void press(KEY_Code_t k) { assert(key(k,KEY_RELEASED)); }
 static void save(uint16_t n, const char *name) {

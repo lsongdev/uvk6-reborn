@@ -147,7 +147,7 @@ test('RadioLink receives arbitrary serial chunks and filters a stale reply', asy
   assert.deepEqual(await link.until(bytes => u16(bytes, 8) === 3), ack(3));
 });
 
-function versionReply(version = 's0v4') {
+function versionReply(version = 'reborn') {
   const bytes = new Uint8Array(40); put16(bytes, 0, 0x0515);
   bytes.set(new TextEncoder().encode(version), 4);
   return bytes;
@@ -167,7 +167,7 @@ test('application establishes plain stamped session and reads physical capacity'
   for (const capacity of [524288, 2097152]) {
     const link = new FakeLink([versionReply(), storageReply(capacity)]);
     const radio = new Radio(link);
-    assert.deepEqual(await radio.connect(), { version: 's0v4', capacity, storage: 'EEPROM' });
+    assert.deepEqual(await radio.connect(), { version: 'reborn', capacity, storage: 'EEPROM' });
     assert.equal(link.obfuscated, false);
     assert.equal(u16(link.sent[0], 0), 0x0514);
     assert.equal(u32(link.sent[0], 4), u32(link.sent[1], 4));
