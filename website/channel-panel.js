@@ -47,7 +47,7 @@ export function ChannelPanel({ info, radio, busy, run, log, progress, download }
       for (let number = 1; number <= 200; number++) {
         controller.current.signal.throwIfAborted();
         const channel = await device.readChannel(number);
-        result.push({ number, original: channel, draft: channel }); progress(number, 200);
+        result.push({ number, original: channel, draft: channel }); progress(number, 200, '个频道');
         await new Promise(resolve => setTimeout(resolve, 20));
       }
       controller.current.signal.throwIfAborted();
@@ -66,7 +66,7 @@ export function ChannelPanel({ info, radio, busy, run, log, progress, download }
         for (const r of changes) {
           const actual = await device.writeChannel(r.number, r.draft, r.original);
           setRows(previous => previous.map(item => item.number === r.number ? { ...item, original: actual, draft: actual } : item));
-          log(`频道 ${r.number} ${actual ? '写入' : '删除'}并回读确认。`); progress(++done, changes.length);
+          log(`频道 ${r.number} ${actual ? '写入' : '删除'}并回读确认。`); progress(++done, changes.length, '个频道');
         }
         setReview(false); log(`写频完成，${done} 个频道已回读确认。`);
       } catch (e) {

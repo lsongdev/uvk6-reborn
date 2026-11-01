@@ -47,7 +47,7 @@ function App() {
   const supported = !!navigator.serial && globalThis.isSecureContext;
   const selected = VARIANTS[variant];
   const log = message => setLogs(previous => [...previous.slice(-199), `${new Date().toLocaleTimeString('zh-CN', { hour12: false })}  ${message}`]);
-  const updateProgress = (done, total) => setProgress({ done, total });
+  const updateProgress = (done, total, unit = 'B') => setProgress({ done, total, unit });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -215,7 +215,7 @@ function App() {
           </section>
         </div>
         <${ChannelPanel} info=${info} radio=${radio} busy=${busy} run=${run} log=${log} progress=${updateProgress} download=${download}/>
-        <section class="activity" aria-label="操作状态与日志">${busy && html`<div class="task-state" role="status"><span class="dot pulse"></span>${busy}…${progress && html`<span>${Math.floor(progress.done / progress.total * 100)}% · ${progress.done.toLocaleString()} / ${progress.total.toLocaleString()} B</span>`}</div>`}${progress && html`<progress aria-label="操作进度" value=${progress.done} max=${progress.total}/>`}${notice && html`<div class="notice ${notice.error ? 'error' : 'success'}" role=${notice.error ? 'alert' : 'status'}>${notice.message}</div>`}<details open=${logs.length > 0}><summary>操作日志 <span>${logs.length ? `${logs.length} 条记录` : '等待开始'}</span></summary><pre class="log" aria-live="polite" aria-relevant="additions text">${logs.join('\n') || '连接和刷写记录将在这里显示。'}</pre><button class="text-button" disabled=${!logs.length} onClick=${() => download(logs.join('\n'), `reborn-log-${stamp()}.txt`, 'text/plain')}>导出日志 ↓</button></details></section>
+        <section class="activity" aria-label="操作状态与日志">${busy && html`<div class="task-state" role="status"><span class="dot pulse"></span>${busy}…${progress && html`<span>${Math.floor(progress.done / progress.total * 100)}% · ${progress.done.toLocaleString()} / ${progress.total.toLocaleString()} ${progress.unit}</span>`}</div>`}${progress && html`<progress aria-label="操作进度" value=${progress.done} max=${progress.total}/>`}${notice && html`<div class="notice ${notice.error ? 'error' : 'success'}" role=${notice.error ? 'alert' : 'status'}>${notice.message}</div>`}<details open=${logs.length > 0}><summary>操作日志 <span>${logs.length ? `${logs.length} 条记录` : '等待开始'}</span></summary><pre class="log" aria-live="polite" aria-relevant="additions text">${logs.join('\n') || '连接和刷写记录将在这里显示。'}</pre><button class="text-button" disabled=${!logs.length} onClick=${() => download(logs.join('\n'), `reborn-log-${stamp()}.txt`, 'text/plain')}>导出日志 ↓</button></details></section>
         ${rf && html`<section class="rf-section"><h3>BK${rf.chip} · RF 寄存器快照</h3><p class="field-note">逐个读取的白名单寄存器；REG30 是请求值缓存，不代表同时采样。</p><div class="registers">${rf.values.map(([reg, value]) => html`<div><span>REG ${hex(reg, 2)}</span><code>0x${hex(value)}</code></div>`)}</div></section>`}
         <section class="about"><div><p class="eyebrow">BUILT TO EXPLORE</p><h2>把电台的可能，<br/>交还给你。</h2><a href=${`${REPO}/blob/main/docs/user-manual.md`}>打开完整使用手册 ↗</a></div><div class="features"><article><span>01 / TUNE</span><h3>四个独立工作槽</h3><p>按频段、频率或频道收听，在兼容接收路径间进行多槽守听。</p></article><article><span>02 / DISCOVER</span><h3>发现身边的信号</h3><p>频谱、搜台、频率捕获与接收亚音扫描，探索更多无线电活动。</p></article><article><span>03 / LISTEN</span><h3>从广播到边带</h3><p>WFM 广播接收。SI4732 改装硬件支持 RDS；SSB 另需外部补丁。</p></article><article><span>04 / OPEN</span><h3>开源，持续进化</h3><p>AGPL-3.0。代码、文档、构建记录与设备适配依据均可公开查看。</p></article></div></section>
       </main>
