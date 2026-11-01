@@ -12,7 +12,7 @@ Tune by band, frequency, and mode. Keep your channels, monitor multiple slots, a
 
 [Web Flasher & Device Tools](https://lsong.org/uvk6-reborn/) · [User Manual](docs/user-manual.md) · [Build & Development](docs/development.md) · [Design](docs/design.md) · [Firmware Builds](https://github.com/lsongdev/uvk6-reborn/actions/workflows/c-cpp.yml)
 
-<img src="docs/images/manual-main.png" alt="Frequency view, broadcast station name and saved channel view" width="780">
+<img src="docs/images/main-screen.png" alt="Frequency view, broadcast station name and saved channel view" width="400">
 
 <sub>Rendered with the firmware UI and example data. Documentation is currently in Chinese.</sub>
 
