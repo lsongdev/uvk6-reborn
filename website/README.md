@@ -40,9 +40,30 @@ python3 tools/ui-preview.py --frames manual-frequency --output website/assets/ma
   matched addresses and sizes, pacing, and a bounded retry budget. Only completed
   backups are offered for download, with optional SHA-256 metadata.
 - A cancelled/failed backup closes the session. Reconnect before another operation.
-  No storage write or arbitrary register write commands are exposed. Channels can be
-  read and written by the firmware's `0x0580`/`0x0582` commands
-  ([format](../docs/channel-format.md)); the website does not use them yet.
+  No raw storage or arbitrary register writes are exposed.
+
+## Channel management
+
+Connect the running firmware, then read all 200 channels before editing. The
+website uses `0x0580` / `0x0582` with the canonical 41-byte record documented in
+[channel-format.md](../docs/channel-format.md); it never writes raw storage addresses.
+Names support ASCII and GB2312 (16 bytes). The tone catalogue matches the firmware.
+Save edits to the pending list, preview all changed fields and deletions, then
+explicitly confirm writing. JSON exports and imports use `reborn-channels-v1`;
+only channel numbers present in an imported file are changed, including explicit
+null entries for deletions. Invalid or duplicate records reject the entire import.
+
+Before writing, the browser downloads an original-channel JSON backup. Each write
+first checks the device channel against the original read, waits for the firmware's
+status and reads the channel again. A conflict, refusal, timeout or mismatch stops
+the batch. Writes are never automatically retried; completed channels stay saved.
+After an uncertain result, export pending edits and reread before continuing.
+Disconnected drafts remain exportable but cannot be written until rereading.
+The browser has no hardware access until the user selects a port and confirms actions.
+
+The GB2312 lookup in `channel-data.js` is generated from Python's standard
+`gb2312` codec over A1–F7 / A1–FE; CTCSS and DCS values come from `src/core/dcs.c`.
+The host tests check the tone catalogue against that source.
 
 ## GitHub Pages
 

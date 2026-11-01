@@ -45,7 +45,7 @@ def prepare(artifacts, output, commit):
     if set(found) != set(VARIANTS):
         raise ValueError('All three firmware variants are required')
     output.mkdir(parents=True)
-    files = ('index.html', 'app.js', 'serial.js', 'protocol.js', 'style.css', 'favicon.svg')
+    files = ('index.html', 'app.js', 'serial.js', 'protocol.js', 'channels.js', 'channel-data.js', 'channel-panel.js', 'style.css', 'favicon.svg')
     asset_urls = {f'./{filename}' for filename in files}
     asset_urls.update(f'./{path.relative_to(source).as_posix()}' for path in (source / 'assets').rglob('*') if path.is_file())
     for filename in files:

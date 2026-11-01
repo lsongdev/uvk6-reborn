@@ -1,4 +1,5 @@
 import { html, render, useState, useEffect, useRef } from 'https://lsong.org/scripts/react/index.js';
+import { ChannelPanel } from './channel-panel.js';
 import { SerialTransport } from './serial.js';
 import { RadioLink, Radio, validateImage, flashFirmware } from './protocol.js';
 
@@ -68,7 +69,7 @@ function App() {
       if (!task.current) disconnect().catch(() => {});
     };
     const beforeUnload = event => {
-      if (task.current === '刷写固件' || task.current === '备份存储') { event.preventDefault(); event.returnValue = ''; }
+      if (task.current === '刷写固件' || task.current === '备份存储' || task.current === '写入频道') { event.preventDefault(); event.returnValue = ''; }
     };
     navigator.serial?.addEventListener('disconnect', disconnected);
     window.addEventListener('beforeunload', beforeUnload);
@@ -93,7 +94,7 @@ function App() {
       const message = cancelled ? (label === '备份存储' ? '备份已取消，没有生成不完整文件。' : '已取消连接设备。') : timedOut ? '固件下载超时，请重试或选择本地 .bin 文件。' : `${error.message}${suffix}`;
       setNotice({ error: !cancelled, message }); log(message);
       // A failed exchange must not leave a seemingly usable session in the UI.
-      if (['连接设备', '刷新诊断', '读取 RF', '备份存储', '重启设备'].includes(label)) await disconnect().catch(() => {});
+      if (['连接设备', '刷新诊断', '读取 RF', '备份存储', '重启设备', '读取频道'].includes(label)) await disconnect().catch(() => {});
     } finally { task.current = ''; setBusy(''); abort.current = null; }
   }
 
@@ -185,7 +186,7 @@ function App() {
 
   return html`
     <div class="app-shell">
-      <header class="site-header"><a class="brand" href="#"><img src="./favicon.svg" alt="" width="32" height="32"/><span>UVK6 <strong>Reborn</strong></span></a><nav aria-label="主导航"><a href="#flash">刷入固件</a><a href="#device">连接电台</a><a href=${REPO}>GitHub ↗</a></nav></header>
+      <header class="site-header"><a class="brand" href="#"><img src="./favicon.svg" alt="" width="32" height="32"/><span>UVK6 <strong>Reborn</strong></span></a><nav aria-label="主导航"><a href="#flash">刷入固件</a><a href="#device">连接电台</a><a href="#channels">频道管理</a><a href=${REPO}>GitHub ↗</a></nav></header>
       <main>
         <section class="hero" aria-labelledby="hero-title"><div><p class="eyebrow">OPEN SOURCE · A NEW RADIO EXPERIENCE</p><h1 id="hero-title">熟悉的电台。<br/><span>全新的可能。</span></h1><p class="hero-copy">为泉盛 UV-K6 与 UV-K1 打造的开源固件。<br/>多工作槽、频谱探索、广播接收，从浏览器开始。</p><div class="hero-actions"><a class="button button-primary" href="#flash">开始刷机 <span aria-hidden="true">↓</span></a><a href=${`${REPO}/blob/main/docs/user-manual.md`}>阅读使用手册 ↗</a></div><p class="hero-note"><span class="dot"></span> 无需安装 · 设备数据保留在浏览器</p></div><div class="radio-preview"><div class="preview-top"><span>UVK6 REBORN</span><span>RX ●</span></div><img src="./assets/main-screen.png" alt="固件单屏界面示意：频率视图，使用示例数据渲染" width="512" height="256"/><div class="preview-bottom"><span>4 个工作槽</span><span>200 个频道</span><span>探索更多频率</span></div><p>固件 UI 渲染示意 · 非实机实时画面</p></div></section>
 
@@ -210,9 +211,10 @@ function App() {
             <dl class="stats-grid"><${Metric} label="RSSI 原始值" value=${stats?.rssi}/><${Metric} label="噪声原始值" value=${stats?.noise}/><${Metric} label="最长主循环" value=${stats ? `${stats.loopMaxMs} ms` : null}/><${Metric} label="静噪状态" value=${stats ? (stats.open ? '打开' : '关闭') : null}/></dl>
             <div class="backup-section"><h4>备份存储</h4><p class="field-note">读取设备报告的物理容量。校准备份通常数秒，全量备份可能需数分钟；完成后下载。</p><div class="backup-actions"><select aria-label="备份范围" value=${backupKind} disabled=${!!busy} onChange=${event => setBackupKind(event.currentTarget.value)}><option value="calibration">原厂校准区域</option><option value="full">完整物理存储</option></select><button class="button" disabled=${!!busy || !info} onClick=${backup}>备份并下载 ↓</button>${busy === '备份存储' && html`<button class="button button-danger" onClick=${() => abort.current?.abort()}>取消</button>`}</div>${backupFile && html`<div class="download-again"><button class="text-button" onClick=${() => download(backupFile.bytes, backupFile.name)}>再次下载备份</button><button class="text-button" onClick=${() => download(JSON.stringify(backupFile.metadata, null, 2), `${backupFile.name}.json`, 'application/json')}>下载 SHA-256 信息</button></div>`}</div>
             <div class="secondary-actions"><button class="text-button" disabled=${!!busy || !info} onClick=${() => run('读取 RF', async () => { setRf(await radio.current.registers()); log('已读取 RF 寄存器白名单。'); })}>读取 RF 寄存器</button><button class="text-button" disabled=${!!busy || !stats} onClick=${() => download(JSON.stringify({ device: info, diagnostics: stats, rf, readAt: new Date().toISOString() }, null, 2), `reborn-diagnostics-${stamp()}.json`, 'application/json')}>导出诊断</button><button class="text-button" disabled=${!!busy || !info} onClick=${() => run('重启设备', async () => { await radio.current.reset(); await disconnect(); log('已发送重启命令，请稍后重新连接。'); })}>重启设备</button></div>
-            <p class="field-note">诊断与备份均为只读操作。当前固件未提供远程调频、频道编辑接口。</p>
+            <p class="field-note">诊断与备份均为只读操作。频道编辑与写入请使用下方频道管理。</p>
           </section>
         </div>
+        <${ChannelPanel} info=${info} radio=${radio} busy=${busy} run=${run} log=${log} progress=${updateProgress} download=${download}/>
         <section class="activity" aria-label="操作状态与日志">${busy && html`<div class="task-state" role="status"><span class="dot pulse"></span>${busy}…${progress && html`<span>${Math.floor(progress.done / progress.total * 100)}% · ${progress.done.toLocaleString()} / ${progress.total.toLocaleString()} B</span>`}</div>`}${progress && html`<progress aria-label="操作进度" value=${progress.done} max=${progress.total}/>`}${notice && html`<div class="notice ${notice.error ? 'error' : 'success'}" role=${notice.error ? 'alert' : 'status'}>${notice.message}</div>`}<details open=${logs.length > 0}><summary>操作日志 <span>${logs.length ? `${logs.length} 条记录` : '等待开始'}</span></summary><pre class="log" aria-live="polite" aria-relevant="additions text">${logs.join('\n') || '连接和刷写记录将在这里显示。'}</pre><button class="text-button" disabled=${!logs.length} onClick=${() => download(logs.join('\n'), `reborn-log-${stamp()}.txt`, 'text/plain')}>导出日志 ↓</button></details></section>
         ${rf && html`<section class="rf-section"><h3>BK${rf.chip} · RF 寄存器快照</h3><p class="field-note">逐个读取的白名单寄存器；REG30 是请求值缓存，不代表同时采样。</p><div class="registers">${rf.values.map(([reg, value]) => html`<div><span>REG ${hex(reg, 2)}</span><code>0x${hex(value)}</code></div>`)}</div></section>`}
         <section class="about"><div><p class="eyebrow">BUILT TO EXPLORE</p><h2>把电台的可能，<br/>交还给你。</h2><a href=${`${REPO}/blob/main/docs/user-manual.md`}>打开完整使用手册 ↗</a></div><div class="features"><article><span>01 / TUNE</span><h3>四个独立工作槽</h3><p>按频段、频率或频道收听，在兼容接收路径间进行多槽守听。</p></article><article><span>02 / DISCOVER</span><h3>发现身边的信号</h3><p>频谱、搜台、频率捕获与接收亚音扫描，探索更多无线电活动。</p></article><article><span>03 / LISTEN</span><h3>从广播到边带</h3><p>WFM 广播接收。SI4732 改装硬件支持 RDS；SSB 另需外部补丁。</p></article><article><span>04 / OPEN</span><h3>开源，持续进化</h3><p>AGPL-3.0。代码、文档、构建记录与设备适配依据均可公开查看。</p></article></div></section>

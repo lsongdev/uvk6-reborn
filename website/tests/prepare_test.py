@@ -52,6 +52,10 @@ class PackagingTests(unittest.TestCase):
             url = f'https://lsong.org/scripts/react/{name}'
             self.assertEqual(import_map['imports'][url], f'{url}?v={COMMIT}')
         self.assertLess(index.index('<script type="importmap">'), index.index('rel="modulepreload"'))
+        for filename in ('channels.js', 'channel-panel.js', 'channel-data.js'):
+            self.assertTrue((self.output / filename).is_file())
+        self.assertIn(f'./channel-data.js?v={COMMIT}', (self.output / 'channels.js').read_text())
+        self.assertIn(f'./channels.js?v={COMMIT}', (self.output / 'protocol.js').read_text())
         app = (self.output / 'app.js').read_text()
         self.assertIn(f'./serial.js?v={COMMIT}', app)
         self.assertIn(f'./protocol.js?v={COMMIT}', app)

@@ -1,4 +1,5 @@
 import { TimeoutError } from './serial.js';
+import { encodeChannel, decodeChannel, sameChannel } from './channels.js';
 
 const KEY = Uint8Array.from([0x16, 0x6c, 0x14, 0xe6, 0x2e, 0x91, 0x0d, 0x40, 0x21, 0x35, 0xd5, 0x40, 0x13, 0x03, 0xe9, 0x80]);
 export const BOARDS = {
@@ -170,7 +171,7 @@ export class Radio {
     const reply = await this.request(command(0x0514, 8, this.stamp), 0x0515);
     if (reply.length < 20) throw new Error('无效的固件版本应答。');
     this.version = text(reply.slice(4, 20));
-    // Only Reborn's current read/diagnostic protocol is supported here.
+    // The normalized channel protocol is part of the current Reborn firmware.
     if (this.version !== 'reborn') throw new Error(`固件协议 ${this.version} 不受支持，请先刷入 UVK6 Reborn。`);
     const info = await this.request(command(0x0572, 8, this.stamp), 0x0573);
     if (info.length !== 32) throw new Error('无效的存储信息应答。');
@@ -228,6 +229,34 @@ export class Radio {
     }
     signal?.throwIfAborted();
     return output;
+  }
+  channelCommand(id, number, channel) {
+    if (!Number.isInteger(number) || number < 1 || number > 200) throw new Error('频道号必须为 1–200。');
+    const bytes = command(id, id === 0x0580 ? 12 : 53);
+    view(bytes).setUint16(4, number, true);
+    view(bytes).setUint32(8, this.stamp, true);
+    if (id === 0x0582 && channel !== null) { bytes[6] = 1; bytes.set(encodeChannel(channel), 12); }
+    return bytes;
+  }
+  async readChannel(number) {
+    const reply = await this.request(this.channelCommand(0x0580, number), 0x0581,
+      bytes => bytes.length >= 8 && u16(bytes, 4) === number);
+    if (reply[7] || u16(reply, 2) !== reply.length - 4) throw new Error('频道应答格式无效。');
+    if (reply[6] === 0 && reply.length === 8) return null;
+    if (reply[6] === 1 && reply.length === 49) return decodeChannel(reply.slice(8));
+    throw new Error('频道读取失败，请确认固件支持频道接口且存储可用。');
+  }
+  async writeChannel(number, channel, expected) {
+    // Preflight all input before any serial I/O; never retry an uncertain write.
+    const payload = this.channelCommand(0x0582, number, channel);
+    if (expected === undefined) throw new Error('请先读取频道，再预览并写入修改。');
+    if (!sameChannel(await this.readChannel(number), expected)) throw new Error(`频道 ${number} 已在电台上改变，请重新读取后编辑。`);
+    const reply = await this.request(payload, 0x0583, bytes => bytes.length >= 8 && u16(bytes, 4) === number);
+    if (reply.length !== 8 || u16(reply, 2) !== 4 || reply[7]) throw new Error('无效的写频应答，请重新读取频道核对。');
+    if (reply[6] !== 0) throw new Error(['', '频道参数无效', '频道存储不可用', '写入或回读失败，请重新读取核对', '电台正在发射，未写入'][reply[6]] || '未知写频状态');
+    const actual = await this.readChannel(number);
+    if (!sameChannel(actual, channel)) throw new Error(`频道 ${number} 写后回读不一致，请重新读取核对。`);
+    return actual;
   }
   reset() { return this.link.send(command(0x05dd, 4)); }
 }
